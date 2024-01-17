@@ -37,7 +37,7 @@ public class RepositoryInfo {
             Log.infof("Label: %s %s", l.getId(), l.getName());
         }
         for (DiscussionCategory c : categories) {
-            Log.infof("Discussion Category: %s %s", c.id.id, c.id.name);
+            Log.infof("Discussion Category: %s %s", c.id, c.name);
         }
    }
 
