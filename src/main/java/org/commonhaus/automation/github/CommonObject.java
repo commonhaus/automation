@@ -1,14 +1,13 @@
 package org.commonhaus.automation.github;
 
 import java.util.Date;
-import java.util.List;
 
 import jakarta.json.JsonObject;
 
 /**
  * Common elements for Discussions, Issues, and Pull Requests
  */
-public class GHObject extends GHType {
+public class CommonObject extends CommonType {
 
     public final Actor author;
     public final String authorAssociation;
@@ -25,9 +24,7 @@ public class GHObject extends GHType {
     public final Date updatedAt;
     public final Date lastEditedAt;
 
-    List<Reaction> reactions = null;
-
-    public GHObject(JsonObject object) {
+    public CommonObject(JsonObject object) {
         super(object);
 
         if (isWebhookData()) {

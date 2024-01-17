@@ -11,6 +11,11 @@ import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
+/**
+ * Represents a reaction to a GraphQL Reactable object.
+ * 
+ * This is not available to webhook events.
+ */
 public class Reaction {
     public final Actor user;
     public final Date createdAt;
@@ -26,11 +31,15 @@ public class Reaction {
         this.user = JsonAttribute.user.actorFrom(object);
     }
 
-    public static List<Reaction> listReactions(QueryContext queryContext, String reactorId) {
+    public String toString() {
+        return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
+    }
+
+    public static List<Reaction> queryReactions(CFGHQueryContext queryContext, String reactorId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
-        Log.debugf("listReactions for discussion %s", reactorId);
+        Log.debugf("queryReactions for reactable %s", reactorId);
         List<Reaction> reactions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);

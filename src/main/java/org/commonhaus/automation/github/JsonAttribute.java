@@ -58,6 +58,7 @@ public enum JsonAttribute {
     isAnswered, 
     isDefault("default"), 
     label, 
+    labels, 
     lastEditedAt, 
     laugh, 
     locked,
@@ -113,10 +114,9 @@ public enum JsonAttribute {
         if (object == null) {
             return false;
         }
-        if (alternateName) {
-            return object.getBoolean(nodeName, object.getBoolean(name(), false));
-        }
-        return object.getBoolean(nodeName, false);
+        return alternateName
+                ? object.getBoolean(nodeName, object.getBoolean(name(), false))
+                : object.getBoolean(nodeName, false);
     }
     /** 
      * @return boolean with value from nodeName (or name()) attribute of object or defaultValue 
@@ -125,10 +125,9 @@ public enum JsonAttribute {
         if (object == null) {
             return defaultValue;
         }
-        if (alternateName) {
-            return object.getBoolean(nodeName, object.getBoolean(name(), defaultValue));
-        }
-        return object.getBoolean(nodeName, defaultValue);
+        return alternateName
+                ? object.getBoolean(nodeName, object.getBoolean(name(), defaultValue))
+                : object.getBoolean(nodeName, defaultValue);
     }
 
     /** 
@@ -138,7 +137,9 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        return object.getString(nodeName);
+        return alternateName
+            ? object.getString(nodeName, object.getString(name(), null))
+            : object.getString(nodeName, null);
     }
     /** 
      * @return String with value from nodeName (or name()) attribute of object or defaultValue 
@@ -147,10 +148,9 @@ public enum JsonAttribute {
         if (object == null) {
             return defaultValue;
         }
-        if (alternateName) {
-            return object.getString(nodeName, object.getString(name(), defaultValue));
-        }
-        return object.getString(nodeName, defaultValue);
+        return alternateName
+            ? object.getString(nodeName, object.getString(name(), defaultValue))
+            : object.getString(nodeName, defaultValue);
     }
 
     /** 
@@ -160,10 +160,9 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        JsonValue value = object.get(nodeName);
-        if (alternateName && value == null) {
-            value = object.get(name());
-        }
+        JsonValue value = alternateName
+            ? object.getOrDefault(nodeName, object.get(name()))
+            : object.get(nodeName);
         return value == null ? null : JsonNumber.class.cast(value).intValue();
     }
     /** 
@@ -173,11 +172,11 @@ public enum JsonAttribute {
         if (object == null) {
             return defaultValue;
         }
-        if (alternateName) {
-            return object.getInt(nodeName, object.getInt(name(), defaultValue));
-        }
-        return object.getInt(nodeName, defaultValue);
+        return alternateName
+                ? object.getInt(nodeName, object.getInt(name(), defaultValue))
+                : object.getInt(nodeName, defaultValue);
     }
+
     /** 
      * @return Date constructed from nodeName (or name()) attribute of object 
      */
@@ -249,11 +248,10 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        JsonObject result = (JsonObject) object.get(nodeName);
-        if (alternateName && result == null) {
-            result = (JsonObject) object.get(name());
-        }
-        return result;
+        JsonValue value = alternateName
+            ? object.getOrDefault(nodeName, object.get(name()))
+            : object.get(nodeName);
+        return value == null ? null : JsonObject.class.cast(value);
     }
     /** 
      * @return JsonObject from nodeName (or name()) attribute
@@ -278,11 +276,10 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        JsonArray array = (JsonArray) object.get(nodeName);
-        if (alternateName && array == null) {
-            array = (JsonArray) object.get(name());
-        }
-        return array;
+        JsonValue value = alternateName
+            ? object.getOrDefault(nodeName, object.get(name()))
+            : object.get(nodeName);
+        return value == null ? null : JsonArray.class.cast(value);
     }
     /** 
      * @return JsonArray constructed from nodeName (or name()) attribute
@@ -300,5 +297,15 @@ public enum JsonAttribute {
             }
         }
         return this.jsonArrayFrom(object);
+    }
+
+    public String stringifyNodeFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonValue value = alternateName
+            ? object.getOrDefault(nodeName, object.get(name()))
+            : object.get(nodeName);
+        return value == null ? null : value.toString();
     }
 }

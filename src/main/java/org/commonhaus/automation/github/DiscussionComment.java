@@ -4,7 +4,7 @@ import java.util.Date;
 
 import jakarta.json.JsonObject;
 
-public class DiscussionComment extends GHComment {
+public class DiscussionComment extends CommonComment {
 
     public final Integer discussion_id;
     public final Date deletedAt;
@@ -17,6 +17,11 @@ public class DiscussionComment extends GHComment {
 
         // discussion may be null (webhook)
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
+        
         this.deletedAt = JsonAttribute.deletedAt.dateFrom(object);
+    }
+
+    public String toString() {
+        return String.format("Comment [%s] on discussion [%s] %s", this.id, this.discussion_id, this.discussion);
     }
 }

@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.util.List;
 
 import org.commonhaus.automation.github.Discussion;
+import org.commonhaus.automation.github.Label;
 import org.commonhaus.automation.github.CFGHApp;
-import org.commonhaus.automation.github.QueryContext;
+import org.commonhaus.automation.github.CFGHQueryContext;
 import org.commonhaus.automation.github.Reaction;
-import org.commonhaus.automation.github.RepositoryInfo;
+import org.commonhaus.automation.github.CFGHRepoInfo;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
 import io.quarkus.vertx.web.Route;
@@ -33,18 +34,37 @@ public class TestEndpoints {
 
     @Blocking
     @Route(methods = Route.HttpMethod.GET) 
-    void reaction(RoutingContext rc) throws IOException { 
+    void discussionReaction(RoutingContext rc) throws IOException { 
         String repo = "commonhaus/automation-test";
-        RepositoryInfo repositoryInfo = installationManager.getRepositoryInfo(repo);
-        QueryContext queryContext = installationManager.getQueryContext(repositoryInfo);
+        CFGHRepoInfo repositoryInfo = installationManager.getRepositoryInfo(repo);
+        CFGHQueryContext queryContext = installationManager.getQueryContext(repositoryInfo);
 
-        List<Discussion> discussions = repositoryInfo.listDiscussions(queryContext, true);
+        List<Discussion> discussions = repositoryInfo.queryDiscussions(queryContext, true);
         for (Discussion d : discussions) {
             Log.infof("Discussion: %s : %s", d.id, d.title);
-            Log.infof("Last Edit: %s by %s", d.lastEditedAt, d.editor.login);
-            List<Reaction> reactions = Reaction.listReactions(queryContext, d.id);
+            Log.infof("Last Edit: %s by %s", d.lastEditedAt, d.editor);
+            List<Reaction> reactions = Reaction.queryReactions(queryContext, d.id);
             for (Reaction r : reactions) {
-                Log.infof("Reaction: %s by %s at %s", r.content, r.user.login, r.createdAt);
+                Log.infof("Reaction: %s by %s at %s", r.content, r.user, r.createdAt);
+            }
+        }
+        rc.response().end("done");
+    }
+
+    @Blocking
+    @Route(methods = Route.HttpMethod.GET) 
+    void discussionLabel(RoutingContext rc) throws IOException { 
+        String repo = "commonhaus/automation-test";
+        CFGHRepoInfo repositoryInfo = installationManager.getRepositoryInfo(repo);
+        CFGHQueryContext queryContext = installationManager.getQueryContext(repositoryInfo);
+
+        List<Discussion> discussions = repositoryInfo.queryDiscussions(queryContext, true);
+        for (Discussion d : discussions) {
+            Log.infof("Discussion: %s : %s", d.id, d.title);
+            Log.infof("Last Edit: %s by %s", d.lastEditedAt, d.editor);
+            List<Label> labels = Label.queryLabels(queryContext, d.id);
+            for (Label l : labels) {
+                Log.infof("Label: %s", l);
             }
         }
         rc.response().end("done");

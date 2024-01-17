@@ -1,8 +1,12 @@
 package org.commonhaus.automation.github;
 
+import java.io.IOException;
+
+import org.kohsuke.github.GHRepository;
+
 import jakarta.json.JsonObject;
 
-public class WebHookDiscussion extends GHWebHook {
+public class WebHookDiscussion extends WebHookBase {
 
     public enum Type {
         answered, 
@@ -22,8 +26,7 @@ public class WebHookDiscussion extends GHWebHook {
         unpinned
     }
 
-    public static WebHookDiscussion from(JsonObject object) {
-        String action = JsonAttribute.action.stringFrom(object);
+    public static WebHookDiscussion from(String action, JsonObject object) throws IOException {
         return switch (action) {
             case "answered" -> new WebHookDiscussion(object, Type.answered);
             case "category_changed" -> new WebHookDiscussion(object, Type.category_changed);
@@ -58,7 +61,7 @@ public class WebHookDiscussion extends GHWebHook {
     public final GHRepository newRepository;
     public final DiscussionComment oldAnswer;
 
-    public WebHookDiscussion(JsonObject object, Type type) {
+    public WebHookDiscussion(JsonObject object, Type type) throws IOException {
         super(object);
         this.type = type;
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
@@ -86,7 +89,7 @@ public class WebHookDiscussion extends GHWebHook {
             this.fromTitle = JsonAttribute.from.stringFrom(
                     JsonAttribute.title.jsonObjectFrom(changes));
             this.newDiscussion = JsonAttribute.new_discussion.discussionFrom(changes);
-            this.newRepository = new GHRepository(JsonAttribute.new_repository.jsonObjectFrom(changes));
+            this.newRepository = repositoryFrom(JsonAttribute.new_repository.stringifyNodeFrom(changes));
         }
     }
 }

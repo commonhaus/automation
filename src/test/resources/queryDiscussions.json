@@ -1,0 +1,143 @@
+{
+    "repository": {
+        "discussions": {
+            "nodes": [
+                {
+                    "id": "D_kwDOLDuJqs4AXNhB",
+                    "number": 5,
+                    "title": "new idea",
+                    "category": {
+                        "name": "Ideas",
+                        "id": "DIC_kwDOLDuJqs4CcW_b",
+                        "emoji": ":bulb:"
+                    },
+                    "author": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "authorAssociation": "CONTRIBUTOR",
+                    "activeLockReason": null,
+                    "answerChosenAt": null,
+                    "body": "an idea",
+                    "bodyText": "an idea",
+                    "closed": false,
+                    "closedAt": null,
+                    "createdAt": "2024-01-17T03:49:20Z",
+                    "isAnswered": null,
+                    "locked": false,
+                    "updatedAt": "2024-01-17T04:02:20Z",
+                    "url": "https://github.com/commonhaus/automation-test/discussions/5"
+                },
+                {
+                    "id": "D_kwDOLDuJqs4AXNcB",
+                    "number": 4,
+                    "title": "another test",
+                    "category": {
+                        "name": "Q&A",
+                        "id": "DIC_kwDOLDuJqs4CcW_a",
+                        "emoji": ":pray:"
+                    },
+                    "author": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "authorAssociation": "CONTRIBUTOR",
+                    "activeLockReason": null,
+                    "answerChosenAt": null,
+                    "body": "a question",
+                    "bodyText": "a question",
+                    "closed": false,
+                    "closedAt": null,
+                    "createdAt": "2024-01-17T01:19:05Z",
+                    "isAnswered": false,
+                    "locked": false,
+                    "updatedAt": "2024-01-17T03:49:02Z",
+                    "url": "https://github.com/commonhaus/automation-test/discussions/4"
+                },
+                {
+                    "id": "D_kwDOLDuJqs4AXNal",
+                    "number": 3,
+                    "title": "A general topic",
+                    "category": {
+                        "name": "General",
+                        "id": "DIC_kwDOLDuJqs4CcW_Z",
+                        "emoji": ":speech_balloon:"
+                    },
+                    "author": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "authorAssociation": "CONTRIBUTOR",
+                    "activeLockReason": null,
+                    "answerChosenAt": null,
+                    "body": "etc.",
+                    "bodyText": "etc.",
+                    "closed": false,
+                    "closedAt": null,
+                    "createdAt": "2024-01-17T00:26:42Z",
+                    "isAnswered": null,
+                    "locked": false,
+                    "updatedAt": "2024-01-17T00:26:43Z",
+                    "url": "https://github.com/commonhaus/automation-test/discussions/3"
+                },
+                {
+                    "id": "D_kwDOLDuJqs4AXNaT",
+                    "number": 2,
+                    "title": "New announcement",
+                    "category": {
+                        "name": "Announcements",
+                        "id": "DIC_kwDOLDuJqs4CcW_Y",
+                        "emoji": ":mega:"
+                    },
+                    "author": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "authorAssociation": "CONTRIBUTOR",
+                    "activeLockReason": null,
+                    "answerChosenAt": null,
+                    "body": "Announcement ",
+                    "bodyText": "Announcement",
+                    "closed": false,
+                    "closedAt": null,
+                    "createdAt": "2024-01-17T00:19:06Z",
+                    "isAnswered": null,
+                    "locked": false,
+                    "updatedAt": "2024-01-17T00:19:07Z",
+                    "url": "https://github.com/commonhaus/automation-test/discussions/2"
+                },
+                {
+                    "id": "D_kwDOLDuJqs4AXNIj",
+                    "number": 1,
+                    "title": "One discussion",
+                    "category": {
+                        "name": "General",
+                        "id": "DIC_kwDOLDuJqs4CcW_Z",
+                        "emoji": ":speech_balloon:"
+                    },
+                    "author": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "authorAssociation": "CONTRIBUTOR",
+                    "activeLockReason": null,
+                    "answerChosenAt": null,
+                    "body": "This is how we do the first thing. \r\n\r\n",
+                    "bodyText": "This is how we do the first thing.",
+                    "closed": false,
+                    "closedAt": null,
+                    "createdAt": "2024-01-16T17:10:27Z",
+                    "isAnswered": null,
+                    "locked": false,
+                    "updatedAt": "2024-01-16T17:10:28Z",
+                    "url": "https://github.com/commonhaus/automation-test/discussions/1"
+                }
+            ]
+        }
+    }
+}

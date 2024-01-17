@@ -4,7 +4,7 @@ import java.util.Date;
 
 import jakarta.json.JsonObject;
 
-public class GHItem extends GHObject {
+public class CommonItem extends CommonObject {
 
     /** Issue/Discussion/PR number within repository */
     public final Integer number;
@@ -24,7 +24,7 @@ public class GHItem extends GHObject {
     public final boolean locked;
     public final String activeLockReason;
 
-    public GHItem(JsonObject object) {
+    public CommonItem(JsonObject object) {
         super(object);
 
         this.number = JsonAttribute.number.integerFrom(object);

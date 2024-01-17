@@ -2,7 +2,7 @@ package org.commonhaus.automation.github;
 
 import jakarta.json.JsonObject;
 
-public class GHType {
+public class CommonType {
     public boolean isWebhookData() {
         return this.webhook_id != null;
     }
@@ -12,7 +12,7 @@ public class GHType {
     /** {@literal id} for webhook events */
     public final Integer webhook_id;
 
-    public GHType(JsonObject object) {
+    public CommonType(JsonObject object) {
         String node_id = JsonAttribute.node_id.stringFrom(object);
         if (node_id != null) {
             // Webhook

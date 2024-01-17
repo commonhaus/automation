@@ -1,8 +1,10 @@
 package org.commonhaus.automation.github;
 
+import java.io.IOException;
+
 import jakarta.json.JsonObject;
 
-public class WebHookDiscussionComment extends GHWebHook {
+public class WebHookDiscussionComment extends WebHookBase {
 
     public enum Type {
         created, 
@@ -10,8 +12,7 @@ public class WebHookDiscussionComment extends GHWebHook {
         edited
     }
 
-    public static WebHookDiscussionComment from(JsonObject object) {
-        String action = JsonAttribute.action.stringFrom(object);
+    public static WebHookDiscussionComment from(String action, JsonObject object) throws IOException {
         return switch (action) {
             case "created" -> new WebHookDiscussionComment(object, Type.created);
             case "deleted" -> new WebHookDiscussionComment(object, Type.deleted);
@@ -27,7 +28,7 @@ public class WebHookDiscussionComment extends GHWebHook {
     // Only present for edits
     public final String fromBody;
 
-    public WebHookDiscussionComment(JsonObject object, Type type) {
+    public WebHookDiscussionComment(JsonObject object, Type type) throws IOException {
         super(object);
         this.type = type;
         this.discussion = JsonAttribute.discussion.discussionFrom(object);

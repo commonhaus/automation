@@ -25,7 +25,7 @@ public class CFGHApp {
     static final DateTimeFormatter DATE_TIME_PARSER_SLASHES = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm:ss Z");
 
-    static Map<String, RepositoryInfo> repositoryInfoCache = new HashMap<>();
+    static Map<String, CFGHRepoInfo> repositoryInfoCache = new HashMap<>();
     
     private final BotConfig quarkusBotConfig;
     private final GitHubClientProvider gitHubClientProvider;
@@ -49,12 +49,12 @@ public class CFGHApp {
                 GitHub ic = gitHubClientProvider.getInstallationClient(ghAppInstallation.getId());
                 GHAuthenticatedAppInstallation ghai = ic.getInstallation();
                 for (GHRepository ghRepository : ghai.listRepositories()) {
-                    QueryContext queryContext = new QueryContext(quarkusBotConfig, 
+                    CFGHQueryContext queryContext = new CFGHQueryContext(quarkusBotConfig, 
                             ghRepository, ghAppInstallation.getId(), gitHubClientProvider);
-                    RepositoryInfo repositoryInfo = new RepositoryInfo(queryContext);
+                    CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(queryContext);
                     if (queryContext.hasErrors()) {
                         Log.warnf("Unable to cache repository information", ghRepository.getFullName());
-                        throw new RepositoryCacheException(queryContext);
+                        throw new CFHGCacheException(queryContext);
                     } else if (Log.isInfoEnabled()) {
                         repositoryInfo.logRepositoryInformation();
                     }
@@ -75,12 +75,12 @@ public class CFGHApp {
         repositoryInfoCache.clear();
     }
 
-    public RepositoryInfo getRepositoryInfo(String fullName) {
+    public CFGHRepoInfo getRepositoryInfo(String fullName) {
         return repositoryInfoCache.get(fullName);
     }
 
-    public QueryContext getQueryContext(RepositoryInfo repositoryInfo) {
-        return new QueryContext(quarkusBotConfig, 
+    public CFGHQueryContext getQueryContext(CFGHRepoInfo repositoryInfo) {
+        return new CFGHQueryContext(quarkusBotConfig, 
                 repositoryInfo.ghRepository, repositoryInfo.ghiId, gitHubClientProvider);
     }
 

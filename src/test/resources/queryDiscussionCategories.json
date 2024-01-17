@@ -1,0 +1,44 @@
+{
+    "repository": {
+        "discussionCategories": {
+            "nodes": [
+                {
+                    "name": "Announcements",
+                    "description": "Updates from maintainers",
+                    "emoji": ":mega:",
+                    "id": "DIC_kwDOLDuJqs4CcW_Y"
+                },
+                {
+                    "name": "General",
+                    "description": "Chat about anything and everything here",
+                    "emoji": ":speech_balloon:",
+                    "id": "DIC_kwDOLDuJqs4CcW_Z"
+                },
+                {
+                    "name": "Ideas",
+                    "description": "Share ideas for new features",
+                    "emoji": ":bulb:",
+                    "id": "DIC_kwDOLDuJqs4CcW_b"
+                },
+                {
+                    "name": "Polls",
+                    "description": "Take a vote from the community",
+                    "emoji": ":ballot_box:",
+                    "id": "DIC_kwDOLDuJqs4CcW_d"
+                },
+                {
+                    "name": "Q&A",
+                    "description": "Ask the community for help",
+                    "emoji": ":pray:",
+                    "id": "DIC_kwDOLDuJqs4CcW_a"
+                },
+                {
+                    "name": "Show and tell",
+                    "description": "Show off something you've made",
+                    "emoji": ":raised_hands:",
+                    "id": "DIC_kwDOLDuJqs4CcW_c"
+                }
+            ]
+        }
+    }
+}

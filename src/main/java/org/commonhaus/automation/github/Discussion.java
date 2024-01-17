@@ -11,7 +11,7 @@ import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-public class Discussion extends GHItem {
+public class Discussion extends CommonItem {
 
     public final DiscussionCategory category;
 
@@ -29,12 +29,16 @@ public class Discussion extends GHItem {
         this.upvoteCount = JsonAttribute.upvoteCount.integerFrom(object);
     }
 
+    public String toString() {
+        return String.format("Discussion [%s] %s", this.id, this.title);
+    }
+
     /**
      * Exceptions and errors are captured for caller in the queryContext
      * 
      * @return list of discussion categories
      */
-    static List<Discussion> listDiscussions(QueryContext queryContext, boolean isOpen) {
+    static List<Discussion> queryDiscussions(CFGHQueryContext queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -60,7 +64,6 @@ public class Discussion extends GHItem {
                               emoji
                           }
                           author {
-                              id
                               login
                               url
                               avatarUrl

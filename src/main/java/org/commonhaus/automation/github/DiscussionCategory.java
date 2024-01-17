@@ -35,11 +35,15 @@ public class DiscussionCategory {
         this.emoji = JsonAttribute.emoji.stringFrom(category);
     }
 
+    public String toString() {
+        return String.format("Discussion [%s] %s %s", this.id, this.emoji, this.name);
+    }
+
     /**
      * Exceptions and errors are captured for caller in the queryContext
      * @return list of discussion categories
      */
-    static List<DiscussionCategory> listDiscussionCategories(QueryContext queryContext) {
+    static List<DiscussionCategory> queryDiscussionCategories(CFGHQueryContext queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
