@@ -1,0 +1,48 @@
+{
+    "node": {
+        "reactions": {
+            "nodes": [
+                {
+                    "user": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "content": "HOORAY",
+                    "createdAt": "2024-01-16T17:10:35Z"
+                },
+                {
+                    "user": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "content": "THUMBS_DOWN",
+                    "createdAt": "2024-01-16T17:10:38Z"
+                },
+                {
+                    "user": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "content": "ROCKET",
+                    "createdAt": "2024-01-16T17:10:42Z"
+                },
+                {
+                    "user": {
+                        "login": "ebullient",
+                        "url": "https://github.com/ebullient",
+                        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+                    },
+                    "content": "CONFUSED",
+                    "createdAt": "2024-01-16T19:42:04Z"
+                }
+            ],
+            "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "Y3Vyc29yOnYyOpHOABI8XQ=="
+            }
+        }
+    }
+}
