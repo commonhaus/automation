@@ -17,28 +17,24 @@ public class CFGHRepoInfo {
 
     List<GHLabel> labels;
 
-    public CFGHRepoInfo(CFGHQueryContext queryContext) {
-        this.ghRepository = queryContext.getGhRepository();
-        this.ghiId = queryContext.getGhiId();
+    public CFGHRepoInfo(GHRepository ghRepository, long id) {
+        this.ghRepository = ghRepository;
+        this.ghiId = id;
     }
 
     public void logRepositoryInformation() {
         Log.infof("GitHub Repository: %s (%s)",
                 ghRepository.getFullName(), ghiId);
-
-        // for (GHLabel l : labels) {
-        //     Log.infof("Label: %s %s", l.getId(), l.getName());
-        // }
     }
 
-    public List<Discussion> queryDiscussions(CFGHQueryContext queryContext, boolean isOpen) {
+    public List<Discussion> queryDiscussions(CFGHQueryHelper queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
         return Discussion.queryDiscussions(queryContext, isOpen);
     }
 
-    public List<DiscussionCategory> queryDiscussionCategories(CFGHQueryContext queryContext) {
+    public List<DiscussionCategory> queryDiscussionCategories(CFGHQueryHelper queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

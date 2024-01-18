@@ -9,6 +9,27 @@ import jakarta.json.JsonObject;
  */
 public class CommonObject extends CommonType {
 
+    static final String COMMON_OBJECT_FIELDS = """
+            id
+            author {
+                login
+                url
+                avatarUrl
+            }
+            editor {
+                login
+                url
+                avatarUrl
+            }
+            authorAssociation
+            body
+            createdAt
+            publishedAt
+            lastEditedAt
+            updatedAt
+            url
+                """;
+
     public final Actor author;
     public final String authorAssociation;
 
@@ -41,11 +62,11 @@ public class CommonObject extends CommonType {
             this.publishedAt = JsonAttribute.publishedAt.dateFrom(object);
         }
 
+        this.authorAssociation = JsonAttribute.authorAssociation.stringFrom(object);
         this.createdAt = JsonAttribute.createdAt.dateFrom(object);
         this.updatedAt = JsonAttribute.updatedAt.dateFrom(object);
         this.url = JsonAttribute.url.stringFrom(object);
 
-        this.authorAssociation = JsonAttribute.authorAssociation.stringFrom(object);
         this.body = JsonAttribute.body.stringFrom(object);
     }
 }

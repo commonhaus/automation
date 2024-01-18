@@ -1,52 +1,40 @@
-# automation-bot
+# Commonhaus Foundation Automation tools
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+## GitHub App
 
-If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
+The CF follows an adapted form of 
 
-## Running the application in dev mode
+labels:
+- `vote:open` - a sense vote
+- `vote:done`  - voting is closed
 
-You can run your application in dev mode that enables live coding using:
-```shell script
-./mvnw compile quarkus:dev
+elements:
+- Item: PR or Discussion
+
+```mermaid
+graph TD
+    created["item created"]
+    vote_open["item / vote:open"]
+    vote_done["item / vote:done"]
+
+    user  -- creates --> created
+    created -- labeled --> vote_open
+    user2 -- reacts --> vote_open
+    user3 -- reacts --> vote_open
+
+    vote_open -- labeled --> vote_done
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at http://localhost:8080/q/dev/.
+Diagrams escape me. The idea is that a user creates an item.
 
-## Packaging and running the application
+Either they apply the `vote:open` label, or they use a bot command to assign the label and open the vote.
 
-The application can be packaged using:
-```shell script
-./mvnw package
-```
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+While the vote is open, the bot will count reactions to the item itself (not its comments). It will update a section of the desription with the current vote tally, including whether or not quorum has been reached.
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+When the vote is closed, the bot will apply the `vote:done` label and close the vote (no more reactions will be counted).
 
-If you want to build an _über-jar_, execute the following command:
-```shell script
-./mvnw package -Dquarkus.package.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using: 
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using: 
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/automation-bot-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.
+- The group that should be used to determine quorum must be specified in the item (or a default group can be specified in the bot config). `::quorum @groupname` would work, and would tag required participants as well.
 
 ## Related Guides
 
-- GitHub App ([guide](https://quarkiverse.github.io/quarkiverse-docs/quarkus-github-app/dev/index.html)): Automate GitHub tasks with a GitHub App
+- Quarkiverse [GitHub App extension guide](https://quarkiverse.github.io/quarkiverse-docs/quarkus-github-app/dev/index.html)

@@ -7,7 +7,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.CFGHApp;
-import org.commonhaus.automation.github.CFGHQueryContext;
+import org.commonhaus.automation.github.CFGHQueryHelper;
 import org.commonhaus.automation.github.CFGHRepoInfo;
 import org.commonhaus.automation.github.Discussion;
 import org.commonhaus.automation.github.Label;
@@ -39,7 +39,7 @@ public class TestEndpoints {
     void discussionReaction(RoutingContext rc) throws IOException {
         String repo = "commonhaus/automation-test";
         CFGHRepoInfo repositoryInfo = installationManager.getRepositoryInfo(repo);
-        CFGHQueryContext queryContext = installationManager.getQueryContext(repositoryInfo);
+        CFGHQueryHelper queryContext = installationManager.getQueryContext(repositoryInfo);
 
         List<Discussion> discussions = repositoryInfo.queryDiscussions(queryContext, true);
         for (Discussion d : discussions) {
@@ -58,7 +58,7 @@ public class TestEndpoints {
     void discussionLabel(RoutingContext rc) throws IOException {
         String repo = "commonhaus/automation-test";
         CFGHRepoInfo repositoryInfo = installationManager.getRepositoryInfo(repo);
-        CFGHQueryContext queryContext = installationManager.getQueryContext(repositoryInfo);
+        CFGHQueryHelper queryContext = installationManager.getQueryContext(repositoryInfo);
 
         List<Discussion> discussions = repositoryInfo.queryDiscussions(queryContext, true);
         for (Discussion d : discussions) {

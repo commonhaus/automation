@@ -22,7 +22,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * Single-use context for GraphQL query
  * Exceptions and errors are captured for caller in the queryContext
  */
-public class CFGHQueryContext {
+public class CFGHQueryHelper {
     final GHRepository ghRepository;
     final long ghiId;
 
@@ -31,7 +31,7 @@ public class CFGHQueryContext {
     final List<GraphQLError> errors = new ArrayList<>(1);
     final List<Throwable> exceptions = new ArrayList<>(1);
 
-    public CFGHQueryContext(BotConfig botConfig, GHRepository ghRepository, long ghiId,
+    public CFGHQueryHelper(BotConfig botConfig, GHRepository ghRepository, long ghiId,
             GitHubClientProvider gitHubClientProvider) {
         this.ghRepository = ghRepository;
         this.ghiId = ghiId;
@@ -101,8 +101,8 @@ public class CFGHQueryContext {
         if (hasErrors()) {
             return null;
         }
-        variables.put("owner", ghRepository.getOwnerName());
-        variables.put("name", ghRepository.getName()); // replace with actual repo name
+        variables.putIfAbsent("owner", ghRepository.getOwnerName());
+        variables.putIfAbsent("name", ghRepository.getName());
 
         DynamicGraphQLClient graphqlCLI = gitHubClientProvider.getInstallationGraphQLClient(ghiId);
         Response response = null;

@@ -32,7 +32,7 @@ public class Label extends CommonType {
         return String.format("Label [%s] %s", this.id, this.name);
     }
 
-    public static List<Label> queryLabels(CFGHQueryContext queryContext, String labeledId) {
+    public static List<Label> queryLabels(CFGHQueryHelper queryContext, String labeledId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

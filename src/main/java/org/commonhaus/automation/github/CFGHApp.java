@@ -18,7 +18,7 @@ import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
-import io.quarkiverse.githubapp.GitHubClientProvider;
+import io.quarkiverse.githubapp.runtime.github.GitHubService;
 import io.quarkus.logging.Log;
 
 @Singleton
@@ -29,12 +29,12 @@ public class CFGHApp {
     static Map<String, CFGHRepoInfo> repositoryInfoCache = new HashMap<>();
 
     private final BotConfig quarkusBotConfig;
-    private final GitHubClientProvider gitHubClientProvider;
+    private final GitHubService gitHubService;
 
     @Inject
-    public CFGHApp(BotConfig quarkusBotConfig, GitHubClientProvider gitHubClientProvider) {
+    public CFGHApp(BotConfig quarkusBotConfig, GitHubService gitHubService) {
         this.quarkusBotConfig = quarkusBotConfig;
-        this.gitHubClientProvider = gitHubClientProvider;
+        this.gitHubService = gitHubService;
     }
 
     public void initializeCache() {
@@ -42,17 +42,17 @@ public class CFGHApp {
             return;
         }
 
-        GitHub ac = gitHubClientProvider.getApplicationClient();
-        GHApp ghApp;
+        GitHub ac = gitHubService.getApplicationClient();
         try {
-            ghApp = ac.getApp();
+            GHApp ghApp = ac.getApp();
             for (GHAppInstallation ghAppInstallation : ghApp.listInstallations()) {
-                GitHub ic = gitHubClientProvider.getInstallationClient(ghAppInstallation.getId());
+                GitHub ic = gitHubService.getInstallationClient(ghAppInstallation.getId());
                 GHAuthenticatedAppInstallation ghai = ic.getInstallation();
+                
                 for (GHRepository ghRepository : ghai.listRepositories()) {
-                    CFGHQueryContext queryContext = new CFGHQueryContext(quarkusBotConfig,
-                            ghRepository, ghAppInstallation.getId(), gitHubClientProvider);
-                    CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(queryContext);
+                    CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(ghRepository, ghAppInstallation.getId());
+                    CFGHQueryHelper queryContext = new CFGHQueryHelper(quarkusBotConfig,
+                            ghRepository, ghAppInstallation.getId(), gitHubService);
                     if (queryContext.hasErrors()) {
                         Log.warnf("Unable to cache repository information", ghRepository.getFullName());
                         throw new CFHGCacheException(queryContext);
@@ -80,9 +80,13 @@ public class CFGHApp {
         return repositoryInfoCache.get(fullName);
     }
 
-    public CFGHQueryContext getQueryContext(CFGHRepoInfo repositoryInfo) {
-        return new CFGHQueryContext(quarkusBotConfig,
-                repositoryInfo.ghRepository, repositoryInfo.ghiId, gitHubClientProvider);
+    public CFGHQueryHelper getQueryContext(CFGHRepoInfo repositoryInfo) {
+        return new CFGHQueryHelper(quarkusBotConfig,
+                repositoryInfo.ghRepository, repositoryInfo.ghiId, gitHubService);
+    }
+
+    public CFGHQueryHelper getQueryContext(GHRepository ghRepository, GHAppInstallation ghai) {
+        return new CFGHQueryHelper(quarkusBotConfig, ghRepository, ghai.getId(), gitHubService);
     }
 
     /** Parses to Date as GitHubClient.parseDate does */

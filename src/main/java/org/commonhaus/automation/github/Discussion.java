@@ -14,6 +14,34 @@ import io.smallrye.graphql.client.Response;
 
 public class Discussion extends CommonItem {
 
+    static final String DISCUSSION_FIELDS = """
+            id
+            number
+            title
+            category {
+                name
+                id
+                emoji
+            }
+            author {
+                login
+                url
+                avatarUrl
+            }
+            authorAssociation
+            activeLockReason
+            answerChosenAt
+            body
+            bodyText
+            closed
+            closedAt
+            createdAt
+            isAnswered
+            locked
+            updatedAt
+            url
+                """;
+
     public final DiscussionCategory category;
 
     public final boolean isAnswered;
@@ -37,9 +65,11 @@ public class Discussion extends CommonItem {
     /**
      * Exceptions and errors are captured for caller in the queryContext
      *
-     * @return list of discussion categories
+     * @param queryContext
+     * @param isOpen true for open discussions, false for non-open discussions
+     * @return list of discussions
      */
-    static List<Discussion> queryDiscussions(CFGHQueryContext queryContext, boolean isOpen) {
+    static List<Discussion> queryDiscussions(CFGHQueryHelper queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -56,31 +86,7 @@ public class Discussion extends CommonItem {
                         repository(owner: $owner, name: $name) {
                           discussions(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
                             nodes {
-                              id
-                              number
-                              title
-                              category {
-                                  name
-                                  id
-                                  emoji
-                              }
-                              author {
-                                  login
-                                  url
-                                  avatarUrl
-                              }
-                              authorAssociation
-                              activeLockReason
-                              answerChosenAt
-                              body
-                              bodyText
-                              closed
-                              closedAt
-                              createdAt
-                              isAnswered
-                              locked
-                              updatedAt
-                              url
+                                """ + DISCUSSION_FIELDS + """
                             }
                           }
                         }
@@ -103,5 +109,62 @@ public class Discussion extends CommonItem {
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
         } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
         return discussions;
+    }
+
+    /**
+     * Edit discussion body
+     *
+     * @return list of discussion categories
+     */
+    static Discussion editDiscussion(CFGHQueryHelper queryContext, Discussion discussion, String modifiedText) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("discussionId", discussion.id);
+        variables.put("comment", modifiedText);
+
+        Response response = queryContext.execRepoQuerySync(
+                """
+                        mutation {
+                            updateDiscussion(input: {repositoryId: "1234", categoryId: "5678", body: "The body", title: "The title"}) {
+                                discussion {
+                                    """
+                        + DISCUSSION_FIELDS + """
+                                        }
+                                    }
+                                }
+                                """,
+                variables);
+        Log.debugf("Discussion #%s: add comment, result: %s", discussion.number, response.getData());
+        if (response.hasError()) {
+            Log.errorf("Discussion #%s - Unable to add comment", discussion.number);
+            return null;
+        }
+        return JsonAttribute.discussion.discussionFrom(response.getData());
+    }
+
+    /**
+     * Exceptions and errors are captured for caller in the queryContext
+     */
+    static DiscussionComment addComment(CFGHQueryHelper queryContext, Discussion discussion, String markdownText) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("discussionId", discussion.id);
+        variables.put("comment", markdownText);
+
+        Response response = queryContext.execRepoQuerySync("""
+                mutation($discussionId: ID!, $comment: String!) {
+                    addDiscussionComment(input: {discussionId: $discussionId, body: $comment}) {
+                        comment {
+                            """ + DiscussionComment.DISCUSSION_COMMENT_WITH_REPLY_FIELDS + """
+                        }
+                    }
+                }
+                """, variables);
+        Log.debugf("Discussion #%s: add comment, result: %s", discussion.number, response.getData());
+        if (response.hasError()) {
+            Log.errorf("Discussion #%s - Unable to add comment", discussion.number);
+            return null;
+        }
+        JsonObject result = JsonAttribute.addDiscussionComment.jsonObjectFrom(response.getData());
+        ;
+        return JsonAttribute.comment.discussionCommentFrom(result);
     }
 }

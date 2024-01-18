@@ -6,6 +6,7 @@ import jakarta.json.JsonArray;
 import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonValue;
+import jakarta.json.JsonValue.ValueType;
 
 /**
  * List of Json fields returned from GraphQL queries.
@@ -91,6 +92,19 @@ public enum JsonAttribute {
     upvoteCount,
     url("html_url"),
     user,
+    isAnswer,
+    viewerDidAuthor,
+    replyTo,
+    viewerHasUpvoted,
+    viewerCannotUpdateReasons,
+    viewerCanUpvote,
+    viewerCanUpdate,
+    viewerCanUnmarkAsAnswer,
+    viewerCanReact,
+    viewerCanMinimize,
+    viewerCanMarkAsAnswer,
+    viewerCanDelete,
+    addDiscussionComment,
     ;
 
     private final String nodeName;
@@ -168,7 +182,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null ? null : JsonNumber.class.cast(value).intValue();
+        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).intValue();
     }
 
     /**
@@ -259,7 +273,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null ? null : JsonObject.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : JsonObject.class.cast(value);
     }
 
     /**
@@ -288,7 +302,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null ? null : JsonArray.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : JsonArray.class.cast(value);
     }
 
     /**
@@ -316,6 +330,6 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null ? null : value.toString();
+        return value == null || value.getValueType() == ValueType.NULL ? null : value.toString();
     }
 }

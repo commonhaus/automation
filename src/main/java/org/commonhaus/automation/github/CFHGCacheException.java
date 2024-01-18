@@ -8,7 +8,7 @@ import io.smallrye.graphql.client.GraphQLError;
 public class CFHGCacheException extends IOException {
     List<GraphQLError> errors;
 
-    public CFHGCacheException(CFGHQueryContext queryContext) {
+    public CFHGCacheException(CFGHQueryHelper queryContext) {
         super("Unable to cache information for repository " + queryContext.getGhRepository().getFullName() + " ("
                 + queryContext.getGhiId() + ")");
         if (queryContext.hasErrors()) {

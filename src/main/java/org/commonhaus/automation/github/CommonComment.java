@@ -4,15 +4,20 @@ import jakarta.json.JsonObject;
 
 public class CommonComment extends CommonObject {
 
-    /** {@literal parent_id} for webhook events (may be null) */
-    public final Integer parent_id;
+    static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
+            body
+            includesCreatedEdit
+            viewerDidAuthor
+                """;
 
     public final boolean includesCreatedEdit;
+
+    public final boolean viewerDidAuthor;
 
     public CommonComment(JsonObject object) {
         super(object);
 
-        this.parent_id = JsonAttribute.parent_id.integerFrom(object);
         this.includesCreatedEdit = JsonAttribute.includesCreatedEdit.booleanFromOrFalse(object);
+        this.viewerDidAuthor = JsonAttribute.viewerDidAuthor.booleanFromOrFalse(object);
     }
 }

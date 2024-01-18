@@ -3,25 +3,25 @@
     "discussion": {
         "repository_url": "https://api.github.com/repos/commonhaus/automation-test",
         "category": {
-            "id": 40988633,
-            "node_id": "DIC_kwDOLDuJqs4CcW_Z",
+            "id": 40988632,
+            "node_id": "DIC_kwDOLDuJqs4CcW_Y",
             "repository_id": 742099370,
-            "emoji": ":speech_balloon:",
-            "name": "General",
-            "description": "Chat about anything and everything here",
+            "emoji": ":mega:",
+            "name": "Announcements",
+            "description": "Updates from maintainers",
             "created_at": "2024-01-11T14:00:10.000-05:00",
             "updated_at": "2024-01-11T14:00:10.000-05:00",
-            "slug": "general",
+            "slug": "announcements",
             "is_answerable": false
         },
         "answer_html_url": null,
         "answer_chosen_at": null,
         "answer_chosen_by": null,
-        "html_url": "https://github.com/commonhaus/automation-test/discussions/3",
-        "id": 6084261,
-        "node_id": "D_kwDOLDuJqs4AXNal",
-        "number": 3,
-        "title": "A general topic",
+        "html_url": "https://github.com/commonhaus/automation-test/discussions/6",
+        "id": 6088825,
+        "node_id": "D_kwDOLDuJqs4AXOh5",
+        "number": 6,
+        "title": "A new announcement",
         "user": {
             "login": "ebullient",
             "id": 808713,
@@ -46,13 +46,13 @@
         "state_reason": null,
         "locked": false,
         "comments": 0,
-        "created_at": "2024-01-17T00:26:42Z",
-        "updated_at": "2024-01-17T00:26:42Z",
+        "created_at": "2024-01-18T04:37:38Z",
+        "updated_at": "2024-01-18T04:37:38Z",
         "author_association": "CONTRIBUTOR",
         "active_lock_reason": null,
-        "body": "etc.",
+        "body": "Much news, or something",
         "reactions": {
-            "url": "https://api.github.com/repos/commonhaus/automation-test/discussions/3/reactions",
+            "url": "https://api.github.com/repos/commonhaus/automation-test/discussions/6/reactions",
             "total_count": 0,
             "+1": 0,
             "-1": 0,
@@ -63,7 +63,7 @@
             "rocket": 0,
             "eyes": 0
         },
-        "timeline_url": "https://api.github.com/repos/commonhaus/automation-test/discussions/3/timeline"
+        "timeline_url": "https://api.github.com/repos/commonhaus/automation-test/discussions/6/timeline"
     },
     "repository": {
         "id": 742099370,

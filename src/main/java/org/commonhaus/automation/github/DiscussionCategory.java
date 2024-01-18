@@ -45,7 +45,7 @@ public class DiscussionCategory {
      *
      * @return list of discussion categories
      */
-    static List<DiscussionCategory> queryDiscussionCategories(CFGHQueryContext queryContext) {
+    static List<DiscussionCategory> queryDiscussionCategories(CFGHQueryHelper queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

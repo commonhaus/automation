@@ -9,6 +9,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 
+import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubEvent;
@@ -19,6 +20,9 @@ import io.quarkus.logging.Log;
 public class WebHookEventListener {
     @Inject
     protected GitHubService gitHubService;
+
+    @Inject
+    protected CFGHApp cfgApp;
 
     public void onEvent(@Observes GitHubEvent event) throws IOException {
         // ... implementation
@@ -54,7 +58,17 @@ public class WebHookEventListener {
             WebHookDiscussion whEvent = WebHookDiscussion.from(github,
                     ghEvent.getAction(),
                     unwrap(ghEvent.getPayload()));
-            Log.debug(whEvent);
+            Log.debugf("%s; %s", whEvent);
+            if (whEvent.type == WebHookDiscussion.Type.created) {
+                CFGHQueryHelper queryContext = cfgApp.getQueryContext(whEvent.repository, whEvent.installation);
+
+                GHMyself myself = github.getMyself();
+                boolean iAmAuthor = myself.getLogin().equals(whEvent.discussion.author.login);
+                Log.debugf("Discussion created by %s (%s)", whEvent.discussion.author, iAmAuthor);
+
+                Discussion.addComment(queryContext, whEvent.discussion, "I see you");
+                return;
+            }
             // TODO: Enabled on Repo
             // TODO: Permissions check
 

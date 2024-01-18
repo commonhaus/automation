@@ -36,7 +36,7 @@ public class Reaction {
         return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
     }
 
-    public static List<Reaction> queryReactions(CFGHQueryContext queryContext, String reactorId) {
+    public static List<Reaction> queryReactions(CFGHQueryHelper queryContext, String reactorId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
