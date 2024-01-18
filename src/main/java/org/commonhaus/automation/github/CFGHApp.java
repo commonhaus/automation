@@ -7,6 +7,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import org.commonhaus.automation.BotConfig;
 import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
@@ -16,8 +19,6 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import io.quarkus.logging.Log;
 
 @Singleton
@@ -26,7 +27,7 @@ public class CFGHApp {
             .ofPattern("yyyy/MM/dd HH:mm:ss Z");
 
     static Map<String, CFGHRepoInfo> repositoryInfoCache = new HashMap<>();
-    
+
     private final BotConfig quarkusBotConfig;
     private final GitHubClientProvider gitHubClientProvider;
 
@@ -40,7 +41,7 @@ public class CFGHApp {
         if (!repositoryInfoCache.isEmpty()) {
             return;
         }
-        
+
         GitHub ac = gitHubClientProvider.getApplicationClient();
         GHApp ghApp;
         try {
@@ -49,7 +50,7 @@ public class CFGHApp {
                 GitHub ic = gitHubClientProvider.getInstallationClient(ghAppInstallation.getId());
                 GHAuthenticatedAppInstallation ghai = ic.getInstallation();
                 for (GHRepository ghRepository : ghai.listRepositories()) {
-                    CFGHQueryContext queryContext = new CFGHQueryContext(quarkusBotConfig, 
+                    CFGHQueryContext queryContext = new CFGHQueryContext(quarkusBotConfig,
                             ghRepository, ghAppInstallation.getId(), gitHubClientProvider);
                     CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(queryContext);
                     if (queryContext.hasErrors()) {
@@ -80,7 +81,7 @@ public class CFGHApp {
     }
 
     public CFGHQueryContext getQueryContext(CFGHRepoInfo repositoryInfo) {
-        return new CFGHQueryContext(quarkusBotConfig, 
+        return new CFGHQueryContext(quarkusBotConfig,
                 repositoryInfo.ghRepository, repositoryInfo.ghiId, gitHubClientProvider);
     }
 
@@ -97,7 +98,7 @@ public class CFGHApp {
         if (timestamp == null) {
             return null;
         }
-    
+
         if (timestamp.charAt(4) == '/') {
             // Unsure where this is used, but retained for compatibility.
             return Instant.from(CFGHApp.DATE_TIME_PARSER_SLASHES.parse(timestamp));

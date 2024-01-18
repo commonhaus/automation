@@ -1,14 +1,15 @@
 package org.commonhaus.automation;
 
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+
 import org.commonhaus.automation.github.CFGHApp;
 import org.jboss.logging.Logger;
 
 import io.quarkus.runtime.StartupEvent;
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 
 public class Bot {
-    
+
     private static final Logger LOG = Logger.getLogger(Bot.class);
 
     @Inject

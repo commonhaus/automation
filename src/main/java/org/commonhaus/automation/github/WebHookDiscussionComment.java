@@ -4,21 +4,18 @@ import java.io.IOException;
 
 import jakarta.json.JsonObject;
 
+import org.kohsuke.github.GitHub;
+
 public class WebHookDiscussionComment extends WebHookBase {
 
     public enum Type {
-        created, 
-        deleted, 
+        created,
+        deleted,
         edited
     }
 
-    public static WebHookDiscussionComment from(String action, JsonObject object) throws IOException {
-        return switch (action) {
-            case "created" -> new WebHookDiscussionComment(object, Type.created);
-            case "deleted" -> new WebHookDiscussionComment(object, Type.deleted);
-            case "edited" -> new WebHookDiscussionComment(object, Type.edited);
-            default -> throw new IllegalArgumentException("Unknown type: " + action);
-        };
+    public static WebHookDiscussionComment from(GitHub github, String action, JsonObject object) throws IOException {
+        return new WebHookDiscussionComment(github, object, Type.valueOf(action));
     }
 
     public final Type type;
@@ -28,8 +25,8 @@ public class WebHookDiscussionComment extends WebHookBase {
     // Only present for edits
     public final String fromBody;
 
-    public WebHookDiscussionComment(JsonObject object, Type type) throws IOException {
-        super(object);
+    public WebHookDiscussionComment(GitHub github, JsonObject object, Type type) throws IOException {
+        super(github, object);
         this.type = type;
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
         this.comment = JsonAttribute.comment.discussionCommentFrom(object);
@@ -39,7 +36,7 @@ public class WebHookDiscussionComment extends WebHookBase {
             this.fromBody = null;
         } else {
             this.fromBody = JsonAttribute.from.stringFrom(
-                JsonAttribute.body.jsonObjectFrom(changes));
+                    JsonAttribute.body.jsonObjectFrom(changes));
         }
     }
 }

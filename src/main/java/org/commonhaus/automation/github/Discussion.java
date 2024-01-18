@@ -6,10 +6,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.quarkus.logging.Log;
-import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.Response;
 
 public class Discussion extends CommonItem {
 
@@ -35,7 +36,7 @@ public class Discussion extends CommonItem {
 
     /**
      * Exceptions and errors are captured for caller in the queryContext
-     * 
+     *
      * @return list of discussion categories
      */
     static List<Discussion> queryDiscussions(CFGHQueryContext queryContext, boolean isOpen) {
@@ -51,45 +52,45 @@ public class Discussion extends CommonItem {
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                query($name: String!, $owner: String!, $after: String) {
-                    repository(owner: $owner, name: $name) {
-                      discussions(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-                        nodes {
-                          id
-                          number
-                          title
-                          category {
-                              name
+                    query($name: String!, $owner: String!, $after: String) {
+                        repository(owner: $owner, name: $name) {
+                          discussions(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                            nodes {
                               id
-                              emoji
-                          }
-                          author {
-                              login
+                              number
+                              title
+                              category {
+                                  name
+                                  id
+                                  emoji
+                              }
+                              author {
+                                  login
+                                  url
+                                  avatarUrl
+                              }
+                              authorAssociation
+                              activeLockReason
+                              answerChosenAt
+                              body
+                              bodyText
+                              closed
+                              closedAt
+                              createdAt
+                              isAnswered
+                              locked
+                              updatedAt
                               url
-                              avatarUrl
+                            }
                           }
-                          authorAssociation
-                          activeLockReason
-                          answerChosenAt
-                          body
-                          bodyText
-                          closed
-                          closedAt
-                          createdAt
-                          isAnswered
-                          locked
-                          updatedAt
-                          url
                         }
                       }
-                    }
-                  }
-                """, variables);
+                    """, variables);
             Log.debugf("discussions (%s): %s", cursor, response.getData());
             if (response.hasError()) {
                 break;
             }
-            JsonObject allDiscussions = JsonAttribute.discussions.extractObjectFrom(response.getData(), 
+            JsonObject allDiscussions = JsonAttribute.discussions.extractObjectFrom(response.getData(),
                     JsonAttribute.repository);
 
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allDiscussions);

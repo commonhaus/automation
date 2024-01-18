@@ -2,6 +2,8 @@ package org.commonhaus.automation.github;
 
 import java.io.IOException;
 
+import jakarta.json.JsonObject;
+
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -9,18 +11,18 @@ import org.kohsuke.github.GitHub;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 
-import jakarta.json.JsonObject;
-
 public class WebHookBase {
     final static ObjectReader reader = GitHub.getMappingObjectReader();
 
     public final String action;
+    public final GitHub github;
     public final GHRepository repository;
     public final GHOrganization organization;
     public final GHAppInstallation installation;
     public final Actor sender;
 
-    public WebHookBase(JsonObject object) throws IOException {
+    public WebHookBase(GitHub github, JsonObject object) throws IOException {
+        this.github = github;
         this.action = JsonAttribute.action.stringFrom(object);
         this.sender = JsonAttribute.sender.actorFrom(object);
 

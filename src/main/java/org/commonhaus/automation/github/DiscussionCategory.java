@@ -2,14 +2,15 @@ package org.commonhaus.automation.github;
 
 import java.util.List;
 
-import io.quarkus.logging.Log;
-import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
+import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.Response;
+
 public class DiscussionCategory {
 
-    /** {@literal id} for GraphQL queries or {@literal node_id} for webhook events */ 
+    /** {@literal id} for GraphQL queries or {@literal node_id} for webhook events */
     public final String id;
     /** {@literal id} for webhook events */
     public final Integer webhook_id;
@@ -41,6 +42,7 @@ public class DiscussionCategory {
 
     /**
      * Exceptions and errors are captured for caller in the queryContext
+     *
      * @return list of discussion categories
      */
     static List<DiscussionCategory> queryDiscussionCategories(CFGHQueryContext queryContext) {
@@ -66,7 +68,7 @@ public class DiscussionCategory {
             return List.of();
         }
 
-        JsonArray categories = JsonAttribute.nodes.extractArrayFrom(response.getData(), 
+        JsonArray categories = JsonAttribute.nodes.extractArrayFrom(response.getData(),
                 JsonAttribute.repository, JsonAttribute.discussionCategories);
 
         return categories.stream()

@@ -17,7 +17,7 @@ public class DiscussionComment extends CommonComment {
 
         // discussion may be null (webhook)
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
-        
+
         this.deletedAt = JsonAttribute.deletedAt.dateFrom(object);
     }
 

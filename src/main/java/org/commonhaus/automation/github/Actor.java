@@ -4,7 +4,7 @@ import jakarta.json.JsonObject;
 
 /**
  * Represents a user or bot that interacts with GitHub.
- * 
+ *
  * The WebHook provides an id (read by GHType), GraphQL doesn't.
  */
 public class Actor extends CommonType {

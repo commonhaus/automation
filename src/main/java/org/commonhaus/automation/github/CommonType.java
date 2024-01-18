@@ -6,8 +6,8 @@ public class CommonType {
     public boolean isWebhookData() {
         return this.webhook_id != null;
     }
-    
-    /** {@literal id} for GraphQL queries or {@literal node_id} for webhook events */ 
+
+    /** {@literal id} for GraphQL queries or {@literal node_id} for webhook events */
     public final String id;
     /** {@literal id} for webhook events */
     public final Integer webhook_id;

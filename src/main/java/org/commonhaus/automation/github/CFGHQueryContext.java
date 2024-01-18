@@ -25,13 +25,14 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 public class CFGHQueryContext {
     final GHRepository ghRepository;
     final long ghiId;
-    
+
     final GitHubClientProvider gitHubClientProvider;
     final BotConfig quarkusBotConfig;
     final List<GraphQLError> errors = new ArrayList<>(1);
     final List<Throwable> exceptions = new ArrayList<>(1);
 
-    public CFGHQueryContext(BotConfig botConfig, GHRepository ghRepository, long ghiId, GitHubClientProvider gitHubClientProvider) {
+    public CFGHQueryContext(BotConfig botConfig, GHRepository ghRepository, long ghiId,
+            GitHubClientProvider gitHubClientProvider) {
         this.ghRepository = ghRepository;
         this.ghiId = ghiId;
         this.gitHubClientProvider = gitHubClientProvider;
@@ -57,7 +58,7 @@ public class CFGHQueryContext {
         try {
             return ghRepository.listLabels().toList();
         } catch (IOException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s", 
+            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
                     ghRepository.getFullName(), e.toString());
             exceptions.add(e);
         }
@@ -71,7 +72,7 @@ public class CFGHQueryContext {
         try {
             return ghRepository.listProjects().toList();
         } catch (IOException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s", 
+            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
                     ghRepository.getFullName(), e.toString());
             exceptions.add(e);
         }
@@ -80,8 +81,9 @@ public class CFGHQueryContext {
 
     /**
      * Exceptions and errors are captured for caller in the queryContext
-     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!}) 
-     * will be provided
+     *
+     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!})
+     *        will be provided
      * @return GraphQL Response
      */
     public Response execRepoQuerySync(String query) {
@@ -90,8 +92,9 @@ public class CFGHQueryContext {
 
     /**
      * Exceptions and errors are captured for caller in the queryContext
-     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!}) 
-     * will be provided
+     *
+     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!})
+     *        will be provided
      * @return GraphQL Response
      */
     public Response execRepoQuerySync(String query, Map<String, Object> variables) {
@@ -106,12 +109,12 @@ public class CFGHQueryContext {
         try {
             response = graphqlCLI.executeSync(query, variables);
             if (response.hasError()) {
-                Log.errorf("Error executing GraphQL query for repository %s: %s", 
-                    ghRepository.getFullName(), response.getErrors());
+                Log.errorf("Error executing GraphQL query for repository %s: %s",
+                        ghRepository.getFullName(), response.getErrors());
                 errors.addAll(response.getErrors());
             }
         } catch (ExecutionException | InterruptedException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s", 
+            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
                     ghRepository.getFullName(), e.toString());
             exceptions.add(e);
         }

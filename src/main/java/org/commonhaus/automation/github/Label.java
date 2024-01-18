@@ -5,10 +5,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.quarkus.logging.Log;
-import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.Response;
 
 public class Label extends CommonType {
 
@@ -46,34 +47,34 @@ public class Label extends CommonType {
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                query($id: ID!, $after: String) {
-                    node(id: $id) {
-                        ... on Labelable {
-                            labels(first: 100, after: $after) {
-                                nodes {
-                                    color
-                                    description
-                                    id
-                                    isDefault
-                                    name
-                                    url
-                                }
-                                pageInfo {
-                                    hasNextPage
-                                    endCursor
+                        query($id: ID!, $after: String) {
+                            node(id: $id) {
+                                ... on Labelable {
+                                    labels(first: 100, after: $after) {
+                                        nodes {
+                                            color
+                                            description
+                                            id
+                                            isDefault
+                                            name
+                                            url
+                                        }
+                                        pageInfo {
+                                            hasNextPage
+                                            endCursor
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-            """, variables);
+                    """, variables);
             Log.debugf("labels (%s): %s", cursor, response.getData());
             if (response.hasError()) {
                 break;
             }
             JsonObject allLabels = JsonAttribute.labels.extractObjectFrom(response.getData(),
-                JsonAttribute.node);
-    
+                    JsonAttribute.node);
+
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allLabels);
             labels.addAll(nodes.stream()
                     .map(JsonObject.class::cast)

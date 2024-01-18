@@ -4,20 +4,53 @@
   xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.commonhaus</groupId>
-  <artifactId>automation-bot</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+
+  <groupId>org.commonhaus.automation</groupId>
+  <artifactId>commonhaus-bot</artifactId>
+  <version>${revision}</version>
+
+  <name>commonhaus-bot</name>
+  <description>Commonhaus Foundation Automation</description>
+  <inceptionYear>2024</inceptionYear>
+  <url>https://github.com/commonhaus/automation</url>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <connection>scm:git:https://github.com/commonhaus/automation.git</connection>
+    <developerConnection>scm:git:git@github.com/commonhaus/automation.git</developerConnection>
+    <tag>${project.version}</tag>
+    <url>https://github.com/commonhaus/automation</url>
+  </scm>
+  <issueManagement>
+    <system>GitHub</system>
+    <url>https://github.com/commonhaus/automation/issues</url>
+  </issueManagement>
+
   <properties>
+    <revision>1.0.0-SNAPSHOT</revision>
+    <!-- Build -->
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
     <maven.compiler.release>17</maven.compiler.release>
+    <formatter-plugin.version>2.23.0</formatter-plugin.version>
+    <impsort-plugin.version>1.9.0</impsort-plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <surefire-plugin.version>3.2.3</surefire-plugin.version>
+    <skipTests>false</skipTests>
+    <skipITs>true</skipITs>
+    <!-- Quarkus -->
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
     <quarkus.platform.version>3.6.5</quarkus.platform.version>
-    <skipITs>true</skipITs>
-    <surefire-plugin.version>3.1.2</surefire-plugin.version>
     <quarkus-github-app.version>2.1.1</quarkus-github-app.version>
+    <!-- Libraries -->
+    <!-- Packaging -->
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -110,6 +143,41 @@
             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
             <maven.home>${maven.home}</maven.home>
           </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>net.revelc.code.formatter</groupId>
+        <artifactId>formatter-maven-plugin</artifactId>
+        <version>${formatter-plugin.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>format</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <configFile>src/ide-config/eclipse-format.xml</configFile>
+          <skip>${skipFormat}</skip>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>net.revelc.code</groupId>
+        <artifactId>impsort-maven-plugin</artifactId>
+        <version>${impsort-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>sort-imports</id>
+            <goals>
+              <goal>sort</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <groups>java.,javax.,jakarta.,org.,com.</groups>
+          <staticGroups>*</staticGroups>
+          <skip>${skipFormat}</skip>
+          <removeUnused>true</removeUnused>
         </configuration>
       </plugin>
     </plugins>

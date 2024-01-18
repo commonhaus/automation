@@ -6,14 +6,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.quarkus.logging.Log;
-import io.smallrye.graphql.client.Response;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
+import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.Response;
+
 /**
  * Represents a reaction to a GraphQL Reactable object.
- * 
+ *
  * This is not available to webhook events.
  */
 public class Reaction {
@@ -50,36 +51,36 @@ public class Reaction {
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                query($id: ID!, $after: String) {
-                    node(id: $id) {
-                        ... on Reactable {
-                            reactions(first: 100, after: $after) {
-                                nodes {
-                                    user {
-                                        id
-                                        login
-                                        url
-                                        avatarUrl
+                        query($id: ID!, $after: String) {
+                            node(id: $id) {
+                                ... on Reactable {
+                                    reactions(first: 100, after: $after) {
+                                        nodes {
+                                            user {
+                                                id
+                                                login
+                                                url
+                                                avatarUrl
+                                            }
+                                            content
+                                            createdAt
+                                        }
+                                        pageInfo {
+                                            hasNextPage
+                                            endCursor
+                                        }
                                     }
-                                    content
-                                    createdAt
-                                }
-                                pageInfo {
-                                    hasNextPage
-                                    endCursor
                                 }
                             }
                         }
-                    }
-                }
-            """, variables);
+                    """, variables);
             Log.debugf("reactions (%s): %s", cursor, response.getData());
             if (response.hasError()) {
                 break;
             }
             JsonObject allReactions = JsonAttribute.reactions.extractObjectFrom(response.getData(),
-                JsonAttribute.node);
-    
+                    JsonAttribute.node);
+
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allReactions);
             reactions.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
