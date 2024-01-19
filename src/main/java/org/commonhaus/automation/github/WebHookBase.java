@@ -4,6 +4,8 @@ import java.io.IOException;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.model.Actor;
+import org.commonhaus.automation.github.model.JsonAttribute;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;

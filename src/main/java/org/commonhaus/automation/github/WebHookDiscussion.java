@@ -4,6 +4,11 @@ import java.io.IOException;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.model.Discussion;
+import org.commonhaus.automation.github.model.DiscussionCategory;
+import org.commonhaus.automation.github.model.DiscussionComment;
+import org.commonhaus.automation.github.model.JsonAttribute;
+import org.commonhaus.automation.github.model.Label;
 import org.kohsuke.github.GitHub;
 
 public class WebHookDiscussion extends WebHookBase {

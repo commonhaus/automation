@@ -9,10 +9,12 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 
-import org.kohsuke.github.GHMyself;
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.model.Discussion;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubEvent;
+import io.quarkiverse.githubapp.runtime.error.ErrorHandlerBridgeFunction;
 import io.quarkiverse.githubapp.runtime.github.GitHubService;
 import io.quarkus.logging.Log;
 
@@ -33,48 +35,49 @@ public class WebHookEventListener {
         long installationId = event.getInstallationId();
         GitHub github = gitHubService.getInstallationClient(installationId);
 
-        switch (event.getEvent()) {
-            case "discussion" -> handleDiscussionEvent(github, event);
-            case "discussion_comment" -> handleDiscussionCommentEvent(github, event);
-        }
-    }
-
-    void handleDiscussionCommentEvent(GitHub github, GitHubEvent ghEvent) {
         try {
-            WebHookDiscussionComment whEvent = WebHookDiscussionComment.from(github,
-                    ghEvent.getAction(),
-                    unwrap(ghEvent.getPayload()));
-            Log.debug(whEvent);
-            // TODO: Enabled on Repo
-            // TODO: Permissions check
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    void handleDiscussionEvent(GitHub github, GitHubEvent ghEvent) {
-        try {
-            WebHookDiscussion whEvent = WebHookDiscussion.from(github,
-                    ghEvent.getAction(),
-                    unwrap(ghEvent.getPayload()));
-            Log.debugf("%s; %s", whEvent);
-            if (whEvent.type == WebHookDiscussion.Type.created) {
-                CFGHQueryHelper queryContext = cfgApp.getQueryContext(whEvent.repository, whEvent.installation);
-
-                GHMyself myself = github.getMyself();
-                boolean iAmAuthor = myself.getLogin().equals(whEvent.discussion.author.login);
-                Log.debugf("Discussion created by %s (%s)", whEvent.discussion.author, iAmAuthor);
-
-                Discussion.addComment(queryContext, whEvent.discussion, "I see you");
-                return;
+            switch (event.getEvent()) {
+                case "discussion" -> handleDiscussionEvent(github, event);
+                case "discussion_comment" -> handleDiscussionCommentEvent(github, event);
             }
-            // TODO: Enabled on Repo
-            // TODO: Permissions check
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Throwable t) {
+            new ErrorHandlerBridgeFunction(event).apply(t);
         }
+    }
+
+    void handleDiscussionCommentEvent(GitHub github, GitHubEvent ghEvent) throws IOException {
+        WebHookDiscussionComment whEvent = WebHookDiscussionComment.from(github,
+                ghEvent.getAction(),
+                unwrap(ghEvent.getPayload()));
+        Log.debugf("Comment %s on Discussion#%s %s by sender %s / author %s",
+                whEvent.comment.id,
+                whEvent.discussion.number,
+                ghEvent.getAction(),
+                whEvent.sender,
+                whEvent.comment.author);
+        // TODO: Enabled on Repo
+        // TODO: Permissions check
+    }
+
+    void handleDiscussionEvent(GitHub github, GitHubEvent ghEvent) throws IOException {
+        WebHookDiscussion whEvent = WebHookDiscussion.from(github,
+                ghEvent.getAction(),
+                unwrap(ghEvent.getPayload()));
+
+        Log.debugf("Discussion#%s %s by sender %s / author %s / editor %s",
+                whEvent.discussion.number,
+                ghEvent.getAction(),
+                whEvent.sender,
+                whEvent.discussion.author,
+                whEvent.discussion.editor);
+
+        if (whEvent.type == WebHookDiscussion.Type.created) {
+            RepoQuery queryContext = cfgApp.getRepoQueryContext(whEvent.repository, whEvent.installation);
+            Discussion.addComment(queryContext, whEvent.discussion, "I see you");
+            return;
+        }
+        // TODO: Enabled on Repo
+        // TODO: Permissions check
     }
 
     private JsonObject unwrap(String payload) {

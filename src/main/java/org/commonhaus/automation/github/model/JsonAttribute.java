@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.Date;
 
@@ -7,6 +7,8 @@ import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
+
+import org.commonhaus.automation.github.CFGHApp;
 
 /**
  * List of Json fields returned from GraphQL queries.
@@ -22,6 +24,7 @@ import jakarta.json.JsonValue.ValueType;
 public enum JsonAttribute {
     action,
     activeLockReason,
+    addDiscussionComment,
     answer,
     answerChosenAt,
     author,
@@ -56,6 +59,7 @@ public enum JsonAttribute {
     id,
     includesCreatedEdit,
     installation,
+    isAnswer,
     isAnswered,
     isDefault("default"),
     label,
@@ -81,6 +85,7 @@ public enum JsonAttribute {
     publishedAt,
     reactableId,
     reactions,
+    replyTo,
     repository,
     rocket,
     sender,
@@ -92,19 +97,17 @@ public enum JsonAttribute {
     upvoteCount,
     url("html_url"),
     user,
-    isAnswer,
-    viewerDidAuthor,
-    replyTo,
-    viewerHasUpvoted,
-    viewerCannotUpdateReasons,
-    viewerCanUpvote,
-    viewerCanUpdate,
-    viewerCanUnmarkAsAnswer,
-    viewerCanReact,
-    viewerCanMinimize,
-    viewerCanMarkAsAnswer,
+    viewer,
     viewerCanDelete,
-    addDiscussionComment,
+    viewerCanMarkAsAnswer,
+    viewerCanMinimize,
+    viewerCanReact,
+    viewerCanUnmarkAsAnswer,
+    viewerCanUpdate,
+    viewerCanUpvote,
+    viewerCannotUpdateReasons,
+    viewerDidAuthor,
+    viewerHasUpvoted,
     ;
 
     private final String nodeName;

@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.Date;
 

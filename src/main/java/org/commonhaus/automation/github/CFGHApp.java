@@ -6,11 +6,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.BotConfig;
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.model.JsonAttribute;
 import org.kohsuke.github.GHApp;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHAuthenticatedAppInstallation;
@@ -20,77 +24,134 @@ import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.runtime.github.GitHubService;
 import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.Response;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @Singleton
 public class CFGHApp {
     static final DateTimeFormatter DATE_TIME_PARSER_SLASHES = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm:ss Z");
 
-    static Map<String, CFGHRepoInfo> repositoryInfoCache = new HashMap<>();
+    static final Map<Long, InstallationInfo> installationInfo = new HashMap<>();
 
     private final BotConfig quarkusBotConfig;
     private final GitHubService gitHubService;
 
     @Inject
-    public CFGHApp(BotConfig quarkusBotConfig, GitHubService gitHubService) {
+    CFGHApp(BotConfig quarkusBotConfig, GitHubService gitHubService) {
         this.quarkusBotConfig = quarkusBotConfig;
         this.gitHubService = gitHubService;
     }
 
     public void initializeCache() {
-        if (!repositoryInfoCache.isEmpty()) {
-            return;
-        }
+        discoverInstallations();
+    }
 
+    public void purgeCache() {
+
+    }
+
+    /**
+     * @param ghiId installation id
+     * @return installation information for the given installation id
+     */
+    public InstallationInfo getInstallationInfo(long ghiId) {
+        return installationInfo.get(ghiId);
+    }
+
+    /**
+     * @param ghiId installation id
+     * @param fullName full name of the repository
+     * @return cached repository info for the specified installation
+     */
+    public CFGHRepoInfo getRepositoryInfo(long ghiId, String fullName) {
+        InstallationInfo info = getInstallationInfo(ghiId);
+        if (info == null) {
+            return null;
+        }
+        return info.getRepositoryInfo(fullName);
+    }
+
+    /**
+     * If this bot has multiple installations that are allowed to access
+     * the same repository, this will return the first one found.
+     *
+     * @param fullName
+     * @return RepoInfo for the specified git repository
+     */
+    public CFGHRepoInfo getRepositoryInfo(String fullName) {
+        for (InstallationInfo info : installationInfo.values()) {
+            CFGHRepoInfo repoInfo = info.getRepositoryInfo(fullName);
+            if (repoInfo != null) {
+                return repoInfo;
+            }
+        }
+        return null;
+    }
+
+    private void discoverInstallations() {
         GitHub ac = gitHubService.getApplicationClient();
         try {
             GHApp ghApp = ac.getApp();
             for (GHAppInstallation ghAppInstallation : ghApp.listInstallations()) {
-                GitHub ic = gitHubService.getInstallationClient(ghAppInstallation.getId());
-                GHAuthenticatedAppInstallation ghai = ic.getInstallation();
-                
-                for (GHRepository ghRepository : ghai.listRepositories()) {
-                    CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(ghRepository, ghAppInstallation.getId());
-                    CFGHQueryHelper queryContext = new CFGHQueryHelper(quarkusBotConfig,
-                            ghRepository, ghAppInstallation.getId(), gitHubService);
-                    if (queryContext.hasErrors()) {
-                        Log.warnf("Unable to cache repository information", ghRepository.getFullName());
-                        throw new CFHGCacheException(queryContext);
-                    } else if (Log.isInfoEnabled()) {
-                        repositoryInfo.logRepositoryInformation();
-                    }
-                    repositoryInfoCache.put(ghRepository.getFullName(), repositoryInfo);
-                }
+                InstallationInfo info = createInstallationInfo(ghAppInstallation);
+                installationInfo.put(ghAppInstallation.getId(), info);
+                Log.infof("[%s] GitHub App Login: %s",
+                        info.getInstallationId(), info.getLogin());
             }
         } catch (GHIOException e) {
             // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
             e.getResponseHeaderFields().forEach((k, v) -> Log.debugf("%s: %s", k, v));
             throw new IllegalStateException(e);
-        } catch (IOException e) {
-            // TODO: Config to handle IOException (retry? quit? ensure notification?)
-            throw new IllegalStateException(e);
+        } catch (Throwable t) {
+            // TODO Auto-generated catch block
+            t.printStackTrace();
         }
     }
 
-    public void purgeCache() {
-        repositoryInfoCache.clear();
+    private InstallationInfo createInstallationInfo(GHAppInstallation ghAppInstallation)
+            throws IOException, ExecutionException, InterruptedException {
+        long ghiId = ghAppInstallation.getId();
+        String login = getViewer(gitHubService.getInstallationGraphQLClient(ghiId));
+        InstallationInfo info = new InstallationInfo(ghiId, login);
+
+        // Get repositories this installation has access to
+        GitHub ic = gitHubService.getInstallationClient(ghiId);
+        GHAuthenticatedAppInstallation ghai = ic.getInstallation();
+        for (GHRepository ghRepository : ghai.listRepositories()) {
+            CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(ghRepository, ghiId);
+            info.addRepositoryInfo(repositoryInfo);
+            Log.infof("[%s] GitHub Repository: %s",
+                    info.getInstallationId(), repositoryInfo.getFullName());
+        }
+        return info;
     }
 
-    public CFGHRepoInfo getRepositoryInfo(String fullName) {
-        return repositoryInfoCache.get(fullName);
+    String getViewer(DynamicGraphQLClient graphqlCLI) throws ExecutionException, InterruptedException {
+        Response response = graphqlCLI.executeSync("""
+                    query {
+                        viewer {
+                          login
+                        }
+                """);
+        Log.debug(response.getData());
+        JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
+        return JsonAttribute.login.stringFrom(viewer);
     }
 
-    public CFGHQueryHelper getQueryContext(CFGHRepoInfo repositoryInfo) {
-        return new CFGHQueryHelper(quarkusBotConfig,
-                repositoryInfo.ghRepository, repositoryInfo.ghiId, gitHubService);
+    public RepoQuery getRepoQueryContext(GHRepository ghRepository, GHAppInstallation ghai) {
+        InstallationInfo info = getInstallationInfo(ghai.getId());
+        CFGHRepoInfo repoInfo = info.getRepositoryInfo(ghRepository.getFullName());
+        return new RepoQuery(quarkusBotConfig, repoInfo, gitHubService);
     }
 
-    public CFGHQueryHelper getQueryContext(GHRepository ghRepository, GHAppInstallation ghai) {
-        return new CFGHQueryHelper(quarkusBotConfig, ghRepository, ghai.getId(), gitHubService);
+    public RepoQuery getRepoQueryContext(String repo) {
+        CFGHRepoInfo repoInfo = getRepositoryInfo(repo);
+        return new RepoQuery(quarkusBotConfig, repoInfo, gitHubService);
     }
 
     /** Parses to Date as GitHubClient.parseDate does */
-    static final Date parseDate(String timestamp) {
+    public static final Date parseDate(String timestamp) {
         if (timestamp == null) {
             return null;
         }
@@ -108,6 +169,33 @@ public class CFGHApp {
             return Instant.from(CFGHApp.DATE_TIME_PARSER_SLASHES.parse(timestamp));
         } else {
             return Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(timestamp));
+        }
+    }
+
+    public static class InstallationInfo {
+        final Map<String, CFGHRepoInfo> repoInfoCache = new HashMap<>();
+        final long ghiId;
+        final String login;
+
+        public InstallationInfo(long ghiId, String login) {
+            this.ghiId = ghiId;
+            this.login = login;
+        }
+
+        public String getLogin() {
+            return login;
+        }
+
+        public long getInstallationId() {
+            return ghiId;
+        }
+
+        public CFGHRepoInfo getRepositoryInfo(String fullName) {
+            return repoInfoCache.get(fullName);
+        }
+
+        void addRepositoryInfo(CFGHRepoInfo repoInfo) {
+            repoInfoCache.put(repoInfo.getFullName(), repoInfo);
         }
     }
 }

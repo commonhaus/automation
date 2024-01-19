@@ -1,9 +1,11 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.List;
 
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -45,7 +47,7 @@ public class DiscussionCategory {
      *
      * @return list of discussion categories
      */
-    static List<DiscussionCategory> queryDiscussionCategories(CFGHQueryHelper queryContext) {
+    public static List<DiscussionCategory> queryDiscussionCategories(RepoQuery queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -61,7 +63,7 @@ public class DiscussionCategory {
                                 }
                             }
                         }
-                        }
+                    }
                 """);
         Log.debugf("discussion categories: %s", response.getData());
         if (response.hasError()) {

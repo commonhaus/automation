@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -8,6 +8,8 @@ import java.util.Map;
 
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -36,7 +38,7 @@ public class Reaction {
         return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
     }
 
-    public static List<Reaction> queryReactions(CFGHQueryHelper queryContext, String reactorId) {
+    public static List<Reaction> queryReactions(RepoQuery queryContext, String reactorId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

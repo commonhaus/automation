@@ -1,6 +1,5 @@
 package org.commonhaus.automation.github;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,8 +7,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.commonhaus.automation.BotConfig;
+import org.commonhaus.automation.github.model.Discussion;
+import org.commonhaus.automation.github.model.DiscussionCategory;
 import org.kohsuke.github.GHLabel;
-import org.kohsuke.github.GHProject;
 import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
@@ -21,9 +21,10 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 /**
  * Single-use context for GraphQL query
  * Exceptions and errors are captured for caller in the queryContext
+ *
+ * @see CFGHApp#getRepoQueryContext(GHRepository, org.kohsuke.github.GHAppInstallation)
  */
 public class CFGHQueryHelper {
-    final GHRepository ghRepository;
     final long ghiId;
 
     final GitHubClientProvider gitHubClientProvider;
@@ -31,9 +32,7 @@ public class CFGHQueryHelper {
     final List<GraphQLError> errors = new ArrayList<>(1);
     final List<Throwable> exceptions = new ArrayList<>(1);
 
-    public CFGHQueryHelper(BotConfig botConfig, GHRepository ghRepository, long ghiId,
-            GitHubClientProvider gitHubClientProvider) {
-        this.ghRepository = ghRepository;
+    CFGHQueryHelper(BotConfig botConfig, long ghiId, GitHubClientProvider gitHubClientProvider) {
         this.ghiId = ghiId;
         this.gitHubClientProvider = gitHubClientProvider;
         this.quarkusBotConfig = botConfig;
@@ -43,81 +42,92 @@ public class CFGHQueryHelper {
         return !errors.isEmpty() || !exceptions.isEmpty();
     }
 
-    public GHRepository getGhRepository() {
-        return ghRepository;
-    }
-
     public long getGhiId() {
         return ghiId;
     }
 
-    public List<GHLabel> getLabels() {
-        if (hasErrors()) {
-            return List.of();
-        }
-        try {
-            return ghRepository.listLabels().toList();
-        } catch (IOException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
-                    ghRepository.getFullName(), e.toString());
-            exceptions.add(e);
-        }
-        return List.of();
-    }
-
-    public List<GHProject> getProjects() {
-        if (hasErrors()) {
-            return List.of();
-        }
-        try {
-            return ghRepository.listProjects().toList();
-        } catch (IOException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
-                    ghRepository.getFullName(), e.toString());
-            exceptions.add(e);
-        }
-        return List.of();
+    public void addException(Exception e) {
+        exceptions.add(e);
     }
 
     /**
+     * Single-use context for GraphQL query
      * Exceptions and errors are captured for caller in the queryContext
      *
-     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!})
-     *        will be provided
-     * @return GraphQL Response
+     * @see CFGHApp#getRepoQueryContext(String)
+     * @see CFGHApp#getRepoQueryContext(GHRepository, org.kohsuke.github.GHAppInstallation)
      */
-    public Response execRepoQuerySync(String query) {
-        return execRepoQuerySync(query, new HashMap<>());
-    }
+    public static class RepoQuery extends CFGHQueryHelper {
+        final GHRepository ghRepository;
+        final CFGHRepoInfo repoInfo;
 
-    /**
-     * Exceptions and errors are captured for caller in the queryContext
-     *
-     * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!})
-     *        will be provided
-     * @return GraphQL Response
-     */
-    public Response execRepoQuerySync(String query, Map<String, Object> variables) {
-        if (hasErrors()) {
-            return null;
+        List<GHLabel> labels;
+        List<DiscussionCategory> discussionCategories;
+
+        RepoQuery(BotConfig botConfig, CFGHRepoInfo repoInfo, GitHubClientProvider gitHubClientProvider) {
+            super(botConfig, repoInfo.ghiId, gitHubClientProvider);
+            this.ghRepository = repoInfo.ghRepository;
+            this.repoInfo = repoInfo;
         }
-        variables.putIfAbsent("owner", ghRepository.getOwnerName());
-        variables.putIfAbsent("name", ghRepository.getName());
 
-        DynamicGraphQLClient graphqlCLI = gitHubClientProvider.getInstallationGraphQLClient(ghiId);
-        Response response = null;
-        try {
-            response = graphqlCLI.executeSync(query, variables);
-            if (response.hasError()) {
-                Log.errorf("Error executing GraphQL query for repository %s: %s",
-                        ghRepository.getFullName(), response.getErrors());
-                errors.addAll(response.getErrors());
+        public GHRepository getGhRepository() {
+            return ghRepository;
+        }
+
+        public CFGHRepoInfo getRepoInfo() {
+            return repoInfo;
+        }
+
+        /**
+         * Exceptions and errors are captured for caller in the queryContext
+         *
+         * @param query GraphQL query. Values for owner and name ({@code $name: String!, $owner: String!})
+         *        will be provided
+         * @return GraphQL Response
+         */
+        public Response execRepoQuerySync(String query) {
+            return execRepoQuerySync(query, new HashMap<>());
+        }
+
+        /**
+         * Exceptions and errors are captured for caller in the queryContext
+         *
+         * @param query GraphQL query. Values for repository owner and name ({@code $name: String!, $owner: String!})
+         *        will be provided
+         * @return GraphQL Response
+         */
+        public Response execRepoQuerySync(String query, Map<String, Object> variables) {
+            if (hasErrors()) {
+                return null;
             }
-        } catch (ExecutionException | InterruptedException e) {
-            Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
-                    ghRepository.getFullName(), e.toString());
-            exceptions.add(e);
+            variables.putIfAbsent("owner", ghRepository.getOwnerName());
+            variables.putIfAbsent("name", ghRepository.getName());
+
+            DynamicGraphQLClient graphqlCLI = gitHubClientProvider.getInstallationGraphQLClient(ghiId);
+            Response response = null;
+            try {
+                response = graphqlCLI.executeSync(query, variables);
+                if (response.hasError()) {
+                    Log.errorf("Error executing GraphQL query for repository %s: %s",
+                            ghRepository.getFullName(), response.getErrors());
+                    errors.addAll(response.getErrors());
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
+                        ghRepository.getFullName(), e.toString());
+                exceptions.add(e);
+            }
+            return response;
         }
-        return response;
+
+        /** Convenience: invoke queryDiscussions on repoInfo with this context (cached data) */
+        public List<Discussion> queryDiscussions(boolean b) {
+            return repoInfo.queryDiscussions(this, b);
+        }
+
+        /** Convenience: invoke queryDiscussionCategories on repoInfo with this context (cached data) */
+        public List<DiscussionCategory> queryDiscussionCategories() {
+            return repoInfo.queryDiscussionCategories(this);
+        }
     }
 }

@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,6 +7,8 @@ import java.util.Map;
 
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -32,7 +34,7 @@ public class Label extends CommonType {
         return String.format("Label [%s] %s", this.id, this.name);
     }
 
-    public static List<Label> queryLabels(CFGHQueryHelper queryContext, String labeledId) {
+    public static List<Label> queryLabels(RepoQuery queryContext, String labeledId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

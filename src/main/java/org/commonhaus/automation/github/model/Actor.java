@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import jakarta.json.JsonObject;
 
@@ -20,6 +20,6 @@ public class Actor extends CommonType {
     }
 
     public String toString() {
-        return String.format("Actor [%s]", this.login);
+        return String.format("Actor[%s]", this.login);
     }
 }

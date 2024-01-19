@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -8,6 +8,8 @@ import java.util.Map;
 
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -69,7 +71,7 @@ public class Discussion extends CommonItem {
      * @param isOpen true for open discussions, false for non-open discussions
      * @return list of discussions
      */
-    static List<Discussion> queryDiscussions(CFGHQueryHelper queryContext, boolean isOpen) {
+    public static List<Discussion> queryDiscussions(RepoQuery queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -116,7 +118,7 @@ public class Discussion extends CommonItem {
      *
      * @return list of discussion categories
      */
-    static Discussion editDiscussion(CFGHQueryHelper queryContext, Discussion discussion, String modifiedText) {
+    public static Discussion editDiscussion(RepoQuery queryContext, Discussion discussion, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", modifiedText);
@@ -144,7 +146,7 @@ public class Discussion extends CommonItem {
     /**
      * Exceptions and errors are captured for caller in the queryContext
      */
-    static DiscussionComment addComment(CFGHQueryHelper queryContext, Discussion discussion, String markdownText) {
+    public static DiscussionComment addComment(RepoQuery queryContext, Discussion discussion, String markdownText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", markdownText);
@@ -164,7 +166,7 @@ public class Discussion extends CommonItem {
             return null;
         }
         JsonObject result = JsonAttribute.addDiscussionComment.jsonObjectFrom(response.getData());
-        ;
+
         return JsonAttribute.comment.discussionCommentFrom(result);
     }
 }
