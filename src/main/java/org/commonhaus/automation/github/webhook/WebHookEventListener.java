@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github;
+package org.commonhaus.automation.github.webhook;
 
 import java.io.IOException;
 
@@ -9,6 +9,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 
+import org.commonhaus.automation.github.CFGHApp;
 import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 import org.commonhaus.automation.github.model.Discussion;
 import org.kohsuke.github.GitHub;
