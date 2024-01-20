@@ -6,23 +6,37 @@ import java.util.List;
 import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
 import org.commonhaus.automation.github.model.Discussion;
 import org.commonhaus.automation.github.model.DiscussionCategory;
+import org.commonhaus.automation.github.model.Label;
 import org.kohsuke.github.GHLabel;
-import org.kohsuke.github.GHProject;
 import org.kohsuke.github.GHRepository;
 
 import io.quarkus.logging.Log;
 
 public class CFGHRepoInfo {
-    final GHRepository ghRepository;
+    final String owner;
+    final String name;
+    final String fullName;
     final long ghiId;
 
     CFGHRepoInfo(GHRepository ghRepository, long ghiId) {
-        this.ghRepository = ghRepository;
+        // Note that GHRepository is bound to a root (GitHub instance) that
+        // will only be valid for a short time. Don't hold onto that resource
+        this.owner = ghRepository.getOwnerName();
+        this.name = ghRepository.getName();
+        this.fullName = ghRepository.getFullName();
         this.ghiId = ghiId;
     }
 
+    public String getOwner() {
+        return owner;
+    }
+
+    public String getName() {
+        return name;
+    }
+
     public String getFullName() {
-        return ghRepository.getFullName();
+        return fullName;
     }
 
     public List<Discussion> queryDiscussions(RepoQuery queryContext, boolean isOpen) {
@@ -41,30 +55,18 @@ public class CFGHRepoInfo {
         return DiscussionCategory.queryDiscussionCategories(queryContext);
     }
 
-    public List<GHLabel> getLabels(RepoQuery queryContext) {
+    public List<Label> getRepositoryLabels(RepoQuery queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
-        // TODO: cache response (?)
+        // TODO: cache data (?)
         try {
-            return ghRepository.listLabels().toList();
+            GHRepository ghRepository = queryContext.getGHRepository();
+            List<GHLabel> ghLabels = ghRepository.listLabels().toList();
+            return Label.fromGHLabels(ghLabels);
         } catch (IOException e) {
             Log.errorf(e, "Error executing GraphQL query for repository %s: %s",
-                    ghRepository.getFullName(), e.toString());
-            queryContext.addException(e);
-        }
-        return List.of();
-    }
-
-    public List<GHProject> getProjects(RepoQuery queryContext) {
-        if (queryContext.hasErrors()) {
-            return List.of();
-        }
-        // TODO: cache response (?)
-        try {
-            return ghRepository.listProjects().toList();
-        } catch (IOException e) {
-            Log.errorf(e, "Error listing projects for repository %s: %s", getFullName(), e);
+                    getFullName(), e.toString());
             queryContext.addException(e);
         }
         return List.of();

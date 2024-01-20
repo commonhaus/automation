@@ -72,7 +72,8 @@ public class WebHookEventListener {
                 whEvent.discussion.editor);
 
         if (whEvent.type == WebHookDiscussion.Type.created) {
-            RepoQuery queryContext = cfgApp.getRepoQueryContext(whEvent.repository, whEvent.installation);
+            RepoQuery queryContext = cfgApp.getRepoQueryContext(whEvent.repository, whEvent.installation)
+                    .addExisting(github);
             Discussion.addComment(queryContext, whEvent.discussion, "I see you");
             return;
         }

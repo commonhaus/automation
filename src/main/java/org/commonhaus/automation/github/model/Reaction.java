@@ -20,6 +20,17 @@ import io.smallrye.graphql.client.Response;
  * This is not available to webhook events.
  */
 public class Reaction {
+    static final String REACTION_FIELDS = """
+            user {
+                id
+                login
+                url
+                avatarUrl
+            }
+            content
+            createdAt
+            """;
+
     public final Actor user;
     public final Date createdAt;
     public final String content;
@@ -53,19 +64,12 @@ public class Reaction {
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                        query($id: ID!, $after: String) {
-                            node(id: $id) {
-                                ... on Reactable {
-                                    reactions(first: 100, after: $after) {
-                                        nodes {
-                                            user {
-                                                id
-                                                login
-                                                url
-                                                avatarUrl
-                                            }
-                                            content
-                                            createdAt
+                    query($id: ID!, $after: String) {
+                        node(id: $id) {
+                            ... on Reactable {
+                                reactions(first: 100, after: $after) {
+                                    nodes {
+                                        """ + REACTION_FIELDS + """
                                         }
                                         pageInfo {
                                             hasNextPage

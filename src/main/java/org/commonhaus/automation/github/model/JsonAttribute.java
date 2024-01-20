@@ -11,15 +11,30 @@ import jakarta.json.JsonValue.ValueType;
 import org.commonhaus.automation.github.CFGHApp;
 
 /**
- * List of Json fields returned from GraphQL queries.
- * Reader wraps construction of base field types from the Json object.
- *
- * Why? This avoids finger checks from a lot of hard-coded strings
- * for fields. It also ensures we're using sane defaults, and converting
- * from Json in a consistent way for more complex types.
- *
- * If an alternate name is provided, the reader will check for that name
- * first, and then fall back to the name() attribute of the enum.
+ * This enumeration defines and manages a set of known field names utilized in GitHub API responses.
+ * It provides a structured approach to handle JSON data without relying on reflection, using
+ * enum values to avoid errors associated with hard-coded strings and to provide common
+ * POJO (Plain Old Java Object) construction mechanisms.
+ * <p>
+ * Usage Examples:
+ * </p>
+ * <ul>
+ * <li>
+ * Extracting a field using the enum:
+ * <br>
+ * {@code JsonAttribute.author.actorFrom(object)}
+ * <br>
+ * This extracts the {@code author} field from the given JsonObject to construct an Actor.
+ * </li>
+ * <li>
+ * Using an alternate enum name:
+ * <br>
+ * {@code JsonAttribute.url.stringFrom(object)}
+ * <br>
+ * This tries to use the {@code html_url} attribute from the JsonObject. If {@code html_url} is not present,
+ * it defaults to using the {@code url} attribute.
+ * </li>
+ * </ul>
  */
 public enum JsonAttribute {
     action,

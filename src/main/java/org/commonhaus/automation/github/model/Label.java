@@ -9,11 +9,21 @@ import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.kohsuke.github.GHLabel;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
 public class Label extends CommonType {
+
+    static final String LABEL_FIELDS = """
+                color
+                description
+                id
+                isDefault
+                name
+                url
+            """;
 
     public final String color;
     public final boolean isDefault;
@@ -30,10 +40,29 @@ public class Label extends CommonType {
         this.url = JsonAttribute.url.stringFrom(object);
     }
 
+    public Label(GHLabel ghLabel) {
+        super(ghLabel.getNodeId());
+        this.color = ghLabel.getColor();
+        this.isDefault = ghLabel.isDefault();
+        this.description = ghLabel.getDescription();
+        this.name = ghLabel.getName();
+        this.url = ghLabel.getUrl();
+    }
+
     public String toString() {
         return String.format("Label [%s] %s", this.id, this.name);
     }
 
+    /**
+     * Use a graphQL Query to find all labels assigned to a given
+     * labelable (issue, pull request, discussion, etc.).
+     *
+     * Exceptions or errors are captured in the queryContext (this method will not throw)
+     *
+     * @param queryContext Context for the query (client authentication, etc.)
+     * @param labeledId ID of the labelable (obscure string, not a number)
+     * @return list of {@link Label} (may return empty list, never null)
+     */
     public static List<Label> queryLabels(RepoQuery queryContext, String labeledId) {
         if (queryContext.hasErrors()) {
             return List.of();
@@ -49,17 +78,12 @@ public class Label extends CommonType {
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                        query($id: ID!, $after: String) {
-                            node(id: $id) {
-                                ... on Labelable {
-                                    labels(first: 100, after: $after) {
-                                        nodes {
-                                            color
-                                            description
-                                            id
-                                            isDefault
-                                            name
-                                            url
+                    query($id: ID!, $after: String) {
+                        node(id: $id) {
+                            ... on Labelable {
+                                labels(first: 100, after: $after) {
+                                    nodes {
+                                    """ + LABEL_FIELDS + """
                                         }
                                         pageInfo {
                                             hasNextPage
@@ -86,6 +110,14 @@ public class Label extends CommonType {
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allLabels);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
         } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+
         return labels;
+    }
+
+    /** Convert list of {@link GHLabel} into a list of {@link Label} */
+    public static List<Label> fromGHLabels(List<GHLabel> ghLabels) {
+        return ghLabels.stream()
+                .map(Label::new)
+                .toList();
     }
 }
