@@ -6,12 +6,10 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.github.CFGHApp;
 import org.jboss.logging.Logger;
 
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 
 public class Bot {
-
-    private static final Logger LOG = Logger.getLogger(Bot.class);
-
     @Inject
     BotConfig quarkusBotConfig;
 
@@ -19,11 +17,11 @@ public class Bot {
     CFGHApp installationManager;
 
     void init(@Observes StartupEvent startupEvent) {
-        LOG.infof("Bot started. dryRun=%s", quarkusBotConfig.isDryRun());
+        Log.infof("Bot started. dryRun=%s", quarkusBotConfig.isDryRun());
         try {
             installationManager.initializeCache();
         } catch (Exception e) {
-            LOG.error("Failed to validate", e);
+            Log.error("Failed to validate", e);
         }
     }
 }

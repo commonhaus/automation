@@ -8,8 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.BotConfig;
@@ -25,9 +26,8 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.runtime.github.GitHubService;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
-import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-@Singleton
+@ApplicationScoped
 public class CFGHApp {
     static final DateTimeFormatter DATE_TIME_PARSER_SLASHES = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm:ss Z");
@@ -36,6 +36,9 @@ public class CFGHApp {
 
     private final BotConfig quarkusBotConfig;
     private final GitHubService gitHubService;
+
+    @Inject
+    protected Instance<CFGHEventHandler> eventHandler;
 
     @Inject
     CFGHApp(BotConfig quarkusBotConfig, GitHubService gitHubService) {
@@ -96,8 +99,6 @@ public class CFGHApp {
             for (GHAppInstallation ghAppInstallation : ghApp.listInstallations()) {
                 InstallationInfo info = createInstallationInfo(ghAppInstallation);
                 installationInfo.put(ghAppInstallation.getId(), info);
-                Log.infof("[%s] GitHub App Login: %s",
-                        info.getInstallationId(), info.getLogin());
             }
         } catch (GHIOException e) {
             // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
@@ -112,12 +113,17 @@ public class CFGHApp {
     private InstallationInfo createInstallationInfo(GHAppInstallation ghAppInstallation)
             throws IOException, ExecutionException, InterruptedException {
         long ghiId = ghAppInstallation.getId();
-        String login = getViewer(gitHubService.getInstallationGraphQLClient(ghiId));
-        InstallationInfo info = new InstallationInfo(ghiId, login);
-
         // Get repositories this installation has access to
-        GitHub ic = gitHubService.getInstallationClient(ghiId);
-        GHAuthenticatedAppInstallation ghai = ic.getInstallation();
+        GitHub github = gitHubService.getInstallationClient(ghiId);
+        GHAuthenticatedAppInstallation ghai = github.getInstallation();
+
+        CFGHQueryHelper queryHelper = new CFGHQueryHelper(quarkusBotConfig, ghiId, gitHubService)
+                .addExisting(github);
+        String login = getViewer(queryHelper);
+
+        InstallationInfo info = new InstallationInfo(ghiId, login);
+        Log.infof("[%s] GitHub App Login: %s", ghiId, login);
+
         for (GHRepository ghRepository : ghai.listRepositories()) {
             CFGHRepoInfo repositoryInfo = new CFGHRepoInfo(ghRepository, ghiId);
             info.addRepositoryInfo(repositoryInfo);
@@ -127,16 +133,19 @@ public class CFGHApp {
         return info;
     }
 
-    String getViewer(DynamicGraphQLClient graphqlCLI) throws ExecutionException, InterruptedException {
-        Response response = graphqlCLI.executeSync("""
+    String getViewer(CFGHQueryHelper queryHelper) {
+        Response response = queryHelper.execQuerySync("""
                     query {
                         viewer {
                           login
                         }
-                """);
-        Log.debug(response.getData());
-        JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
-        return JsonAttribute.login.stringFrom(viewer);
+                    }
+                """, null);
+        if (!response.hasError()) {
+            JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
+            return JsonAttribute.login.stringFrom(viewer);
+        }
+        return "unknown";
     }
 
     public RepoQuery getRepoQueryContext(GHRepository ghRepository, GHAppInstallation ghai) {
