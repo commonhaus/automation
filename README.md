@@ -38,10 +38,10 @@ stateDiagram-v2
 
 The item should be closed once the vote concludes.
 
-- **① revise**: If the vote fails, the sponsor can withdraw the proposal in its entirety or they can work on a revised proposal in a new item (discussion, issue, or PR) that addresses concerns, and start the process again.
-- **② proceed**: If the vote passes, the proposal is adopted. That could mean an idea is accepted and work begins on a PR, it could mean that a PR is merged (e.g. for policy or bylaw changes).
+- **① revise**: If the consensus suggests revisions, the sponsor has the opportunity to refine the proposal. This can involve either withdrawing the proposal for comprehensive re-evaluation or creating a new item (like a discussion, issue, or PR) that incorporates the community's feedback.
+- **② proceed**: When the consensus is to proceed, it signals readiness to take the next steps with the proposal. This progression could involve beginning work on a related PR, implementing the proposed ideas, or any other actions necessary to bring the proposal to fruition.
 
-If work continues into a new item (either because it is revised, or because an approved proposal leads to a PR or other follow-on activity), cross-references should be added to both items.
+If work continues into a new item (revised proposal,  a PR for implementation, or other follow-on activity), cross-references should be added to both items.
 
 #### Label usage
 
