@@ -5,7 +5,7 @@ import java.util.List;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.QueryHelper.QueryContext;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -47,7 +47,7 @@ public class DiscussionCategory {
      *
      * @return list of discussion categories
      */
-    public static List<DiscussionCategory> queryDiscussionCategories(RepoQuery queryContext) {
+    public static List<DiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

@@ -1,14 +1,27 @@
 package org.commonhaus.automation.github.model;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.List;
 
+import jakarta.json.Json;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
+import jakarta.json.JsonReader;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
 
-import org.commonhaus.automation.github.CFGHApp;
+import org.kohsuke.github.GHAppInstallation;
+import org.kohsuke.github.GHOrganization;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+
+import com.fasterxml.jackson.databind.ObjectReader;
+
+import io.quarkus.logging.Log;
 
 /**
  * This enumeration defines and manages a set of known field names utilized in GitHub API responses.
@@ -125,6 +138,11 @@ public enum JsonAttribute {
     viewerHasUpvoted,
     ;
 
+    /** Bridge between JSON-B parsed types and Jackson-created GH* types */
+    static final ObjectReader ghApiReader = GitHub.getMappingObjectReader();
+    static final DateTimeFormatter DATE_TIME_PARSER_SLASHES = DateTimeFormatter
+            .ofPattern("yyyy/MM/dd HH:mm:ss Z");
+
     private final String nodeName;
     private final boolean alternateName;
 
@@ -210,9 +228,37 @@ public enum JsonAttribute {
         if (object == null) {
             return defaultValue;
         }
-        return alternateName
-                ? object.getInt(nodeName, object.getInt(name(), defaultValue))
-                : object.getInt(nodeName, defaultValue);
+        JsonValue value = alternateName
+                ? object.getOrDefault(nodeName, object.get(name()))
+                : object.get(nodeName);
+        return value == null || value.getValueType() == ValueType.NULL ? defaultValue : JsonNumber.class.cast(value).intValue();
+    }
+
+    /**
+     * @return Long with value from nodeName (or name()) attribute of object or null
+     */
+    public Long longFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonValue value = alternateName
+                ? object.getOrDefault(nodeName, object.get(name()))
+                : object.get(nodeName);
+        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).longValue();
+    }
+
+    /**
+     * @return long with value from nodeName (or name()) attribute of object or default value
+     */
+    public long longFrom(JsonObject object, long defaultValue) {
+        if (object == null) {
+            return defaultValue;
+        }
+        JsonValue value = alternateName
+                ? object.getOrDefault(nodeName, object.get(name()))
+                : object.get(nodeName);
+        return value == null || value.getValueType() == ValueType.NULL ? defaultValue
+                : JsonNumber.class.cast(value).longValue();
     }
 
     /**
@@ -225,7 +271,7 @@ public enum JsonAttribute {
         String timestamp = alternateName
                 ? object.getString(nodeName, object.getString(name(), null))
                 : object.getString(nodeName, null);
-        return CFGHApp.parseDate(timestamp);
+        return parseDate(timestamp);
     }
 
     /**
@@ -281,6 +327,44 @@ public enum JsonAttribute {
         }
         JsonObject field = jsonObjectFrom(object);
         return field == null ? null : new Label(field);
+    }
+
+    public List<Label> labelsFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonArray list = jsonArrayFrom(object);
+        if (list == null) {
+            return null;
+        }
+        return list.stream()
+                .map(JsonObject.class::cast)
+                .map(Label::new)
+                .toList();
+    }
+
+    /** Bridge to GH* type usually parsed using Jackson; may be incomplete */
+    public GHRepository repositoryFrom(JsonObject object) {
+        String value = stringFrom(object);
+        return value == null
+                ? null
+                : tryOrNull(value, GHRepository.class);
+    }
+
+    /** Bridge to GH* type usually parsed using Jackson; may be incomplete */
+    public GHOrganization organizationFrom(JsonObject object) {
+        String value = stringFrom(object);
+        return value == null
+                ? null
+                : tryOrNull(value, GHOrganization.class);
+    }
+
+    /** Bridge to GH* type usually parsed using Jackson; may be incomplete */
+    public GHAppInstallation appInstallationFrom(JsonObject object) {
+        String value = stringFrom(object);
+        return value == null
+                ? null
+                : tryOrNull(value, GHAppInstallation.class);
     }
 
     /** @return JsonObject with nodeName (or name()) from object */
@@ -349,5 +433,41 @@ public enum JsonAttribute {
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
         return value == null || value.getValueType() == ValueType.NULL ? null : value.toString();
+    }
+
+    private <T> T tryOrNull(String string, Class<T> clazz) {
+        try {
+            return ghApiReader.readValue(string, clazz);
+        } catch (IOException e) {
+            Log.debugf(e, "Unable to parse %s as %s", string, clazz);
+            return null;
+        }
+    }
+
+    /** Parses to Date as GitHubClient.parseDate does */
+    public static final Date parseDate(String timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+        return Date.from(parseInstant(timestamp));
+    }
+
+    /** Parses to Instant as GitHubClient.parseInstant does */
+    static Instant parseInstant(String timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+
+        if (timestamp.charAt(4) == '/') {
+            // Unsure where this is used, but retained for compatibility.
+            return Instant.from(DATE_TIME_PARSER_SLASHES.parse(timestamp));
+        } else {
+            return Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(timestamp));
+        }
+    }
+
+    public static JsonObject unpack(String payload) {
+        JsonReader reader = Json.createReader(new java.io.StringReader(payload));
+        return reader.readObject();
     }
 }

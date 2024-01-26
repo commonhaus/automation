@@ -8,7 +8,7 @@ import java.util.Map;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.kohsuke.github.GHLabel;
 
 import io.quarkus.logging.Log;
@@ -23,6 +23,15 @@ public class Label extends CommonType {
                 isDefault
                 name
                 url
+            """;
+
+    static final String FIRST_10_LABELS = """
+                labels(first: 10) {
+                    nodes {
+                    """ + LABEL_FIELDS + """
+                        }
+                    }
+                }
             """;
 
     public final String color;
@@ -63,7 +72,7 @@ public class Label extends CommonType {
      * @param labeledId ID of the labelable (obscure string, not a number)
      * @return list of {@link Label} (may return empty list, never null)
      */
-    public static List<Label> queryLabels(RepoQuery queryContext, String labeledId) {
+    public static List<Label> queryLabels(QueryContext queryContext, String labeledId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

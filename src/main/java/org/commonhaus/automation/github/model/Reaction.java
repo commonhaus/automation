@@ -9,7 +9,7 @@ import java.util.Map;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.QueryHelper.QueryContext;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -49,7 +49,7 @@ public class Reaction {
         return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
     }
 
-    public static List<Reaction> queryReactions(RepoQuery queryContext, String reactorId) {
+    public static List<Reaction> queryReactions(QueryContext queryContext, String reactorId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

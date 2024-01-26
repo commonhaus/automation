@@ -2,6 +2,8 @@ package org.commonhaus.automation.github.model;
 
 import jakarta.json.JsonObject;
 
+import org.kohsuke.github.GHUser;
+
 /**
  * Represents a user or bot that interacts with GitHub.
  *
@@ -12,11 +14,18 @@ public class Actor extends CommonType {
     public final String url;
     public final String avatarUrl;
 
-    public Actor(JsonObject author) {
-        super(author);
-        this.url = JsonAttribute.url.stringFrom(author);
-        this.avatarUrl = JsonAttribute.avatarUrl.stringFrom(author);
-        this.login = JsonAttribute.login.stringFrom(author);
+    public Actor(JsonObject senderUser) {
+        super(senderUser);
+        this.url = JsonAttribute.url.stringFrom(senderUser);
+        this.avatarUrl = JsonAttribute.avatarUrl.stringFrom(senderUser);
+        this.login = JsonAttribute.login.stringFrom(senderUser);
+    }
+
+    public Actor(GHUser senderUser) {
+        super(senderUser);
+        this.url = senderUser.getUrl().toString();
+        this.avatarUrl = senderUser.getAvatarUrl();
+        this.login = senderUser.getLogin();
     }
 
     public String toString() {

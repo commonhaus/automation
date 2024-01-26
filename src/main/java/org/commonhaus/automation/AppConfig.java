@@ -8,7 +8,7 @@ import io.smallrye.config.ConfigMapping;
  * Mapping for GitHub App and Discord Bot configuration
  */
 @ConfigMapping(prefix = "commonhaus-bot")
-public interface BotConfig {
+public interface AppConfig {
 
     Optional<Boolean> dryRun();
 

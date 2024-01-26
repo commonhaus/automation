@@ -9,7 +9,7 @@ import java.util.Map;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.CFGHQueryHelper.RepoQuery;
+import org.commonhaus.automation.github.QueryHelper.QueryContext;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
@@ -35,6 +35,7 @@ public class Discussion extends CommonItem {
             answerChosenAt
             body
             bodyText
+            """ + Label.FIRST_10_LABELS + """
             closed
             closedAt
             createdAt
@@ -45,6 +46,7 @@ public class Discussion extends CommonItem {
                 """;
 
     public final DiscussionCategory category;
+    public final List<Label> labels;
 
     public final boolean isAnswered;
     public final Date answerChosenAt;
@@ -55,6 +57,7 @@ public class Discussion extends CommonItem {
         super(object);
 
         this.category = JsonAttribute.category.discussionCategoryFrom(object);
+        this.labels = JsonAttribute.labels.labelsFrom(object);
         this.isAnswered = JsonAttribute.isAnswered.booleanFromOrFalse(object);
         this.answerChosenAt = JsonAttribute.answerChosenAt.dateFrom(object);
         this.upvoteCount = JsonAttribute.upvoteCount.integerFrom(object);
@@ -71,7 +74,7 @@ public class Discussion extends CommonItem {
      * @param isOpen true for open discussions, false for non-open discussions
      * @return list of discussions
      */
-    public static List<Discussion> queryDiscussions(RepoQuery queryContext, boolean isOpen) {
+    public static List<Discussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -118,7 +121,7 @@ public class Discussion extends CommonItem {
      *
      * @return list of discussion categories
      */
-    public static Discussion editDiscussion(RepoQuery queryContext, Discussion discussion, String modifiedText) {
+    public static Discussion editDiscussion(QueryContext queryContext, Discussion discussion, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", modifiedText);
@@ -146,7 +149,7 @@ public class Discussion extends CommonItem {
     /**
      * Exceptions and errors are captured for caller in the queryContext
      */
-    public static DiscussionComment addComment(RepoQuery queryContext, Discussion discussion, String markdownText) {
+    public static DiscussionComment addComment(QueryContext queryContext, Discussion discussion, String markdownText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", markdownText);
