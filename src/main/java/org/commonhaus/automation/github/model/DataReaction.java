@@ -19,7 +19,7 @@ import io.smallrye.graphql.client.Response;
  *
  * This is not available to webhook events.
  */
-public class Reaction {
+public class DataReaction {
     static final String REACTION_FIELDS = """
             user {
                 id
@@ -31,13 +31,13 @@ public class Reaction {
             createdAt
             """;
 
-    public final Actor user;
+    public final DataActor user;
     public final Date createdAt;
     public final String content;
     public final String id;
     public final String reactableId; // "parent" id
 
-    Reaction(JsonObject object) {
+    DataReaction(JsonObject object) {
         this.content = JsonAttribute.content.stringFrom(object);
         this.createdAt = JsonAttribute.createdAt.dateFrom(object);
         this.id = JsonAttribute.id.stringFrom(object);
@@ -49,12 +49,12 @@ public class Reaction {
         return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
     }
 
-    public static List<Reaction> queryReactions(QueryContext queryContext, String reactorId) {
+    public static List<DataReaction> queryReactions(QueryContext queryContext, String reactorId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
         Log.debugf("queryReactions for reactable %s", reactorId);
-        List<Reaction> reactions = new ArrayList<>();
+        List<DataReaction> reactions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);
 
@@ -90,7 +90,7 @@ public class Reaction {
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allReactions);
             reactions.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
-                    .map(Reaction::new)
+                    .map(DataReaction::new)
                     .toList());
 
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allReactions);

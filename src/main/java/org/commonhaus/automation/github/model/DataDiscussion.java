@@ -14,28 +14,26 @@ import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
-public class Discussion extends CommonItem {
+public class DataDiscussion extends DataCommonItem {
 
     static final String DISCUSSION_FIELDS = """
             id
             number
             title
             category {
-                name
-                id
-                emoji
+                """ + DataDiscussionCategory.DISCUSSION_CATEGORY_FIELDS + """
             }
             author {
+                avatarUrl
                 login
                 url
-                avatarUrl
             }
             authorAssociation
             activeLockReason
             answerChosenAt
             body
             bodyText
-            """ + Label.FIRST_10_LABELS + """
+            """ + DataLabel.FIRST_10_LABELS + """
             closed
             closedAt
             createdAt
@@ -45,15 +43,15 @@ public class Discussion extends CommonItem {
             url
                 """;
 
-    public final DiscussionCategory category;
-    public final List<Label> labels;
+    public final DataDiscussionCategory category;
+    public final List<DataLabel> labels;
 
     public final boolean isAnswered;
     public final Date answerChosenAt;
 
     public final Integer upvoteCount;
 
-    Discussion(JsonObject object) {
+    DataDiscussion(JsonObject object) {
         super(object);
 
         this.category = JsonAttribute.category.discussionCategoryFrom(object);
@@ -74,11 +72,11 @@ public class Discussion extends CommonItem {
      * @param isOpen true for open discussions, false for non-open discussions
      * @return list of discussions
      */
-    public static List<Discussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
+    public static List<DataDiscussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
-        List<Discussion> discussions = new ArrayList<>();
+        List<DataDiscussion> discussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("isOpen", isOpen);
 
@@ -107,7 +105,7 @@ public class Discussion extends CommonItem {
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allDiscussions);
             discussions.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
-                    .map(Discussion::new)
+                    .map(DataDiscussion::new)
                     .toList());
 
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allDiscussions);
@@ -121,7 +119,7 @@ public class Discussion extends CommonItem {
      *
      * @return list of discussion categories
      */
-    public static Discussion editDiscussion(QueryContext queryContext, Discussion discussion, String modifiedText) {
+    public static DataDiscussion editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", modifiedText);
@@ -149,7 +147,7 @@ public class Discussion extends CommonItem {
     /**
      * Exceptions and errors are captured for caller in the queryContext
      */
-    public static DiscussionComment addComment(QueryContext queryContext, Discussion discussion, String markdownText) {
+    public static DataDiscussionComment addComment(QueryContext queryContext, DataDiscussion discussion, String markdownText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussion.id);
         variables.put("comment", markdownText);
@@ -158,7 +156,7 @@ public class Discussion extends CommonItem {
                 mutation($discussionId: ID!, $comment: String!) {
                     addDiscussionComment(input: {discussionId: $discussionId, body: $comment}) {
                         comment {
-                            """ + DiscussionComment.DISCUSSION_COMMENT_WITH_REPLY_FIELDS + """
+                            """ + DataDiscussionComment.DISCUSSION_COMMENT_WITH_REPLY_FIELDS + """
                         }
                     }
                 }

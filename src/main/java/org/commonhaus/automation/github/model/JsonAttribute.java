@@ -136,6 +136,7 @@ public enum JsonAttribute {
     viewerCannotUpdateReasons,
     viewerDidAuthor,
     viewerHasUpvoted,
+    slug,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -277,59 +278,59 @@ public enum JsonAttribute {
     /**
      * @return Actor constructed from nodeName (or name()) attribute of object
      */
-    public Actor actorFrom(JsonObject object) {
+    public DataActor actorFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         JsonObject field = jsonObjectFrom(object);
-        return field == null ? null : new Actor(field);
+        return field == null ? null : new DataActor(field);
     }
 
     /**
      * @return Discussion constructed from nodeName (or name()) attribute of object
      */
-    public Discussion discussionFrom(JsonObject object) {
+    public DataDiscussion discussionFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         JsonObject field = jsonObjectFrom(object);
-        return field == null ? null : new Discussion(field);
+        return field == null ? null : new DataDiscussion(field);
     }
 
     /**
      * @return DiscussionCategory constructed from nodeName (or name()) attribute of object
      */
-    public DiscussionCategory discussionCategoryFrom(JsonObject object) {
+    public DataDiscussionCategory discussionCategoryFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         JsonObject field = jsonObjectFrom(object);
-        return field == null ? null : new DiscussionCategory(field);
+        return field == null ? null : new DataDiscussionCategory(field);
     }
 
     /**
      * @return DiscussionComment constructed from nodeName (or name()) attribute of object
      */
-    public DiscussionComment discussionCommentFrom(JsonObject object) {
+    public DataDiscussionComment discussionCommentFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         JsonObject field = jsonObjectFrom(object);
-        return field == null ? null : new DiscussionComment(field);
+        return field == null ? null : new DataDiscussionComment(field);
     }
 
     /**
      * @return Label constructed from nodeName (or name()) attribute of object
      */
-    public Label labelFrom(JsonObject object) {
+    public DataLabel labelFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         JsonObject field = jsonObjectFrom(object);
-        return field == null ? null : new Label(field);
+        return field == null ? null : new DataLabel(field);
     }
 
-    public List<Label> labelsFrom(JsonObject object) {
+    public List<DataLabel> labelsFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
@@ -339,7 +340,7 @@ public enum JsonAttribute {
         }
         return list.stream()
                 .map(JsonObject.class::cast)
-                .map(Label::new)
+                .map(DataLabel::new)
                 .toList();
     }
 

@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github;
 
-import org.commonhaus.automation.github.RepositoryAppConfig.ConfigToggle;
+import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
 
 /**
  * Highlevel workflow to manage voting.
@@ -21,7 +21,7 @@ public class Voting {
         return repoConfigFile.voting;
     }
 
-    public static class Config extends ConfigToggle {
+    public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
             public boolean isEnabled() {

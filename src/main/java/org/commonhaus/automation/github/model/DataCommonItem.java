@@ -4,7 +4,7 @@ import java.util.Date;
 
 import jakarta.json.JsonObject;
 
-public class CommonItem extends CommonObject {
+public class DataCommonItem extends DataCommonObject {
 
     /** Issue/Discussion/PR number within repository */
     public final Integer number;
@@ -24,7 +24,7 @@ public class CommonItem extends CommonObject {
     public final boolean locked;
     public final String activeLockReason;
 
-    public CommonItem(JsonObject object) {
+    public DataCommonItem(JsonObject object) {
         super(object);
 
         this.number = JsonAttribute.number.integerFrom(object);

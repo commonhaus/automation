@@ -1,27 +1,27 @@
 {
-    "action": "unlabeled",
+    "action": "created",
     "discussion": {
         "repository_url": "https://api.github.com/repos/commonhaus/automation-test",
         "category": {
-            "id": 40988635,
-            "node_id": "DIC_kwDOLDuJqs4CcW_b",
+            "id": 40988632,
+            "node_id": "DIC_kwDOLDuJqs4CcW_Y",
             "repository_id": 742099370,
-            "emoji": ":bulb:",
-            "name": "Ideas",
-            "description": "Share ideas for new features",
+            "emoji": ":mega:",
+            "name": "Announcements",
+            "description": "Updates from maintainers",
             "created_at": "2024-01-11T14:00:10.000-05:00",
             "updated_at": "2024-01-11T14:00:10.000-05:00",
-            "slug": "ideas",
+            "slug": "announcements",
             "is_answerable": false
         },
         "answer_html_url": null,
         "answer_chosen_at": null,
         "answer_chosen_by": null,
-        "html_url": "https://github.com/commonhaus/automation-test/discussions/5",
-        "id": 6084673,
-        "node_id": "D_kwDOLDuJqs4AXNhB",
-        "number": 5,
-        "title": "new idea",
+        "html_url": "https://github.com/commonhaus/automation-test/discussions/12",
+        "id": 6137420,
+        "node_id": "D_kwDOLDuJqs4AXaZM",
+        "number": 12,
+        "title": "Another new announcement (no label)",
         "user": {
             "login": "ebullient",
             "id": 808713,
@@ -45,34 +45,25 @@
         "state": "open",
         "state_reason": null,
         "locked": false,
-        "comments": 1,
-        "created_at": "2024-01-17T03:49:20Z",
-        "updated_at": "2024-01-17T04:02:20Z",
+        "comments": 0,
+        "created_at": "2024-01-26T23:34:55Z",
+        "updated_at": "2024-01-26T23:34:55Z",
         "author_association": "CONTRIBUTOR",
         "active_lock_reason": null,
-        "body": "an idea",
+        "body": "Thing with stuff",
         "reactions": {
-            "url": "https://api.github.com/repos/commonhaus/automation-test/discussions/5/reactions",
-            "total_count": 1,
+            "url": "https://api.github.com/repos/commonhaus/automation-test/discussions/12/reactions",
+            "total_count": 0,
             "+1": 0,
             "-1": 0,
             "laugh": 0,
             "hooray": 0,
             "confused": 0,
-            "heart": 1,
+            "heart": 0,
             "rocket": 0,
             "eyes": 0
         },
-        "timeline_url": "https://api.github.com/repos/commonhaus/automation-test/discussions/5/timeline"
-    },
-    "label": {
-        "id": 6420110645,
-        "node_id": "LA_kwDOLDuJqs8AAAABfqsdNQ",
-        "url": "https://api.github.com/repos/commonhaus/automation-test/labels/bug",
-        "name": "bug",
-        "color": "d73a4a",
-        "default": true,
-        "description": "Something isn't working"
+        "timeline_url": "https://api.github.com/repos/commonhaus/automation-test/discussions/12/timeline"
     },
     "repository": {
         "id": 742099370,
@@ -193,7 +184,7 @@
         "members_url": "https://api.github.com/orgs/commonhaus/members{/member}",
         "public_members_url": "https://api.github.com/orgs/commonhaus/public_members{/member}",
         "avatar_url": "https://avatars.githubusercontent.com/u/144493209?v=4",
-        "description": null
+        "description": ""
     },
     "sender": {
         "login": "ebullient",

@@ -1,20 +1,27 @@
 package org.commonhaus.automation.github.rules;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.DataLabel;
 
 public class MatchLabel {
     List<String> labels;
 
     public boolean matches(QueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        if (eventData == null) {
+        String id = eventData.getLabelableId();
+        if (id == null) {
             return false;
         }
 
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'matches'");
+        Collection<DataLabel> eventLabels = queryContext.getCachedLabels(id);
+        if (eventLabels == null || eventLabels.isEmpty()) {
+            return false;
+        }
+
+        return false;
     }
 }

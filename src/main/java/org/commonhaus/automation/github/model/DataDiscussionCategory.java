@@ -10,18 +10,29 @@ import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
-public class DiscussionCategory {
+public class DataDiscussionCategory {
 
-    /** {@literal id} for GraphQL queries or {@literal node_id} for webhook events */
+    static final String DISCUSSION_CATEGORY_FIELDS = """
+            description
+            emoji
+            id
+            name
+            slug
+            """;
+
+    /**
+     * {@literal id} for GraphQL queries or {@literal node_id} for webhook events
+     */
     public final String id;
     /** {@literal id} for webhook events */
     public final Integer webhook_id;
 
     public final String name;
+    public final String slug;
     public final String description;
     public final String emoji;
 
-    DiscussionCategory(JsonObject category) {
+    DataDiscussionCategory(JsonObject category) {
         String node_id = JsonAttribute.node_id.stringFrom(category);
         if (node_id != null) {
             // Webhook
@@ -36,6 +47,7 @@ public class DiscussionCategory {
         this.name = JsonAttribute.name.stringFrom(category);
         this.description = JsonAttribute.description.stringFrom(category);
         this.emoji = JsonAttribute.emoji.stringFrom(category);
+        this.slug = JsonAttribute.slug.stringFrom(category);
     }
 
     public String toString() {
@@ -47,19 +59,16 @@ public class DiscussionCategory {
      *
      * @return list of discussion categories
      */
-    public static List<DiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
+    public static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
         Response response = queryContext.execRepoQuerySync("""
-                    query($name: String!, $owner: String!) {
-                        repository(owner: $owner, name: $name) {
-                            discussionCategories(first: 25) {
-                                nodes {
-                                    name
-                                    description
-                                    emoji
-                                    id
+                query($name: String!, $owner: String!) {
+                    repository(owner: $owner, name: $name) {
+                        discussionCategories(first: 25) {
+                            nodes {
+                                """ + DISCUSSION_CATEGORY_FIELDS + """
                                 }
                             }
                         }
@@ -75,7 +84,7 @@ public class DiscussionCategory {
 
         return categories.stream()
                 .map(JsonObject.class::cast)
-                .map(DiscussionCategory::new)
+                .map(DataDiscussionCategory::new)
                 .toList();
     }
 }

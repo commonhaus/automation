@@ -4,11 +4,11 @@ import java.util.Date;
 
 import jakarta.json.JsonObject;
 
-public class DiscussionComment extends CommonComment {
+public class DataDiscussionComment extends DataCommonComment {
 
     static final String DISCUSSION_COMMENT_FIELDS = COMMENT_FIELDS + """
             discussion {
-                """ + Discussion.DISCUSSION_FIELDS + """
+                """ + DataDiscussion.DISCUSSION_FIELDS + """
             }
             isAnswer
             """;
@@ -26,8 +26,8 @@ public class DiscussionComment extends CommonComment {
     public final Date deletedAt;
     public final boolean isAnswer;
 
-    public final Discussion discussion;
-    public final DiscussionComment replyTo;
+    public final DataDiscussion discussion;
+    public final DataDiscussionComment replyTo;
 
     public final boolean viewerCanDelete;
     public final boolean viewerCanMarkAsAnswer;
@@ -39,7 +39,7 @@ public class DiscussionComment extends CommonComment {
     public final String viewerCannotUpdateReasons;
     public final boolean viewerHasUpvoted;
 
-    public DiscussionComment(JsonObject object) {
+    public DataDiscussionComment(JsonObject object) {
         super(object);
         this.discussion_id = JsonAttribute.discussion_id.integerFrom(object);
         this.parent_id = JsonAttribute.parent_id.integerFrom(object);

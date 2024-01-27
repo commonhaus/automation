@@ -30,17 +30,17 @@
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
     <formatter-plugin.version>2.23.0</formatter-plugin.version>
     <impsort-plugin.version>1.9.0</impsort-plugin.version>
+    <surefire-plugin.version>3.2.3</surefire-plugin.version>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <quarkus-github-app.version>999-SNAPSHOT</quarkus-github-app.version>
+    <quarkus-github-app.version>2.2.0</quarkus-github-app.version>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
     <quarkus.platform.version>3.6.5</quarkus.platform.version>
     <revision>1.0.0-SNAPSHOT</revision>
     <skipITs>true</skipITs>
     <skipTests>false</skipTests>
-    <surefire-plugin.version>3.2.3</surefire-plugin.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -62,6 +62,10 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-arc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-qute</artifactId>
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>

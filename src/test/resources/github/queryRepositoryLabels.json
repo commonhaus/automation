@@ -1,0 +1,66 @@
+{
+  "repository": {
+    "labels": {
+      "nodes": [
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdNQ",
+          "name": "bug",
+          "color": "d73a4a",
+          "description": "Something isn't working"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdOw",
+          "name": "documentation",
+          "color": "0075ca",
+          "description": "Improvements or additions to documentation"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdQQ",
+          "name": "duplicate",
+          "color": "cfd3d7",
+          "description": "This issue or pull request already exists"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdRQ",
+          "name": "enhancement",
+          "color": "a2eeef",
+          "description": "New feature or request"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdSw",
+          "name": "good first issue",
+          "color": "7057ff",
+          "description": "Good for newcomers"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdTg",
+          "name": "help wanted",
+          "color": "008672",
+          "description": "Extra attention is needed"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdUw",
+          "name": "invalid",
+          "color": "e4e669",
+          "description": "This doesn't seem right"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdVg",
+          "name": "question",
+          "color": "d876e3",
+          "description": "Further information is requested"
+        },
+        {
+          "id": "LA_kwDOLDuJqs8AAAABfqsdWA",
+          "name": "wontfix",
+          "color": "ffffff",
+          "description": "This will not be worked on"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "MTA"
+      }
+    }
+  }
+}

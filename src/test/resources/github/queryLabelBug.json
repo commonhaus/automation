@@ -1,0 +1,20 @@
+{
+  "node": {
+    "labels": {
+      "nodes": [
+        {
+          "color": "d73a4a",
+          "description": "Something isn't working",
+          "id": "LA_kwDOLDuJqs8AAAABfqsdNQ",
+          "isDefault": true,
+          "name": "bug",
+          "url": "https://github.com/commonhaus/automation-test/labels/bug"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "MQ"
+      }
+    }
+  }
+}

@@ -1,15 +1,14 @@
 package org.commonhaus.automation.github;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.QueryHelper.QueryContext;
-import org.commonhaus.automation.github.RepositoryAppConfig.ConfigToggle;
+import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
+import org.commonhaus.automation.github.RepositoryAppConfig.DiscussionConfig;
+import org.commonhaus.automation.github.RepositoryAppConfig.PullRequestConfig;
 import org.commonhaus.automation.github.actions.Action;
 import org.commonhaus.automation.github.rules.Rule;
 import org.kohsuke.github.GHEventPayload;
@@ -33,20 +32,20 @@ public class Notice {
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param discussion GitHub API parsed payload
+     * @param discussionPayload GitHub API parsed payload; connected GHRepository and GHOrganization
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
     void onDiscussionEvent(GitHubEvent event, GitHub github,
-            @Discussion GHEventPayload.Discussion discussion,
+            @Discussion.Created @Discussion.CategoryChanged @Discussion.Edited GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        Log.debugf("notice.onDiscussionEvent (%s): %s %s", noticeConfig.isEnabled(), event.getEventAction(),
-                event.getPayload());
+        Log.tracef("notice.onDiscussionEvent (%s): %s",
+                event.getEventAction(), event.getPayload());
         if (!noticeConfig.isEnabled()) {
             return;
         }
 
-        final EventData initialData = new EventData(event, discussion);
+        final EventData initialData = new EventData(event, discussionPayload);
         QueryContext queryContext = queryHelper.newQueryContext(initialData, github);
 
         Set<String> actions = new HashSet<>();
@@ -54,6 +53,21 @@ public class Notice {
             if (rule.matches(queryContext)) {
                 actions.addAll(rule.then);
             }
+        }
+        Log.debugf("notice.onDiscussionEvent (%s): Discussion #%s triggered (%s) actions: %s",
+                event.getEventAction(), discussionPayload.getDiscussion().getNumber(), actions.size(), actions);
+
+        if (actions.isEmpty()) {
+            return;
+        }
+
+        for (String actionName : actions) {
+            Action action = noticeConfig.actions.get(actionName);
+            if (action == null) {
+                Log.warnf("notice.onDiscussionEvent (%s): Action '%s' not found", event.getEventAction(), actionName);
+                continue;
+            }
+            action.apply(queryContext);
         }
     }
 
@@ -77,7 +91,6 @@ public class Notice {
 
         QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussion), github);
 
-
     }
 
     static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
@@ -87,7 +100,7 @@ public class Notice {
         return repoConfigFile.notice;
     }
 
-    public static class Config extends ConfigToggle {
+    public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
             public boolean isEnabled() {
@@ -99,15 +112,5 @@ public class Notice {
 
         @JsonProperty("pull_request")
         public PullRequestConfig pullRequest;
-
-        public Map<String, Action> actions = new HashMap<>();
-    }
-
-    public static class DiscussionConfig {
-        public List<Rule> rules;
-    }
-
-    public static class PullRequestConfig {
-        public List<Rule> rules;
     }
 }

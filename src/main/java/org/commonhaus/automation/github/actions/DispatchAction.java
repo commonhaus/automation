@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github.actions;
 
+import org.commonhaus.automation.github.QueryHelper.QueryContext;
+
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -9,4 +11,9 @@ public class DispatchAction extends Action {
 
     @JsonAlias("name")
     String workflowName;
+
+    @Override
+    public void apply(QueryContext queryContext) {
+
+    }
 }

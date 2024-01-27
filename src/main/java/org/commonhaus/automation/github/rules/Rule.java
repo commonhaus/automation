@@ -16,14 +16,22 @@ public class Rule {
     final static TypeReference<List<String>> LIST_STRING = new TypeReference<>() {
     };
 
+    MatchAction action;
     MatchCategory category;
     MatchFilePath path;
     MatchLabel label;
 
     public List<String> then;
 
+    public boolean usesLabels() {
+        return label != null;
+    }
+
     public boolean matches(QueryContext queryContext) {
         boolean matches = true;
+        if (action != null) {
+            matches &= action.matches(queryContext);
+        }
         if (category != null) {
             matches &= category.matches(queryContext);
         }
@@ -52,17 +60,21 @@ public class Rule {
             ObjectMapper mapper = (ObjectMapper) p.getCodec();
             JsonNode node = mapper.readTree(p);
             Rule rule = new Rule();
+            if (node.has("action")) {
+                rule.action = new MatchAction();
+                rule.action.actions = mapper.convertValue(node.get("action"), LIST_STRING);
+            }
             if (node.has("category")) {
                 rule.category = new MatchCategory();
                 rule.category.category = mapper.convertValue(node.get("category"), LIST_STRING);
             }
-            if (node.has("path")) {
-                rule.path = new MatchFilePath();
-                rule.path.paths = mapper.convertValue(node.get("path"), LIST_STRING);
-            }
             if (node.has("label")) {
                 rule.label = new MatchLabel();
                 rule.label.labels = mapper.convertValue(node.get("then"), LIST_STRING);
+            }
+            if (node.has("path")) {
+                rule.path = new MatchFilePath();
+                rule.path.paths = mapper.convertValue(node.get("path"), LIST_STRING);
             }
             if (node.has("then")) {
                 rule.then = mapper.convertValue(node.get("then"), LIST_STRING);

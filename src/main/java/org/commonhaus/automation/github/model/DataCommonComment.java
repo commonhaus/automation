@@ -2,7 +2,7 @@ package org.commonhaus.automation.github.model;
 
 import jakarta.json.JsonObject;
 
-public class CommonComment extends CommonObject {
+public class DataCommonComment extends DataCommonObject {
 
     static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
             body
@@ -14,7 +14,7 @@ public class CommonComment extends CommonObject {
 
     public final boolean viewerDidAuthor;
 
-    public CommonComment(JsonObject object) {
+    public DataCommonComment(JsonObject object) {
         super(object);
 
         this.includesCreatedEdit = JsonAttribute.includesCreatedEdit.booleanFromOrFalse(object);

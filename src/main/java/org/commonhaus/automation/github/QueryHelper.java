@@ -2,20 +2,22 @@ package org.commonhaus.automation.github;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.AppConfig;
+import org.commonhaus.automation.github.model.DataLabel;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
-import io.quarkiverse.githubapp.runtime.sse.HttpEventStreamClient.Event;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
@@ -23,6 +25,8 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @ApplicationScoped
 public class QueryHelper {
+
+    public static final Map<String, ConcurrentHashMap<String, Object>> itemCache = new ConcurrentHashMap<>();
 
     @Inject
     AppConfig botConfig;
@@ -36,6 +40,19 @@ public class QueryHelper {
 
     public QueryContext newQueryContext(EventData eventData, GitHub github) {
         return newQueryContext(eventData).addExisting(github);
+    }
+
+    static <T> T getCache(String itemId, String key, Class<T> type) {
+        Map<String, Object> cache = itemCache.computeIfAbsent(itemId, k -> new ConcurrentHashMap<>());
+        Object value = cache.get(key);
+        return value == null
+                ? null
+                : type.cast(value);
+    }
+
+    static void putCache(String itemId, String key, Object value) {
+        Map<String, Object> cache = itemCache.computeIfAbsent(itemId, k -> new ConcurrentHashMap<>());
+        cache.put(key, value);
     }
 
     /**
@@ -202,6 +219,97 @@ public class QueryHelper {
             variables.putIfAbsent("owner", evt.getRepoOwner());
             variables.putIfAbsent("name", evt.getRepoName());
             return execQuerySync(query, variables);
+        }
+
+        public <T> T getCache(String itemId, String key, Class<T> type) {
+            return QueryHelper.getCache(itemId, key, type);
+        }
+
+        public void putCache(String itemId, String key, Object value) {
+            QueryHelper.putCache(itemId, key, value);
+        }
+
+        /**
+         * Get labels for the labelable item
+         *
+         * @param cacheId Labelable item node id
+         * @return collection of labels for the item
+         */
+        public Collection<DataLabel> getCachedLabels(String itemId) {
+            Collection<DataLabel> labels = getCache(itemId, "labels", Collection.class);
+            if (labels != null) {
+                return labels;
+            }
+            // fresh fetch graphQL fetch
+            labels = DataLabel.queryLabels(this, itemId);
+            if (labels != null) {
+                putCache(itemId, "labels", labels);
+            }
+            return labels;
+        }
+
+        /**
+         * Add a label from the list of known labels if the associated item has been seen/cached
+         *
+         * @param cacheId Labelable item node id
+         * @param label Label to add
+         * @return updated collection of labels for the item, or null if not cached
+         */
+        public Collection<DataLabel> addCachedLabel(String cacheId, DataLabel label) {
+            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
+            if (cache == null) {
+                return null; // ignore items we've never seen
+            }
+            getCachedLabels(cacheId); // ensure labels are cached (if not already)
+
+            // merge/update cache w/ new label
+            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
+                ((Collection<DataLabel>) x).add(label);
+                return x;
+            });
+        }
+
+        /**
+         * Remove a label from the list of known labels if the associated item exists
+         *
+         * @param cacheId Labelable item node id
+         * @param label Label to remove
+         * @return updated collection of labels for the item, or null if not cached
+         */
+        public Collection<DataLabel> removeCachedLabel(String cacheId, DataLabel label) {
+            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
+            if (cache == null) {
+                return null; // ignore items we've never seen
+            }
+            getCachedLabels(cacheId); // ensure labels are cached (if not already)
+
+            // merge/update cache to remove
+            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
+                ((Collection<DataLabel>) x).remove(label);
+                return x;
+            });
+        }
+
+        /**
+         * Update a label in the cache if the associated item exists
+         *
+         * @param cacheId Labelable item node id
+         * @param label Label to update/replace
+         * @return updated collection of labels for the item, or null if not cached
+         */
+        public Collection<DataLabel> updateCachedLabel(String cacheId, DataLabel label) {
+            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
+            if (cache == null) {
+                return null; // ignore items we've never seen
+            }
+            getCachedLabels(cacheId); // ensure labels are cached (if not already)
+
+            // merge/update cached list
+            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
+                ((Collection<DataLabel>) x).remove(label); // remove old (if exists)
+                ((Collection<DataLabel>) x).add(label); // replace with updated
+                return x;
+            });
         }
     }
 }

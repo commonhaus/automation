@@ -7,7 +7,7 @@ import jakarta.json.JsonObject;
 /**
  * Common elements for Discussions, Issues, and Pull Requests
  */
-public class CommonObject extends CommonType {
+public class DataCommonObject extends DataCommonType {
 
     static final String COMMON_OBJECT_FIELDS = """
             id
@@ -30,7 +30,7 @@ public class CommonObject extends CommonType {
             url
                 """;
 
-    public final Actor author;
+    public final DataActor author;
     public final String authorAssociation;
 
     public final String url;
@@ -41,11 +41,11 @@ public class CommonObject extends CommonType {
     public final String body;
 
     // Updatable
-    public final Actor editor;
+    public final DataActor editor;
     public final Date updatedAt;
     public final Date lastEditedAt;
 
-    public CommonObject(JsonObject object) {
+    public DataCommonObject(JsonObject object) {
         super(object);
 
         if (isWebhookData()) {

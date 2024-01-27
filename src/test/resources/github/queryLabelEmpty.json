@@ -1,0 +1,12 @@
+{
+  "node": {
+    "labels": {
+      "nodes": [
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "MQ"
+      }
+    }
+  }
+}
