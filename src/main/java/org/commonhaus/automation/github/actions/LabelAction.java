@@ -44,7 +44,8 @@ public class LabelAction extends Action {
         }
 
         if (!newLabels.isEmpty()) {
-            DataLabel.modifyLabels(queryContext, nodeId, newLabels);
+            // Modify labels and update cache
+            queryContext.modifyLabels(nodeId, newLabels);
         }
     }
 }

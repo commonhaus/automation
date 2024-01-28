@@ -137,6 +137,8 @@ public enum JsonAttribute {
     viewerDidAuthor,
     viewerHasUpvoted,
     slug,
+    labelable,
+    addLabelsToLabelable,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */

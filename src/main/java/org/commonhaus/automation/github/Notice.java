@@ -38,9 +38,8 @@ public class Notice {
     void onDiscussionEvent(GitHubEvent event, GitHub github,
             @Discussion.Created @Discussion.CategoryChanged @Discussion.Edited GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        Log.tracef("notice.onDiscussionEvent (%s): %s",
-                event.getEventAction(), event.getPayload());
         if (!noticeConfig.isEnabled()) {
             return;
         }
@@ -90,7 +89,6 @@ public class Notice {
         }
 
         QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussion), github);
-
     }
 
     static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {

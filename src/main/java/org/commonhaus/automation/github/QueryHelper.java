@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
@@ -174,6 +175,10 @@ public class QueryHelper {
             if (hasErrors()) {
                 return null;
             }
+            if (botConfig.isDryRun() && query.contains("mutation")) {
+                Log.infof("DryRun would execute the following query :: %s :: with attributes :: %s", query, variables);
+                return null;
+            }
 
             DynamicGraphQLClient graphqlCLI = getGraphQLClient();
             Response response = null;
@@ -238,6 +243,7 @@ public class QueryHelper {
         public Collection<DataLabel> getCachedLabels(String itemId) {
             Collection<DataLabel> labels = getCache(itemId, "labels", Collection.class);
             if (labels != null) {
+                System.out.println(":: HIT :: " + itemId + " ::: ");
                 return labels;
             }
             // fresh fetch graphQL fetch
@@ -245,6 +251,7 @@ public class QueryHelper {
             if (labels != null) {
                 putCache(itemId, "labels", labels);
             }
+            System.out.println(":: UPDATE :: " + itemId + " ::: ");
             return labels;
         }
 
@@ -310,6 +317,22 @@ public class QueryHelper {
                 ((Collection<DataLabel>) x).add(label); // replace with updated
                 return x;
             });
+        }
+
+        /**
+         * Add a label from the list of known labels if the associated item has been seen/cached
+         *
+         * @param cacheId Labelable item node id
+         * @param labels updated Set of labels (e.g. post modify command)
+         * @return updated collection of labels for the item, or null if not cached
+         */
+        public Collection<DataLabel> modifyLabels(String cacheId, List<DataLabel> labels) {
+            Set<DataLabel> newLabels = DataLabel.modifyLabels(this, cacheId, labels);
+            if (newLabels == null) {
+                return null;
+            }
+            QueryHelper.putCache(cacheId, "labels", newLabels);
+            return newLabels;
         }
     }
 }

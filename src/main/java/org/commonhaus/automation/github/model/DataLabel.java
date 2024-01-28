@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
@@ -33,6 +34,17 @@ public class DataLabel extends DataCommonType {
                         }
                     }
                 }
+            """;
+    static final String PAGINATED_LABELS = """
+            labels(first: 50, after: $after) {
+                nodes {
+                """ + LABEL_FIELDS + """
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
             """;
 
     public final String color;
@@ -131,55 +143,77 @@ public class DataLabel extends DataCommonType {
         if (queryContext.hasErrors()) {
             return null;
         }
-        boolean repositoryQuery = false;
         String query = """
                 query($id: ID!, $after: String) {
                     node(id: $id) {
                         ... on Labelable {
-                            labels(first: 100, after: $after) {
-                                nodes {
-                                """ + LABEL_FIELDS + """
-                                    }
-                                    pageInfo {
-                                        hasNextPage
-                                        endCursor
-                                    }
-                                }
-                            }
+                        """ + PAGINATED_LABELS + """
                         }
                     }
+                }
                 """;
 
         // A Repository has an id, and it has labels, but it is not a Labelable.
         // we need to alter the query a little bit to get the labels.
         if (labeledId.equals(queryContext.getEventData().getRepositoryId())) {
-            repositoryQuery = true;
             query = """
-                query($owner: String!, $name: String!, $after: String) {
-                    repository(owner: $owner, name: $name) {
-                      labels(first: 100, after: $after) {
-                        nodes {
-                          id
-                          name
-                          color
-                          description
+                    query($owner: String!, $name: String!, $after: String) {
+                        repository(owner: $owner, name: $name) {
+                            """ + PAGINATED_LABELS + """
                         }
-                        pageInfo {
-                          hasNextPage
-                          endCursor
-                        }
-                      }
                     }
-                  }
-            """;
+                    """;
         }
 
+        final var repositoryQuery = query.contains("repository");
         Log.debugf("queryLabels for labelable %s (repo=%s)", labeledId, repositoryQuery);
 
         Set<DataLabel> labels = new HashSet<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", labeledId);
 
+        paginateLabels(queryContext, query, variables, labels, (obj) -> {
+            return repositoryQuery
+                    ? JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.repository)
+                    : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node);
+        });
+
+        return labels;
+    }
+
+    public static Set<DataLabel> modifyLabels(QueryContext queryContext, String labeledId, List<DataLabel> newLabels) {
+        if (queryContext.hasErrors()) {
+            return null;
+        }
+        Log.debugf("modifyLabels for labelable %s with %s", labeledId, newLabels);
+        String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("labelableId", labeledId);
+        variables.put("labelIds", labelIds);
+
+        String query = """
+                mutation AddLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
+                    addLabelsToLabelable(input: {
+                            labelableId: $labelableId,
+                            labelIds: $labelIds}) {
+                        clientMutationId
+                        labelable {
+                            """ + PAGINATED_LABELS + """
+                        }
+                    }
+                }""";
+
+        Set<DataLabel> labels = new HashSet<>();
+        paginateLabels(queryContext, query, variables, labels, (obj) -> {
+            return JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable);
+        });
+
+        return labels;
+    }
+
+    static void paginateLabels(QueryContext queryContext, String query, Map<String, Object> variables, Set<DataLabel> labels,
+            Function<JsonObject, JsonObject> findPageLabels) {
         JsonObject pageInfo = null;
         String cursor = null;
 
@@ -190,9 +224,7 @@ public class DataLabel extends DataCommonType {
             if (response.hasError()) {
                 break;
             }
-            JsonObject pageLabels = repositoryQuery
-                ? JsonAttribute.labels.extractObjectFrom(response.getData(), JsonAttribute.repository)
-                : JsonAttribute.labels.extractObjectFrom(response.getData(), JsonAttribute.node);
+            JsonObject pageLabels = findPageLabels.apply(response.getData());
 
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(pageLabels);
             labels.addAll(nodes.stream()
@@ -203,33 +235,5 @@ public class DataLabel extends DataCommonType {
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(pageLabels);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
         } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
-        return labels;
-    }
-
-    public static void modifyLabels(QueryContext queryContext, String labeledId, List<DataLabel> newLabels) {
-        if (queryContext.hasErrors()) {
-            return;
-        }
-        Log.debugf("modifyLabels for labelable %s with %s", labeledId, newLabels);
-        String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
-
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("labelableId", labeledId);
-        variables.put("labelIds", labelIds);
-
-        Response response = queryContext.execRepoQuerySync("""
-                mutation AddLabels($labelableId: ID!, $labelIds: [ID!]!) {
-                  addLabelsToLabelable(input: {
-                    labelableId: $labelableId,
-                    labelIds: $labelIds}) {
-                        clientMutationId
-                    }
-                }""", variables);
-        Log.debugf("modifyLabels response: %s", response == null ? "null (dryRun?)" : response.getData());
-        if (response.hasError()) {
-            return;
-        }
-        // we should get a separate/follow-on webhook event for the label change
-        // let that happen, rather than racing.
     }
 }

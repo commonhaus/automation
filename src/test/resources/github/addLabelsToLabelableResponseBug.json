@@ -1,0 +1,31 @@
+{
+  "addLabelsToLabelable": {
+    "clientMutationId": null,
+    "labelable": {
+      "labels": {
+        "nodes": [
+          {
+            "color": "74B08A",
+            "description": "",
+            "id": "LA_kwDOLDuJqs8AAAABgn2hGA",
+            "isDefault": false,
+            "name": "notice",
+            "url": "https://github.com/commonhaus/automation-test/labels/notice"
+          },
+          {
+            "color": "d73a4a",
+            "description": "Something isn't working",
+            "id": "LA_kwDOLDuJqs8AAAABfqsdNQ",
+            "isDefault": true,
+            "name": "bug",
+            "url": "https://github.com/commonhaus/automation-test/labels/bug"
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "MQ"
+        }
+      }
+    }
+  }
+}

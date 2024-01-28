@@ -99,12 +99,13 @@ public class NotifyLabelsTest {
 
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
-                            .thenReturn(noLabels, repoLabels);
+                            .thenReturn(noLabels, repoLabels, modifiedLabel);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
                 .event(GHEvent.DISCUSSION)
@@ -116,7 +117,7 @@ public class NotifyLabelsTest {
                 });
 
         // Cache unchanged: will be updated by later event.
-        verifyLabelCache(discussionId, 0, List.of("notice"));
+        verifyLabelCache(discussionId, 1, List.of("notice"));
     }
 
     @Test
@@ -137,14 +138,14 @@ public class NotifyLabelsTest {
         QueryHelper.putCache(repositoryId, "labels", existing);
         verifyLabelCache(repositoryId, 1, List.of("notice"));
 
-        Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponseBug.json"));
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
-                            .thenReturn(bugLabel, repoLabels);
+                            .thenReturn(bugLabel, modifiedLabel);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedReviewsLabel.json")
                 .event(GHEvent.DISCUSSION)
@@ -156,7 +157,7 @@ public class NotifyLabelsTest {
                 });
 
         // Cache unchanged: will be updated by later event.
-        verifyLabelCache(discussionId, 1, List.of("bug"));
+        verifyLabelCache(discussionId, 2, List.of("bug"));
     }
 
     @Test

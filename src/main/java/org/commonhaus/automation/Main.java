@@ -24,7 +24,7 @@ public class Main {
 
         @Override
         public int run(String... args) throws Exception {
-            System.out.println("Do startup logic here");
+            System.out.println("Do startup logic here. dryRun=" + botConfig.isDryRun());
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()
             Quarkus.waitForExit();

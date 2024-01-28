@@ -124,17 +124,15 @@ public class DataDiscussion extends DataCommonItem {
         variables.put("discussionId", discussion.id);
         variables.put("comment", modifiedText);
 
-        Response response = queryContext.execRepoQuerySync(
-                """
-                        mutation {
-                            updateDiscussion(input: {repositoryId: "1234", categoryId: "5678", body: "The body", title: "The title"}) {
-                                discussion {
-                                    """
-                        + DISCUSSION_FIELDS + """
-                                        }
-                                    }
-                                }
-                                """,
+        Response response = queryContext.execRepoQuerySync("""
+                mutation {
+                    updateDiscussion(input: {repositoryId: "1234", categoryId: "5678", body: "The body", title: "The title"}) {
+                        discussion {
+                            """ + DISCUSSION_FIELDS + """
+                        }
+                    }
+                }
+                """,
                 variables);
         Log.debugf("Discussion #%s: add comment, result: %s", discussion.number, response.getData());
         if (response.hasError()) {

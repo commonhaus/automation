@@ -42,15 +42,17 @@ public class LabelChanges {
 
         EventPayload.DiscussionPayload payload = initialData.getEventPayload();
         if (payload == null) {
-            Log.errorf("DiscussionLabels.onLabelChangeEvent: no event payload, %s", event.getPayload());
+            Log.errorf("LabelChanges (%s): no event payload, %s", event.getEventAction(), event.getPayload());
             return;
         }
         DataDiscussion discussion = payload.discussion;
         DataLabel label = payload.label;
         if (discussion == null || label == null) {
-            Log.errorf("DiscussionLabels.onLabelChangeEvent: missing discussion or label, %s", event.getPayload());
+            Log.errorf("LabelChanges (%s): missing discussion or label, %s", event.getEventAction(), event.getPayload());
             return;
         }
+
+        Log.debugf("LabelChanges (%s): discussion %s changed label %s", event.getEventAction(), discussion.id, label);
 
         // Don't fetch labels first: only add/remove if it's an item/id we know about
         if (initialData.getActionType() == ActionType.labeled) {
@@ -70,6 +72,7 @@ public class LabelChanges {
      */
     void onRepositoryLabelChange(GitHubEvent event, GitHub github,
             @Label GHEventPayload.Label labelPayload) {
+
         if (labelPayload.getRepository() == null) {
             return;
         }
@@ -79,6 +82,8 @@ public class LabelChanges {
 
         DataLabel label = new DataLabel(labelPayload.getLabel());
         String cacheId = labelPayload.getRepository().getNodeId();
+
+        Log.debugf("LabelChanges (%s): repository %s changed label %s", event.getEventAction(), cacheId, label);
 
         // Don't fetch labels first: only add/remove if it's an item/id we know about
         if (initialData.getActionType() == ActionType.created) {
