@@ -75,20 +75,41 @@ public class Notice {
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param discussion GitHub API parsed payload
+     * @param pullRequestPayload GitHub API parsed payload
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
     void onPullRequestEvent(GitHubEvent event, GitHub github,
-            @PullRequest GHEventPayload.PullRequest discussion,
+            @PullRequest GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        Log.debugf("notice.onPullRequestEvent (%s): %s %s", noticeConfig.isEnabled(), event.getEventAction(),
-                event.getPayload());
         if (!noticeConfig.isEnabled()) {
             return;
         }
 
-        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussion), github);
+        Log.debugf("notice.onPullRequestEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
+
+        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, pullRequestPayload), github);
+        Set<String> actions = new HashSet<>();
+        for (Rule rule : noticeConfig.discussion.rules) {
+            if (rule.matches(queryContext)) {
+                actions.addAll(rule.then);
+            }
+        }
+        Log.debugf("notice.onPullRequestEvent (%s): Pull Request #%s triggered (%s) actions: %s",
+                event.getEventAction(), pullRequestPayload.getPullRequest().getNumber(), actions.size(), actions);
+
+        if (actions.isEmpty()) {
+            return;
+        }
+
+        for (String actionName : actions) {
+            Action action = noticeConfig.actions.get(actionName);
+            if (action == null) {
+                Log.warnf("notice.onPullRequestEvent (%s): Action '%s' not found", event.getEventAction(), actionName);
+                continue;
+            }
+            action.apply(queryContext);
+        }
     }
 
     static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {

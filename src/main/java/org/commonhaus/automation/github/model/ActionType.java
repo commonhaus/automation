@@ -9,6 +9,7 @@ public enum ActionType {
     edited,
     labeled,
     locked,
+    opened,
     pinned,
     reopened,
     transferred,

@@ -110,8 +110,12 @@ public class EventData {
                 DataDiscussion discussion = payload.discussion;
                 yield discussion.id;
             }
+            case pull_request -> {
+                GHEventPayload.PullRequest payload = getGHEventPayload(GHEventPayload.PullRequest.class);
+                yield payload.getPullRequest().getNodeId();
+            }
             default -> {
-                Log.errorf("EventData.getItemId: unsupported event type %s", eventType);
+                Log.errorf("EventData.getLabelableId: unsupported event type %s", eventType);
                 yield null;
             }
         };

@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,7 +53,8 @@ public class NotifyLabelsTest {
 
     @BeforeEach
     void beforeEach() {
-        QueryHelper.itemCache.clear();
+        QueryHelper.cache.invalidateAll();
+        QueryHelper.cache.cleanUp();
     }
 
     @Test
@@ -135,7 +135,7 @@ public class NotifyLabelsTest {
         // preload the cache: no request to fetch repo labels (and check our work)
         Set<DataLabel> existing = new HashSet<>();
         existing.add(new DataLabel.Builder().name("notice").build());
-        QueryHelper.putCache(repositoryId, "labels", existing);
+        QueryHelper.putCache(repositoryId, QueryHelper.LABEL, existing);
         verifyLabelCache(repositoryId, 1, List.of("notice"));
 
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
@@ -170,7 +170,7 @@ public class NotifyLabelsTest {
         // preload the cache: no request to fetch labels (and check our work)
         Set<DataLabel> existing = new HashSet<>();
         existing.add(new DataLabel.Builder().name("bug").build());
-        QueryHelper.putCache(discussionId, "labels", existing);
+        QueryHelper.putCache(discussionId, QueryHelper.LABEL, existing);
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
@@ -195,8 +195,6 @@ public class NotifyLabelsTest {
         // from src/test/resources/github/eventDiscussionUnlabeled.json
         String discussionId = "D_kwDOLDuJqs4AXNhB";
 
-        // Mark this discussion as one of interest (seen by other events)
-        QueryHelper.putCache(discussionId, "interest", Boolean.TRUE);
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
 
         given()
@@ -218,10 +216,8 @@ public class NotifyLabelsTest {
     }
 
     private void verifyLabelCache(String discussionId, int size, List<String> expectedLabels) {
-        Map<String, Object> item = QueryHelper.itemCache.get(discussionId);
-        Assertions.assertNotNull(item);
+        Collection<DataLabel> labels = QueryHelper.getCache(discussionId, "labels", Collection.class);
 
-        Collection<DataLabel> labels = (Collection<DataLabel>) item.get("labels");
         Assertions.assertNotNull(labels);
         Assertions.assertEquals(size, labels.size(), stringify(labels));
 

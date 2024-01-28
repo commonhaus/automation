@@ -30,7 +30,6 @@
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
     <formatter-plugin.version>2.23.0</formatter-plugin.version>
     <impsort-plugin.version>1.9.0</impsort-plugin.version>
-    <surefire-plugin.version>3.2.3</surefire-plugin.version>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -41,6 +40,7 @@
     <revision>1.0.0-SNAPSHOT</revision>
     <skipITs>true</skipITs>
     <skipTests>false</skipTests>
+    <surefire-plugin.version>3.2.3</surefire-plugin.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -66,6 +66,10 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-qute</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-caffeine</artifactId>
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>

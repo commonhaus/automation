@@ -23,22 +23,18 @@ public class Rule {
 
     public List<String> then;
 
-    public boolean usesLabels() {
-        return label != null;
-    }
-
     public boolean matches(QueryContext queryContext) {
         boolean matches = true;
         if (action != null) {
             matches &= action.matches(queryContext);
         }
-        if (category != null) {
+        if (matches && category != null) {
             matches &= category.matches(queryContext);
         }
-        if (path != null) {
+        if (matches && path != null) {
             matches &= path.matches(queryContext);
         }
-        if (label != null) {
+        if (matches && label != null) {
             matches &= label.matches(queryContext);
         }
         return matches;
@@ -70,7 +66,7 @@ public class Rule {
             }
             if (node.has("label")) {
                 rule.label = new MatchLabel();
-                rule.label.labels = mapper.convertValue(node.get("then"), LIST_STRING);
+                rule.label.labels = mapper.convertValue(node.get("label"), LIST_STRING);
             }
             if (node.has("path")) {
                 rule.path = new MatchFilePath();

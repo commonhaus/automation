@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -18,6 +18,9 @@ import org.commonhaus.automation.github.model.DataLabel;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GitHub;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
@@ -26,8 +29,10 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @ApplicationScoped
 public class QueryHelper {
-
-    public static final Map<String, ConcurrentHashMap<String, Object>> itemCache = new ConcurrentHashMap<>();
+    static final String LABEL = "labels";
+    static Cache<String, Object> cache = Caffeine.newBuilder()
+            .expireAfterWrite(6, TimeUnit.HOURS)
+            .build();
 
     @Inject
     AppConfig botConfig;
@@ -44,16 +49,20 @@ public class QueryHelper {
     }
 
     static <T> T getCache(String itemId, String key, Class<T> type) {
-        Map<String, Object> cache = itemCache.computeIfAbsent(itemId, k -> new ConcurrentHashMap<>());
-        Object value = cache.get(key);
-        return value == null
-                ? null
-                : type.cast(value);
+        String idx = itemId + ":" + key;
+        T result = (T) cache.getIfPresent(idx);
+        if (result != null) {
+            System.out.println(":: HIT :: " + idx + " ::: ");
+        } else {
+            System.out.println(":: MISS :: " + idx + " ::: ");
+        }
+        return result;
     }
 
     static void putCache(String itemId, String key, Object value) {
-        Map<String, Object> cache = itemCache.computeIfAbsent(itemId, k -> new ConcurrentHashMap<>());
-        cache.put(key, value);
+        String idx = itemId + ":" + key;
+        System.out.println(":: UPDATE :: " + idx + " ::: ");
+        cache.put(idx, value);
     }
 
     /**
@@ -243,15 +252,13 @@ public class QueryHelper {
         public Collection<DataLabel> getCachedLabels(String itemId) {
             Collection<DataLabel> labels = getCache(itemId, "labels", Collection.class);
             if (labels != null) {
-                System.out.println(":: HIT :: " + itemId + " ::: ");
                 return labels;
             }
             // fresh fetch graphQL fetch
             labels = DataLabel.queryLabels(this, itemId);
             if (labels != null) {
-                putCache(itemId, "labels", labels);
+                putCache(itemId, LABEL, labels);
             }
-            System.out.println(":: UPDATE :: " + itemId + " ::: ");
             return labels;
         }
 
@@ -263,17 +270,12 @@ public class QueryHelper {
          * @return updated collection of labels for the item, or null if not cached
          */
         public Collection<DataLabel> addCachedLabel(String cacheId, DataLabel label) {
-            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
-            if (cache == null) {
-                return null; // ignore items we've never seen
+            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
+            if (labels == null) {
+                return null;
             }
-            getCachedLabels(cacheId); // ensure labels are cached (if not already)
-
-            // merge/update cache w/ new label
-            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
-                ((Collection<DataLabel>) x).add(label);
-                return x;
-            });
+            labels.add(label);
+            return labels;
         }
 
         /**
@@ -284,17 +286,12 @@ public class QueryHelper {
          * @return updated collection of labels for the item, or null if not cached
          */
         public Collection<DataLabel> removeCachedLabel(String cacheId, DataLabel label) {
-            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
-            if (cache == null) {
-                return null; // ignore items we've never seen
+            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
+            if (labels == null) {
+                return null;
             }
-            getCachedLabels(cacheId); // ensure labels are cached (if not already)
-
-            // merge/update cache to remove
-            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
-                ((Collection<DataLabel>) x).remove(label);
-                return x;
-            });
+            labels.remove(label);
+            return labels;
         }
 
         /**
@@ -305,18 +302,14 @@ public class QueryHelper {
          * @return updated collection of labels for the item, or null if not cached
          */
         public Collection<DataLabel> updateCachedLabel(String cacheId, DataLabel label) {
-            ConcurrentHashMap<String, Object> cache = itemCache.get(cacheId);
-            if (cache == null) {
-                return null; // ignore items we've never seen
+            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
+            if (labels == null) {
+                return null;
             }
-            getCachedLabels(cacheId); // ensure labels are cached (if not already)
-
-            // merge/update cached list
-            return (Collection<DataLabel>) cache.computeIfPresent("labels", (k, x) -> {
-                ((Collection<DataLabel>) x).remove(label); // remove old (if exists)
-                ((Collection<DataLabel>) x).add(label); // replace with updated
-                return x;
-            });
+            // only the id is equals/hashcode -- so remove and add
+            labels.remove(label);
+            labels.add(label);
+            return labels;
         }
 
         /**
@@ -331,7 +324,7 @@ public class QueryHelper {
             if (newLabels == null) {
                 return null;
             }
-            QueryHelper.putCache(cacheId, "labels", newLabels);
+            QueryHelper.putCache(cacheId, LABEL, newLabels);
             return newLabels;
         }
     }

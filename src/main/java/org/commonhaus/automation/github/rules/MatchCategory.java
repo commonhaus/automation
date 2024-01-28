@@ -1,6 +1,5 @@
 package org.commonhaus.automation.github.rules;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
@@ -29,18 +28,15 @@ public class MatchCategory {
             return false;
         }
 
-        List<String> comparison = new ArrayList<>();
         DataDiscussionCategory discussionCategory = discussion.category;
-        addIfPresent(comparison, discussionCategory.name);
-        addIfPresent(comparison, discussionCategory.slug);
-        addIfPresent(comparison, discussionCategory.id);
-
-        return category.stream().anyMatch(x -> comparison.contains(x.toLowerCase()));
-    }
-
-    private void addIfPresent(List<String> list, String value) {
-        if (value != null) {
-            list.add(value.toLowerCase());
+        for (String cat : category) {
+            if (cat.equals(discussionCategory.id)
+                    || cat.equalsIgnoreCase(discussionCategory.name)
+                    || cat.equals(discussionCategory.id)) {
+                return true;
+            }
         }
+
+        return false;
     }
 }

@@ -22,6 +22,6 @@ public class MatchLabel {
             return false;
         }
 
-        return false;
+        return eventLabels.stream().anyMatch(x -> labels.contains(x.name) || labels.contains(x.id));
     }
 }
