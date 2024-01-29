@@ -1,0 +1,69 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - '.gitignore'
+      - 'CODEOWNERS'
+      - 'LICENSE'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - 'CODEOWNERS'
+      - 'LICENSE'
+      - '*.md'
+
+env:
+  JAVA_VERSION: 17
+  JAVA_DISTRO: temurin
+  GH_BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+  GH_BOT_NAME: "GitHub Action"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRO}}
+        cache: maven
+
+    - name: Build with Maven
+      run: mvn -B formatter:validate verify --file pom.xml
+
+    - name: Project metadata
+      id: metadata
+      run: |
+        SNAPSHOT=$(yq '.release.snapshot-version' .github/project.yml)
+        ARTIFACT=$(yq '.build.artifact' .github/project.yml)
+        echo "snapshot=${SNAPSHOT}" >> $GITHUB_OUTPUT
+        echo "artifact=${ARTIFACT}" >> $GITHUB_OUTPUT
+
+    - name: Update release with snapshot artifact
+      id: mvn-release-snapshot
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
+      run: |
+        git config user.name ${{ env.GH_BOT_NAME }}
+        git config user.email ${{ env.GH_BOT_EMAIL }}
+
+        ARTIFACT=target/${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}-runner.jar
+        gh release upload "${SNAPSHOT}" --clobber ./artifacts/${ARTIFACT}#${ARTIFACT}
+
+        echo "Update tag for $SNAPSHOT"
+        git push origin :refs/tags/$SNAPSHOT
+        git tag -f $SNAPSHOT
+        git push --tags
+
+        echo "Update $SNAPSHOT release"
+        gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
+        gh release edit "${SNAPSHOT}" --draft=false
+        gh release view "${SNAPSHOT}"

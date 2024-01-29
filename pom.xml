@@ -2,13 +2,16 @@
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
+
   <groupId>org.commonhaus.automation</groupId>
   <artifactId>commonhaus-bot</artifactId>
   <version>${revision}</version>
+
   <name>commonhaus-bot</name>
   <description>Commonhaus Foundation Automation</description>
   <url>https://github.com/commonhaus/automation</url>
   <inceptionYear>2024</inceptionYear>
+
   <licenses>
     <license>
       <name>The Apache License, Version 2.0</name>
@@ -26,22 +29,26 @@
     <system>GitHub</system>
     <url>https://github.com/commonhaus/automation/issues</url>
   </issueManagement>
+
   <properties>
+    <revision>199-SNAPSHOT</revision>
+    <!-- Build -->
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
     <formatter-plugin.version>2.23.0</formatter-plugin.version>
     <impsort-plugin.version>1.9.0</impsort-plugin.version>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <skipITs>true</skipITs>
+    <skipTests>false</skipTests>
+    <surefire-plugin.version>3.2.3</surefire-plugin.version>
+    <!-- Quarkus -->
     <quarkus-github-app.version>2.2.0</quarkus-github-app.version>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
     <quarkus.platform.version>3.6.5</quarkus.platform.version>
-    <revision>1.0.0-SNAPSHOT</revision>
-    <skipITs>true</skipITs>
-    <skipTests>false</skipTests>
-    <surefire-plugin.version>3.2.3</surefire-plugin.version>
   </properties>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -53,6 +60,7 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>io.quarkiverse.githubapp</groupId>
@@ -88,6 +96,7 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
   <build>
     <plugins>
       <plugin>
