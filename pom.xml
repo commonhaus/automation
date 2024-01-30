@@ -33,7 +33,7 @@
   <properties>
     <revision>199-SNAPSHOT</revision>
     <!-- Build -->
-    <compiler-plugin.version>3.11.0</compiler-plugin.version>
+    <compiler-plugin.version>3.12.1</compiler-plugin.version>
     <formatter-plugin.version>2.23.0</formatter-plugin.version>
     <impsort-plugin.version>1.9.0</impsort-plugin.version>
     <maven.compiler.release>17</maven.compiler.release>
