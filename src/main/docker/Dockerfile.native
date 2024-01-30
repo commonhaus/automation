@@ -7,11 +7,11 @@
 #
 # Then, build the image with:
 #
-# docker build -f src/main/docker/Dockerfile.native -t quarkus/automation-bot .
+# docker build -f src/main/docker/Dockerfile.native -t commonhaus/commonhaus-bot .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/automation-bot
+# docker run -i --rm -p 8080:8080 commonhaus/commonhaus-bot
 #
 ###
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.9

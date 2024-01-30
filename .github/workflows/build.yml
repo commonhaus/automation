@@ -17,26 +17,30 @@ on:
       - '*.md'
 
 env:
-  JAVA_VERSION: 17
+  JAVA_VERSION: 21
   JAVA_DISTRO: temurin
   GH_BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
   GH_BOT_NAME: "GitHub Action"
+  GRAALVM_DIST: graalvm-community
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up JDK
-      uses: actions/setup-java@v4
+    - uses: graalvm/setup-graalvm@v1
       with:
+        distribution: ${{ env.GRAALVM_DIST }}
         java-version: ${{ env.JAVA_VERSION }}
-        distribution: ${{ env.JAVA_DISTRO}}
-        cache: maven
-
-    - name: Build with Maven
-      run: mvn -B formatter:validate verify --file pom.xml
+        cache: 'maven'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Project metadata
       id: metadata
@@ -45,6 +49,17 @@ jobs:
         ARTIFACT=$(yq '.build.artifact' .github/project.yml)
         echo "snapshot=${SNAPSHOT}" >> $GITHUB_OUTPUT
         echo "artifact=${ARTIFACT}" >> $GITHUB_OUTPUT
+
+    - name: Build with Maven
+      run: |
+        ./mvnw -B -ntp formatter:validate verify
+
+    - name: Build and run in native mode
+      id: mvn-native-build
+      env:
+        MAVEN_OPTS: "-Xmx1g"
+      run: |
+        ./mvnw -B -ntp verify -Dnative -DskipTests -DskipFormat
 
     - name: Update release with snapshot artifact
       id: mvn-release-snapshot
@@ -55,8 +70,11 @@ jobs:
         git config user.name ${{ env.GH_BOT_NAME }}
         git config user.email ${{ env.GH_BOT_EMAIL }}
 
-        ARTIFACT=target/${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}-runner.jar
-        gh release upload "${SNAPSHOT}" --clobber ./artifacts/${ARTIFACT}#${ARTIFACT}
+        ls -al target
+        AV=${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}
+
+        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}.jar#${AV}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}-runner#${AV}-runner
 
         echo "Update tag for $SNAPSHOT"
         git push origin :refs/tags/$SNAPSHOT
@@ -65,5 +83,25 @@ jobs:
 
         echo "Update $SNAPSHOT release"
         gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish OCI (native)
+      id: publish-oci
+      run: |
+        docker build -f src/main/docker/Dockerfile.native-micro -t ghcr.io/commonhaus/commonhaus-bot:latest .
+        docker push ghcr.io/commonhaus/commonhaus-bot:latest
+
+    - name: Mark snapshot release as non-draft
+      id: update-snapshot-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
+      run: |
         gh release edit "${SNAPSHOT}" --draft=false
         gh release view "${SNAPSHOT}"
