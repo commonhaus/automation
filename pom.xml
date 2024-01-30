@@ -41,7 +41,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <skipITs>true</skipITs>
     <skipTests>false</skipTests>
-    <surefire-plugin.version>3.2.3</surefire-plugin.version>
+    <surefire-plugin.version>3.2.5</surefire-plugin.version>
     <!-- Quarkus -->
     <quarkus-github-app.version>2.2.0</quarkus-github-app.version>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
