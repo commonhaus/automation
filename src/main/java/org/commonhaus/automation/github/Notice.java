@@ -90,7 +90,7 @@ public class Notice {
 
         QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, pullRequestPayload), github);
         Set<String> actions = new HashSet<>();
-        for (Rule rule : noticeConfig.discussion.rules) {
+        for (Rule rule : noticeConfig.pullRequest.rules) {
             if (rule.matches(queryContext)) {
                 actions.addAll(rule.then);
             }

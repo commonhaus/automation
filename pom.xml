@@ -47,6 +47,8 @@
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
     <quarkus.platform.version>3.7.1</quarkus.platform.version>
+    <!-- Libraries -->
+    <glob.version>0.9.0</glob.version>
   </properties>
 
   <dependencyManagement>
@@ -78,6 +80,11 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-caffeine</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.hrakaroo</groupId>
+        <artifactId>glob</artifactId>
+        <version>${glob.version}</version>
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>

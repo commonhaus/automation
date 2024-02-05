@@ -26,6 +26,11 @@ public class LabelAction extends Action {
 
         String nodeId = eventData.getLabelableId();
         Collection<DataLabel> repoLabels = queryContext.getCachedLabels(eventData.getRepositoryId());
+        if (repoLabels == null) {
+            Log.errorf("Labels not found in repository [%s/%s]", eventData.getRepoOwner(), eventData.getRepoName());
+            return;
+        }
+
         List<DataLabel> newLabels = new ArrayList<>();
 
         // Find the repository label (with id) for each requested label

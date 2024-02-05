@@ -3,6 +3,8 @@ package org.commonhaus.automation.github;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -13,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +28,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
+import org.kohsuke.github.GHPullRequestFileDetail;
+import org.kohsuke.github.PagedIterable;
+import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
@@ -58,7 +64,7 @@ public class NotifyLabelsTest {
     }
 
     @Test
-    void discussionCreated() throws RuntimeException, Exception {
+    void discussionCreated() throws Exception {
         // When a general, not-interesting, discussion is created,
         // - labels are still fetched (label rule)
         // - no other rules or actions are triggered
@@ -87,7 +93,7 @@ public class NotifyLabelsTest {
     }
 
     @Test
-    void discussionCreatedAnnouncements() throws RuntimeException, Exception {
+    void discussionCreatedAnnouncements() throws Exception {
         // When a discussion is created in announcements
         // - labels are fetched (label rule)
         // - the notice label is added
@@ -102,7 +108,7 @@ public class NotifyLabelsTest {
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
                             .thenReturn(noLabels, repoLabels, modifiedLabel);
@@ -116,12 +122,11 @@ public class NotifyLabelsTest {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        // Cache unchanged: will be updated by later event.
         verifyLabelCache(discussionId, 1, List.of("notice"));
     }
 
     @Test
-    void discussionCreatedReviewsLabeled() throws RuntimeException, Exception {
+    void discussionCreatedReviewsLabeled() throws Exception {
         // When a discussion is created in announcements
         // - labels are fetched (label rule)
         // - the notice label is added
@@ -142,7 +147,7 @@ public class NotifyLabelsTest {
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponseBug.json"));
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
                             .thenReturn(bugLabel, modifiedLabel);
@@ -156,12 +161,11 @@ public class NotifyLabelsTest {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        // Cache unchanged: will be updated by later event.
-        verifyLabelCache(discussionId, 2, List.of("bug"));
+        verifyLabelCache(discussionId, 2, List.of("bug", "notice"));
     }
 
     @Test
-    void discussionLabeled() throws RuntimeException, Exception {
+    void discussionLabeled() throws Exception {
         // When a discussion is labeled, ...
 
         // from src/test/resources/github/eventDiscussionLabeled.json
@@ -175,7 +179,7 @@ public class NotifyLabelsTest {
 
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionLabeled.json")
                 .event(GHEvent.DISCUSSION)
@@ -188,18 +192,16 @@ public class NotifyLabelsTest {
     }
 
     @Test
-    void discussionUnlabeled() throws RuntimeException, Exception {
+    void discussionUnlabeled() throws Exception {
         // When a discussion is labeled, ...
         // If we don't have the labels cached, we fetch them first
-
         // from src/test/resources/github/eventDiscussionUnlabeled.json
         String discussionId = "D_kwDOLDuJqs4AXNhB";
-
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
 
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
                             .thenReturn(bugLabel);
@@ -213,6 +215,37 @@ public class NotifyLabelsTest {
                 });
 
         verifyLabelCache(discussionId, 0, List.of());
+    }
+
+    @Test
+    void testRelevantPr() throws Exception {
+        String prNodeId = "PR_kwDOLDuJqs5lPq17";
+        long id = 1698606459;
+        Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
+        Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                    // 2 GraphQL queries to fetch labels
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(anyString(), anyMap()))
+                            .thenReturn(bugLabel, repoLabels, modifiedLabel);
+
+                    // Mocked REST request
+                    PagedIterable<GHPullRequestFileDetail> paths = mockPagedIterable(
+                            mockGHPullRequestFileDetail("bylaws/README.md"));
+                    when(mocks.pullRequest(id).listFiles()).thenReturn(paths);
+                })
+                .when().payloadFromClasspath("/github/eventPullRequestCreatedBylaws.json")
+                .event(GHEvent.PULL_REQUEST)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), times(3))
+                            .executeSync(anyString(), anyMap());
+                });
+
+        verifyLabelCache(prNodeId, 1, List.of("notice"));
     }
 
     private void verifyLabelCache(String discussionId, int size, List<String> expectedLabels) {
@@ -245,25 +278,31 @@ public class NotifyLabelsTest {
     //             .thenReturn(iterableMock);
     // }
 
-    // @SafeVarargs
-    // @SuppressWarnings("unchecked")
-    // public static <T> PagedIterable<T> mockPagedIterable(T... contentMocks) {
-    //     PagedIterable<T> iterableMock = mock(PagedIterable.class);
-    //     try {
-    //         lenient().when(iterableMock.toList()).thenAnswer(ignored2 -> List.of(contentMocks));
-    //     } catch (IOException e) {
-    //         // This should never happen
-    //         // That's a classic unwise comment, but it's a mock, so surely we're safe? :)
-    //         throw new RuntimeException(e);
-    //     }
-    //     lenient().when(iterableMock.iterator()).thenAnswer(ignored -> {
-    //         PagedIterator<T> iteratorMock = mock(PagedIterator.class);
-    //         Iterator<T> actualIterator = List.of(contentMocks).iterator();
-    //         when(iteratorMock.next()).thenAnswer(ignored2 -> actualIterator.next());
-    //         lenient().when(iteratorMock.hasNext()).thenAnswer(ignored2 -> actualIterator.hasNext());
+    public static GHPullRequestFileDetail mockGHPullRequestFileDetail(String filename) {
+        GHPullRequestFileDetail mock = mock(GHPullRequestFileDetail.class);
+        lenient().when(mock.getFilename()).thenReturn(filename);
+        return mock;
+    }
 
-    //         return iteratorMock;
-    //     });
-    //     return iterableMock;
-    // }
+    @SafeVarargs
+    @SuppressWarnings("unchecked")
+    public static <T> PagedIterable<T> mockPagedIterable(T... contentMocks) {
+        PagedIterable<T> iterableMock = mock(PagedIterable.class);
+        try {
+            lenient().when(iterableMock.toList()).thenAnswer(ignored2 -> List.of(contentMocks));
+        } catch (IOException e) {
+            // This should never happen
+            // That's a classic unwise comment, but it's a mock, so surely we're safe? :)
+            throw new RuntimeException(e);
+        }
+        lenient().when(iterableMock.iterator()).thenAnswer(ignored -> {
+            PagedIterator<T> iteratorMock = mock(PagedIterator.class);
+            Iterator<T> actualIterator = List.of(contentMocks).iterator();
+            when(iteratorMock.next()).thenAnswer(ignored2 -> actualIterator.next());
+            lenient().when(iteratorMock.hasNext()).thenAnswer(ignored2 -> actualIterator.hasNext());
+
+            return iteratorMock;
+        });
+        return iterableMock;
+    }
 }

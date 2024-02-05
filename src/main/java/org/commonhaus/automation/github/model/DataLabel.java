@@ -227,6 +227,9 @@ public class DataLabel extends DataCommonType {
             JsonObject pageLabels = findPageLabels.apply(response.getData());
 
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(pageLabels);
+            if (nodes == null) {
+                break;
+            }
             labels.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
                     .map(DataLabel::new)
