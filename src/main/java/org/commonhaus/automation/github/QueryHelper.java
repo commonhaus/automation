@@ -48,7 +48,7 @@ public class QueryHelper {
         return newQueryContext(eventData).addExisting(github);
     }
 
-    static <T> T getCache(String itemId, String key, Class<T> type) {
+    public static <T> T getCache(String itemId, String key, Class<T> type) {
         String idx = itemId + ":" + key;
         T result = (T) cache.getIfPresent(idx);
         if (result != null) {
@@ -59,7 +59,7 @@ public class QueryHelper {
         return result;
     }
 
-    static void putCache(String itemId, String key, Object value) {
+    public static void putCache(String itemId, String key, Object value) {
         String idx = itemId + ":" + key;
         System.out.println(":: UPDATE :: " + idx + " ::: ");
         cache.put(idx, value);

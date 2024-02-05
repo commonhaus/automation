@@ -33,6 +33,8 @@ import org.kohsuke.github.PagedIterable;
 import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
 
+import com.hrakaroo.glob.MatchingEngine;
+
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
@@ -246,6 +248,10 @@ public class NotifyLabelsTest {
                 });
 
         verifyLabelCache(prNodeId, 1, List.of("notice"));
+        Assertions.assertNotNull(QueryHelper.getCache("GLOB", "bylaws/*", Object.class),
+                "bylaws/* GLOB cache should exist");
+        Assertions.assertNull(QueryHelper.getCache("GLOB", "policy/*", Object.class),
+                "policy/* GLOB cache should not exist");
     }
 
     private void verifyLabelCache(String discussionId, int size, List<String> expectedLabels) {

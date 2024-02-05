@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.rules;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
+import org.commonhaus.automation.github.QueryHelper;
 import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.EventType;
 import org.kohsuke.github.GHEventPayload;
@@ -55,8 +56,12 @@ public class MatchFilePath {
         return false;
     }
 
-    //@CacheResult(cacheName = "glob-cache")
     MatchingEngine compileGlob(String filenamePattern) {
-        return GlobPattern.compile(filenamePattern);
+        MatchingEngine me = QueryHelper.getCache("GLOB", filenamePattern, MatchingEngine.class);
+        if (me == null) {
+            me = GlobPattern.compile(filenamePattern);
+            QueryHelper.putCache("GLOB", filenamePattern, me);
+        }
+        return me;
     }
 }
