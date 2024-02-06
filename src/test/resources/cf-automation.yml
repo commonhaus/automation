@@ -3,38 +3,67 @@ notice:
     rules:
       - # If a discussion is created in the Announcements or Reviews 
         # category, apply the notice label
+        # email announce and discord announce
         category: [Announcements, Reviews]
         action: [created, category_changed]
-        then: [label_notice]
-      - # If an event happens for a discussion in Announcements or Reviews
-        # send an email to the announcement list 
-        # dispatch a follow-on action to update the website (RSS, etc)
-        category: [Announcements, Reviews]
-        then: [dispatch, email]
-      - # If a discussion with a Notice label is updated in any way,
-        # dispatch a follow-on action to update the website (RSS, etc)
+        then: [label_notice, email_announce, discord_announce]
+      - # If a discussion that already has a notice label is updated,
+        # update discord activity
+        action: 
+        - "!labeled"
+        - "!unlabeled"
         label: [notice]
-        then: [dispatch]
+        then: [discord_activity]
+  discussion_comment:
+    rules:
+      - # If a comment is made on a discussion with a Notice label,
+        # update discord activity
+        action: [created]
+        label: [notice]
+        then: [discord_activity]
+  issue_comment:
+    rules:
+      - # If a comment is made on an issue (or pull request) with a Notice label,
+        # update discord activity
+        action: [created]
+        label: [notice]
+        then: [discord_activity]
+  pull_request_review_comment:
+    rules:
+      - # If a review comment is made on an issue (or pull request) with a Notice label,
+        # update discord activity
+        action: [created]
+        label: [notice]
+        then: [discord_activity]
   pull_request:
     rules:
       - # If a pull request is created that touches bylaws or policies
-        # apply the notice label
-        # send an email to the announcement list
-        # dispatch a follow-on action to update the website (RSS, etc)
-        path:
+        # that does not have the notice label:
+        #   apply the notice label
+        #   send an email to the announcement list
+        action:
+          - opened
+          - edited
+          - closed
+        paths:
           - bylaws/*
           - policies/*
-        then: [label_notice, dispatch, email]
+        label: ["!notice"]
+        then: [label_notice, email_activity]
       - # If a pull request has a notice label,
         # dispatch a follow-on action to update the website (RSS, etc)
+        action:
+          - opened
+          - edited
+          - closed
         label: [notice]
-        then: [dispatch]
+        then: [email_activity]
   actions:
     label_notice: [notice]
-    email: 
+    email_announce: 
       address: test@commonhaus.org
       template: something.qute
-    dispatch: 
-      repo: commonhaus/commonhaus.github.io
-      name: gh-notice.yml
+    discord_announce:
+      channel: something
+      template: something.qute
 

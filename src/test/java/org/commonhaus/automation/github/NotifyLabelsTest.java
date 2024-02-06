@@ -41,6 +41,7 @@ import io.smallrye.graphql.client.Response;
 @GitHubAppTest
 public class NotifyLabelsTest {
     final String repoFullName = "commonhaus/automation-test";
+    final String repositoryId = "R_kgDOLDuJqg";
     final long repoId = 742099370;
     final long installationId = 46053716;
     static final DataLabel bug = new DataLabel.Builder().name("bug").id("LA_kwDOLDuJqs8AAAABfqsdNQ").build();
@@ -62,16 +63,17 @@ public class NotifyLabelsTest {
     @BeforeEach
     void beforeEach() {
         QueryHelper.QueryCache.LABELS.invalidateAll();
+        verifyNoLabelCache(repositoryId);
     }
 
     @Test
     void discussionCreated() throws Exception {
         // When a general, not-interesting, discussion is created,
-        // - labels are still fetched (label rule)
-        // - no other rules or actions are triggered
+        // - no rules or actions are triggered
 
         // from src/test/resources/github/eventDiscussionCreated.json
         String discussionId = "D_kwDOLDuJqs4AXaZU";
+        verifyNoLabelCache(discussionId);
 
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
         given()
@@ -98,11 +100,10 @@ public class NotifyLabelsTest {
         // When a discussion is created in announcements
         // - labels are fetched (label rule)
         // - the notice label is added
-        // - email is sent
-        // - a workflow is dispatched
 
         // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
         String discussionId = "D_kwDOLDuJqs4AXaZM";
+        verifyNoLabelCache(discussionId);
 
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
@@ -136,7 +137,6 @@ public class NotifyLabelsTest {
 
         // from src/test/resources/github/eventDiscussionCreatedReviewsLabel.json
         String discussionId = "D_kwDOLDuJqs4AXaZQ";
-        String repositoryId = "R_kgDOLDuJqg";
 
         // preload the cache: no request to fetch repo labels (and check our work)
         Set<DataLabel> existing = new HashSet<>();
@@ -196,6 +196,7 @@ public class NotifyLabelsTest {
         // When a discussion is unlabeled, ...
         // from src/test/resources/github/eventDiscussionUnlabeled.json
         String discussionId = "D_kwDOLDuJqs4AXNhB";
+        verifyNoLabelCache(discussionId);
 
         given()
                 .github(mocks -> {
@@ -209,8 +210,7 @@ public class NotifyLabelsTest {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        Assertions.assertNull(QueryHelper.QueryCache.LABELS.getCachedValue(discussionId, Set.class),
-                "Discussion labels cache should not exist");
+        verifyNoLabelCache(discussionId);
     }
 
     @Test
@@ -243,8 +243,9 @@ public class NotifyLabelsTest {
     @Test
     void testRelevantPr() throws Exception {
         String prNodeId = "PR_kwDOLDuJqs5lPq17";
-        long id = 1698606459;
+        verifyNoLabelCache(prNodeId);
 
+        long id = 1698606459;
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
@@ -297,6 +298,11 @@ public class NotifyLabelsTest {
                 });
 
         verifyLabelCache(repoId, 2, List.of("bug", "notice"));
+    }
+
+    private void verifyNoLabelCache(String labelId) {
+        Assertions.assertNull(QueryHelper.QueryCache.LABELS.getCachedValue(labelId, Set.class),
+                "Label cache for " + labelId + " should not exist");
     }
 
     private void verifyLabelCache(String labeledId, int size, List<String> expectedLabels) {

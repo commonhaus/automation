@@ -19,7 +19,7 @@ import io.quarkus.logging.Log;
 /**
  * Only applies to GitHub Pull Requests
  */
-public class MatchFilePath {
+public class MatchPaths {
     List<String> paths;
 
     public boolean matches(QueryContext queryContext) {
@@ -35,7 +35,6 @@ public class MatchFilePath {
         if (prFiles != null) {
             for (GHPullRequestFileDetail changedFile : prFiles) {
                 for (String p : paths) {
-
                     if (!p.contains("*")) {
                         if (changedFile.getFilename().startsWith(p)) {
                             return true;

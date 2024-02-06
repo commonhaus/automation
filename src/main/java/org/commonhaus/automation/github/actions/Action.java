@@ -41,8 +41,8 @@ public abstract class Action {
                 return labelsAction;
             } else if (root.has("address")) {
                 return mapper.convertValue(root, EmailAction.class);
-            } else if (root.has("repo")) {
-                return mapper.convertValue(root, DispatchAction.class);
+            } else if (root.has("channel")) {
+                return mapper.convertValue(root, DiscordAction.class);
             }
             return null;
         }

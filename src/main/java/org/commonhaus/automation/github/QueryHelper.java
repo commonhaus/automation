@@ -280,7 +280,6 @@ public class QueryHelper {
         public Collection<DataLabel> getCachedLabels(String itemId) {
             @SuppressWarnings("unchecked")
             Set<DataLabel> labels = QueryHelper.QueryCache.LABELS.getCachedValue(itemId, Set.class);
-
             if (labels != null) {
                 return labels;
             }

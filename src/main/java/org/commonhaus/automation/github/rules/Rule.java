@@ -18,7 +18,7 @@ public class Rule {
 
     MatchAction action;
     MatchCategory category;
-    MatchFilePath path;
+    MatchPaths paths;
     MatchLabel label;
 
     public List<String> then;
@@ -31,8 +31,8 @@ public class Rule {
         if (matches && category != null) {
             matches &= category.matches(queryContext);
         }
-        if (matches && path != null) {
-            matches &= path.matches(queryContext);
+        if (matches && paths != null) {
+            matches &= paths.matches(queryContext);
         }
         if (matches && label != null) {
             matches &= label.matches(queryContext);
@@ -56,26 +56,46 @@ public class Rule {
             ObjectMapper mapper = (ObjectMapper) p.getCodec();
             JsonNode node = mapper.readTree(p);
             Rule rule = new Rule();
-            if (node.has("action")) {
-                rule.action = new MatchAction();
-                rule.action.actions = mapper.convertValue(node.get("action"), LIST_STRING);
+            if (RuleType.action.existsIn(node)) {
+                rule.action = new MatchAction(mapper.convertValue(RuleType.action.getFrom(node), LIST_STRING));
             }
-            if (node.has("category")) {
+            if (RuleType.category.existsIn(node)) {
                 rule.category = new MatchCategory();
-                rule.category.category = mapper.convertValue(node.get("category"), LIST_STRING);
+                rule.category.category = mapper.convertValue(RuleType.category.getFrom(node), LIST_STRING);
             }
-            if (node.has("label")) {
-                rule.label = new MatchLabel();
-                rule.label.labels = mapper.convertValue(node.get("label"), LIST_STRING);
+            if (RuleType.label.existsIn(node)) {
+                rule.label = new MatchLabel(mapper.convertValue(RuleType.label.getFrom(node), LIST_STRING));
             }
-            if (node.has("path")) {
-                rule.path = new MatchFilePath();
-                rule.path.paths = mapper.convertValue(node.get("path"), LIST_STRING);
+            if (RuleType.paths.existsIn(node)) {
+                rule.paths = new MatchPaths();
+                rule.paths.paths = mapper.convertValue(RuleType.paths.getFrom(node), LIST_STRING);
             }
-            if (node.has("then")) {
-                rule.then = mapper.convertValue(node.get("then"), LIST_STRING);
+            if (RuleType.then.existsIn(node)) {
+                rule.then = mapper.convertValue(RuleType.then.getFrom(node), LIST_STRING);
             }
             return rule;
+        }
+    }
+
+    enum RuleType {
+        action,
+        category,
+        label,
+        paths,
+        then;
+
+        boolean existsIn(JsonNode source) {
+            if (source == null) {
+                return false;
+            }
+            return source.has(this.name());
+        }
+
+        JsonNode getFrom(JsonNode source) {
+            if (source == null) {
+                return null;
+            }
+            return source.get(this.name());
         }
     }
 }
