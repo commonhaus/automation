@@ -1,5 +1,7 @@
 package org.commonhaus.automation;
 
+import java.nio.file.Path;
+
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
@@ -14,6 +16,7 @@ import io.quarkus.runtime.annotations.QuarkusMain;
 public class Main {
 
     public static void main(String... args) {
+        System.out.println("cwd=" + Path.of("").toAbsolutePath());
         Quarkus.run(ApplicationRoot.class, args);
     }
 
@@ -24,7 +27,7 @@ public class Main {
 
         @Override
         public int run(String... args) throws Exception {
-            System.out.println("Do startup logic here. dryRun=" + botConfig.isDryRun());
+            System.out.println("dryRun=" + botConfig.isDryRun());
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()
             Quarkus.waitForExit();

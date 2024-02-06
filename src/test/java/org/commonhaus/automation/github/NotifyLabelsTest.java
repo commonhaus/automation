@@ -33,8 +33,6 @@ import org.kohsuke.github.PagedIterable;
 import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
 
-import com.hrakaroo.glob.MatchingEngine;
-
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
@@ -45,6 +43,8 @@ public class NotifyLabelsTest {
     final String repoFullName = "commonhaus/automation-test";
     final long repoId = 742099370;
     final long installationId = 46053716;
+    static final DataLabel bug = new DataLabel.Builder().name("bug").id("LA_kwDOLDuJqs8AAAABfqsdNQ").build();
+    static final DataLabel notice = new DataLabel.Builder().name("notice").id("LA_kwDOLDuJqs8AAAABgn2hGA").build();
 
     Response mockResponse(Path filename) {
         try {
@@ -61,8 +61,7 @@ public class NotifyLabelsTest {
 
     @BeforeEach
     void beforeEach() {
-        QueryHelper.cache.invalidateAll();
-        QueryHelper.cache.cleanUp();
+        QueryHelper.QueryCache.LABELS.invalidateAll();
     }
 
     @Test
@@ -142,7 +141,7 @@ public class NotifyLabelsTest {
         // preload the cache: no request to fetch repo labels (and check our work)
         Set<DataLabel> existing = new HashSet<>();
         existing.add(new DataLabel.Builder().name("notice").build());
-        QueryHelper.putCache(repositoryId, QueryHelper.LABEL, existing);
+        QueryHelper.QueryCache.LABELS.putCachedValue(repositoryId, existing);
         verifyLabelCache(repositoryId, 1, List.of("notice"));
 
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
@@ -169,14 +168,13 @@ public class NotifyLabelsTest {
     @Test
     void discussionLabeled() throws Exception {
         // When a discussion is labeled, ...
-
         // from src/test/resources/github/eventDiscussionLabeled.json
         String discussionId = "D_kwDOLDuJqs4AXNhB";
 
         // preload the cache: no request to fetch labels (and check our work)
         Set<DataLabel> existing = new HashSet<>();
-        existing.add(new DataLabel.Builder().name("bug").build());
-        QueryHelper.putCache(discussionId, QueryHelper.LABEL, existing);
+        existing.add(bug);
+        QueryHelper.QueryCache.LABELS.putCachedValue(discussionId, existing);
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
@@ -194,24 +192,47 @@ public class NotifyLabelsTest {
     }
 
     @Test
-    void discussionUnlabeled() throws Exception {
-        // When a discussion is labeled, ...
-        // If we don't have the labels cached, we fetch them first
+    void discussionUnlabeledUnknown() throws Exception {
+        // When a discussion is unlabeled, ...
         // from src/test/resources/github/eventDiscussionUnlabeled.json
         String discussionId = "D_kwDOLDuJqs4AXNhB";
-        Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
 
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
-                    when(mocks.installationGraphQLClient(installationId)
-                            .executeSync(anyString(), anyMap()))
-                            .thenReturn(bugLabel);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
-                    verify(mocks.installationGraphQLClient(installationId))
+                    verify(mocks.installationGraphQLClient(installationId), times(0))
+                            .executeSync(anyString(), anyMap());
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        Assertions.assertNull(QueryHelper.QueryCache.LABELS.getCachedValue(discussionId, Set.class),
+                "Discussion labels cache should not exist");
+    }
+
+    @Test
+    void discussionUnlabeled() throws Exception {
+        // When a discussion is unlabeled, ...
+        // from src/test/resources/github/eventDiscussionUnlabeled.json
+        String discussionId = "D_kwDOLDuJqs4AXNhB";
+
+        // preload the cache: no request to fetch labels (and check our work)
+        Set<DataLabel> existing = new HashSet<>();
+        existing.add(bug);
+        QueryHelper.QueryCache.LABELS.putCachedValue(discussionId, existing);
+        verifyLabelCache(discussionId, 1, List.of("bug"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), times(0))
                             .executeSync(anyString(), anyMap());
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
@@ -223,6 +244,7 @@ public class NotifyLabelsTest {
     void testRelevantPr() throws Exception {
         String prNodeId = "PR_kwDOLDuJqs5lPq17";
         long id = 1698606459;
+
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
@@ -248,14 +270,38 @@ public class NotifyLabelsTest {
                 });
 
         verifyLabelCache(prNodeId, 1, List.of("notice"));
-        Assertions.assertNotNull(QueryHelper.getCache("GLOB", "bylaws/*", Object.class),
+        Assertions.assertNotNull(QueryHelper.QueryCache.GLOB.getCachedValue("bylaws/*", Object.class),
                 "bylaws/* GLOB cache should exist");
-        Assertions.assertNull(QueryHelper.getCache("GLOB", "policy/*", Object.class),
+        Assertions.assertNull(QueryHelper.QueryCache.GLOB.getCachedValue("policy/*", Object.class),
                 "policy/* GLOB cache should not exist");
     }
 
-    private void verifyLabelCache(String discussionId, int size, List<String> expectedLabels) {
-        Collection<DataLabel> labels = QueryHelper.getCache(discussionId, "labels", Collection.class);
+    @Test
+    public void testLabelChanged() throws Exception {
+        String repoId = "R_kgDOLDuJqg";
+
+        // preload the cache: no request to fetch labels (and check our work)
+        Set<DataLabel> existing = new HashSet<>();
+        existing.add(bug);
+        QueryHelper.QueryCache.LABELS.putCachedValue(repoId, existing);
+        verifyLabelCache(repoId, 1, List.of("bug"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                })
+                .when().payloadFromClasspath("/github/eventLabelCreated.json")
+                .event(GHEvent.LABEL)
+                .then().github(mocks -> {
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        verifyLabelCache(repoId, 2, List.of("bug", "notice"));
+    }
+
+    private void verifyLabelCache(String labeledId, int size, List<String> expectedLabels) {
+        @SuppressWarnings("unchecked")
+        Set<DataLabel> labels = QueryHelper.QueryCache.LABELS.getCachedValue(labeledId, Set.class);
 
         Assertions.assertNotNull(labels);
         Assertions.assertEquals(size, labels.size(), stringify(labels));
@@ -272,17 +318,6 @@ public class NotifyLabelsTest {
     public String stringify(Collection<DataLabel> labels) {
         return labels.stream().map(label -> label.name).collect(Collectors.joining(", "));
     }
-
-    // public void repositoryLabelMocks(GitHubMockSetupContext mocks) throws IOException {
-    //     GHLabel mockLabel = mock(GHLabel.class);
-    //     when(mockLabel.getName()).thenReturn("notice");
-    //     when(mockLabel.getId()).thenReturn(1L);
-    //     when(mockLabel.getNodeId()).thenReturn("MDU6TGFiZWwx");
-
-    //     PagedIterable<GHLabel> iterableMock = mockPagedIterable(mockLabel);
-    //     when(mocks.repository(repoFullName).listLabels())
-    //             .thenReturn(iterableMock);
-    // }
 
     public static GHPullRequestFileDetail mockGHPullRequestFileDetail(String filename) {
         GHPullRequestFileDetail mock = mock(GHPullRequestFileDetail.class);

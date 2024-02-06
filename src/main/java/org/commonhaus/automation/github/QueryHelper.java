@@ -9,11 +9,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.AppConfig;
+import org.commonhaus.automation.github.model.ActionType;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GitHub;
@@ -29,10 +31,61 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @ApplicationScoped
 public class QueryHelper {
-    static final String LABEL = "labels";
-    static Cache<String, Object> cache = Caffeine.newBuilder()
-            .expireAfterWrite(6, TimeUnit.HOURS)
-            .build();
+    public enum QueryCache {
+        LABELS(Caffeine.newBuilder()
+                .expireAfterWrite(6, TimeUnit.HOURS)
+                .build()),
+        GLOB(Caffeine.newBuilder()
+                .maximumSize(200)
+                .build());
+
+        private final Cache<String, Object> cache;
+
+        private QueryCache(Cache<String, Object> cache) {
+            this.cache = cache;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T getCachedValue(String key, Class<T> type) {
+            T result = (T) cache.getIfPresent(key);
+            if (result != null) {
+                Log.debugf(":: HIT :: %s/%s ::: ", this.name(), key);
+            } else {
+                Log.debugf(":: MISS :: %s/%s ::: ", this.name(), key);
+            }
+            return result;
+        }
+
+        /**
+         * Put a value into the cache
+         *
+         * @param key
+         * @param value to be cached
+         * @return new value
+         */
+        public <T> T putCachedValue(String key, T value) {
+            Log.debugf(":: PUT :: %s/%s ::: ", this.name(), key);
+            cache.put(key, value);
+            return value;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T computeIfPresent(String key, BiFunction<String, Object, T> mappingFunction) {
+            Log.debugf(":: UPDATE :: %s/%s ::: ", this.name(), key);
+            Object value = cache.asMap().computeIfPresent(key, mappingFunction);
+            return (T) value;
+        }
+
+        public void invalidate(String key) {
+            Log.debugf(":: INVALIDATE :: %s/%s ::: ", this.name(), key);
+            cache.invalidate(key);
+        }
+
+        public void invalidateAll() {
+            Log.debugf(":: INVALIDATE ALL :: %s ::: ", this.name());
+            cache.invalidateAll();
+        }
+    }
 
     @Inject
     AppConfig botConfig;
@@ -46,23 +99,6 @@ public class QueryHelper {
 
     public QueryContext newQueryContext(EventData eventData, GitHub github) {
         return newQueryContext(eventData).addExisting(github);
-    }
-
-    public static <T> T getCache(String itemId, String key, Class<T> type) {
-        String idx = itemId + ":" + key;
-        T result = (T) cache.getIfPresent(idx);
-        if (result != null) {
-            System.out.println(":: HIT :: " + idx + " ::: ");
-        } else {
-            System.out.println(":: MISS :: " + idx + " ::: ");
-        }
-        return result;
-    }
-
-    public static void putCache(String itemId, String key, Object value) {
-        String idx = itemId + ":" + key;
-        System.out.println(":: UPDATE :: " + idx + " ::: ");
-        cache.put(idx, value);
     }
 
     /**
@@ -143,7 +179,7 @@ public class QueryHelper {
 
         @FunctionalInterface
         public interface GitHubParameterApiCall<R> {
-            R apply(GitHub gh) throws GHIOException, IOException;
+            R apply(GitHub gh, boolean isDryRun) throws GHIOException, IOException;
         }
 
         /**
@@ -159,7 +195,7 @@ public class QueryHelper {
                 return null;
             }
             try {
-                return ghApiCall.apply(getGitHub());
+                return ghApiCall.apply(getGitHub(), botConfig.isDryRun());
             } catch (GHIOException e) {
                 // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
                 Log.errorf(e, "[%s] Error making GH Request: %s", evt.installationId(), e.toString());
@@ -235,14 +271,6 @@ public class QueryHelper {
             return execQuerySync(query, variables);
         }
 
-        public <T> T getCache(String itemId, String key, Class<T> type) {
-            return QueryHelper.getCache(itemId, key, type);
-        }
-
-        public void putCache(String itemId, String key, Object value) {
-            QueryHelper.putCache(itemId, key, value);
-        }
-
         /**
          * Get labels for the labelable item
          *
@@ -250,14 +278,16 @@ public class QueryHelper {
          * @return collection of labels for the item
          */
         public Collection<DataLabel> getCachedLabels(String itemId) {
-            Collection<DataLabel> labels = getCache(itemId, "labels", Collection.class);
+            @SuppressWarnings("unchecked")
+            Set<DataLabel> labels = QueryHelper.QueryCache.LABELS.getCachedValue(itemId, Set.class);
+
             if (labels != null) {
                 return labels;
             }
             // fresh fetch graphQL fetch
             labels = DataLabel.queryLabels(this, itemId);
             if (labels != null) {
-                putCache(itemId, LABEL, labels);
+                QueryHelper.QueryCache.LABELS.putCachedValue(itemId, labels);
             }
             return labels;
         }
@@ -269,63 +299,33 @@ public class QueryHelper {
          * @param label Label to add
          * @return updated collection of labels for the item, or null if not cached
          */
-        public Collection<DataLabel> addCachedLabel(String cacheId, DataLabel label) {
-            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
-            if (labels == null) {
-                return null;
-            }
-            labels.add(label);
-            return labels;
+        public Collection<DataLabel> modifyLabels(String cacheId, DataLabel label, ActionType action) {
+            return QueryHelper.QueryCache.LABELS.computeIfPresent(cacheId, (k, v) -> {
+                @SuppressWarnings("unchecked")
+                Set<DataLabel> labels = (Set<DataLabel>) v;
+                if (action == ActionType.deleted || action == ActionType.unlabeled || action == ActionType.edited) {
+                    labels.remove(label);
+                }
+                if (action == ActionType.created || action == ActionType.labeled || action == ActionType.edited) {
+                    labels.add(label);
+                }
+                return labels;
+            });
         }
 
         /**
-         * Remove a label from the list of known labels if the associated item exists
+         * Replace cached labels with result of modification (post-mutation)
          *
          * @param cacheId Labelable item node id
-         * @param label Label to remove
-         * @return updated collection of labels for the item, or null if not cached
+         * @param labels updated Set of labels (e.g. post-mutation)
+         * @return updated collection of labels
          */
-        public Collection<DataLabel> removeCachedLabel(String cacheId, DataLabel label) {
-            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
-            if (labels == null) {
-                return null;
-            }
-            labels.remove(label);
-            return labels;
-        }
-
-        /**
-         * Update a label in the cache if the associated item exists
-         *
-         * @param cacheId Labelable item node id
-         * @param label Label to update/replace
-         * @return updated collection of labels for the item, or null if not cached
-         */
-        public Collection<DataLabel> updateCachedLabel(String cacheId, DataLabel label) {
-            Collection<DataLabel> labels = getCachedLabels(cacheId); // ensure labels are cached (if not already)
-            if (labels == null) {
-                return null;
-            }
-            // only the id is equals/hashcode -- so remove and add
-            labels.remove(label);
-            labels.add(label);
-            return labels;
-        }
-
-        /**
-         * Add a label from the list of known labels if the associated item has been seen/cached
-         *
-         * @param cacheId Labelable item node id
-         * @param labels updated Set of labels (e.g. post modify command)
-         * @return updated collection of labels for the item, or null if not cached
-         */
-        public Collection<DataLabel> modifyLabels(String cacheId, List<DataLabel> labels) {
+        public Collection<DataLabel> updateLabels(String cacheId, List<DataLabel> labels) {
             Set<DataLabel> newLabels = DataLabel.modifyLabels(this, cacheId, labels);
             if (newLabels == null) {
                 return null;
             }
-            QueryHelper.putCache(cacheId, LABEL, newLabels);
-            return newLabels;
+            return QueryHelper.QueryCache.LABELS.putCachedValue(cacheId, newLabels);
         }
     }
 }

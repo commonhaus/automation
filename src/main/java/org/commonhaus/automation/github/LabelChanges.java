@@ -3,7 +3,6 @@ package org.commonhaus.automation.github;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.QueryHelper.QueryContext;
-import org.commonhaus.automation.github.model.ActionType;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.EventPayload;
@@ -53,13 +52,7 @@ public class LabelChanges {
         }
 
         Log.debugf("LabelChanges (%s): discussion %s changed label %s", event.getEventAction(), discussion.id, label);
-
-        // Don't fetch labels first: only add/remove if it's an item/id we know about
-        if (initialData.getActionType() == ActionType.labeled) {
-            queryContext.addCachedLabel(discussion.id, label);
-        } else {
-            queryContext.removeCachedLabel(discussion.id, label);
-        }
+        queryContext.modifyLabels(discussion.id, label, initialData.getActionType());
     }
 
     /**
@@ -84,14 +77,6 @@ public class LabelChanges {
         String cacheId = labelPayload.getRepository().getNodeId();
 
         Log.debugf("LabelChanges (%s): repository %s changed label %s", event.getEventAction(), cacheId, label);
-
-        // Don't fetch labels first: only add/remove if it's an item/id we know about
-        if (initialData.getActionType() == ActionType.created) {
-            queryContext.addCachedLabel(cacheId, label);
-        } else if (initialData.getActionType() == ActionType.edited) {
-            queryContext.updateCachedLabel(cacheId, label);
-        } else {
-            queryContext.removeCachedLabel(cacheId, label);
-        }
+        queryContext.modifyLabels(cacheId, label, initialData.getActionType());
     }
 }

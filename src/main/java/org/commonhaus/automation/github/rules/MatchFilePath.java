@@ -57,10 +57,9 @@ public class MatchFilePath {
     }
 
     MatchingEngine compileGlob(String filenamePattern) {
-        MatchingEngine me = QueryHelper.getCache("GLOB", filenamePattern, MatchingEngine.class);
+        MatchingEngine me = QueryHelper.QueryCache.GLOB.getCachedValue(filenamePattern, MatchingEngine.class);
         if (me == null) {
-            me = GlobPattern.compile(filenamePattern);
-            QueryHelper.putCache("GLOB", filenamePattern, me);
+            me = QueryHelper.QueryCache.GLOB.putCachedValue(filenamePattern, GlobPattern.compile(filenamePattern));
         }
         return me;
     }
