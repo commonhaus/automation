@@ -22,6 +22,8 @@ env:
   GH_BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
   GH_BOT_NAME: "GitHub Action"
   GRAALVM_DIST: graalvm-community
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -33,12 +35,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: graalvm/setup-graalvm@v1
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
       with:
-        distribution: ${{ env.GRAALVM_DIST }}
-        java-version: ${{ env.JAVA_VERSION }}
-        cache: 'maven'
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        java-version: 21
+        distribution: 'temurin'
+        cache: maven
 
     - name: Project metadata
       id: metadata
@@ -57,9 +59,13 @@ jobs:
       env:
         MAVEN_OPTS: "-Xmx1g"
       run: |
-        ./mvnw -B -ntp verify -Dnative -DskipTests -DskipFormat
+        ./mvnw -B -ntp verify -DskipTests -DskipFormat \
+          -Dnative \
+          -Dquarkus.native.container-build=true \
+          -Dquarkus.container-image.build=true
 
     - name: Update release with snapshot artifact
+      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
       id: mvn-release-snapshot
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,7 +88,23 @@ jobs:
         echo "Update $SNAPSHOT release"
         gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
 
+    - name: Log in to the Container registry
+      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      uses: docker/login-action@3d58c274f17dffee475a5520cbe67f0a882c4dbb
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish OCI (native)
+      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      id: publish-oci
+      run: |
+        docker build -f src/main/docker/Dockerfile.native-micro -t ghcr.io/commonhaus/commonhaus-bot:latest .
+        docker push ghcr.io/commonhaus/commonhaus-bot:latest
+
     - name: Mark snapshot release as non-draft
+      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
       id: update-snapshot-release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
