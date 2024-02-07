@@ -99,9 +99,12 @@ jobs:
     - name: Publish OCI (native)
       if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
       id: publish-oci
+      env:
+        SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
       run: |
-        docker build -f src/main/docker/Dockerfile.native-micro -t ghcr.io/commonhaus/commonhaus-bot:latest .
-        docker push ghcr.io/commonhaus/commonhaus-bot:latest
+        image="commonhaus/commonhaus-bot:${SNAPSHOT}"
+        docker tag "${image}" "ghcr.io/${image}"
+        docker push "ghcr.io/commonhaus/commonhaus-bot:${SNAPSHOT}"
 
     - name: Mark snapshot release as non-draft
       if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
