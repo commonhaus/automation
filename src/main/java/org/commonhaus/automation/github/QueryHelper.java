@@ -326,5 +326,9 @@ public class QueryHelper {
             }
             return QueryHelper.QueryCache.LABELS.putCachedValue(cacheId, newLabels);
         }
+
+        public boolean isDryRun() {
+            return botConfig.isDryRun();
+        }
     }
 }

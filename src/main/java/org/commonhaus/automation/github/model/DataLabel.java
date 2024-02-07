@@ -141,6 +141,7 @@ public class DataLabel extends DataCommonType {
      */
     public static Set<DataLabel> queryLabels(QueryContext queryContext, String labeledId) {
         if (queryContext.hasErrors()) {
+            Log.debugf("queryLabels for labelable %s; skipping modify (errors)", labeledId);
             return null;
         }
         String query = """
@@ -178,13 +179,20 @@ public class DataLabel extends DataCommonType {
                     : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node);
         });
 
+        Log.infof("queryLabels for labelable %s; result=%s", labels);
         return labels;
     }
 
     public static Set<DataLabel> modifyLabels(QueryContext queryContext, String labeledId, List<DataLabel> newLabels) {
+        if (queryContext.isDryRun()) {
+            Log.infof("modifyLabels (dry-run) for labelable %s; result=%s", labeledId, newLabels);
+            return new HashSet<>(newLabels);
+        }
         if (queryContext.hasErrors()) {
+            Log.debugf("modifyLabels for labelable %s; skipping modify (errors)", labeledId);
             return null;
         }
+
         Log.debugf("modifyLabels for labelable %s with %s", labeledId, newLabels);
         String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
 
@@ -209,6 +217,7 @@ public class DataLabel extends DataCommonType {
             return JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable);
         });
 
+        Log.infof("modifyLabels for labelable %s; result=%s", labels);
         return labels;
     }
 

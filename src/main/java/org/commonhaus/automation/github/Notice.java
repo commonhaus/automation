@@ -53,7 +53,7 @@ public class Notice {
                 actions.addAll(rule.then);
             }
         }
-        Log.debugf("notice.onDiscussionEvent (%s): Discussion #%s triggered (%s) actions: %s",
+        Log.infof("notice.onDiscussionEvent (%s): Discussion #%s triggered (%s) actions: %s",
                 event.getEventAction(), discussionPayload.getDiscussion().getNumber(), actions.size(), actions);
 
         if (actions.isEmpty()) {
@@ -95,7 +95,7 @@ public class Notice {
                 actions.addAll(rule.then);
             }
         }
-        Log.debugf("notice.onPullRequestEvent (%s): Pull Request #%s triggered (%s) actions: %s",
+        Log.infof("notice.onPullRequestEvent (%s): Pull Request #%s triggered (%s) actions: %s",
                 event.getEventAction(), pullRequestPayload.getPullRequest().getNumber(), actions.size(), actions);
 
         if (actions.isEmpty()) {
