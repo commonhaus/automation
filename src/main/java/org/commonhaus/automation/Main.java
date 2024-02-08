@@ -1,5 +1,7 @@
 package org.commonhaus.automation;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 
 import jakarta.enterprise.event.Observes;
@@ -17,6 +19,17 @@ public class Main {
 
     public static void main(String... args) {
         System.out.println("cwd=" + Path.of("").toAbsolutePath());
+
+        try {
+            String hostName = "api.github.com";
+
+            // Resolving host name to IP address
+            InetAddress address = InetAddress.getByName(hostName);
+            System.out.println("IP address of " + hostName + ": " + address.getHostAddress());
+        } catch (UnknownHostException e) {
+            System.out.println("Could not resolve host: " + e.getMessage());
+        }
+
         Quarkus.run(ApplicationRoot.class, args);
     }
 

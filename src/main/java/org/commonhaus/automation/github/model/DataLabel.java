@@ -179,7 +179,7 @@ public class DataLabel extends DataCommonType {
                     : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node);
         });
 
-        Log.infof("queryLabels for labelable %s; result=%s", labels);
+        Log.infof("queryLabels for labelable %s; result=%s", labeledId, labels);
         return labels;
     }
 
@@ -217,7 +217,7 @@ public class DataLabel extends DataCommonType {
             return JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable);
         });
 
-        Log.infof("modifyLabels for labelable %s; result=%s", labels);
+        Log.infof("modifyLabels for labelable %s; result=%s", labeledId, labels);
         return labels;
     }
 
