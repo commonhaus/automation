@@ -75,10 +75,10 @@ jobs:
         git config user.email ${{ env.GH_BOT_EMAIL }}
 
         ls -al target
-        AV=${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}
+        AV=${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}-runner
 
         gh release upload "${SNAPSHOT}" --clobber ./target/${AV}.jar#${AV}.jar
-        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}-runner#${AV}-runner
+        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}#${AV}
 
         echo "Update tag for $SNAPSHOT"
         git push origin :refs/tags/$SNAPSHOT
