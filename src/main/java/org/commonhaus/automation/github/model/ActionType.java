@@ -12,6 +12,7 @@ public enum ActionType {
     opened,
     pinned,
     reopened,
+    synchronize,
     transferred,
     unanswered,
     unlabeled,

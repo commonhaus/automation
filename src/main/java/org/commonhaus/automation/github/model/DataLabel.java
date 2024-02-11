@@ -26,7 +26,6 @@ public class DataLabel extends DataCommonType {
                 name
                 url
             """;
-
     static final String FIRST_10_LABELS = """
             labels(first: 10) {
                 nodes {
@@ -81,7 +80,7 @@ public class DataLabel extends DataCommonType {
     }
 
     public String toString() {
-        return String.format("Label [%s] %s", this.id, this.name);
+        return String.format("Label[%s:%s]", this.id, this.name);
     }
 
     public static class Builder {
@@ -183,17 +182,17 @@ public class DataLabel extends DataCommonType {
         return labels;
     }
 
-    public static Set<DataLabel> modifyLabels(QueryContext queryContext, String labeledId, List<DataLabel> newLabels) {
+    public static Set<DataLabel> addLabels(QueryContext queryContext, String labeledId, List<DataLabel> newLabels) {
         if (queryContext.isDryRun()) {
-            Log.infof("modifyLabels (dry-run) for labelable %s; result=%s", labeledId, newLabels);
+            Log.infof("addLabels (dry-run) for labelable %s; result=%s", labeledId, newLabels);
             return new HashSet<>(newLabels);
         }
         if (queryContext.hasErrors()) {
-            Log.debugf("modifyLabels for labelable %s; skipping modify (errors)", labeledId);
+            Log.debugf("addLabels for labelable %s; skipping modify (errors)", labeledId);
             return null;
         }
 
-        Log.debugf("modifyLabels for labelable %s with %s", labeledId, newLabels);
+        Log.debugf("addLabels for labelable %s with %s", labeledId, newLabels);
         String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
 
         Map<String, Object> variables = new HashMap<>();
@@ -234,7 +233,6 @@ public class DataLabel extends DataCommonType {
                 break;
             }
             JsonObject pageLabels = findPageLabels.apply(response.getData());
-
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(pageLabels);
             if (nodes == null) {
                 break;

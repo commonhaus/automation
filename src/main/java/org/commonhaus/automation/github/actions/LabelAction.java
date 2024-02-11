@@ -50,7 +50,7 @@ public class LabelAction extends Action {
 
         if (!newLabels.isEmpty()) {
             // Modify labels and update cache
-            queryContext.updateLabels(nodeId, newLabels);
+            queryContext.addLabels(nodeId, newLabels);
         }
     }
 }

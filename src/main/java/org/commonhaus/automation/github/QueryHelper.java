@@ -292,10 +292,12 @@ public class QueryHelper {
         }
 
         /**
-         * Add a label from the list of known labels if the associated item has been seen/cached
+         * Add, remove, or edit a label from the list of known labels
+         * if the associated item has been seen/cached
          *
          * @param cacheId Labelable item node id
          * @param label Label to add
+         * @param action Type of action to perform (created, edited, deleted, labeled, unlabeled)
          * @return updated collection of labels for the item, or null if not cached
          */
         public Collection<DataLabel> modifyLabels(String cacheId, DataLabel label, ActionType action) {
@@ -316,11 +318,11 @@ public class QueryHelper {
          * Replace cached labels with result of modification (post-mutation)
          *
          * @param cacheId Labelable item node id
-         * @param labels updated Set of labels (e.g. post-mutation)
-         * @return updated collection of labels
+         * @param labels labels to add
+         * @return updated Set of labels (e.g. post-mutation)
          */
-        public Collection<DataLabel> updateLabels(String cacheId, List<DataLabel> labels) {
-            Set<DataLabel> newLabels = DataLabel.modifyLabels(this, cacheId, labels);
+        public Collection<DataLabel> addLabels(String cacheId, List<DataLabel> labels) {
+            Set<DataLabel> newLabels = DataLabel.addLabels(this, cacheId, labels);
             if (newLabels == null) {
                 return null;
             }
