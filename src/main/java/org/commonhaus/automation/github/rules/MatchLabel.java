@@ -31,7 +31,7 @@ public class MatchLabel {
         }
 
         Collection<DataLabel> eventLabels = queryContext.getCachedLabels(id);
-        if (eventLabels == null || eventLabels.isEmpty()) {
+        if (!include.isEmpty() && (eventLabels == null || eventLabels.isEmpty())) {
             return false;
         }
 

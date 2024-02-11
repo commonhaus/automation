@@ -50,6 +50,14 @@ jobs:
         echo "snapshot=${SNAPSHOT}" >> $GITHUB_OUTPUT
         echo "artifact=${ARTIFACT}" >> $GITHUB_OUTPUT
 
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-single-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-single-buildx
+
     - name: Build with Maven
       run: |
         ./mvnw -B -ntp formatter:validate verify

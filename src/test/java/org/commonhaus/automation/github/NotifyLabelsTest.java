@@ -34,6 +34,7 @@ import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
+import io.quarkus.arc.Arc;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
 
@@ -44,6 +45,7 @@ public class NotifyLabelsTest {
     final String repositoryId = "R_kgDOLDuJqg";
     final long repoId = 742099370;
     final long installationId = 46053716;
+
     static final DataLabel bug = new DataLabel.Builder().name("bug").id("LA_kwDOLDuJqs8AAAABfqsdNQ").build();
     static final DataLabel notice = new DataLabel.Builder().name("notice").id("LA_kwDOLDuJqs8AAAABgn2hGA").build();
 
@@ -64,6 +66,7 @@ public class NotifyLabelsTest {
     void beforeEach() {
         QueryHelper.QueryCache.LABELS.invalidateAll();
         verifyNoLabelCache(repositoryId);
+        Arc.container().instance(QueryHelper.class).get().setBotSenderLogin("login");
     }
 
     @Test
@@ -242,12 +245,16 @@ public class NotifyLabelsTest {
 
     @Test
     void testRelevantPr() throws Exception {
-        String prNodeId = "PR_kwDOLDuJqs5lPq17";
+        // test query for sender login
+        Arc.container().instance(QueryHelper.class).get().setBotSenderLogin(null);
+
+        String prNodeId = "PR_kwDOLDuJqs5mlMVl";
         verifyNoLabelCache(prNodeId);
 
-        long id = 1698606459;
+        long id = 1721025893;
+        Response viewer = mockResponse(Path.of("src/test/resources/github/queryViewer.json"));
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
-        Response bugLabel = mockResponse(Path.of("src/test/resources/github/queryLabelBug.json"));
+        Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
 
         given()
@@ -256,7 +263,7 @@ public class NotifyLabelsTest {
                     // 2 GraphQL queries to fetch labels
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(anyString(), anyMap()))
-                            .thenReturn(bugLabel, repoLabels, modifiedLabel);
+                            .thenReturn(viewer, noLabels, repoLabels, modifiedLabel);
 
                     // Mocked REST request
                     PagedIterable<GHPullRequestFileDetail> paths = mockPagedIterable(
@@ -266,7 +273,7 @@ public class NotifyLabelsTest {
                 .when().payloadFromClasspath("/github/eventPullRequestCreatedBylaws.json")
                 .event(GHEvent.PULL_REQUEST)
                 .then().github(mocks -> {
-                    verify(mocks.installationGraphQLClient(installationId), times(3))
+                    verify(mocks.installationGraphQLClient(installationId), times(4))
                             .executeSync(anyString(), anyMap());
                 });
 

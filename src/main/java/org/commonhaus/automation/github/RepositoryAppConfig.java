@@ -25,7 +25,7 @@ public class RepositoryAppConfig {
         }
 
         public boolean isEnabled() {
-            return enabled == null || enabled.booleanValue();
+            return (enabled == null || enabled.booleanValue()) && !actions.isEmpty();
         }
     }
 

@@ -12,11 +12,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
+import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.model.ActionType;
 import org.commonhaus.automation.github.model.DataLabel;
+import org.commonhaus.automation.github.model.JsonAttribute;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GitHub;
 
@@ -31,6 +32,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @ApplicationScoped
 public class QueryHelper {
+
     public enum QueryCache {
         LABELS(Caffeine.newBuilder()
                 .expireAfterWrite(6, TimeUnit.HOURS)
@@ -87,18 +89,48 @@ public class QueryHelper {
         }
     }
 
-    @Inject
-    AppConfig botConfig;
+    private final AppConfig botConfig;
+    private final GitHubClientProvider gitHubClientProvider;
+    private String botSenderLogin;
 
-    @Inject
-    GitHubClientProvider gitHubClientProvider;
+    public QueryHelper(AppConfig botConfig, GitHubClientProvider gitHubClientProvider) {
+        this.botConfig = botConfig;
+        this.gitHubClientProvider = gitHubClientProvider;
+    }
 
     public QueryContext newQueryContext(EventData event) {
-        return new QueryContext(botConfig, gitHubClientProvider, event);
+        return new QueryContext(this, botConfig, gitHubClientProvider, event);
     }
 
     public QueryContext newQueryContext(EventData eventData, GitHub github) {
         return newQueryContext(eventData).addExisting(github);
+    }
+
+    public String getBotSenderLogin() {
+        return getBotSenderLogin(new QueryContext(null, botConfig, gitHubClientProvider, null));
+    }
+
+    public String getBotSenderLogin(QueryContext ctx) {
+        String id = botSenderLogin;
+        if (id == null) {
+            Response response = ctx.execQuerySync("""
+                        query {
+                            viewer {
+                              login
+                            }
+                        }
+                    """, new HashMap<>());
+            if (response.hasError()) {
+                return "unknown";
+            }
+            JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
+            botSenderLogin = id = JsonAttribute.login.stringFrom(viewer);
+        }
+        return id;
+    }
+
+    void setBotSenderLogin(String login) {
+        botSenderLogin = login;
     }
 
     /**
@@ -111,7 +143,8 @@ public class QueryHelper {
      * It is not thread-safe.
      */
     public static class QueryContext {
-        protected final AppConfig botConfig;
+        private final QueryHelper helper;
+        private final AppConfig botConfig;
 
         private final GitHubClientProvider gitHubClientProvider;
 
@@ -119,13 +152,15 @@ public class QueryHelper {
         protected final List<Throwable> exceptions = new ArrayList<>(1);
 
         /** Short-lived (minutes) CLI for GitHub REST API */
-        GitHub github;
+        private GitHub github;
         /** Short-lived (minutes) CLI for GitHub GraphQL API */
-        DynamicGraphQLClient graphQLClient;
+        private DynamicGraphQLClient graphQLClient;
+        /** Event data used to construct this query context */
+        private final EventData evt;
 
-        final EventData evt;
-
-        QueryContext(AppConfig botConfig, GitHubClientProvider gitHubClientProvider, EventData event) {
+        private QueryContext(QueryHelper helper, AppConfig botConfig, GitHubClientProvider gitHubClientProvider,
+                EventData event) {
+            this.helper = helper;
             this.botConfig = botConfig;
             this.gitHubClientProvider = gitHubClientProvider;
 
@@ -331,6 +366,12 @@ public class QueryHelper {
 
         public boolean isDryRun() {
             return botConfig.isDryRun();
+        }
+
+        public boolean isFromMe() {
+            String botSenderId = helper.getBotSenderLogin(this);
+            String eventSenderId = evt.getSenderLogin();
+            return botSenderId.equals(eventSenderId);
         }
     }
 }

@@ -54,6 +54,12 @@ public class EventData {
         }
     }
 
+    public String getSenderLogin() {
+        return ghSender == null
+                ? sender.login
+                : ghSender.getLogin();
+    }
+
     public String getAction() {
         return event.getAction();
     }
@@ -90,6 +96,7 @@ public class EventData {
         return type.cast(ghPayload);
     }
 
+    @SuppressWarnings("unchecked")
     public <T extends EventPayload> T getEventPayload() {
         if (eventPayload == null) {
             eventPayload = eventType.getDataFrom(actionType, jsonData);
