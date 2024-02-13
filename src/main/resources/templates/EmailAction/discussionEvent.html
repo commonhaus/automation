@@ -16,5 +16,5 @@
           || discussion.closedAt != discussion.createdAt}
     <div class="closed">closed <time>{time:format(discussion.closedAt, "dd MMM yyyy")}</time></div>
 {/if}{/dateTime}
-{#body}{discussion.body}{/body}
+{#body}{htmlBody.raw}{/body}
 {/include}

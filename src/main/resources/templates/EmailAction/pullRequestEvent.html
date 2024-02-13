@@ -16,5 +16,5 @@
         || pullRequest.closedAt != pullRequest.createdAt}
     <div class="closed">closed <time>{time:format(pullRequest.closedAt, "dd MMM yyyy")}</time></div>
 {/if}{/dateTime}
-{#body}{pullRequest.body}{/body}
+{#body}{htmlBody.raw}{/body}
 {/include}

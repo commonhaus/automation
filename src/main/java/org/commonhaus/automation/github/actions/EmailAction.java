@@ -7,6 +7,9 @@ import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
 import org.commonhaus.automation.github.model.EventPayload.DiscussionPayload;
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
@@ -21,13 +24,16 @@ import io.quarkus.qute.CheckedTemplate;
 
 @JsonDeserialize(as = EmailAction.class)
 public class EmailAction extends Action {
+    static final Parser parser = Parser.builder().build();
+    static final HtmlRenderer renderer = HtmlRenderer.builder().build();
 
     @CheckedTemplate
     static class Templates {
-        public static native MailTemplateInstance pullRequestEvent(String title, GHPullRequest pullRequest);
+        public static native MailTemplateInstance pullRequestEvent(String title, String htmlBody,
+                GHPullRequest pullRequest);
 
-        public static native MailTemplateInstance discussionEvent(String title, DataDiscussion discussion, String repoSlug,
-                URL repoUrl);
+        public static native MailTemplateInstance discussionEvent(String title, String htmlBody,
+                DataDiscussion discussion, String repoSlug, URL repoUrl);
     }
 
     @JsonProperty
@@ -43,14 +49,20 @@ public class EmailAction extends Action {
             MailTemplateInstance mailTemplateInstance = switch (eventData.getEventType()) {
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
+
                     subject = "PR #" + payload.getNumber() + " " + payload.getPullRequest().getTitle();
-                    yield Templates.pullRequestEvent(subject, payload.getPullRequest());
+                    yield Templates.pullRequestEvent(subject,
+                            toHtmlBody(payload.getPullRequest().getBody()),
+                            payload.getPullRequest());
                 }
                 case discussion -> {
                     EventPayload.DiscussionPayload payload = (DiscussionPayload) eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
+
                     subject = "#" + discussion.number + " " + discussion.title + " (" + discussion.category.name + ")";
-                    yield Templates.discussionEvent(subject, discussion,
+                    yield Templates.discussionEvent(subject,
+                            toHtmlBody(discussion.body),
+                            discussion,
                             eventData.getRepository().getFullName(),
                             eventData.getRepository().getUrl());
                 }
@@ -72,5 +84,18 @@ public class EmailAction extends Action {
                                         subject));
             }
         });
+    }
+
+    private String toHtmlBody(String body) {
+        if (body == null) {
+            return "<p></p>";
+        }
+        try {
+            Node document = parser.parse(body);
+            return renderer.render(document);
+        } catch (Exception e) {
+            Log.errorf(e, "EmailAction.toHtmlBody: Failed to render body as HTML");
+            return body;
+        }
     }
 }
