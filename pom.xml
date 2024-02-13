@@ -50,8 +50,10 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.7.1</quarkus.platform.version>
+        <quarkus.mailpit.version>0.0.9</quarkus.mailpit.version>
         <!-- Libraries -->
         <glob.version>0.9.0</glob.version>
+        <awaitility.version>4.2.0</awaitility.version>
         <!-- Image attributes -->
         <quarkus.package.type>uber-jar</quarkus.package.type>
         <quarkus.container-image.group>commonhaus</quarkus.container-image.group>
@@ -87,6 +89,10 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-mailer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-caffeine</artifactId>
         </dependency>
         <dependency>
@@ -112,6 +118,12 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>${awaitility.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

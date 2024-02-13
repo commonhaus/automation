@@ -2,6 +2,9 @@ package org.commonhaus.automation.github.model;
 
 import jakarta.json.JsonObject;
 
+import io.quarkus.qute.TemplateData;
+
+@TemplateData
 public class EventPayload {
     public final ActionType action;
 
@@ -9,6 +12,7 @@ public class EventPayload {
         this.action = action;
     }
 
+    @TemplateData
     public static class DiscussionPayload extends EventPayload {
         public final DataDiscussion discussion;
 
@@ -46,6 +50,7 @@ public class EventPayload {
         }
     }
 
+    @TemplateData
     public static class DiscussionCommentPayload extends DiscussionPayload {
         public final DataDiscussionComment comment;
 

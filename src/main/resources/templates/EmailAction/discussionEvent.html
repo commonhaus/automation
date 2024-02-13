@@ -1,0 +1,20 @@
+{#include includes/base}
+{#repoSlug}{repoSlug}{/repoSlug}
+{#repoUrl}{repoUrl}{/repoUrl}
+{#ghUrl}{discussion.url}{/ghUrl}
+{#authorLogin}{discussion.author.login}{/authorLogin}
+{#authorUrl}{discussion.author.url}{/authorUrl}
+{#authorAvatarUrl}{discussion.author.avatarUrl}{/authorAvatarUrl}
+{#dateTime}
+    <div class="posted">created <time>{time:format(discussion.createdAt, "dd MMM yyyy")}</time></div>
+{#if discussion.updatedAt 
+          && (discussion.updatedAt && discussion.closedAt != discussion.updatedAt) 
+          || discussion.updatedAt != discussion.createdAt}
+    <div class="updated">updated <time>{time:format(discussion.updatedAt, "dd MMM yyyy")}</time></div>
+{/if}{#if discussion.closedAt 
+          && (discussion.updatedAt && discussion.closedAt != discussion.updatedAt) 
+          || discussion.closedAt != discussion.createdAt}
+    <div class="closed">closed <time>{time:format(discussion.closedAt, "dd MMM yyyy")}</time></div>
+{/if}{/dateTime}
+{#body}{discussion.body}{/body}
+{/include}
