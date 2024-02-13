@@ -5,7 +5,7 @@ notice:
         # category, apply the notice label
         category: [Announcements, Reviews]
         action: [created, category_changed]
-        then: [label_notice]
+        then: [email_activity]
   pull_request:
     rules:
       - # If a pull request is created that touches bylaws or policies
@@ -14,13 +14,11 @@ notice:
         #   send an email to the announcement list
         action:
           - opened
-          - edited
-          - closed
         paths:
           - bylaws/*
           - policies/*
-        label: ["!notice"]
-        then: [label_notice]
+        then: [email_activity]
   actions:
-    label_notice: [notice]
+    email_activity: 
+      address: test@commonhaus.org
 

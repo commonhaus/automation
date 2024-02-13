@@ -24,11 +24,15 @@ public class MatchPaths {
 
     public boolean matches(QueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        if (paths == null || paths.isEmpty() || eventData == null || eventData.getEventType() != EventType.pull_request) {
+        if (eventData.getEventType() != EventType.pull_request) {
             return false;
         }
+        if (paths == null || paths.isEmpty()) {
+            // it is a pull request, but no paths are specified, so it matches
+            return true;
+        }
 
-        GHEventPayload.PullRequest pullRequest = eventData.getGHEventPayload(GHEventPayload.PullRequest.class);
+        GHEventPayload.PullRequest pullRequest = eventData.getGHEventPayload();
         GHPullRequest ghPullRequest = pullRequest.getPullRequest();
 
         PagedIterable<GHPullRequestFileDetail> prFiles = ghPullRequest.listFiles();

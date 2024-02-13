@@ -38,7 +38,7 @@ public class Notice {
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
     void onDiscussionEvent(GitHubEvent event, GitHub github,
-            @Discussion.Created @Discussion.CategoryChanged @Discussion.Edited GHEventPayload.Discussion discussionPayload,
+            @Discussion GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
@@ -49,7 +49,7 @@ public class Notice {
         QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussionPayload), github);
         if (queryContext.isFromMe()) {
             Log.debugf("notice.onDiscussionEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            return;
+            //return;
         }
         Log.debugf("notice.onDiscussionEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
 
@@ -81,7 +81,7 @@ public class Notice {
         QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, pullRequestPayload), github);
         if (queryContext.isFromMe()) {
             Log.debugf("notice.onPullRequestEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            return;
+            //return;
         }
         Log.debugf("notice.onPullRequestEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
 

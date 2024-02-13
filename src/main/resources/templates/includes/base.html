@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>{title}</title>
+  <style media="all" type="text/css">
+    table,
+    a {
+      background: #fcfcfc;
+      color: #222;
+    }
+    a {
+      text-decoration: underline;
+      text-decoration-color: rgb(54, 184, 184);
+    }
+    @media (prefers-color-scheme: dark) {
+      /* Your dark mode styles: */
+      table,
+      a[href] {
+        background: #222;
+        color: #ccc;
+      }
+    }
+
+    body {
+      font-family: Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: 16px;
+      line-height: 1.3;
+      -ms-text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    table {
+      border-collapse: separate;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    table td {
+      font-family: Helvetica, sans-serif;
+      font-size: 16px;
+      vertical-align: top;
+      padding: 0 1em;
+    }
+
+    header,
+    main,
+    footer {
+      margin: 1em 0;
+      padding: .5em;
+    }
+    header span {
+      font-size: .9em;
+    }
+
+    footer {
+      font-size: .8em;
+      border-top: 1px solid #999;
+    }
+
+    h1 {
+      font-size: 1.3em;
+      margin: .2em;
+    }
+
+    .avatar {
+      float: right;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5em;
+    }
+
+    .avatar img {
+      width: 24px;
+      height: 24px;
+      background: #fff;
+      border-radius: 20px;
+      border: 1px solid var(--bg-accent);
+    }
+  </style>
+</head>
+
+<body>
+  <table border="0" cellpadding="0" cellspacing="0" width="600">
+    <tr>
+      <td>
+        <header>
+          <span>[<a href="">{#insert repoSlug}{/}</a>]</span>
+          <h1><a href="{#insert ghUrl}https://github.com{/}">{title}</a></h1>
+        </header>
+        <main>{#insert body}No body!{/}</main>
+        <footer>
+          <a class="avatar" href="{#insert authorUrl}{/}" target="_top">
+            <img src="{#insert authorAvatarUrl}{/}" />
+            <span>{#insert authorLogin}{/}</span>
+          </a>
+          {#insert dateTime}{/}
+        </footer>
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>

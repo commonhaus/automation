@@ -19,7 +19,7 @@ public class Routes {
     @Route(path = "/ping", order = 99, produces = "text/html")
     public void handleRequest(RoutingContext routingContext, RoutingExchange routingExchange) throws IOException {
         Template tpl = engine.getTemplate("index.html");
-        Log.infof("handle plain request");
+        Log.debug("handle plain request");
         routingExchange
                 .ok()
                 .putHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex")

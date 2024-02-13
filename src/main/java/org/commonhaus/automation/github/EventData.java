@@ -92,8 +92,9 @@ public class EventData {
         return installation.getId();
     }
 
-    public <T extends GHEventPayload> T getGHEventPayload(Class<T> type) {
-        return type.cast(ghPayload);
+    @SuppressWarnings("unchecked")
+    public <T extends GHEventPayload> T getGHEventPayload() {
+        return (T) ghPayload;
     }
 
     @SuppressWarnings("unchecked")
@@ -118,7 +119,7 @@ public class EventData {
                 yield discussion.id;
             }
             case pull_request -> {
-                GHEventPayload.PullRequest payload = getGHEventPayload(GHEventPayload.PullRequest.class);
+                GHEventPayload.PullRequest payload = getGHEventPayload();
                 yield payload.getPullRequest().getNodeId();
             }
             default -> {

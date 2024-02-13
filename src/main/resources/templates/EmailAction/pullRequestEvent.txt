@@ -1,0 +1,18 @@
+{#include includes/baseText}
+{#repoSlug}{pullRequest.repository.fullName}{/repoSlug}
+{#ghUrl}{pullRequest.issueUrl}{/ghUrl}
+{#authorLogin}{pullRequest.user.login}{/authorLogin}
+{#authorUrl}{pullRequest.user.url}{/authorUrl}
+{#createdAt}{pullRequest.createdAt}{/createdAt}
+{#dateTime}{#if pullRequest.closedAt 
+          && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
+          || pullRequest.closedAt != pullRequest.createdAt}
+- closed {pullRequest.closedAt}
+{/if}{#if pullRequest.updatedAt 
+          && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
+          || pullRequest.updatedAt != pullRequest.createdAt}
+- updated {pullRequest.updatedAt}
+{/if}
+{/dateTime}
+{#body}{pullRequest.body}{/body}
+{/include}
