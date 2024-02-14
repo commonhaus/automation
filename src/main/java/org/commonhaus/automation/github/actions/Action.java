@@ -40,7 +40,7 @@ public abstract class Action {
                 labelsAction.labels = mapper.convertValue(root, LIST_STRING);
                 return labelsAction;
             } else if (root.has("address")) {
-                return mapper.convertValue(root, EmailAction.class);
+                return new EmailAction(root.get("address"));
             } else if (root.has("channel")) {
                 return mapper.convertValue(root, DiscordAction.class);
             }

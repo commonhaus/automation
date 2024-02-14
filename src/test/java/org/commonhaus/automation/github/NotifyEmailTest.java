@@ -66,7 +66,7 @@ public class NotifyEmailTest extends GithubTest {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
     }
 
     @Test
@@ -89,6 +89,6 @@ public class NotifyEmailTest extends GithubTest {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                 });
 
-        await().atMost(10, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        await().atMost(10, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
     }
 }

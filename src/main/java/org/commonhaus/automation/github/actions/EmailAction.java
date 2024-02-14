@@ -15,6 +15,7 @@ import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.quarkus.arc.Arc;
@@ -37,14 +38,28 @@ public class EmailAction extends Action {
     }
 
     @JsonProperty
-    String address;
+    String[] addresses;
+
+    public EmailAction() {
+    }
+
+    public EmailAction(JsonNode address) {
+        if (address.isArray()) {
+            this.addresses = new String[address.size()];
+            for (int i = 0; i < address.size(); i++) {
+                this.addresses[i] = address.get(i).asText();
+            }
+        } else {
+            this.addresses = new String[] { address.asText() };
+        }
+    }
 
     @Override
     public void apply(QueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
         // Fire and forget: mail construction and sending happens in a separate thread
         Arc.container().instance(ManagedExecutor.class).get().submit(() -> {
-            Log.debugf("EmailAction.apply: Preparing email to %s for %s.%s", address, eventData.getEventType(),
+            Log.debugf("EmailAction.apply: Preparing email to %s for %s.%s", addresses, eventData.getEventType(),
                     eventData.getAction());
 
             final String subject;
@@ -78,19 +93,19 @@ public class EmailAction extends Action {
                 };
             } catch (Exception e) {
                 mailTemplateInstance = null;
-                Log.errorf(e, "EmailAction.apply: Failed to prepare email to %s", address);
+                Log.errorf(e, "EmailAction.apply: Failed to prepare email to %s", (Object[]) addresses);
                 return;
             }
 
             if (mailTemplateInstance != null) {
-                Log.debugf("EmailAction.apply: Sending email to %s; %s", address, subject);
+                Log.debugf("EmailAction.apply: Sending email to %s; %s", addresses, subject);
                 mailTemplateInstance
-                        .to(address)
+                        .to(addresses)
                         .subject(subject)
                         .send()
                         .subscribe().with(
-                                success -> Log.infof("EmailAction.apply: Email sent to %s; %s", address, subject),
-                                failure -> Log.errorf(failure, "EmailAction.apply: Failed to send email to %s", address,
+                                success -> Log.infof("EmailAction.apply: Email sent to %s; %s", addresses, subject),
+                                failure -> Log.errorf(failure, "EmailAction.apply: Failed to send email to %s", addresses,
                                         subject));
             }
         });
