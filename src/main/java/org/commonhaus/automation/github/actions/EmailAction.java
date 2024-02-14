@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.actions;
 
 import java.net.URL;
+import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.QueryHelper.QueryContext;
@@ -10,6 +11,7 @@ import org.commonhaus.automation.github.model.EventPayload.DiscussionPayload;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
@@ -27,6 +29,20 @@ import io.quarkus.qute.CheckedTemplate;
 public class EmailAction extends Action {
     static final Parser parser = Parser.builder().build();
     static final HtmlRenderer renderer = HtmlRenderer.builder().build();
+
+    static boolean initialized = false;
+    static String replyToAddress = null;
+
+    static void addReplyTo(MailTemplateInstance mailTemplateInstance) {
+        String replyTo = replyToAddress;
+        if (replyTo == null && !initialized) {
+            replyToAddress = replyTo = ConfigProvider.getConfig().getValue("automation.replyTo", String.class);
+            initialized = true;
+        }
+        if (replyTo != null) {
+            mailTemplateInstance.replyTo(replyTo);
+        }
+    }
 
     @CheckedTemplate
     static class Templates {
@@ -59,7 +75,7 @@ public class EmailAction extends Action {
         EventData eventData = queryContext.getEventData();
         // Fire and forget: mail construction and sending happens in a separate thread
         Arc.container().instance(ManagedExecutor.class).get().submit(() -> {
-            Log.debugf("EmailAction.apply: Preparing email to %s for %s.%s", addresses, eventData.getEventType(),
+            Log.debugf("EmailAction.apply: Preparing email to %s for %s.%s", List.of(addresses), eventData.getEventType(),
                     eventData.getAction());
 
             final String subject;
@@ -93,19 +109,21 @@ public class EmailAction extends Action {
                 };
             } catch (Exception e) {
                 mailTemplateInstance = null;
-                Log.errorf(e, "EmailAction.apply: Failed to prepare email to %s", (Object[]) addresses);
+                Log.errorf(e, "EmailAction.apply: Failed to prepare email to %s", List.of(addresses));
                 return;
             }
 
             if (mailTemplateInstance != null) {
-                Log.debugf("EmailAction.apply: Sending email to %s; %s", addresses, subject);
+                Log.debugf("EmailAction.apply: Sending email to %s; %s", List.of(addresses), subject);
+                addReplyTo(mailTemplateInstance);
                 mailTemplateInstance
                         .to(addresses)
                         .subject(subject)
                         .send()
                         .subscribe().with(
-                                success -> Log.infof("EmailAction.apply: Email sent to %s; %s", addresses, subject),
-                                failure -> Log.errorf(failure, "EmailAction.apply: Failed to send email to %s", addresses,
+                                success -> Log.infof("EmailAction.apply: Email sent to %s; %s", List.of(addresses), subject),
+                                failure -> Log.errorf(failure, "EmailAction.apply: Failed to send email to %s",
+                                        List.of(addresses),
                                         subject));
             }
         });
