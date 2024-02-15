@@ -42,6 +42,33 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Generate cache key
+      id: image-cache-key
+      run: |
+        echo "cache_key=build-image-cache-$(/bin/date -u "+%Y-%U")" >> $GITHUB_OUTPUT
+
+    - name: Check Cache Data
+      id: image-cache-check
+      uses: actions/cache@v4.0.0
+      with:
+        path: build-image
+        key: ${{ steps.image-cache-key.outputs.cache_key }}
+        lookup-only: true
+
+    - name: Download build image
+      id: build-image-download
+      if: steps.image-cache-check.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p build-image
+        docker pull quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
+        docker save quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 -o build-image/mandrel.tar
+
+    - name: Load build image
+      id: load-build-image
+      if: steps.image-cache-check.outputs.cache-hit == 'true'
+      run: |
+        docker load build-image/mandrel.tar quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
+
     - name: Project metadata
       id: metadata
       run: |
@@ -49,14 +76,6 @@ jobs:
         ARTIFACT=$(yq '.build.artifact' .github/project.yml)
         echo "snapshot=${SNAPSHOT}" >> $GITHUB_OUTPUT
         echo "artifact=${ARTIFACT}" >> $GITHUB_OUTPUT
-
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-single-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-single-buildx
 
     - name: Build with Maven
       run: |
@@ -123,3 +142,41 @@ jobs:
       run: |
         gh release edit "${SNAPSHOT}" --draft=false
         gh release view "${SNAPSHOT}"
+
+    - name: Delete snapshots artifacts from cache
+      run: find ~/.m2 -name \*-SNAPSHOT -type d -exec rm -rf {} +
+
+  deploy:
+    if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          sudo chmod 600 ~/.ssh/id_rsa
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
+
+
+      - name: Update CF Bot
+        run: |
+          ssh $SSH_PORT $SSH_USER_HOST "$SSH_BOT_UPDATE"
+        shell: bash
+        env:
+          SSH_USER_HOST: ${{secrets.SSH_USER_HOST}}
+          SSH_PORT: ${{secrets.SSH_PORT}}
+          SSH_BOT_UPDATE: ${{secrets.SSH_BOT_UPDATE}}
+
+      - name: Cleanup
+        run: |
+          rm ~/.ssh/id_rsa
+          rm ~/.ssh/known_hosts
+        shell: bash
