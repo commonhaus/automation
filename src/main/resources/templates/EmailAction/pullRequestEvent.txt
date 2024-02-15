@@ -1,6 +1,6 @@
 {#include includes/baseText}
 {#repoSlug}{pullRequest.repository.fullName}{/repoSlug}
-{#ghUrl}{pullRequest.issueUrl}{/ghUrl}
+{#ghUrl}{pullRequest.htmlUrl}{/ghUrl}
 {#authorLogin}{pullRequest.user.login}{/authorLogin}
 {#authorUrl}{pullRequest.user.url}{/authorUrl}
 {#createdAt}{pullRequest.createdAt}{/createdAt}
