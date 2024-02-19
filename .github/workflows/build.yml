@@ -62,7 +62,7 @@ jobs:
         docker pull quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
         docker save quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 -o build-image/mandrel.tar
 
-    - uses: actions/cache/save@v3
+    - uses: actions/cache/save@v4
       id: cache-save
       if: always()
       with:
