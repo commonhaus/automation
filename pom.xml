@@ -49,7 +49,7 @@
         <quarkus-github-app.version>2.3.0</quarkus-github-app.version>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.7.2</quarkus.platform.version>
+        <quarkus.platform.version>3.7.4</quarkus.platform.version>
         <quarkus.mailpit.version>0.0.9</quarkus.mailpit.version>
         <!-- Libraries -->
         <glob.version>0.9.0</glob.version>
