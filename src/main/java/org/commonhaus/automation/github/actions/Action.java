@@ -3,8 +3,8 @@ package org.commonhaus.automation.github.actions;
 import java.io.IOException;
 import java.util.List;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.actions.Action.ActionDeserializer;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;

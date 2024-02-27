@@ -5,8 +5,8 @@ import java.util.Collection;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.DataLabel;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 public class MatchLabel {
 
@@ -25,12 +25,12 @@ public class MatchLabel {
 
     public boolean matches(QueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        String id = eventData.getLabelableId();
+        String id = eventData.getNodeId();
         if (id == null) {
             return false;
         }
 
-        Collection<DataLabel> eventLabels = queryContext.getCachedLabels(id);
+        Collection<DataLabel> eventLabels = queryContext.getLabels(id);
         if (!include.isEmpty() && (eventLabels == null || eventLabels.isEmpty())) {
             return false;
         }

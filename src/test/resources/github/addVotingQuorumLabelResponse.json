@@ -1,0 +1,31 @@
+{
+  "addLabelsToLabelable": {
+    "clientMutationId": null,
+    "labelable": {
+      "labels": {
+        "nodes": [
+          {
+            "color": "74B08A",
+            "description": "",
+            "id": "LA_kwDOLDuJqs8AAAABgn2hGA",
+            "isDefault": false,
+            "name": "vote/open",
+            "url": "https://github.com/commonhaus/automation-test/labels/vote%2Fopen"
+          },
+          {
+            "color": "d73a4a",
+            "description": "",
+            "id": "LA_kwDOLDuJqs8AAAABfqsdNQ",
+            "isDefault": true,
+            "name": "vote/quorum",
+            "url": "https://github.com/commonhaus/automation-test/labels/vote%2Fquorum"
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "MQ"
+        }
+      }
+    }
+  }
+}

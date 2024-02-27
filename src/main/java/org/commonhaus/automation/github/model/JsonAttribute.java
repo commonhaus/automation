@@ -53,6 +53,7 @@ public enum JsonAttribute {
     action,
     activeLockReason,
     addDiscussionComment,
+    addLabelsToLabelable,
     answer,
     answerChosenAt,
     author,
@@ -65,9 +66,12 @@ public enum JsonAttribute {
     closedAt,
     color,
     comment,
+    commentEdge,
+    comments,
     confused,
     content,
     createdAt("created_at"),
+    databaseId,
     deletedAt,
     description,
     discussion,
@@ -90,7 +94,10 @@ public enum JsonAttribute {
     isAnswer,
     isAnswered,
     isDefault("default"),
+    issue,
+    issueComment,
     label,
+    labelable,
     labels,
     lastEditedAt,
     laugh,
@@ -117,10 +124,12 @@ public enum JsonAttribute {
     repository,
     rocket,
     sender,
+    slug,
     state,
     stateReason,
     title,
     total_count,
+    updateDiscussionComment,
     updatedAt("updated_at"),
     upvoteCount,
     url("html_url"),
@@ -136,9 +145,6 @@ public enum JsonAttribute {
     viewerCannotUpdateReasons,
     viewerDidAuthor,
     viewerHasUpvoted,
-    slug,
-    labelable,
-    addLabelsToLabelable,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -161,6 +167,10 @@ public enum JsonAttribute {
 
     public String getNodeName() {
         return nodeName;
+    }
+
+    public boolean existsIn(JsonObject object) {
+        return object != null && (object.containsKey(nodeName) || object.containsKey(name()));
     }
 
     /**
@@ -289,6 +299,17 @@ public enum JsonAttribute {
     }
 
     /**
+     * @return DataCommonItem constructed from nodeName (or name()) attribute of object
+     */
+    public DataCommonItem commonItemFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataCommonItem(field);
+    }
+
+    /**
      * @return Discussion constructed from nodeName (or name()) attribute of object
      */
     public DataDiscussion discussionFrom(JsonObject object) {
@@ -311,7 +332,7 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return DiscussionComment constructed from nodeName (or name()) attribute of object
+     * @return DataDiscussionComment constructed from nodeName (or name()) attribute of object
      */
     public DataDiscussionComment discussionCommentFrom(JsonObject object) {
         if (object == null) {
@@ -319,6 +340,17 @@ public enum JsonAttribute {
         }
         JsonObject field = jsonObjectFrom(object);
         return field == null ? null : new DataDiscussionComment(field);
+    }
+
+    /**
+     * @return DataIssueComment constructed from nodeName (or name()) attribute of object
+     */
+    public DataIssueComment issueCommentFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataIssueComment(field);
     }
 
     /**

@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github;
 
+import java.time.Instant;
+
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.ActionType;
@@ -21,6 +23,7 @@ public class EventData {
     final GitHubEvent event;
     final JsonObject jsonData;
     final GHEventPayload ghPayload;
+    private final String logId;
 
     /** GHRepo / context of current request */
     final GHRepository repository;
@@ -33,6 +36,10 @@ public class EventData {
     private DataActor sender;
     private GHUser ghSender;
     private EventPayload eventPayload;
+    private String nodeId;
+    private String nodeUrl;
+    private String body;
+    private int number = 0;
 
     EventData(GitHubEvent event, GHEventPayload payload) {
         this.event = event;
@@ -52,6 +59,21 @@ public class EventData {
             this.organization = JsonAttribute.organization.organizationFrom(jsonData);
             this.installation = JsonAttribute.installation.appInstallationFrom(jsonData);
         }
+
+        this.logId = "("
+                + getRepoSlug() + "::"
+                + getEventType() + "."
+                + getActionType()
+                + (getNumber() >= 0 ? ("#" + getNumber()) : "")
+                + ")";
+    }
+
+    public String getLogId() {
+        return logId;
+    }
+
+    public JsonObject getJsonData() {
+        return jsonData;
     }
 
     public String getSenderLogin() {
@@ -72,6 +94,10 @@ public class EventData {
         return eventType;
     }
 
+    public String eventTime() {
+        return Instant.now().toString();
+    }
+
     public String getRepoOwner() {
         return repository.getOwnerName();
     }
@@ -80,12 +106,20 @@ public class EventData {
         return repository.getName();
     }
 
+    public String getRepoSlug() {
+        return repository.getFullName();
+    }
+
     public String getRepositoryId() {
         return repository.getNodeId();
     }
 
     public GHRepository getRepository() {
         return repository;
+    }
+
+    public GHOrganization getOrganization() {
+        return organization;
     }
 
     public long installationId() {
@@ -111,21 +145,104 @@ public class EventData {
      *
      * @return the id of the primary item for this event
      */
-    public String getLabelableId() {
-        return switch (eventType) {
-            case discussion, discussion_comment -> {
-                EventPayload.DiscussionPayload payload = getEventPayload();
-                DataDiscussion discussion = payload.discussion;
-                yield discussion.id;
-            }
-            case pull_request -> {
-                GHEventPayload.PullRequest payload = getGHEventPayload();
-                yield payload.getPullRequest().getNodeId();
-            }
-            default -> {
-                Log.errorf("EventData.getLabelableId: unsupported event type %s", eventType);
-                yield null;
-            }
-        };
+    public String getNodeId() {
+        String id = nodeId;
+        if (id == null) {
+            id = nodeId = switch (eventType) {
+                case discussion, discussion_comment -> {
+                    EventPayload.DiscussionPayload payload = getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    yield discussion.id;
+                }
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getNodeId();
+                }
+                default -> {
+                    Log.errorf("[%s] EventData.getNodeId: unsupported event type", logId);
+                    yield null;
+                }
+            };
+        }
+        return id;
+    }
+
+    public String getNodeUrl() {
+        String url = nodeUrl;
+        if (url == null) {
+            url = nodeUrl = switch (eventType) {
+                case discussion, discussion_comment -> {
+                    EventPayload.DiscussionPayload payload = getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    yield discussion.url;
+                }
+                case issue, issue_comment -> {
+                    GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getHtmlUrl().toString();
+                }
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getHtmlUrl().toString();
+                }
+                default -> {
+                    Log.errorf("[%s] EventData.getNodeUrl: unsupported event type", logId);
+                    yield null;
+                }
+            };
+        }
+        return url;
+    }
+
+    public String getBody() {
+        String result = body;
+        if (result == null) {
+            result = body = switch (eventType) {
+                case discussion -> {
+                    EventPayload.DiscussionPayload payload = getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    yield discussion.body;
+                }
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getBody();
+                }
+                default -> {
+                    Log.errorf("[%s] EventData.getBody: unsupported event type", logId);
+                    yield null;
+                }
+            };
+        }
+        return body;
+    }
+
+    public int getNumber() {
+        int result = number;
+        if (result == 0) {
+            result = number = switch (eventType) {
+                case discussion, discussion_comment -> {
+                    EventPayload.DiscussionPayload payload = getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    yield discussion.number;
+                }
+                case issue -> {
+                    GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getNumber();
+                }
+                case issue_comment -> {
+                    GHEventPayload.IssueComment payload = getGHEventPayload();
+                    yield payload.getIssue().getNumber();
+                }
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getNumber();
+                }
+                case label -> -1;
+                default -> {
+                    Log.errorf("[%s] EventData.getNumber: unsupported event type", logId);
+                    yield -1;
+                }
+            };
+        }
+        return result;
     }
 }

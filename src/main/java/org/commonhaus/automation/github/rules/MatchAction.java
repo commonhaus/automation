@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 public class MatchAction {
 

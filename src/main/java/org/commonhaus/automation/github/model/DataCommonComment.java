@@ -1,23 +1,132 @@
 package org.commonhaus.automation.github.model;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+
+import io.smallrye.graphql.client.Response;
 
 public class DataCommonComment extends DataCommonObject {
 
-    static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
+    static final String COMMENT_FIELDS_MIN = COMMON_OBJECT_MIN + """
+            databaseId
+            """;
+
+    protected static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
+            databaseId
             body
             includesCreatedEdit
             viewerDidAuthor
-                """;
+            """;
 
+    public final Integer databaseId;
     public final boolean includesCreatedEdit;
-
     public final boolean viewerDidAuthor;
 
     public DataCommonComment(JsonObject object) {
         super(object);
 
+        this.databaseId = JsonAttribute.databaseId.integerFrom(object);
         this.includesCreatedEdit = JsonAttribute.includesCreatedEdit.booleanFromOrFalse(object);
         this.viewerDidAuthor = JsonAttribute.viewerDidAuthor.booleanFromOrFalse(object);
+    }
+
+    /** package private. See QueryHelper / QueryContext */
+    static DataCommonComment findBotComment(QueryContext queryContext, String itemId, Integer commentId) {
+        if (commentId != null) {
+            // we have a commentId, so we can just fetch it directly
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("commentId", commentId);
+            Response response = queryContext.execQuerySync("""
+                    query($commentId: ID!) {
+                        node(id: $commentId) {
+                            ... on IssueComment {
+                                """ + COMMENT_FIELDS_MIN + """
+                    }
+                    ... on PullRequestReviewComment {
+                        """ + COMMENT_FIELDS_MIN + """
+                    }
+                    ... on DiscussionComment {
+                        """ + COMMENT_FIELDS_MIN + """
+                            }
+                        }
+                    }
+                    """, variables);
+            if (response.hasError()) {
+                if (queryContext.hasNotFound()) {
+                    queryContext.clearErrors();
+                } else {
+                    return null;
+                }
+            }
+            JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
+            DataCommonComment ec = new DataCommonComment(node);
+            if (queryContext.isBot(ec.author.login)) {
+                return ec;
+            }
+        }
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("itemId", itemId);
+
+        JsonObject pageInfo = null;
+        String cursor = null;
+
+        // Paginate.. excessive, but..
+        do {
+            variables.put("after", cursor);
+            Response response = queryContext.execQuerySync("""
+                    query($itemId: ID!, $after: String) {
+                        node(id: $itemId) {
+                            ... on Issue {
+                                comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                                    nodes {
+                                        """ + COMMENT_FIELDS_MIN + """
+                            }
+                        }
+                    }
+                    ... on PullRequest {
+                        comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                            nodes {
+                                """ + COMMENT_FIELDS_MIN + """
+                            }
+                        }
+                    }
+                    ... on Discussion {
+                        comments(first: 50, after: $after) {
+                            nodes {
+                                """ + COMMENT_FIELDS_MIN + """
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    """, variables);
+            if (response.hasError()) {
+                if (queryContext.hasNotFound()) {
+                    queryContext.clearErrors();
+                }
+                return null;
+            }
+            JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
+            JsonObject comments = JsonAttribute.comments.jsonObjectFrom(node);
+            JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(comments);
+            for (JsonObject comment : nodes.getValuesAs(JsonObject.class)) {
+                DataCommonComment cc = new DataCommonComment(comment);
+                if (queryContext.isBot(cc.author.login)) {
+                    // we found it! bail ASAP
+                    return cc;
+                }
+            }
+            pageInfo = JsonAttribute.node.jsonObjectFrom(comments);
+            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
+        } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+
+        // we didn't find one...
+        return null;
     }
 }

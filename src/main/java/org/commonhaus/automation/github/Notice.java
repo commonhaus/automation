@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -7,11 +8,12 @@ import java.util.Set;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.DiscussionConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.PullRequestConfig;
 import org.commonhaus.automation.github.actions.Action;
+import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.Rule;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
@@ -46,23 +48,18 @@ public class Notice {
             return;
         }
 
-        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussionPayload), github);
-        if (queryContext.isFromMe()) {
-            Log.debugf("notice.onDiscussionEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            //return;
-        }
-        Log.debugf("notice.onDiscussionEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
+        EventData eventData = new EventData(event, discussionPayload);
+        QueryContext queryContext = queryHelper.newQueryContext(eventData, github);
+        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
 
-        Set<String> actions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
-        Log.infof("notice.onDiscussionEvent (%s): Discussion #%s triggered (%s) actions: %s",
-                event.getEventAction(), discussionPayload.getDiscussion().getNumber(), actions.size(), actions);
+        Log.infof("[%s] notice.onDiscussionEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onDiscussionEvent", event.getEventAction(), queryContext,
-                actions, noticeConfig.actions);
+        applyMatchingActions("notice.onDiscussionEvent", queryContext, desiredActions, noticeConfig.actions);
     }
 
     /**
-     * Called when there is a discussion event.
+     * Called when there is a pull request event.
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
@@ -78,19 +75,14 @@ public class Notice {
             return;
         }
 
-        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, pullRequestPayload), github);
-        if (queryContext.isFromMe()) {
-            Log.debugf("notice.onPullRequestEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            //return;
-        }
-        Log.debugf("notice.onPullRequestEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
+        EventData eventData = new EventData(event, pullRequestPayload);
+        QueryContext queryContext = queryHelper.newQueryContext(eventData, github);
 
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.pullRequest.rules);
-        Log.infof("notice.onPullRequestEvent (%s): Pull Request #%s triggered (%s) actions: %s",
-                event.getEventAction(), pullRequestPayload.getPullRequest().getNumber(), desiredActions.size(), desiredActions);
+        Log.infof("[%s] notice.onPullRequestEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onPullRequestEvent", event.getEventAction(), queryContext,
-                desiredActions, noticeConfig.actions);
+        applyMatchingActions("notice.onPullRequestEvent", queryContext, desiredActions, noticeConfig.actions);
     }
 
     private Set<String> findMatchingActions(QueryContext queryContext, List<Rule> rules) {
@@ -103,7 +95,7 @@ public class Notice {
         return actions;
     }
 
-    private void applyMatchingActions(String method, String eventAction, QueryContext queryContext,
+    private void applyMatchingActions(String method, QueryContext queryContext,
             Set<String> desiredActions, Map<String, Action> actionsMap) {
         if (desiredActions.isEmpty()) {
             return;
@@ -111,7 +103,9 @@ public class Notice {
         for (String actionName : desiredActions) {
             Action action = actionsMap.get(actionName);
             if (action == null) {
-                Log.warnf("%s (%s): Action '%s' not found", method, eventAction, actionName);
+                Log.warnf("[%s] %s: Action '%s' not found",
+                        queryContext.getLogId(),
+                        method, actionName);
                 continue;
             }
             action.apply(queryContext);
@@ -133,9 +127,16 @@ public class Notice {
             }
         };
 
+        @Override
+        public boolean isEnabled() {
+            return super.isEnabled() && !actions.isEmpty();
+        }
+
         public DiscussionConfig discussion;
 
         @JsonProperty("pull_request")
         public PullRequestConfig pullRequest;
+
+        public Map<String, Action> actions = new HashMap<>();
     }
 }

@@ -3,11 +3,13 @@ package org.commonhaus.automation.github;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.model.GithubTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
@@ -35,7 +37,7 @@ public class NotifyEmailTest extends GithubTest {
         // - no rules or actions are triggered
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-email.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
                 .event(GHEvent.DISCUSSION)
@@ -56,7 +58,7 @@ public class NotifyEmailTest extends GithubTest {
 
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-email.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
                 .event(GHEvent.DISCUSSION)
@@ -77,7 +79,7 @@ public class NotifyEmailTest extends GithubTest {
 
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-email.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
                     // Mocked REST request
                     PagedIterable<GHPullRequestFileDetail> paths = mockPagedIterable(
                             mockGHPullRequestFileDetail("bylaws/README.md"));
@@ -86,7 +88,10 @@ public class NotifyEmailTest extends GithubTest {
                 .when().payloadFromClasspath("/github/eventPullRequestOpenedBylaws.json")
                 .event(GHEvent.PULL_REQUEST)
                 .then().github(mocks -> {
+                    verify(mocks.pullRequest(id)).listFiles();
+
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         await().atMost(10, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);

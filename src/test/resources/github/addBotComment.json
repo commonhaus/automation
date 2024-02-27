@@ -1,0 +1,28 @@
+{
+  "addDiscussionComment": {
+    "clientMutationId": null,
+    "comment": {
+      "id": "DC_kwDOLDuJqs4Agx94",
+      "databaseId": 8593272,
+      "author": {
+        "login": "commonhaus-test-bot",
+        "url": "https://github.com/apps/commonhaus-test-bot",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+      },
+      "editor": null,
+      "authorAssociation": "NONE",
+      "body": "No consensus mechanism found in the item description",
+      "createdAt": "2024-02-26T14:23:20Z",
+      "publishedAt": "2024-02-26T14:23:20Z",
+      "lastEditedAt": null,
+      "updatedAt": "2024-02-26T14:23:20Z",
+      "url": "https://github.com/commonhaus/automation-test/discussions/25#discussioncomment-8593272",
+      "includesCreatedEdit": false,
+      "viewerDidAuthor": true,
+      "isAnswer": false,
+      "discussion": {
+        "id": "D_kwDOLDuJqs4AXteZ"
+      }
+    }
+  }
+}

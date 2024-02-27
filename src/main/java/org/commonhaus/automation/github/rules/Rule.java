@@ -2,7 +2,7 @@ package org.commonhaus.automation.github.rules;
 
 import java.util.List;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.Rule.RuleDeserializer;
 
 import com.fasterxml.jackson.core.type.TypeReference;

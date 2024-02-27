@@ -54,7 +54,7 @@ public class DataCommonType {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        DataLabel other = (DataLabel) obj;
+        DataCommonType other = (DataCommonType) obj;
         if (id == null) {
             if (other.id != null)
                 return false;

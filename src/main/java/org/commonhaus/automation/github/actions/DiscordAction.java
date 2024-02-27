@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github.actions;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 

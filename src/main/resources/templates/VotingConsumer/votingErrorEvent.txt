@@ -1,0 +1,7 @@
+{#include includes/errorText}
+{#title}{title}{/title}
+{#repoSlug}{eventData.getRepoOwner()}/{eventData.getRepoName()}{/repoSlug}
+{#ghUrl}{eventData.getNodeUrl()}{/ghUrl}
+{#dateTime}{eventData.eventTime()}{/dateTime}
+{#body}{body}{/body}
+{/include}

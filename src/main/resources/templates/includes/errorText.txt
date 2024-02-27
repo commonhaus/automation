@@ -1,0 +1,13 @@
+
+[{#insert repoSlug}{/}]
+{#insert title}{/} [1]
+
+{#insert body}{/}
+
+
+---
+{#insert dateTime}{/}
+
+[1]: {#insert ghUrl}https://github.com{/}
+
+

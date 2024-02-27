@@ -2,10 +2,11 @@ package org.commonhaus.automation.github;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.EventPayload;
+import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -41,17 +42,17 @@ public class LabelChanges {
 
         EventPayload.DiscussionPayload payload = initialData.getEventPayload();
         if (payload == null) {
-            Log.errorf("LabelChanges (%s): no event payload, %s", event.getEventAction(), event.getPayload());
+            Log.errorf("[%s] LabelChanges: no event payload, %s", initialData.getLogId(), event.getPayload());
             return;
         }
         DataDiscussion discussion = payload.discussion;
         DataLabel label = payload.label;
         if (discussion == null || label == null) {
-            Log.errorf("LabelChanges (%s): missing discussion or label, %s", event.getEventAction(), event.getPayload());
+            Log.errorf("[%s] LabelChanges: missing discussion or label, %s", initialData.getLogId(), event.getPayload());
             return;
         }
 
-        Log.debugf("LabelChanges (%s): discussion %s changed label %s", event.getEventAction(), discussion.id, label);
+        Log.debugf("[%s] LabelChanges: discussion changed label %s", initialData.getLogId(), label);
         queryContext.modifyLabels(discussion.id, label, initialData.getActionType());
     }
 
@@ -76,7 +77,7 @@ public class LabelChanges {
         DataLabel label = new DataLabel(labelPayload.getLabel());
         String cacheId = labelPayload.getRepository().getNodeId();
 
-        Log.debugf("LabelChanges (%s): repository %s changed label %s", event.getEventAction(), cacheId, label);
+        Log.debugf("[%s] LabelChanges: repository %s changed label %s", initialData.getLogId(), cacheId, label);
         queryContext.modifyLabels(cacheId, label, initialData.getActionType());
     }
 }

@@ -9,6 +9,16 @@ import jakarta.json.JsonObject;
  */
 public class DataCommonObject extends DataCommonType {
 
+    static final String COMMON_OBJECT_MIN = """
+            id
+            author {
+                login
+                url
+                avatarUrl
+            }
+            url
+            """;
+
     static final String COMMON_OBJECT_FIELDS = """
             id
             author {
@@ -38,7 +48,8 @@ public class DataCommonObject extends DataCommonType {
     public final Date createdAt;
     public final Date publishedAt;
 
-    public final String body;
+    // allow modification for dry run
+    public String body;
 
     // Updatable
     public final DataActor editor;

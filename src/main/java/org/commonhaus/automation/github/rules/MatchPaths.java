@@ -3,9 +3,9 @@ package org.commonhaus.automation.github.rules;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.EventType;
+import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -50,7 +50,8 @@ public class MatchPaths {
                                 return true;
                             }
                         } catch (Exception e) {
-                            Log.error("Error evaluating glob expression: " + p, e);
+                            Log.errorf(e, "[%s] Error evaluating glob expression %s: %s",
+                                    queryContext.getLogId(), p, e.toString());
                         }
                     }
                 }

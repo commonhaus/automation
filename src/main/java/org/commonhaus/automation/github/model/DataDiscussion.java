@@ -9,38 +9,22 @@ import java.util.Map;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
-import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
 public class DataDiscussion extends DataCommonItem {
 
-    static final String DISCUSSION_FIELDS = """
-            id
-            number
-            title
+    static final String DISCUSSION_FIELDS = ISSUE_FIELDS + """
             category {
                 """ + DataDiscussionCategory.DISCUSSION_CATEGORY_FIELDS + """
             }
-            author {
-                avatarUrl
-                login
-                url
-            }
             authorAssociation
-            activeLockReason
             answerChosenAt
-            body
-            bodyText
             """ + DataLabel.FIRST_10_LABELS + """
-            closed
-            closedAt
             createdAt
             isAnswered
-            locked
             updatedAt
-            url
                 """;
 
     public final DataDiscussionCategory category;
@@ -65,17 +49,8 @@ public class DataDiscussion extends DataCommonItem {
         return String.format("Discussion [%s] %s", this.id, this.title);
     }
 
-    /**
-     * Exceptions and errors are captured for caller in the queryContext
-     *
-     * @param queryContext
-     * @param isOpen true for open discussions, false for non-open discussions
-     * @return list of discussions
-     */
-    public static List<DataDiscussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
-        if (queryContext.hasErrors()) {
-            return List.of();
-        }
+    /** package private. See QueryHelper / QueryContext */
+    static List<DataDiscussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
         List<DataDiscussion> discussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("isOpen", isOpen);
@@ -95,7 +70,6 @@ public class DataDiscussion extends DataCommonItem {
                         }
                       }
                     """, variables);
-            Log.debugf("discussions (%s): %s", cursor, response.getData());
             if (response.hasError()) {
                 break;
             }
@@ -114,19 +88,16 @@ public class DataDiscussion extends DataCommonItem {
         return discussions;
     }
 
-    /**
-     * Edit discussion body
-     *
-     * @return list of discussion categories
-     */
-    public static DataDiscussion editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
+    /** package private. See QueryHelper / QueryContext */
+    static DataDiscussion editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
-        variables.put("discussionId", discussion.id);
-        variables.put("comment", modifiedText);
+        variables.put("id", discussion.id);
+        variables.put("body", modifiedText);
 
         Response response = queryContext.execRepoQuerySync("""
-                mutation {
-                    updateDiscussion(input: {repositoryId: "1234", categoryId: "5678", body: "The body", title: "The title"}) {
+                mutation UpdateDiscussion($id: ID!, $body: String!) {
+                    updateDiscussion(input: { discussionId: $id, body: $body }) {
+                        clientMutationId
                         discussion {
                             """ + DISCUSSION_FIELDS + """
                         }
@@ -134,38 +105,12 @@ public class DataDiscussion extends DataCommonItem {
                 }
                 """,
                 variables);
-        Log.debugf("Discussion #%s: add comment, result: %s", discussion.number, response.getData());
         if (response.hasError()) {
-            Log.errorf("Discussion #%s - Unable to add comment", discussion.number);
+            if (queryContext.hasNotFound()) {
+                queryContext.clearErrors();
+            }
             return null;
         }
         return JsonAttribute.discussion.discussionFrom(response.getData());
-    }
-
-    /**
-     * Exceptions and errors are captured for caller in the queryContext
-     */
-    public static DataDiscussionComment addComment(QueryContext queryContext, DataDiscussion discussion, String markdownText) {
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("discussionId", discussion.id);
-        variables.put("comment", markdownText);
-
-        Response response = queryContext.execRepoQuerySync("""
-                mutation($discussionId: ID!, $comment: String!) {
-                    addDiscussionComment(input: {discussionId: $discussionId, body: $comment}) {
-                        comment {
-                            """ + DataDiscussionComment.DISCUSSION_COMMENT_WITH_REPLY_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
-        Log.debugf("Discussion #%s: add comment, result: %s", discussion.number, response.getData());
-        if (response.hasError()) {
-            Log.errorf("Discussion #%s - Unable to add comment", discussion.number);
-            return null;
-        }
-        JsonObject result = JsonAttribute.addDiscussionComment.jsonObjectFrom(response.getData());
-
-        return JsonAttribute.comment.discussionCommentFrom(result);
     }
 }
