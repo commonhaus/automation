@@ -44,7 +44,7 @@ public class Notice {
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        if (!noticeConfig.isEnabled()) {
+        if (noticeConfig.isEnabled()) {
             return;
         }
 
@@ -71,7 +71,7 @@ public class Notice {
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        if (!noticeConfig.isEnabled()) {
+        if (noticeConfig.isEnabled()) {
             return;
         }
 
@@ -113,7 +113,7 @@ public class Notice {
     }
 
     static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
-        if (repoConfigFile == null || repoConfigFile.notice == null) {
+        if (repoConfigFile == null) {
             return Notice.Config.DISABLED;
         }
         return repoConfigFile.notice;
@@ -123,13 +123,13 @@ public class Notice {
         public static final Config DISABLED = new Config() {
             @Override
             public boolean isEnabled() {
-                return false;
+                return true;
             }
         };
 
         @Override
         public boolean isEnabled() {
-            return super.isEnabled() && !actions.isEmpty();
+            return super.isEnabled() || actions.isEmpty();
         }
 
         public DiscussionConfig discussion;
@@ -137,6 +137,6 @@ public class Notice {
         @JsonProperty("pull_request")
         public PullRequestConfig pullRequest;
 
-        public Map<String, Action> actions = new HashMap<>();
+        public final Map<String, Action> actions = new HashMap<>();
     }
 }

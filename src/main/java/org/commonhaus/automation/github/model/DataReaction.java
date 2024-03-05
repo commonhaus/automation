@@ -21,6 +21,17 @@ import io.smallrye.graphql.client.Response;
  * This is not available to webhook events.
  */
 public class DataReaction {
+    static final ReactionContent[] ORDER = {
+            ReactionContent.ROCKET,
+            ReactionContent.HEART,
+            ReactionContent.HOORAY,
+            ReactionContent.LAUGH,
+            ReactionContent.PLUS_ONE,
+            ReactionContent.EYES,
+            ReactionContent.CONFUSED,
+            ReactionContent.MINUS_ONE,
+    };
+
     static final String REACTION_FIELDS = """
             user {
                 id
@@ -36,20 +47,66 @@ public class DataReaction {
     public final Date createdAt;
     public final String content;
     public final ReactionContent reactionContent;
-    public final String id;
     public final String reactableId; // "parent" id
+    public final int sortOrder;
 
     DataReaction(JsonObject object) {
         this.createdAt = JsonAttribute.createdAt.dateFrom(object);
-        this.id = JsonAttribute.id.stringFrom(object);
         this.reactableId = JsonAttribute.reactableId.stringFrom(object);
         this.user = JsonAttribute.user.actorFrom(object);
         this.content = JsonAttribute.content.stringFrom(object);
         this.reactionContent = reactionContentFrom(this.content);
+        this.sortOrder = sortOrderFor(this.reactionContent);
+    }
+
+    public DataReaction(DataActor user, String content) {
+        this.user = user;
+        this.content = content;
+        this.reactionContent = reactionContentFrom(this.content);
+        this.sortOrder = sortOrderFor(this.reactionContent);
+        this.createdAt = new Date();
+        this.reactableId = null;
+    }
+
+    public static String toEmoji(DataReaction reaction) {
+        if (reaction.reactionContent == null) {
+            return "❓";
+        }
+        return toEmoji(reaction.reactionContent);
+    }
+
+    public static String toEmoji(ReactionContent content) {
+        return switch (content) {
+            case ROCKET -> "🚀";
+            case HEART -> "❤️";
+            case HOORAY -> "🎉";
+            case LAUGH -> "😄";
+            case PLUS_ONE -> "👍";
+            case EYES -> "👀";
+            case CONFUSED -> "😕";
+            case MINUS_ONE -> "👎";
+        };
+    }
+
+    public Date date() {
+        return this.createdAt;
+    }
+
+    public int sortOrder() {
+        return this.sortOrder;
     }
 
     public String toString() {
         return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
+    }
+
+    private static int sortOrderFor(ReactionContent content) {
+        for (int i = 0; i < ORDER.length; i++) {
+            if (ORDER[i] == content) {
+                return i;
+            }
+        }
+        return ORDER.length;
     }
 
     public static ReactionContent reactionContentFrom(String content) {
@@ -58,6 +115,9 @@ public class DataReaction {
         }
         if ("thumbs_up".equalsIgnoreCase(content)) {
             return ReactionContent.PLUS_ONE;
+        }
+        if ("tada".equalsIgnoreCase(content)) {
+            return ReactionContent.HOORAY;
         }
         for (ReactionContent rc : ReactionContent.values()) {
             if (rc.getContent().equalsIgnoreCase(content) || rc.name().equalsIgnoreCase(content)) {
@@ -77,7 +137,7 @@ public class DataReaction {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);
 
-        JsonObject pageInfo = null;
+        JsonObject pageInfo;
         String cursor = null;
 
         // paginated...
@@ -117,7 +177,7 @@ public class DataReaction {
 
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allReactions);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
         return reactions;
     }
 

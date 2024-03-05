@@ -52,6 +52,7 @@
         <quarkus.platform.version>3.7.2</quarkus.platform.version>
         <quarkus.mailpit.version>0.0.9</quarkus.mailpit.version>
         <!-- Libraries -->
+        <assertj.version>3.25.3</assertj.version>
         <awaitility.version>4.2.0</awaitility.version>
         <glob.version>0.9.0</glob.version>
         <!-- Image attributes -->
@@ -132,6 +133,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
@@ -143,10 +149,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jacoco</artifactId>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
             <scope>test</scope>
-          </dependency>
+        </dependency>
         <!-- <dependency>
             <groupId>io.quarkiverse.mailpit</groupId>
             <artifactId>quarkus-mailpit</artifactId>

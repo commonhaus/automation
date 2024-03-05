@@ -10,7 +10,6 @@ import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
-import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.Label;
@@ -31,11 +30,9 @@ public class LabelChanges {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param discussionPayload GitHub API parsed payload
-     * @param repoConfigFile CFGH RepoConfig (if exists)
      */
     void onDiscussionLabelChangeEvent(GitHubEvent event, GitHub github,
-            @Discussion.Labeled @Discussion.Unlabeled GHEventPayload.Discussion discussionPayload,
-            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+            @Discussion.Labeled @Discussion.Unlabeled GHEventPayload.Discussion discussionPayload) {
 
         final EventData initialData = new EventData(event, discussionPayload);
         QueryContext queryContext = queryHelper.newQueryContext(initialData, github);
@@ -61,8 +58,6 @@ public class LabelChanges {
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param discussionPayload GitHub API parsed payload
-     * @param repoConfigFile CFGH RepoConfig (if exists)
      */
     void onRepositoryLabelChange(GitHubEvent event, GitHub github,
             @Label GHEventPayload.Label labelPayload) {

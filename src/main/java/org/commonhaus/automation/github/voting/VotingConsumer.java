@@ -12,15 +12,15 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
+import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataCommonComment;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.DataReaction;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper;
-import org.commonhaus.automation.github.model.QueryHelper.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.MatchLabel;
 import org.commonhaus.automation.mail.MailConsumer;
-import org.kohsuke.github.GHUser;
 import org.kohsuke.github.ReactionContent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -101,8 +101,8 @@ public class VotingConsumer {
     }
 
     private void checkOpenVote(QueryContext qc, EventData eventData, Voting.Config votingConfig) {
-        Log.debugf("[%s] checkOpenVote: checking open vote ()", qc.getLogId(),
-                votingConfig.error_email_address, votingConfig.vote_result_path);
+        Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", qc.getLogId(),
+                votingConfig.error_email_address, votingConfig.votingThreshold);
 
         // Make sure other labels are present
         List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE);
@@ -111,14 +111,14 @@ public class VotingConsumer {
             qc.addBotReaction(ReactionContent.CONFUSED);
             String comment = "The following labels must be defined in this repository:\r\n"
                     + String.join(", ", requiredLabels) + "\r\n\r\n"
-                    + "Please ensure all lablels have been defined.";
+                    + "Please ensure all labels have been defined.";
             updateBotComment(qc, comment);
             return;
         }
 
         // Get information about vote mechanics (return if bad data)
-        final VoteInformation voteInfo = new VoteInformation(eventData.getBody(), qc);
-        if (!voteInfo.isValid(qc)) {
+        final VoteInformation voteInfo = new VoteInformation(qc, eventData.getBody(), votingConfig);
+        if (!voteInfo.isValid()) {
             qc.addBotReaction(ReactionContent.CONFUSED);
 
             // Add or update a bot comment summarizing what went wrong.
@@ -126,29 +126,44 @@ public class VotingConsumer {
             return;
         }
 
-        // GraphQL fetch of all reactions on item (return if none)
-        // Could query by group first, but pagination happens either way.
-        List<DataReaction> reactions = qc.getReactions();
+        final Collection<DataReaction> reactions;
+        final Collection<DataCommonComment> comments;
 
-        if (reactions.isEmpty()) {
-            updateBotComment(qc, "No votes found on this item.");
+        if (voteInfo.countComments()) {
+            reactions = List.of();
+            comments = qc.getComments();
+
+            // The bot's votes/comments never count.
+            comments.removeIf(x -> qc.isBot(x.author.login));
+
+            updateBotComment(qc, "No votes (non-bot comments) found on this item.");
             return;
+        } else {
+            comments = List.of();
+            // GraphQL fetch of all reactions on item (return if none)
+            // Could query by group first, but pagination happens either way.
+            reactions = qc.getReactions();
+
+            // The bot's votes never count.
+            reactions.removeIf(x -> {
+                if (qc.isBot(x.user.login)) {
+                    if (x.reactionContent == ReactionContent.CONFUSED) {
+                        // If we were previously confused, we aren't anymore.
+                        qc.removeBotReaction(ReactionContent.CONFUSED);
+                    }
+                    return true;
+                }
+                return false;
+            });
+
+            if (reactions.isEmpty()) {
+                updateBotComment(qc, "No votes (reactions) found on this item.");
+                return;
+            }
         }
 
-        // The bot's votes never count.
-        reactions.removeIf(x -> {
-            if (qc.isBot(x.user.login)) {
-                if (x.reactionContent == ReactionContent.CONFUSED) {
-                    // If we were previously confused, we aren't anymore.
-                    qc.removeBotReaction(ReactionContent.CONFUSED);
-                }
-                return true;
-            }
-            return false;
-        });
-
-        List<String> logins = getTeamLogins(qc, voteInfo);
-        VoteTally tally = new VoteTally(voteInfo, reactions, logins);
+        List<DataActor> logins = getTeamLogins(qc, voteInfo);
+        VoteTally tally = new VoteTally(voteInfo, reactions, comments, logins);
 
         // Add or update a bot comment summarizing the vote.
         String commentBody = tally.toMarkdown();
@@ -161,7 +176,7 @@ public class VotingConsumer {
         }
         updateBotComment(qc, commentBody);
 
-        if (tally.hasQuorum()) {
+        if (tally.hasQuorum) {
             qc.addLabel(eventData, VOTE_QUORUM);
         }
     }
@@ -195,16 +210,13 @@ public class VotingConsumer {
             }
         }
         return null;
-    };
+    }
 
-    private List<String> getTeamLogins(QueryContext qc, VoteInformation voteInfo) {
-        @SuppressWarnings("unchecked")
-        List<String> logins = QueryCache.TEAM_LIST.getCachedValue(voteInfo.teamKey, List.class);
+    private List<DataActor> getTeamLogins(QueryContext qc, VoteInformation voteInfo) {
+        List<DataActor> logins = QueryCache.TEAM_LIST.getCachedValue(voteInfo.group);
         if (logins == null) {
-            logins = qc.execGitHubSync((gh, dryRun) -> {
-                return voteInfo.team.getMembers().stream().map(GHUser::getLogin).toList();
-            });
-            QueryCache.TEAM_LIST.putCachedValue(voteInfo.teamKey, logins);
+            logins = qc.execGitHubSync((gh, dryRun) -> voteInfo.team.getMembers().stream().map(DataActor::new).toList());
+            QueryCache.TEAM_LIST.putCachedValue(voteInfo.group, logins);
         }
         return logins;
     }
@@ -222,7 +234,7 @@ public class VotingConsumer {
             String htmlBody = messageBody.replace("\n", "<br/>\n");
 
             MailTemplateInstance mail = Templates.votingErrorEvent(eventData,
-                    "Voting Error: " + e.toString(),
+                    "Voting Error: " + e,
                     messageBody,
                     htmlBody);
 

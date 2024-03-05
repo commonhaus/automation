@@ -8,8 +8,8 @@ import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 public class MatchAction {
 
-    public List<String> include = new ArrayList<>(1);
-    public List<String> exclude = new ArrayList<>(1);
+    public final List<String> include = new ArrayList<>(1);
+    public final List<String> exclude = new ArrayList<>(1);
 
     public MatchAction(List<String> actions) {
         actions.forEach(x -> {

@@ -13,7 +13,6 @@ import io.smallrye.graphql.client.Response;
 public class DataDiscussionCategory {
 
     static final String DISCUSSION_CATEGORY_FIELDS = """
-            description
             emoji
             id
             name
@@ -29,7 +28,6 @@ public class DataDiscussionCategory {
 
     public final String name;
     public final String slug;
-    public final String description;
     public final String emoji;
 
     DataDiscussionCategory(JsonObject category) {
@@ -45,7 +43,6 @@ public class DataDiscussionCategory {
         }
 
         this.name = JsonAttribute.name.stringFrom(category);
-        this.description = JsonAttribute.description.stringFrom(category);
         this.emoji = JsonAttribute.emoji.stringFrom(category);
         this.slug = JsonAttribute.slug.stringFrom(category);
     }

@@ -6,7 +6,6 @@ import java.util.List;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
-import org.commonhaus.automation.github.model.EventPayload.DiscussionPayload;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.mail.MailConsumer;
 import org.commonmark.node.Node;
@@ -76,7 +75,7 @@ public class EmailAction extends Action {
                             payload.getPullRequest());
                 }
                 case discussion -> {
-                    EventPayload.DiscussionPayload payload = (DiscussionPayload) eventData.getEventPayload();
+                    EventPayload.DiscussionPayload payload = eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
 
                     subject = "#" + discussion.number + " " + discussion.title + " (" + discussion.category.name + ")";
@@ -93,7 +92,6 @@ public class EmailAction extends Action {
                 }
             };
         } catch (Exception e) {
-            mailTemplateInstance = null;
             Log.errorf(e, "[%s] EmailAction.apply: Failed to prepare email to %s", eventData.getLogId(), List.of(addresses));
             return;
         }

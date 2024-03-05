@@ -155,12 +155,12 @@ public enum JsonAttribute {
     private final String nodeName;
     private final boolean alternateName;
 
-    private JsonAttribute() {
+    JsonAttribute() {
         this.nodeName = this.name();
         this.alternateName = false;
     }
 
-    private JsonAttribute(String nodeName) {
+    JsonAttribute(String nodeName) {
         this.nodeName = nodeName;
         this.alternateName = true;
     }
@@ -231,7 +231,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).intValue();
+        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).intValue();
     }
 
     /**
@@ -244,7 +244,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? defaultValue : JsonNumber.class.cast(value).intValue();
+        return value == null || value.getValueType() == ValueType.NULL ? defaultValue : ((JsonNumber) value).intValue();
     }
 
     /**
@@ -257,7 +257,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).longValue();
+        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).longValue();
     }
 
     /**
@@ -271,7 +271,7 @@ public enum JsonAttribute {
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
         return value == null || value.getValueType() == ValueType.NULL ? defaultValue
-                : JsonNumber.class.cast(value).longValue();
+                : ((JsonNumber) value).longValue();
     }
 
     /**
@@ -410,7 +410,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonObject.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonObject) value;
     }
 
     /**
@@ -439,7 +439,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonArray.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonArray) value;
     }
 
     /**
@@ -480,7 +480,7 @@ public enum JsonAttribute {
     }
 
     /** Parses to Date as GitHubClient.parseDate does */
-    public static final Date parseDate(String timestamp) {
+    public static Date parseDate(String timestamp) {
         if (timestamp == null) {
             return null;
         }

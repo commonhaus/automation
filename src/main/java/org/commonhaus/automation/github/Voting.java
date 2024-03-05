@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github;
 
+import java.util.Map;
+
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
@@ -42,7 +44,7 @@ public class Voting {
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Voting.Config votingConfig = getVotingConfig(repoConfigFile);
-        if (!votingConfig.isEnabled()) {
+        if (votingConfig.isEnabled()) {
             return;
         }
 
@@ -55,31 +57,39 @@ public class Voting {
     }
 
     static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
-        if (repoConfigFile == null || repoConfigFile.voting == null) {
+        if (repoConfigFile == null) {
             return Voting.Config.DISABLED;
         }
         return repoConfigFile.voting;
+    }
+
+    // How many votes are required for a vote to count?
+    public enum Threshold {
+        all,
+        majority,
+        supermajority
     }
 
     public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
             public boolean isEnabled() {
-                return false;
+                return true;
             }
         };
 
-        public String vote_result_path;
         public String[] error_email_address;
+        public Map<String, Threshold> votingThreshold;
 
         public boolean sendErrorEmail() {
             return error_email_address != null && error_email_address.length > 0;
         }
 
-        public String resultPath() {
-            return vote_result_path == null
-                    ? "votes/"
-                    : (vote_result_path + "/").replace("//", "/");
+        public Threshold votingThreshold(String group) {
+            if (votingThreshold == null) {
+                return Threshold.all;
+            }
+            return votingThreshold.getOrDefault(group, Threshold.all);
         }
     }
 }

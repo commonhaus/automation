@@ -29,8 +29,6 @@ public class DataDiscussionComment extends DataCommonComment {
     public final Integer discussion_id;
     /** {@literal parent_id} for webhook events (may be null) */
     public final Integer parent_id;
-    public final boolean isAnswer;
-
     public final DataDiscussion discussion;
 
     public DataDiscussionComment(JsonObject object) {
@@ -40,7 +38,6 @@ public class DataDiscussionComment extends DataCommonComment {
 
         // discussion may be null (webhook)
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
-        this.isAnswer = JsonAttribute.isAnswer.booleanFromOrFalse(object);
     }
 
     public String toString() {

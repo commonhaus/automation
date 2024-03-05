@@ -19,12 +19,8 @@ import io.smallrye.graphql.client.Response;
 public class DataLabel extends DataCommonType {
 
     static final String LABEL_FIELDS = """
-                color
-                description
                 id
-                isDefault
                 name
-                url
             """;
     static final String FIRST_10_LABELS = """
             labels(first: 10) {
@@ -45,37 +41,21 @@ public class DataLabel extends DataCommonType {
             }
             """;
 
-    public final String color;
-    public final boolean isDefault;
-    public final String description;
     public final String name;
-    public final String url;
 
     public DataLabel(JsonObject object) {
         super(object);
-        this.color = JsonAttribute.color.stringFrom(object);
-        this.isDefault = JsonAttribute.isDefault.booleanFromOrFalse(object);
-        this.description = JsonAttribute.description.stringFrom(object);
         this.name = JsonAttribute.name.stringFrom(object);
-        this.url = JsonAttribute.url.stringFrom(object);
     }
 
     public DataLabel(GHLabel ghLabel) {
         super(ghLabel.getNodeId());
-        this.color = ghLabel.getColor();
-        this.isDefault = ghLabel.isDefault();
-        this.description = ghLabel.getDescription();
         this.name = ghLabel.getName();
-        this.url = ghLabel.getUrl();
     }
 
     public DataLabel(Builder builder) {
         super(builder.id);
         this.name = builder.name;
-        this.color = null;
-        this.isDefault = false;
-        this.description = null;
-        this.url = null;
     }
 
     public String toString() {
@@ -139,11 +119,9 @@ public class DataLabel extends DataCommonType {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", labeledId);
 
-        paginateLabels(queryContext, query, variables, labels, (obj) -> {
-            return repositoryQuery
-                    ? JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.repository)
-                    : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node);
-        });
+        paginateLabels(queryContext, query, variables, labels, (obj) -> repositoryQuery
+                ? JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.repository)
+                : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node));
 
         Log.infof("[%s] queryLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
         return labels;
@@ -169,9 +147,8 @@ public class DataLabel extends DataCommonType {
                 }""";
 
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(queryContext, query, variables, labels, (obj) -> {
-            return JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable);
-        });
+        paginateLabels(queryContext, query, variables, labels, (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
+                JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable));
 
         Log.infof("[%s] modifyLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
         return labels;
@@ -179,7 +156,7 @@ public class DataLabel extends DataCommonType {
 
     static void paginateLabels(QueryContext queryContext, String query, Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
-        JsonObject pageInfo = null;
+        JsonObject pageInfo;
         String cursor = null;
 
         do {
@@ -203,6 +180,6 @@ public class DataLabel extends DataCommonType {
 
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(pageLabels);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
     }
 }

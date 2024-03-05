@@ -1,7 +1,5 @@
 package org.commonhaus.automation;
 
-import java.io.IOException;
-
 import jakarta.inject.Inject;
 
 import io.quarkus.qute.Engine;
@@ -16,7 +14,7 @@ public class Routes {
     Engine engine;
 
     @Route(path = "/ping", order = 99, produces = "text/html")
-    public void handleRequest(RoutingContext routingContext, RoutingExchange routingExchange) throws IOException {
+    public void handleRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
         Template tpl = engine.getTemplate("index.html");
         routingExchange
                 .ok()

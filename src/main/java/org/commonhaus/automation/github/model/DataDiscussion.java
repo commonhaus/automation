@@ -1,7 +1,6 @@
 package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,29 +19,19 @@ public class DataDiscussion extends DataCommonItem {
                 """ + DataDiscussionCategory.DISCUSSION_CATEGORY_FIELDS + """
             }
             authorAssociation
-            answerChosenAt
             """ + DataLabel.FIRST_10_LABELS + """
             createdAt
-            isAnswered
             updatedAt
                 """;
 
     public final DataDiscussionCategory category;
     public final List<DataLabel> labels;
 
-    public final boolean isAnswered;
-    public final Date answerChosenAt;
-
-    public final Integer upvoteCount;
-
     DataDiscussion(JsonObject object) {
         super(object);
 
         this.category = JsonAttribute.category.discussionCategoryFrom(object);
         this.labels = JsonAttribute.labels.labelsFrom(object);
-        this.isAnswered = JsonAttribute.isAnswered.booleanFromOrFalse(object);
-        this.answerChosenAt = JsonAttribute.answerChosenAt.dateFrom(object);
-        this.upvoteCount = JsonAttribute.upvoteCount.integerFrom(object);
     }
 
     public String toString() {
@@ -55,7 +44,7 @@ public class DataDiscussion extends DataCommonItem {
         Map<String, Object> variables = new HashMap<>();
         variables.put("isOpen", isOpen);
 
-        JsonObject pageInfo = null;
+        JsonObject pageInfo;
         String cursor = null;
         do {
             variables.put("after", cursor);
@@ -84,12 +73,14 @@ public class DataDiscussion extends DataCommonItem {
 
             pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allDiscussions);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (pageInfo != null && JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
         return discussions;
     }
 
-    /** package private. See QueryHelper / QueryContext */
-    static DataDiscussion editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
+    /**
+     * package private. See QueryHelper / QueryContext
+     */
+    static void editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", discussion.id);
         variables.put("body", modifiedText);
@@ -109,8 +100,8 @@ public class DataDiscussion extends DataCommonItem {
             if (queryContext.hasNotFound()) {
                 queryContext.clearErrors();
             }
-            return null;
+            return;
         }
-        return JsonAttribute.discussion.discussionFrom(response.getData());
+        JsonAttribute.discussion.discussionFrom(response.getData());
     }
 }

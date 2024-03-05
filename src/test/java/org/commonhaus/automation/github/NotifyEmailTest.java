@@ -36,9 +36,7 @@ public class NotifyEmailTest extends GithubTest {
         // When a general, not-interesting, discussion is created,
         // - no rules or actions are triggered
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -57,9 +55,7 @@ public class NotifyEmailTest extends GithubTest {
         // - the notice label is added
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {

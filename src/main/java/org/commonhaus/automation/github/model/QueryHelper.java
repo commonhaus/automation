@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.json.JsonObject;
@@ -23,9 +21,6 @@ import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.ReactionContent;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
@@ -34,71 +29,6 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @ApplicationScoped
 public class QueryHelper {
-
-    public enum QueryCache {
-        LABELS(Caffeine.newBuilder()
-                .expireAfterWrite(6, TimeUnit.HOURS)
-                .build()),
-        GLOB(Caffeine.newBuilder()
-                .maximumSize(200)
-                .build()),
-        RECENT_BOT_CONTENT(Caffeine.newBuilder()
-                .expireAfterWrite(6, TimeUnit.HOURS)
-                .build()),
-        TEAM(Caffeine.newBuilder()
-                .expireAfterWrite(6, TimeUnit.HOURS)
-                .build()),
-        TEAM_LIST(Caffeine.newBuilder()
-                .expireAfterWrite(12, TimeUnit.HOURS)
-                .build());
-
-        private final Cache<String, Object> cache;
-
-        private QueryCache(Cache<String, Object> cache) {
-            this.cache = cache;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T getCachedValue(String key, Class<T> type) {
-            T result = (T) cache.getIfPresent(key);
-            if (result != null) {
-                Log.debugf(":: HIT %s/%s ::: ", this.name(), key);
-            } else {
-                Log.debugf(":: MISS %s/%s ::: ", this.name(), key);
-            }
-            return result;
-        }
-
-        /**
-         * Put a value into the cache
-         *
-         * @param key
-         * @param value to be cached
-         * @return new value
-         */
-        public <T> T putCachedValue(String key, T value) {
-            Log.debugf(":: PUT %s/%s ::: ", this.name(), key);
-            cache.put(key, value);
-            return value;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T computeIfPresent(String key, BiFunction<String, Object, T> mappingFunction) {
-            Log.debugf(":: UPDATE %s/%s ::: ", this.name(), key);
-            Object value = cache.asMap().computeIfPresent(key, mappingFunction);
-            return (T) value;
-        }
-
-        public void invalidate(String key) {
-            Log.debugf(":: INVALIDATE %s/%s ::: ", this.name(), key);
-            cache.invalidate(key);
-        }
-
-        public void invalidateAll() {
-            Log.debugf(":: INVALIDATE ALL %s ::: ", this.name());
-            cache.invalidateAll();
-        }
-    }
 
     private final AppConfig botConfig;
     private final GitHubClientProvider gitHubClientProvider;
@@ -222,7 +152,7 @@ public class QueryHelper {
 
         @FunctionalInterface
         public interface GitHubParameterApiCall<R> {
-            R apply(GitHub gh, boolean isDryRun) throws GHIOException, IOException;
+            R apply(GitHub gh, boolean isDryRun) throws IOException;
         }
 
         /**
@@ -242,8 +172,9 @@ public class QueryHelper {
             } catch (GHIOException e) {
                 // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
                 Log.errorf(e, "[%s] Error making GH Request: %s", evt.getLogId(), e.toString());
-                if (Log.isDebugEnabled()) {
-                    e.getResponseHeaderFields().forEach((k, v) -> Log.debugf("%s: %s", k, v));
+                if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
+                    e.getResponseHeaderFields()
+                            .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 }
                 addException(e);
             } catch (IOException | RuntimeException e) {
@@ -323,8 +254,7 @@ public class QueryHelper {
          * @return collection of labels for the item
          */
         public Collection<DataLabel> getLabels(String itemId) {
-            @SuppressWarnings("unchecked")
-            Set<DataLabel> labels = QueryCache.LABELS.getCachedValue(itemId, Set.class);
+            Set<DataLabel> labels = QueryCache.LABELS.getCachedValue(itemId);
             if (labels != null) {
                 return labels;
             }
@@ -373,7 +303,6 @@ public class QueryHelper {
          * @param cacheId Labelable item node id
          * @param label Label to add
          * @param action Type of action to perform (created, edited, deleted, labeled, unlabeled)
-         * @return updated collection of labels for the item, or null if not cached
          */
         public void modifyLabels(String cacheId, DataLabel label, ActionType action) {
             QueryCache.LABELS.computeIfPresent(cacheId, (k, v) -> {
@@ -412,10 +341,8 @@ public class QueryHelper {
             Collection<DataLabel> newLabels = findLabels(eventData, labels);
             if (!newLabels.isEmpty()) {
                 Set<DataLabel> currentLabels = DataLabel.addLabels(this, nodeId, newLabels);
-                if (currentLabels != null) {
-                    QueryCache.LABELS.putCachedValue(nodeId, currentLabels);
-                    return currentLabels;
-                }
+                QueryCache.LABELS.putCachedValue(nodeId, currentLabels);
+                return currentLabels;
             }
             return null;
         }
@@ -464,7 +391,7 @@ public class QueryHelper {
 
             String itemId = this.evt.getNodeId();
 
-            DataCommonComment comment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId, DataCommonComment.class);
+            DataCommonComment comment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId);
             if (comment == null) {
                 comment = DataCommonComment.findBotComment(this, itemId, commentIdFromBody);
             }
@@ -472,12 +399,9 @@ public class QueryHelper {
             if (comment == null) {
                 // new comment
                 comment = switch (evt.getEventType()) {
-                    case discussion, discussion_comment -> {
-                        yield DataDiscussionComment.addComment(this, itemId, commentBody);
-                    }
-                    case issue, pull_request, issue_comment -> {
-                        yield DataIssueComment.addIssueComment(this, itemId, commentBody);
-                    }
+                    case discussion, discussion_comment -> DataDiscussionComment.addComment(this, itemId, commentBody);
+                    case issue, pull_request, issue_comment ->
+                        DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
                         Log.errorf("[%s] addBotComment: Unknown event type", getLogId());
                         yield null;
@@ -490,12 +414,10 @@ public class QueryHelper {
                     return comment;
                 }
                 comment = switch (evt.getEventType()) {
-                    case discussion, discussion_comment -> {
-                        yield DataDiscussionComment.editComment(this, comment, commentBody);
-                    }
-                    case issue, pull_request, issue_comment -> {
-                        yield DataIssueComment.editIssueComment(this, comment, commentBody);
-                    }
+                    case discussion, discussion_comment ->
+                        DataDiscussionComment.editComment(this, comment, commentBody);
+                    case issue, pull_request, issue_comment ->
+                        DataIssueComment.editIssueComment(this, comment, commentBody);
                     default -> {
                         Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
                         yield null;
@@ -536,9 +458,7 @@ public class QueryHelper {
                     GHEventPayload.PullRequest payload = evt.getGHEventPayload();
                     updateIssueDescription(payload.getPullRequest(), bodyString);
                 }
-                default -> {
-                    Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
-                }
+                default -> Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
             }
         }
 
@@ -554,6 +474,13 @@ public class QueryHelper {
                 return List.of();
             }
             return DataReaction.queryReactions(this, this.evt.getNodeId());
+        }
+
+        public Collection<DataCommonComment> getComments() {
+            if (hasErrors()) {
+                return List.of();
+            }
+            return DataCommonComment.queryComments(this, this.evt.getNodeId());
         }
     }
 }

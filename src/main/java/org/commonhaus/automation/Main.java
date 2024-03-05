@@ -39,7 +39,7 @@ public class Main {
         AppConfig botConfig;
 
         @Override
-        public int run(String... args) throws Exception {
+        public int run(String... args) {
             System.out.println("dryRun=" + botConfig.isDryRun());
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -44,10 +45,10 @@ public class GithubTest {
 
     @BeforeEach
     protected void beforeEach() {
-        QueryHelper.QueryCache.TEAM.invalidateAll();
-        QueryHelper.QueryCache.TEAM_LIST.invalidateAll();
-        QueryHelper.QueryCache.LABELS.invalidateAll();
-        QueryHelper.QueryCache.RECENT_BOT_CONTENT.invalidateAll();
+        QueryCache.TEAM.invalidateAll();
+        QueryCache.TEAM_LIST.invalidateAll();
+        QueryCache.LABELS.invalidateAll();
+        QueryCache.RECENT_BOT_CONTENT.invalidateAll();
         verifyNoLabelCache(repositoryId);
         setLogin("login");
     }
@@ -57,11 +58,11 @@ public class GithubTest {
     }
 
     public void setLabels(String id, DataLabel... labels) {
-        QueryHelper.QueryCache.LABELS.putCachedValue(id, new HashSet<>(Set.of(labels)));
+        QueryCache.LABELS.putCachedValue(id, new HashSet<>(Set.of(labels)));
     }
 
     public void setLabels(String id, Set<DataLabel> labels) {
-        QueryHelper.QueryCache.LABELS.putCachedValue(id, new HashSet<>(labels));
+        QueryCache.LABELS.putCachedValue(id, new HashSet<>(labels));
     }
 
     public Response mockResponse(Path filename) {
@@ -102,22 +103,20 @@ public class GithubTest {
         // We're always updating the cache, but that often happens in a separate thread.
         // let's make sure all of the updates are done before proceeding to the next test
         await().atMost(5, SECONDS)
-                .until(() -> QueryHelper.QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId, DataCommonComment.class) != null);
+                .until(() -> QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId) != null);
 
-        DataCommonComment botComment = QueryHelper.QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId,
-                DataCommonComment.class);
+        DataCommonComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId);
         Assertions.assertEquals(commentId, botComment.id,
                 "Cached Bot Comment ID for " + nodeId + " should equal " + commentId + ", was " + botComment);
     }
 
     public void verifyNoLabelCache(String labelId) {
-        Assertions.assertNull(QueryHelper.QueryCache.LABELS.getCachedValue(labelId, Set.class),
+        Assertions.assertNull(QueryCache.LABELS.getCachedValue(labelId),
                 "Label cache for " + labelId + " should not exist");
     }
 
     public void verifyLabelCache(String labeledId, int size, List<String> expectedLabels) {
-        @SuppressWarnings("unchecked")
-        Set<DataLabel> labels = QueryHelper.QueryCache.LABELS.getCachedValue(labeledId, Set.class);
+        Set<DataLabel> labels = QueryCache.LABELS.getCachedValue(labeledId);
 
         Assertions.assertNotNull(labels);
         Assertions.assertEquals(size, labels.size(), stringify(labels));
@@ -136,8 +135,15 @@ public class GithubTest {
     }
 
     public static GHUser mockGHUser(String login) {
+        final URL url = mock(URL.class);
+        lenient().when(url.toString()).thenReturn("");
         GHUser mock = mock(GHUser.class);
+        lenient().when(mock.getId()).thenReturn((long) mock.hashCode());
+        lenient().when(mock.getNodeId()).thenReturn(login);
         lenient().when(mock.getLogin()).thenReturn(login);
+        lenient().when(mock.getHtmlUrl()).thenReturn(url);
+        lenient().when(mock.getUrl()).thenReturn(url);
+        lenient().when(mock.getAvatarUrl()).thenReturn("");
         return mock;
     }
 

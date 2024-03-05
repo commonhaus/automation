@@ -4,30 +4,43 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.model.DataReaction;
-import org.commonhaus.automation.github.model.QueryHelper.QueryCache;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.ReactionContent;
 
 public class VoteInformation {
+    enum Type {
+        marthas,
+        manualReactions,
+        manualComments,
+        undefined
+    }
+
     static final Pattern groupPattern = Pattern.compile("voting group[^@]+@([^\\s]+)", Pattern.CASE_INSENSITIVE);
+
     static final String quoted = "['\"]([^'\"]*)['\"]";
     static final Pattern consensusPattern = Pattern.compile(
             "<!--vote::marthas approve=" + quoted + " ok=" + quoted + " revise=" + quoted + " -->",
             Pattern.CASE_INSENSITIVE);
 
+    static final Pattern manualPattern = Pattern.compile("<!--vote::manual (.*?)-->", Pattern.CASE_INSENSITIVE);
+
+    public final Type voteType;
     public final List<ReactionContent> revise;
     public final List<ReactionContent> ok;
     public final List<ReactionContent> approve;
 
     public final String group;
     public final GHTeam team;
-    public final String teamKey;
+    public final Voting.Threshold votingThreshold;
 
-    public VoteInformation(String bodyString, QueryContext qc) {
+    public VoteInformation(QueryContext qc, String bodyString, Voting.Config voteConfig) {
         // Body contains voting group? "Voting group"
         Matcher m = groupPattern.matcher(bodyString);
         GHTeam team = null;
@@ -35,38 +48,43 @@ public class VoteInformation {
             this.group = m.group(1);
 
             GHOrganization org = qc.getEventData().getOrganization();
-            String teamName = group.replace(org.getLogin() + "/", "");
-            this.teamKey = org.getLogin() + "/" + teamName;
-
-            team = QueryCache.TEAM.getCachedValue(this.teamKey, GHTeam.class);
+            team = QueryCache.TEAM.getCachedValue(this.group);
             if (team == null) {
-                team = qc.execGitHubSync((gh, dryRun) -> {
-                    return org.getTeamByName(teamName);
-                });
+                String teamName = this.group.replace(org.getLogin() + "/", "");
+                team = qc.execGitHubSync((gh, dryRun) -> org.getTeamByName(teamName));
                 if (!qc.hasErrors()) {
-                    QueryCache.TEAM.putCachedValue(this.teamKey, team);
+                    QueryCache.TEAM.putCachedValue(this.group, team);
                 }
             }
         } else {
             this.group = null;
-            this.teamKey = null;
         }
         this.team = team;
+        this.votingThreshold = voteConfig.votingThreshold(this.group);
 
-        // Body contains Consensus mechanism? "use emoji reactions"
         m = consensusPattern.matcher(bodyString);
         if (m.find()) {
+            this.voteType = Type.marthas;
             this.approve = listFrom(m.group(1));
             this.ok = listFrom(m.group(2));
             this.revise = listFrom(m.group(3));
         } else {
+            m = manualPattern.matcher(bodyString);
+            boolean manual = m.find();
+            this.voteType = manual && m.group(1) != null && m.group(1).contains("comments")
+                    ? Type.manualComments
+                    : manual ? Type.manualReactions : Type.undefined;
             this.approve = List.of();
             this.ok = List.of();
             this.revise = List.of();
         }
     }
 
-    public boolean isValid(QueryContext qc) {
+    public boolean countComments() {
+        return voteType == Type.manualComments;
+    }
+
+    public boolean isValid() {
         return !(invalidGroup() || invalidReactions());
     }
 
@@ -75,75 +93,96 @@ public class VoteInformation {
     }
 
     public boolean invalidReactions() {
+        if (this.voteType == Type.undefined) {
+            // we can't count votes if the vote type is undefined
+            return true;
+        }
+        if (this.voteType != Type.marthas) {
+            // all reactions are valid if they are being counted by humans
+            return false;
+        }
         return approve.isEmpty() || ok.isEmpty() || revise.isEmpty()
                 || approve.contains(null) || ok.contains(null) || revise.contains(null);
     }
 
     public String getErrorContent() {
         // GH Markdown likes \r\n line endings
-        return String.format(""
-                + "Configuration for item is invalid:\r\n"
-                + "\r\n"
-                + "- Team for specified group (%s) must exist (%s)\r\n"
-                + "%s\r\n"
-                + "- Reactions must be non-empty and use valid reactions:\r\n"
-                + "    - approve: %s\r\n"
-                + "    - ok: %s\r\n"
-                + "    - revise: %s\r\n"
-                + "%s\r\n",
+        return String.format("""
+                Configuration for item is invalid:\r
+                \r
+                - Team for specified group (%s) must exist (%s)\r
+                %s\r
+                %s\r
+                %s\r
+                """,
                 group,
                 team != null,
-                invalidGroup() ? validTeamComment() : "",
+                invalidGroup() ? validTeamComment : "",
+                explainVoteCounting(),
+                invalidReactions() ? validReactionsComment : "");
+    }
+
+    private String explainVoteCounting() {
+        return switch (voteType) {
+            case marthas -> showReactionGroups();
+            case manualReactions -> "- Counting reactions manually";
+            case manualComments -> "- Counting comments";
+            case undefined -> "- No valid vote counting method found";
+        };
+    }
+
+    private String showReactionGroups() {
+        return String.format("""
+                - Reactions must be non-empty and use valid reactions:\r
+                    - approve: %s\r
+                    - ok: %s\r
+                    - revise: %s""",
                 showReactions(approve),
                 showReactions(ok),
-                showReactions(revise),
-                invalidReactions() ? validReactionsComment() : ""); // de-indent
+                showReactions(revise));
     }
 
-    private String validTeamComment() {
-        // GH Markdown likes \r\n line endings
-        return "\r\n"
-                + "> [!TIP]\r\n"
-                + "> Item description should contain text that matches the following (case-insensitive):  \r\n"
-                + "> `voting group[^@]+@([^ ]+)`\r\n"
-                + ">\r\n"
-                + "> For example:\r\n"
-                + ">\r\n"
-                + "> ```md\r\n"
-                + "> ## Voting group\r\n"
-                + "> @commonhaus/test-quorum-default\r\n"
-                + "> ```\r\n"
-                + ">\r\n"
-                + "> Or:\r\n"
-                + ">\r\n"
-                + "> ```md\r\n"
-                + "> - voting group: @commonhaus/test-quorum-default\r\n"
-                + "> ```\r\n";
-    }
+    private static final String validTeamComment = """
+            \r
+            > [!TIP]\r
+            > Item description should contain text that matches the following (case-insensitive):  \r
+            > `voting group[^@]+@([^ ]+)`\r
+            >\r
+            > For example:\r
+            >\r
+            > ```md\r
+            > ## Voting group\r
+            > @commonhaus/test-quorum-default\r
+            > ```\r
+            >\r
+            > Or:\r
+            >\r
+            > ```md\r
+            > - voting group: @commonhaus/test-quorum-default\r
+            > ```\r
+            """;
 
-    private String validReactionsComment() {
-        // GH Markdown likes \r\n line endings
-        // Passing this through GraphQL query will eat any other flavor of whitespace.
-        return "\r\n"
-                + "> [!TIP]\r\n"
-                + "> Item description should contain an HTML comment that matches the following (case-insensitive):  \r\n"
-                + "> `<!--vote::marthas approve=\"([^\"]*)\" ok=\"([^\"]*)\" revise=\"([^\"]*)\" -->`\r\n"
-                + ">\r\n"
-                + "> For example:\r\n"
-                + ">\r\n"
-                + "> ```md\r\n"
-                + "> <!--vote::marthas approve=\"+1\" ok=\"eyes\" revise=\"-1\" -->\r\n"
-                + "> ```\r\n"
-                + ">\r\n"
-                + "> Or:\r\n"
-                + ">\r\n"
-                + "> ```md\r\n"
-                + "> <!--vote::marthas approve=\"+1, rocket, hooray\" ok=\"eyes\" revise=\"-1, confused\" -->\r\n"
-                + "> ```\r\n"
-                + ">\r\n"
-                + "> Valid values: +1, -1, laugh, confused, heart, hooray, rocket, eyes\r\n"
-                + "> aliases: [+1, plus_one, thumbs_up], [-1, minus_one, thumbs_down]\r\n";
-    }
+    private static final String validReactionsComment = """
+            \r
+            > [!TIP]\r
+            > Item description should contain an HTML comment that describes how votes should be counted.\r
+            >\r
+            > Some examples:\r
+            >\r
+            > ```md\r
+            > <!--vote::manual -->\r
+            > <!--vote::manual comments -->\r
+            > <!--vote::marthas approve="+1" ok="eyes" revise="-1" -->\r
+            > <!--vote::marthas approve="+1, rocket, hooray" ok="eyes" revise="-1, confused" -->\r
+            > ```\r
+            >\r
+            > - **manual**: The bot will group votes by reaction, and count votes of the required group\r
+            > - **manual with comments**: The bot will count comments by members of the required group\r
+            > - **marthas**: The bot will group votes (approve, ok, revise), and count votes of the required group\r
+            >\r
+            > Valid values: +1, -1, laugh, confused, heart, hooray, rocket, eyes\r
+            > aliases: [+1, plus_one, thumbs_up], [-1, minus_one, thumbs_down]\r
+            """;
 
     private String showReactions(List<ReactionContent> reactions) {
         return reactions.stream()
@@ -156,9 +195,9 @@ public class VoteInformation {
             return List.of();
         }
         String[] groups = group.split("\\s*,\\s*");
-        return List.of(groups).stream()
+        return Stream.of(groups)
                 .map(x -> x.replace(":", ""))
-                .map(x -> DataReaction.reactionContentFrom(x))
+                .map(DataReaction::reactionContentFrom)
                 .toList();
     }
 }

@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.EventType;
-import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
@@ -61,9 +61,9 @@ public class MatchPaths {
     }
 
     MatchingEngine compileGlob(String filenamePattern) {
-        MatchingEngine me = QueryHelper.QueryCache.GLOB.getCachedValue(filenamePattern, MatchingEngine.class);
+        MatchingEngine me = QueryCache.GLOB.getCachedValue(filenamePattern);
         if (me == null) {
-            me = QueryHelper.QueryCache.GLOB.putCachedValue(filenamePattern, GlobPattern.compile(filenamePattern));
+            me = QueryCache.GLOB.putCachedValue(filenamePattern, GlobPattern.compile(filenamePattern));
         }
         return me;
     }

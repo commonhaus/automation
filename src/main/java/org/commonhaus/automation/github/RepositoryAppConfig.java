@@ -6,11 +6,11 @@ import java.util.List;
 import org.commonhaus.automation.github.rules.Rule;
 
 public class RepositoryAppConfig {
-    static final String NAME = "cf-automation.yml";
+    public static final String NAME = "cf-automation.yml";
 
     static class File {
-        public Notice.Config notice = new Notice.Config();
-        public Voting.Config voting = new Voting.Config();
+        public final Notice.Config notice = new Notice.Config();
+        public final Voting.Config voting = new Voting.Config();
     }
 
     public static class CommonConfig {
@@ -20,7 +20,7 @@ public class RepositoryAppConfig {
         }
 
         public boolean isEnabled() {
-            return (enabled == null || enabled.booleanValue());
+            return (enabled != null && !enabled);
         }
     }
 

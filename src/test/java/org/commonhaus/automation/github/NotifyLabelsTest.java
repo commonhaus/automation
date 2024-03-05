@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.commonhaus.automation.github.model.GithubTest;
-import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
@@ -39,9 +39,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyNoLabelCache(discussionId);
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -132,9 +130,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionLabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -153,9 +149,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyNoLabelCache(discussionId);
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -179,9 +173,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -242,9 +234,9 @@ public class NotifyLabelsTest extends GithubTest {
                 });
 
         verifyLabelCache(prNodeId, 1, List.of("notice"));
-        Assertions.assertNotNull(QueryHelper.QueryCache.GLOB.getCachedValue("bylaws/*", Object.class),
+        Assertions.assertNotNull(QueryCache.GLOB.getCachedValue("bylaws/*"),
                 "bylaws/* GLOB cache should exist");
-        Assertions.assertNull(QueryHelper.QueryCache.GLOB.getCachedValue("policy/*", Object.class),
+        Assertions.assertNull(QueryCache.GLOB.getCachedValue("policy/*"),
                 "policy/* GLOB cache should not exist");
     }
 
@@ -257,9 +249,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyLabelCache(repoId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventLabelCreated.json")
                 .event(GHEvent.LABEL)
                 .then().github(mocks -> {

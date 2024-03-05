@@ -26,16 +26,16 @@ public class Rule {
     public boolean matches(QueryContext queryContext) {
         boolean matches = true;
         if (action != null) {
-            matches &= action.matches(queryContext);
+            matches = action.matches(queryContext);
         }
         if (matches && category != null) {
-            matches &= category.matches(queryContext);
+            matches = category.matches(queryContext);
         }
         if (matches && paths != null) {
-            matches &= paths.matches(queryContext);
+            matches = paths.matches(queryContext);
         }
         if (matches && label != null) {
-            matches &= label.matches(queryContext);
+            matches = label.matches(queryContext);
         }
         return matches;
     }
@@ -52,7 +52,7 @@ public class Rule {
         @Override
         public Rule deserialize(com.fasterxml.jackson.core.JsonParser p,
                 com.fasterxml.jackson.databind.DeserializationContext ctxt)
-                throws java.io.IOException, com.fasterxml.jackson.core.JsonProcessingException {
+                throws java.io.IOException {
             ObjectMapper mapper = (ObjectMapper) p.getCodec();
             JsonNode node = mapper.readTree(p);
             Rule rule = new Rule();

@@ -11,8 +11,6 @@ public class DataCommonItem extends DataCommonObject {
             title
             closed
             closedAt
-            locked
-            activeLockReason
             """;
 
     static final String ISSUE_FIELDS_MIN = COMMON_OBJECT_MIN + """
@@ -28,15 +26,6 @@ public class DataCommonItem extends DataCommonObject {
     public final Date closedAt;
     public final boolean closed;
 
-    // State: may only be present for webhooks (transitions)
-    public final String state;
-    // Reason item is in a state: may be null
-    public final String stateReason;
-
-    // Lockable
-    public final boolean locked;
-    public final String activeLockReason;
-
     public DataCommonItem(JsonObject object) {
         super(object);
 
@@ -45,11 +34,5 @@ public class DataCommonItem extends DataCommonObject {
 
         this.closedAt = JsonAttribute.closedAt.dateFrom(object);
         this.closed = JsonAttribute.closed.booleanFromOrFalse(object);
-
-        this.state = JsonAttribute.state.stringFrom(object);
-        this.stateReason = JsonAttribute.stateReason.stringFrom(object);
-
-        this.locked = JsonAttribute.locked.booleanFromOrFalse(object);
-        this.activeLockReason = JsonAttribute.activeLockReason.stringFrom(object);
     }
 }

@@ -31,8 +31,7 @@ public class MatchCategory {
         DataDiscussionCategory discussionCategory = discussion.category;
         for (String cat : category) {
             if (cat.equals(discussionCategory.id)
-                    || cat.equalsIgnoreCase(discussionCategory.name)
-                    || cat.equals(discussionCategory.id)) {
+                    || cat.equalsIgnoreCase(discussionCategory.name)) {
                 return true;
             }
         }

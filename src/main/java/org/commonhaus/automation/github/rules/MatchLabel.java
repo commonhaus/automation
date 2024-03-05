@@ -10,8 +10,8 @@ import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 public class MatchLabel {
 
-    public List<String> include = new ArrayList<>(1);
-    public List<String> exclude = new ArrayList<>(1);
+    public final List<String> include = new ArrayList<>(1);
+    public final List<String> exclude = new ArrayList<>(1);
 
     public MatchLabel(List<String> actions) {
         actions.forEach(x -> {

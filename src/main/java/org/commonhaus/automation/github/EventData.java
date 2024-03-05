@@ -212,7 +212,7 @@ public class EventData {
                 }
             };
         }
-        return body;
+        return result;
     }
 
     public int getNumber() {
@@ -237,10 +237,6 @@ public class EventData {
                     yield payload.getPullRequest().getNumber();
                 }
                 case label -> -1;
-                default -> {
-                    Log.errorf("[%s] EventData.getNumber: unsupported event type", logId);
-                    yield -1;
-                }
             };
         }
         return result;

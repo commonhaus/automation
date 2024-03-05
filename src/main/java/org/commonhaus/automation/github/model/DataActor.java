@@ -28,6 +28,10 @@ public class DataActor extends DataCommonType {
         this.login = senderUser.getLogin();
     }
 
+    public String login() {
+        return login;
+    }
+
     public String toString() {
         return String.format("Actor[%s]", this.login);
     }

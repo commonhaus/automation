@@ -7,7 +7,6 @@ import org.commonhaus.automation.github.actions.Action.ActionDeserializer;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,7 +31,7 @@ public abstract class Action {
         }
 
         @Override
-        public Action deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+        public Action deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
             ObjectMapper mapper = (ObjectMapper) jp.getCodec();
             JsonNode root = mapper.readTree(jp);
             if (root.isArray()) {
@@ -41,8 +40,6 @@ public abstract class Action {
                 return labelsAction;
             } else if (root.has("address")) {
                 return new EmailAction(root.get("address"));
-            } else if (root.has("channel")) {
-                return mapper.convertValue(root, DiscordAction.class);
             }
             return null;
         }
