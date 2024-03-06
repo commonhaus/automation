@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.commonhaus.automation.github.actions.Action.ActionDeserializer;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -19,7 +19,7 @@ public abstract class Action {
     final static TypeReference<List<String>> LIST_STRING = new TypeReference<>() {
     };
 
-    public abstract void apply(QueryContext queryContext);
+    public abstract void apply(EventQueryContext queryContext);
 
     public static class ActionDeserializer extends StdDeserializer<Action> {
         public ActionDeserializer() {

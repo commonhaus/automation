@@ -25,6 +25,7 @@ import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataCommonComment;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.DataReaction;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.GithubTest;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
@@ -407,18 +408,19 @@ public class VotingTest extends GithubTest {
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
         }
 
+        EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
+        when(queryContext.getOrganization()).thenReturn(org);
+
         Voting.Config votingConfig = new Voting.Config();
         votingConfig.votingThreshold = new java.util.HashMap<>();
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
 
-        EventData eventData = Mockito.mock(EventData.class);
-        QueryContext queryContext = Mockito.mock(QueryContext.class);
-        when(queryContext.getEventData()).thenReturn(eventData);
-        when(eventData.getOrganization()).thenReturn(org);
+        VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all,
+                body);
 
         // Martha's
 
-        VoteInformation voteInfo = new VoteInformation(queryContext, body, votingConfig);
+        VoteInformation voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
         assertThat(voteInfo.group).isEqualTo("commonhaus/test-quorum-default");
         assertThat(voteInfo.votingThreshold).isEqualTo(Voting.Threshold.all);
@@ -440,14 +442,14 @@ public class VotingTest extends GithubTest {
         // Majority have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
-        voteInfo = new VoteInformation(queryContext, body, votingConfig);
+        voteInfo = new VoteInformation(event);
         assertVoteTally(26, true, voteInfo, extraReactions, teamReactions, teamLogins);
         assertVoteTally(25, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
         // Supermajority (2/3) have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
-        voteInfo = new VoteInformation(queryContext, body, votingConfig);
+        voteInfo = new VoteInformation(event);
         assertVoteTally(34, true, voteInfo, extraReactions, teamReactions, teamLogins);
         assertVoteTally(33, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
@@ -458,8 +460,9 @@ public class VotingTest extends GithubTest {
                 <!--vote::manual -->
                 """;
 
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
-        voteInfo = new VoteInformation(queryContext, body, votingConfig);
+        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all, body);
+
+        voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
         assertThat(voteInfo.approve).isEmpty();
         assertThat(voteInfo.ok).isEmpty();
@@ -481,8 +484,9 @@ public class VotingTest extends GithubTest {
                 <!--vote::manual comments -->
                 """;
 
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
-        voteInfo = new VoteInformation(queryContext, body, votingConfig);
+        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all, body);
+
+        voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
         assertThat(voteInfo.approve).isEmpty();
         assertThat(voteInfo.ok).isEmpty();
@@ -491,6 +495,16 @@ public class VotingTest extends GithubTest {
 
         voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
         assertThat(voteTally.categories).hasSize(1);
+    }
+
+    VoteEvent createVoteEvent(QueryContext queryContext, Voting.Config votingConfig, String group, Voting.Threshold threshold,
+            String body) {
+        EventData eventData = Mockito.mock(EventData.class);
+        when(eventData.getBody()).thenReturn(body);
+
+        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
+
+        return new VoteEvent(queryContext, votingConfig, eventData);
     }
 
     VoteTally assertVoteTally(int numUsers, boolean expectHasQuorum,

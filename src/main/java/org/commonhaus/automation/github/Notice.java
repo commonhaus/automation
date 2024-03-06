@@ -12,8 +12,8 @@ import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.DiscussionConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.PullRequestConfig;
 import org.commonhaus.automation.github.actions.Action;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.QueryHelper;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.Rule;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
@@ -25,6 +25,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class Notice {
 
@@ -39,7 +40,7 @@ public class Notice {
      * @param discussionPayload GitHub API parsed payload; connected GHRepository and GHOrganization
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
-    void onDiscussionEvent(GitHubEvent event, GitHub github,
+    void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Discussion GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
@@ -49,7 +50,7 @@ public class Notice {
         }
 
         EventData eventData = new EventData(event, discussionPayload);
-        QueryContext queryContext = queryHelper.newQueryContext(eventData, github);
+        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
 
         Log.infof("[%s] notice.onDiscussionEvent: triggered (%s) actions: %s", eventData.getLogId(),
@@ -66,7 +67,7 @@ public class Notice {
      * @param pullRequestPayload GitHub API parsed payload
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
-    void onPullRequestEvent(GitHubEvent event, GitHub github,
+    void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @PullRequest GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
@@ -76,7 +77,7 @@ public class Notice {
         }
 
         EventData eventData = new EventData(event, pullRequestPayload);
-        QueryContext queryContext = queryHelper.newQueryContext(eventData, github);
+        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.pullRequest.rules);
         Log.infof("[%s] notice.onPullRequestEvent: triggered (%s) actions: %s", eventData.getLogId(),
@@ -85,7 +86,7 @@ public class Notice {
         applyMatchingActions("notice.onPullRequestEvent", queryContext, desiredActions, noticeConfig.actions);
     }
 
-    private Set<String> findMatchingActions(QueryContext queryContext, List<Rule> rules) {
+    private Set<String> findMatchingActions(EventQueryContext queryContext, List<Rule> rules) {
         Set<String> actions = new HashSet<>();
         for (Rule rule : rules) {
             if (rule.matches(queryContext)) {
@@ -95,7 +96,7 @@ public class Notice {
         return actions;
     }
 
-    private void applyMatchingActions(String method, QueryContext queryContext,
+    private void applyMatchingActions(String method, EventQueryContext queryContext,
             Set<String> desiredActions, Map<String, Action> actionsMap) {
         if (desiredActions.isEmpty()) {
             return;

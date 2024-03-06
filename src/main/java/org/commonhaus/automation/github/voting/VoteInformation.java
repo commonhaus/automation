@@ -40,14 +40,18 @@ public class VoteInformation {
     public final GHTeam team;
     public final Voting.Threshold votingThreshold;
 
-    public VoteInformation(QueryContext qc, String bodyString, Voting.Config voteConfig) {
+    public VoteInformation(VoteEvent event) {
+        QueryContext qc = event.getQueryContext();
+        Voting.Config voteConfig = event.getVotingConfig();
+        String bodyString = event.getBody();
+
         // Body contains voting group? "Voting group"
         Matcher m = groupPattern.matcher(bodyString);
         GHTeam team = null;
         if (m.find()) {
             this.group = m.group(1);
 
-            GHOrganization org = qc.getEventData().getOrganization();
+            GHOrganization org = event.getOrganization();
             team = QueryCache.TEAM.getCachedValue(this.group);
             if (team == null) {
                 String teamName = this.group.replace(org.getLogin() + "/", "");

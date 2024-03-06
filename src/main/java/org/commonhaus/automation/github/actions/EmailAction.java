@@ -6,7 +6,7 @@ import java.util.List;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.mail.MailConsumer;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
@@ -56,7 +56,7 @@ public class EmailAction extends Action {
     }
 
     @Override
-    public void apply(QueryContext queryContext) {
+    public void apply(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
 
         Log.debugf("[%s] EmailAction.apply: Preparing email to %s",

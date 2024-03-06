@@ -1,7 +1,5 @@
 package org.commonhaus.automation.github;
 
-import java.time.Instant;
-
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.ActionType;
@@ -92,18 +90,6 @@ public class EventData {
 
     public EventType getEventType() {
         return eventType;
-    }
-
-    public String eventTime() {
-        return Instant.now().toString();
-    }
-
-    public String getRepoOwner() {
-        return repository.getOwnerName();
-    }
-
-    public String getRepoName() {
-        return repository.getName();
     }
 
     public String getRepoSlug() {

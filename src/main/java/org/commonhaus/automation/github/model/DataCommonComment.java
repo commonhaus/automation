@@ -70,64 +70,6 @@ public class DataCommonComment extends DataCommonObject {
 
         Collection<DataCommonComment> allComments = queryComments(queryContext, itemId, true);
         return allComments == null || allComments.isEmpty() ? null : allComments.iterator().next();
-
-        //Map<String, Object> variables = new HashMap<>();
-        //variables.put("itemId", itemId);
-        //
-        //JsonObject pageInfo;
-        //String cursor = null;
-        //
-        //// Paginate.. excessive?, but..
-        //do {
-        //    variables.put("after", cursor);
-        //    Response response = queryContext.execQuerySync("""
-        //            query($itemId: ID!, $after: String) {
-        //                node(id: $itemId) {
-        //                    ... on Issue {
-        //                        comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-        //                            nodes {
-        //                                """ + COMMENT_FIELDS_MIN + """
-        //                    }
-        //                }
-        //            }
-        //            ... on PullRequest {
-        //                comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-        //                    nodes {
-        //                        """ + COMMENT_FIELDS_MIN + """
-        //                    }
-        //                }
-        //            }
-        //            ... on Discussion {
-        //                comments(first: 50, after: $after) {
-        //                    nodes {
-        //                        """ + COMMENT_FIELDS_MIN + """
-        //                            }
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //            """, variables);
-        //    if (response.hasError()) {
-        //        if (queryContext.hasNotFound()) {
-        //            queryContext.clearErrors();
-        //        }
-        //        return null;
-        //    }
-        //    JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
-        //    JsonObject comments = JsonAttribute.comments.jsonObjectFrom(node);
-        //    JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(comments);
-        //    for (JsonObject comment : nodes.getValuesAs(JsonObject.class)) {
-        //        DataCommonComment cc = new DataCommonComment(comment);
-        //        if (queryContext.isBot(cc.author.login)) {
-        //            // we found it! bail ASAP
-        //            return cc;
-        //        }
-        //    }
-        //    pageInfo = JsonAttribute.node.jsonObjectFrom(comments);
-        //    cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        //} while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
-        // we didn't find one...
-        //return null;
     }
 
     public static Collection<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {

@@ -89,7 +89,7 @@ public class DataIssueComment extends DataCommonComment {
             }
             return null;
         }
-        JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());
+        JsonObject result = JsonAttribute.updateIssueComment.jsonObjectFrom(response.getData());
         return JsonAttribute.issueComment.issueCommentFrom(result);
     }
 }

@@ -5,8 +5,8 @@ import java.util.Map;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.QueryHelper;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.voting.VoteEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
@@ -15,6 +15,7 @@ import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 /**
@@ -39,7 +40,7 @@ public class Voting {
      *        and GHOrganization
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
-    void onDiscussionEvent(GitHubEvent event, GitHub github,
+    void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Discussion GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
@@ -49,11 +50,11 @@ public class Voting {
         }
 
         EventData eventData = new EventData(event, discussionPayload);
-        QueryContext qc = queryHelper.newQueryContext(eventData, github);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionEvent: voting enabled; queue event", qc.getLogId());
-        bus.requestAndForget("voting", new VoteEvent(qc, votingConfig));
+        bus.requestAndForget("voting", new VoteEvent(qc, votingConfig, eventData));
     }
 
     static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {

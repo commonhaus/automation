@@ -2,7 +2,7 @@ package org.commonhaus.automation.github.rules;
 
 import java.util.List;
 
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.rules.Rule.RuleDeserializer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -23,7 +23,7 @@ public class Rule {
 
     public List<String> then;
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         boolean matches = true;
         if (action != null) {
             matches = action.matches(queryContext);
@@ -35,7 +35,7 @@ public class Rule {
             matches = paths.matches(queryContext);
         }
         if (matches && label != null) {
-            matches = label.matches(queryContext);
+            matches = label.matches(queryContext, queryContext.getEventData().getNodeId());
         }
         return matches;
     }

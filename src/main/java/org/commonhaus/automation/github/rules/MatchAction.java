@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 
 public class MatchAction {
 
@@ -21,7 +21,7 @@ public class MatchAction {
         });
     }
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
         if (eventData == null) {
             return false;

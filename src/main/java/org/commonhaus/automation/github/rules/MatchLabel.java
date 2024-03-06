@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
@@ -23,14 +22,12 @@ public class MatchLabel {
         });
     }
 
-    public boolean matches(QueryContext queryContext) {
-        EventData eventData = queryContext.getEventData();
-        String id = eventData.getNodeId();
-        if (id == null) {
+    public boolean matches(QueryContext queryContext, String nodeId) {
+        if (nodeId == null) {
             return false;
         }
 
-        Collection<DataLabel> eventLabels = queryContext.getLabels(id);
+        Collection<DataLabel> eventLabels = queryContext.getLabels(nodeId);
         if (!include.isEmpty() && (eventLabels == null || eventLabels.isEmpty())) {
             return false;
         }

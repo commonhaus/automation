@@ -39,7 +39,7 @@ public class DataDiscussion extends DataCommonItem {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataDiscussion> queryDiscussions(QueryContext queryContext, boolean isOpen) {
+    static List<DataDiscussion> queryDiscussions(EventQueryContext queryContext, boolean isOpen) {
         List<DataDiscussion> discussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("isOpen", isOpen);
@@ -80,9 +80,9 @@ public class DataDiscussion extends DataCommonItem {
     /**
      * package private. See QueryHelper / QueryContext
      */
-    static void editDiscussion(QueryContext queryContext, DataDiscussion discussion, String modifiedText) {
+    static void editDiscussion(QueryContext queryContext, String nodeId, String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
-        variables.put("id", discussion.id);
+        variables.put("id", nodeId);
         variables.put("body", modifiedText);
 
         Response response = queryContext.execRepoQuerySync("""

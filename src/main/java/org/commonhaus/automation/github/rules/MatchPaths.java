@@ -3,9 +3,9 @@ package org.commonhaus.automation.github.rules;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryCache;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -22,7 +22,7 @@ import io.quarkus.logging.Log;
 public class MatchPaths {
     List<String> paths;
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
         if (eventData.getEventType() != EventType.pull_request) {
             return false;

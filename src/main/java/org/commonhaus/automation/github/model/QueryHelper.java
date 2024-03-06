@@ -14,10 +14,9 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.model.EventPayload.DiscussionPayload;
-import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;
-import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHOrganization;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.ReactionContent;
 
@@ -39,17 +38,29 @@ public class QueryHelper {
         this.gitHubClientProvider = gitHubClientProvider;
     }
 
-    public QueryContext newQueryContext(EventData event) {
-        return new QueryContext(this, botConfig, gitHubClientProvider, event);
+    public EventQueryContext newQueryContext(EventData event) {
+        return new EventQueryContext(this, botConfig, gitHubClientProvider, event);
     }
 
-    public QueryContext newQueryContext(EventData eventData, GitHub github) {
-        return newQueryContext(eventData).addExisting(github);
+    public EventQueryContext newQueryContext(EventData eventData, GitHub github, DynamicGraphQLClient graphQLClient) {
+        return newQueryContext(eventData)
+                .addExisting(github)
+                .addExisting(graphQLClient);
     }
 
-    /** Package private. Mostly for test */
+    /** Package private. */
+    String getBotSenderLogin() {
+        return botSenderLogin;
+    }
+
+    /** Package private. Not synchronized or volatile, eventual consistency is fine */
     void setBotSenderLogin(String login) {
         botSenderLogin = login;
+    }
+
+    @FunctionalInterface
+    public interface GitHubParameterApiCall<R> {
+        R apply(GitHub gh, boolean isDryRun) throws IOException;
     }
 
     /**
@@ -61,42 +72,38 @@ public class QueryHelper {
      * <p>
      * It is not thread-safe.
      */
-    public static class QueryContext {
-        private final QueryHelper helper;
-        private final AppConfig botConfig;
+    public static abstract class QueryContext {
+        protected final QueryHelper helper;
+        protected final AppConfig botConfig;
 
-        private final GitHubClientProvider gitHubClientProvider;
+        protected final GitHubClientProvider gitHubClientProvider;
 
         protected final List<GraphQLError> errors = new ArrayList<>(1);
         protected final List<Throwable> exceptions = new ArrayList<>(1);
 
         /** Short-lived (minutes) CLI for GitHub REST API */
-        private GitHub github;
+        protected GitHub github;
         /** Short-lived (minutes) CLI for GitHub GraphQL API */
-        private DynamicGraphQLClient graphQLClient;
-        /** Event data used to construct this query context */
-        private final EventData evt;
+        protected DynamicGraphQLClient graphQLClient;
 
-        private QueryContext(QueryHelper helper, AppConfig botConfig, GitHubClientProvider gitHubClientProvider,
-                EventData event) {
+        QueryContext(QueryHelper helper, AppConfig botConfig, GitHubClientProvider gitHubClientProvider) {
             this.helper = helper;
             this.botConfig = botConfig;
             this.gitHubClientProvider = gitHubClientProvider;
-
-            // unpack Json-B from string
-            this.evt = event;
         }
+
+        public abstract String getLogId();
+
+        public abstract long installationId();
+
+        public abstract String getRepositoryId();
+
+        public abstract GHRepository getRepository();
+
+        public abstract GHOrganization getOrganization();
 
         public boolean isCredentialValid() {
             return github != null && github.isCredentialValid();
-        }
-
-        public EventData getEventData() {
-            return evt;
-        }
-
-        public String getLogId() {
-            return evt.getLogId();
         }
 
         public boolean hasErrors() {
@@ -134,7 +141,7 @@ public class QueryHelper {
          */
         protected DynamicGraphQLClient getGraphQLClient() {
             if (graphQLClient == null) {
-                graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(evt.installationId());
+                graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId());
             }
             return graphQLClient;
         }
@@ -145,14 +152,9 @@ public class QueryHelper {
          */
         public GitHub getGitHub() {
             if (github == null) {
-                github = gitHubClientProvider.getInstallationClient(evt.installationId());
+                github = gitHubClientProvider.getInstallationClient(installationId());
             }
             return github;
-        }
-
-        @FunctionalInterface
-        public interface GitHubParameterApiCall<R> {
-            R apply(GitHub gh, boolean isDryRun) throws IOException;
         }
 
         /**
@@ -171,14 +173,14 @@ public class QueryHelper {
                 return ghApiCall.apply(getGitHub(), botConfig.isDryRun());
             } catch (GHIOException e) {
                 // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
-                Log.errorf(e, "[%s] Error making GH Request: %s", evt.getLogId(), e.toString());
+                Log.errorf(e, "[%s] Error making GH Request: %s", getLogId(), e.toString());
                 if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                     e.getResponseHeaderFields()
                             .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 }
                 addException(e);
             } catch (IOException | RuntimeException e) {
-                Log.errorf(e, "[%s] Error making GH Request: %s", evt.getLogId(), e.toString());
+                Log.errorf(e, "[%s] Error making GH Request: %s", getLogId(), e.toString());
                 addException(e);
             }
             return null;
@@ -222,7 +224,7 @@ public class QueryHelper {
         /**
          * Exceptions and errors are captured for caller in the queryContext
          *
-         * @param query GraphQL query. Values for owner and name
+         * @param query GraphQL query. Values for repository owner and name
          *        ({@code $name: String!, $owner: String!})
          *        will be provided
          * @return GraphQL Response
@@ -238,12 +240,14 @@ public class QueryHelper {
          * @param query GraphQL query. Values for repository owner and name
          *        ({@code $name: String!, $owner: String!})
          *        will be provided
+         * @param variables Additional query variables
          * @return GraphQL Response
          * @see #execQuerySync(String, Map)
          */
         public Response execRepoQuerySync(String query, Map<String, Object> variables) {
-            variables.putIfAbsent("owner", evt.getRepoOwner());
-            variables.putIfAbsent("name", evt.getRepoName());
+            GHRepository repo = getRepository();
+            variables.putIfAbsent("owner", repo.getOwnerName());
+            variables.putIfAbsent("name", repo.getName());
             return execQuerySync(query, variables);
         }
 
@@ -272,8 +276,8 @@ public class QueryHelper {
          * @param labels List of label names or ids
          * @return collection of resolved labels
          */
-        public Collection<DataLabel> findLabels(EventData eventData, List<String> labels) {
-            Collection<DataLabel> repoLabels = getLabels(eventData.getRepositoryId());
+        public Collection<DataLabel> findLabels(List<String> labels) {
+            Collection<DataLabel> repoLabels = getLabels(getRepositoryId());
             if (repoLabels == null) {
                 Log.errorf("[%s] Labels not found in repository", getLogId());
                 return List.of();
@@ -300,12 +304,12 @@ public class QueryHelper {
          * Add, remove, or edit a label from the list of known labels
          * if the associated item has been seen/cached
          *
-         * @param cacheId Labelable item node id
+         * @param nodeId Labelable item node id
          * @param label Label to add
          * @param action Type of action to perform (created, edited, deleted, labeled, unlabeled)
          */
-        public void modifyLabels(String cacheId, DataLabel label, ActionType action) {
-            QueryCache.LABELS.computeIfPresent(cacheId, (k, v) -> {
+        public void modifyLabels(String nodeId, DataLabel label, ActionType action) {
+            QueryCache.LABELS.computeIfPresent(nodeId, (k, v) -> {
                 @SuppressWarnings("unchecked")
                 Set<DataLabel> labels = (Set<DataLabel>) v;
                 if (action == ActionType.deleted || action == ActionType.unlabeled || action == ActionType.edited) {
@@ -321,24 +325,23 @@ public class QueryHelper {
         /**
          * Add label by name or id to event item
          *
-         * @param eventData EventData
-         * @param label Label name or id
-         * @return updated collection of labels for the item, or null if label not found
+         * @param nodeId Id of node(discussion or pull request or issue) to add labels to
+         * @param label label name or id
+         * @return updated collection of labels for the item, or null if no labels were found
          */
-        public Collection<DataLabel> addLabel(EventData eventData, String label) {
-            return addLabels(eventData, List.of(label));
+        public Collection<DataLabel> addLabel(String nodeId, String label) {
+            return addLabels(nodeId, List.of(label));
         }
 
         /**
          * Add label by name or id to event item
          *
-         * @param eventData EventData
+         * @param nodeId Id of node(discussion or pull request or issue) to add labels to
          * @param labels Collection of Label names or ids
          * @return updated collection of labels for the item, or null if no labels were found
          */
-        public Collection<DataLabel> addLabels(EventData eventData, List<String> labels) {
-            String nodeId = eventData.getNodeId();
-            Collection<DataLabel> newLabels = findLabels(eventData, labels);
+        public Collection<DataLabel> addLabels(String nodeId, List<String> labels) {
+            Collection<DataLabel> newLabels = findLabels(labels);
             if (!newLabels.isEmpty()) {
                 Set<DataLabel> currentLabels = DataLabel.addLabels(this, nodeId, newLabels);
                 QueryCache.LABELS.putCachedValue(nodeId, currentLabels);
@@ -357,7 +360,7 @@ public class QueryHelper {
         }
 
         private String botLogin() {
-            String login = helper.botSenderLogin;
+            String login = helper.getBotSenderLogin();
             if (login == null) {
                 Response response = execQuerySync("""
                             query {
@@ -370,26 +373,26 @@ public class QueryHelper {
                     return "unknown";
                 }
                 JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
-                helper.botSenderLogin = login = JsonAttribute.login.stringFrom(viewer);
+                login = JsonAttribute.login.stringFrom(viewer);
+                helper.setBotSenderLogin(login);
             }
             return login;
         }
 
-        public void addBotReaction(ReactionContent reaction) {
-            DataReaction.addBotReaction(this, evt.getNodeId(), reaction);
+        public void addBotReaction(String nodeId, ReactionContent reaction) {
+            DataReaction.addBotReaction(this, nodeId, reaction);
         }
 
-        public void removeBotReaction(ReactionContent reaction) {
-            DataReaction.removeBotReaction(this, evt.getNodeId(), reaction);
+        public void removeBotReaction(String nodeId, ReactionContent reaction) {
+            DataReaction.removeBotReaction(this, nodeId, reaction);
         }
 
-        public DataCommonComment updateBotComment(String commentBody, Integer commentIdFromBody) {
+        public DataCommonComment updateBotComment(EventType eventType, String itemId, String commentBody,
+                Integer commentIdFromBody) {
             if (hasErrors()) {
                 Log.debugf("[%s] updateBotComment skipping due to errors", getLogId());
                 return null;
             }
-
-            String itemId = this.evt.getNodeId();
 
             DataCommonComment comment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId);
             if (comment == null) {
@@ -398,8 +401,9 @@ public class QueryHelper {
 
             if (comment == null) {
                 // new comment
-                comment = switch (evt.getEventType()) {
-                    case discussion, discussion_comment -> DataDiscussionComment.addComment(this, itemId, commentBody);
+                comment = switch (eventType) {
+                    case discussion, discussion_comment ->
+                        DataDiscussionComment.addComment(this, itemId, commentBody);
                     case issue, pull_request, issue_comment ->
                         DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
@@ -413,7 +417,7 @@ public class QueryHelper {
                     comment.body = commentBody;
                     return comment;
                 }
-                comment = switch (evt.getEventType()) {
+                comment = switch (eventType) {
                     case discussion, discussion_comment ->
                         DataDiscussionComment.editComment(this, comment, commentBody);
                     case issue, pull_request, issue_comment ->
@@ -431,7 +435,7 @@ public class QueryHelper {
             return comment;
         }
 
-        public void updateItemDescription(String bodyString) {
+        public void updateItemDescription(EventType eventType, String nodeId, String bodyString) {
             if (isDryRun()) {
                 Log.debugf("[%s] updateItemDescription would set body to: %s", getLogId(), bodyString);
                 return;
@@ -441,46 +445,28 @@ public class QueryHelper {
                 return;
             }
 
-            switch (evt.getEventType()) {
+            switch (eventType) {
                 case discussion, discussion_comment -> {
-                    DiscussionPayload payload = evt.getEventPayload();
-                    DataDiscussion.editDiscussion(this, payload.discussion, bodyString);
+                    DataDiscussion.editDiscussion(this, nodeId, bodyString);
                 }
-                case issue -> {
-                    GHEventPayload.Issue payload = evt.getGHEventPayload();
-                    updateIssueDescription(payload.getIssue(), bodyString);
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = evt.getGHEventPayload();
-                    updateIssueDescription(payload.getIssue(), bodyString);
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = evt.getGHEventPayload();
-                    updateIssueDescription(payload.getPullRequest(), bodyString);
-                }
+                case issue, pull_request, issue_comment ->
+                    DataCommonItem.editIssueDescription(this, nodeId, bodyString);
                 default -> Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
             }
         }
 
-        private void updateIssueDescription(GHIssue issue, String bodyString) {
-            execGitHubSync((gh, dryRun) -> {
-                issue.setBody(bodyString);
-                return null;
-            });
-        }
-
-        public List<DataReaction> getReactions() {
+        public List<DataReaction> getReactions(String nodeId) {
             if (hasErrors()) {
                 return List.of();
             }
-            return DataReaction.queryReactions(this, this.evt.getNodeId());
+            return DataReaction.queryReactions(this, nodeId);
         }
 
-        public Collection<DataCommonComment> getComments() {
+        public Collection<DataCommonComment> getComments(String nodeId) {
             if (hasErrors()) {
                 return List.of();
             }
-            return DataCommonComment.queryComments(this, this.evt.getNodeId());
+            return DataCommonComment.queryComments(this, nodeId);
         }
     }
 }

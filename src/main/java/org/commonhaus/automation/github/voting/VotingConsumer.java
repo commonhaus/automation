@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataCommonComment;
@@ -51,7 +50,7 @@ public class VotingConsumer {
 
     @CheckedTemplate
     static class Templates {
-        public static native MailTemplateInstance votingErrorEvent(EventData eventData, String title, String body,
+        public static native MailTemplateInstance votingErrorEvent(VoteEvent voteEvent, String title, String body,
                 String htmlBody);
     }
 
@@ -68,9 +67,8 @@ public class VotingConsumer {
     @Blocking
     public void consume(Message<VoteEvent> msg) {
         VoteEvent voteEvent = msg.body();
-        QueryContext qc = voteEvent.qc;
-        EventData eventData = qc.getEventData();
-        Voting.Config votingConfig = voteEvent.votingConfig;
+        QueryContext qc = voteEvent.getQueryContext();
+        Voting.Config votingConfig = voteEvent.getVotingConfig();
 
         // Each query context does have a reference to the original event and to the
         // potentially short-lived GitHub connection. Reauthenticate if
@@ -81,48 +79,48 @@ public class VotingConsumer {
         }
         Log.debugf("[%s] voting.checkVotes: process event", qc.getLogId());
         try {
-            if (OPEN_VOTE.matches(qc)) {
-                checkOpenVote(qc, eventData, votingConfig);
+            if (OPEN_VOTE.matches(qc, voteEvent.getId())) {
+                checkOpenVote(qc, voteEvent, votingConfig);
             }
-            if (FINISH_VOTE.matches(qc)) {
-                finishVote(qc, eventData, votingConfig);
+            if (FINISH_VOTE.matches(qc, voteEvent.getId())) {
+                finishVote(qc, voteEvent, votingConfig);
             }
         } catch (RuntimeException e) {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", qc.getLogId());
-            sendErrorEmail(votingConfig, eventData, e);
+            sendErrorEmail(votingConfig, voteEvent, e);
         }
 
         // nothing to do
         msg.reply(null);
     }
 
-    private void finishVote(QueryContext qc, EventData eventData, Voting.Config votingConfig) {
+    private void finishVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
         String logId = "[" + qc.getLogId() + "] finishVote";
     }
 
-    private void checkOpenVote(QueryContext qc, EventData eventData, Voting.Config votingConfig) {
+    private void checkOpenVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
         Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", qc.getLogId(),
                 votingConfig.error_email_address, votingConfig.votingThreshold);
 
         // Make sure other labels are present
         List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE);
-        Collection<DataLabel> voteLabels = qc.findLabels(eventData, requiredLabels);
+        Collection<DataLabel> voteLabels = qc.findLabels(requiredLabels);
         if (voteLabels.size() != requiredLabels.size()) {
-            qc.addBotReaction(ReactionContent.CONFUSED);
+            qc.addBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
             String comment = "The following labels must be defined in this repository:\r\n"
                     + String.join(", ", requiredLabels) + "\r\n\r\n"
                     + "Please ensure all labels have been defined.";
-            updateBotComment(qc, comment);
+            updateBotComment(voteEvent, comment);
             return;
         }
 
         // Get information about vote mechanics (return if bad data)
-        final VoteInformation voteInfo = new VoteInformation(qc, eventData.getBody(), votingConfig);
+        final VoteInformation voteInfo = new VoteInformation(voteEvent);
         if (!voteInfo.isValid()) {
-            qc.addBotReaction(ReactionContent.CONFUSED);
+            qc.addBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
 
             // Add or update a bot comment summarizing what went wrong.
-            updateBotComment(qc, voteInfo.getErrorContent());
+            updateBotComment(voteEvent, voteInfo.getErrorContent());
             return;
         }
 
@@ -131,25 +129,25 @@ public class VotingConsumer {
 
         if (voteInfo.countComments()) {
             reactions = List.of();
-            comments = qc.getComments();
+            comments = qc.getComments(voteEvent.getId());
 
             // The bot's votes/comments never count.
             comments.removeIf(x -> qc.isBot(x.author.login));
 
-            updateBotComment(qc, "No votes (non-bot comments) found on this item.");
+            updateBotComment(voteEvent, "No votes (non-bot comments) found on this item.");
             return;
         } else {
             comments = List.of();
             // GraphQL fetch of all reactions on item (return if none)
             // Could query by group first, but pagination happens either way.
-            reactions = qc.getReactions();
+            reactions = qc.getReactions(voteEvent.getId());
 
             // The bot's votes never count.
             reactions.removeIf(x -> {
                 if (qc.isBot(x.user.login)) {
                     if (x.reactionContent == ReactionContent.CONFUSED) {
                         // If we were previously confused, we aren't anymore.
-                        qc.removeBotReaction(ReactionContent.CONFUSED);
+                        qc.removeBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
                     }
                     return true;
                 }
@@ -157,12 +155,12 @@ public class VotingConsumer {
             });
 
             if (reactions.isEmpty()) {
-                updateBotComment(qc, "No votes (reactions) found on this item.");
+                updateBotComment(voteEvent, "No votes (reactions) found on this item.");
                 return;
             }
         }
 
-        List<DataActor> logins = getTeamLogins(qc, voteInfo);
+        List<DataActor> logins = getTeamLogins(voteEvent, voteInfo);
         VoteTally tally = new VoteTally(voteInfo, reactions, comments, logins);
 
         // Add or update a bot comment summarizing the vote.
@@ -172,19 +170,20 @@ public class VotingConsumer {
             commentBody += "\r\n<!-- vote::data " + jsonData + " -->";
         } catch (JsonProcessingException e) {
             Log.errorf(e, "[%s] voting.checkVotes: unable to serialize voting data", qc.getLogId());
-            sendErrorEmail(votingConfig, eventData, e);
+            sendErrorEmail(votingConfig, voteEvent, e);
         }
-        updateBotComment(qc, commentBody);
+        updateBotComment(voteEvent, commentBody);
 
         if (tally.hasQuorum) {
-            qc.addLabel(eventData, VOTE_QUORUM);
+            qc.addLabel(voteEvent.getId(), VOTE_QUORUM);
         }
     }
 
-    private void updateBotComment(QueryContext qc, String commentBody) {
-        String bodyString = qc.getEventData().getBody();
+    private void updateBotComment(VoteEvent voteEvent, String commentBody) {
+        QueryContext qc = voteEvent.getQueryContext();
+        String bodyString = voteEvent.getBody();
         Integer existingId = commentIdFromBody(bodyString);
-        DataCommonComment comment = qc.updateBotComment(commentBody, existingId);
+        DataCommonComment comment = qc.updateBotComment(voteEvent.getEventType(), voteEvent.getId(), commentBody, existingId);
         if (comment != null && (existingId == null || !existingId.equals(comment.databaseId))) {
             String prefix = String.format("Progress tracked [below](%s \"%s\").",
                     comment.url, comment.databaseId);
@@ -194,7 +193,7 @@ public class VotingConsumer {
             } else {
                 bodyString = prefix + "\r\n\r\n" + bodyString;
             }
-            qc.updateItemDescription(bodyString);
+            qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), bodyString);
         }
     }
 
@@ -212,7 +211,8 @@ public class VotingConsumer {
         return null;
     }
 
-    private List<DataActor> getTeamLogins(QueryContext qc, VoteInformation voteInfo) {
+    private List<DataActor> getTeamLogins(VoteEvent voteEvent, VoteInformation voteInfo) {
+        QueryContext qc = voteEvent.getQueryContext();
         List<DataActor> logins = QueryCache.TEAM_LIST.getCachedValue(voteInfo.group);
         if (logins == null) {
             logins = qc.execGitHubSync((gh, dryRun) -> voteInfo.team.getMembers().stream().map(DataActor::new).toList());
@@ -221,24 +221,24 @@ public class VotingConsumer {
         return logins;
     }
 
-    private void sendErrorEmail(Voting.Config votingConfig, EventData eventData, Exception e) {
+    private void sendErrorEmail(Voting.Config votingConfig, VoteEvent voteEvent, Exception e) {
         // If configured to do so, send an email to the error_email_address
         if (votingConfig.sendErrorEmail()) {
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
             e.printStackTrace(pw);
 
-            String subject = "Voting error occurred with " + eventData.getRepoSlug() + " #" + eventData.getNumber();
+            String subject = "Voting error occurred with " + voteEvent.getRepoSlug() + " #" + voteEvent.getNumber();
 
             String messageBody = sw.toString();
             String htmlBody = messageBody.replace("\n", "<br/>\n");
 
-            MailTemplateInstance mail = Templates.votingErrorEvent(eventData,
+            MailTemplateInstance mail = Templates.votingErrorEvent(voteEvent,
                     "Voting Error: " + e,
                     messageBody,
                     htmlBody);
 
-            bus.requestAndForget("mail", new MailConsumer.MailEvent(eventData.getLogId(),
+            bus.requestAndForget("mail", new MailConsumer.MailEvent(voteEvent.getLogId(),
                     mail, subject, votingConfig.error_email_address));
         }
     }

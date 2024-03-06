@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -14,7 +14,7 @@ public class LabelAction extends Action {
     List<String> labels = new ArrayList<>();
 
     @Override
-    public void apply(QueryContext queryContext) {
+    public void apply(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
         if (eventData == null || labels.isEmpty()) {
             return;

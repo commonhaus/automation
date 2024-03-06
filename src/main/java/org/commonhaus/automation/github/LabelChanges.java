@@ -5,8 +5,8 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.EventPayload;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.QueryHelper;
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -14,6 +14,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.Label;
 import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 /**
  * Discussion webhook events do not include labels
@@ -31,11 +32,11 @@ public class LabelChanges {
      * @param github GitHub API (connection instance)
      * @param discussionPayload GitHub API parsed payload
      */
-    void onDiscussionLabelChangeEvent(GitHubEvent event, GitHub github,
+    void onDiscussionLabelChangeEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Discussion.Labeled @Discussion.Unlabeled GHEventPayload.Discussion discussionPayload) {
 
         final EventData initialData = new EventData(event, discussionPayload);
-        QueryContext queryContext = queryHelper.newQueryContext(initialData, github);
+        EventQueryContext queryContext = queryHelper.newQueryContext(initialData, github, graphQLClient);
 
         EventPayload.DiscussionPayload payload = initialData.getEventPayload();
         if (payload == null) {
@@ -59,7 +60,7 @@ public class LabelChanges {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      */
-    void onRepositoryLabelChange(GitHubEvent event, GitHub github,
+    void onRepositoryLabelChange(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Label GHEventPayload.Label labelPayload) {
 
         if (labelPayload.getRepository() == null) {
@@ -67,7 +68,7 @@ public class LabelChanges {
         }
 
         final EventData initialData = new EventData(event, labelPayload);
-        QueryContext queryContext = queryHelper.newQueryContext(initialData, github);
+        EventQueryContext queryContext = queryHelper.newQueryContext(initialData, github, graphQLClient);
 
         DataLabel label = new DataLabel(labelPayload.getLabel());
         String cacheId = labelPayload.getRepository().getNodeId();

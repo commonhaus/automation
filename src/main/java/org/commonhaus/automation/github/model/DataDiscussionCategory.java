@@ -5,8 +5,6 @@ import java.util.List;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
-
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
@@ -52,7 +50,7 @@ public class DataDiscussionCategory {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
+    static List<DataDiscussionCategory> queryDiscussionCategories(EventQueryContext queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
