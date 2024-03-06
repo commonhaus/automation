@@ -113,7 +113,7 @@ public class Notice {
         }
     }
 
-    static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
+    public static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
         if (repoConfigFile == null) {
             return Notice.Config.DISABLED;
         }

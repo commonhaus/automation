@@ -9,7 +9,6 @@ import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
-import org.kohsuke.github.ReactionContent;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
@@ -77,37 +76,10 @@ public class EventQueryContext extends QueryContext {
      * Add label by name or id to event item
      *
      * @param eventData EventData
-     * @param label Label name or id
-     * @return updated collection of labels for the item, or null if label not found
-     */
-    public Collection<DataLabel> addLabel(EventData eventData, String label) {
-        return addLabels(eventData, List.of(label));
-    }
-
-    /**
-     * Add label by name or id to event item
-     *
-     * @param eventData EventData
      * @param labels Collection of Label names or ids
      * @return updated collection of labels for the item, or null if no labels were found
      */
     public Collection<DataLabel> addLabels(EventData eventData, List<String> labels) {
         return super.addLabels(eventData.getNodeId(), labels);
-    }
-
-    public void addBotReaction(ReactionContent reaction) {
-        super.addBotReaction(evt.getNodeId(), reaction);
-    }
-
-    public void removeBotReaction(ReactionContent reaction) {
-        super.removeBotReaction(evt.getNodeId(), reaction);
-    }
-
-    public DataCommonComment updateBotComment(String commentBody, Integer commentIdFromBody) {
-        return super.updateBotComment(this.evt.getEventType(), this.evt.getNodeId(), commentBody, commentIdFromBody);
-    }
-
-    public void updateItemDescription(String bodyString) {
-        super.updateItemDescription(this.evt.getEventType(), this.evt.getNodeId(), bodyString);
     }
 }

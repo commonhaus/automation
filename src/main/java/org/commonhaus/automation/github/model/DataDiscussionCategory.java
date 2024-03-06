@@ -11,10 +11,8 @@ import io.smallrye.graphql.client.Response;
 public class DataDiscussionCategory {
 
     static final String DISCUSSION_CATEGORY_FIELDS = """
-            emoji
             id
             name
-            slug
             """;
 
     /**
@@ -25,8 +23,6 @@ public class DataDiscussionCategory {
     public final Integer webhook_id;
 
     public final String name;
-    public final String slug;
-    public final String emoji;
 
     DataDiscussionCategory(JsonObject category) {
         String node_id = JsonAttribute.node_id.stringFrom(category);
@@ -41,12 +37,10 @@ public class DataDiscussionCategory {
         }
 
         this.name = JsonAttribute.name.stringFrom(category);
-        this.emoji = JsonAttribute.emoji.stringFrom(category);
-        this.slug = JsonAttribute.slug.stringFrom(category);
     }
 
     public String toString() {
-        return String.format("Discussion [%s] %s %s", this.id, this.emoji, this.name);
+        return String.format("Discussion [%s] %s", this.id, this.name);
     }
 
     /** package private. See QueryHelper / QueryContext */

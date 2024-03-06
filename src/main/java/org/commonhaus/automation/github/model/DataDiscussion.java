@@ -18,7 +18,6 @@ public class DataDiscussion extends DataCommonItem {
             category {
                 """ + DataDiscussionCategory.DISCUSSION_CATEGORY_FIELDS + """
             }
-            authorAssociation
             """ + DataLabel.FIRST_10_LABELS + """
             createdAt
             updatedAt
@@ -38,43 +37,47 @@ public class DataDiscussion extends DataCommonItem {
         return String.format("Discussion [%s] %s", this.id, this.title);
     }
 
-    /** package private. See QueryHelper / QueryContext */
-    static List<DataDiscussion> queryDiscussions(EventQueryContext queryContext, boolean isOpen) {
-        List<DataDiscussion> discussions = new ArrayList<>();
+    static List<DataDiscussion> findDiscussionsWithLabel(QueryContext queryContext, String labelName) {
+        List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
-        variables.put("isOpen", isOpen);
+
+        variables.put("query", String.format("repo:%s label:%s is:open sort:updated-desc",
+                queryContext.getRepository().getFullName(), labelName));
 
         JsonObject pageInfo;
         String cursor = null;
         do {
             variables.put("after", cursor);
             Response response = queryContext.execRepoQuerySync("""
-                    query($name: String!, $owner: String!, $after: String) {
-                        repository(owner: $owner, name: $name) {
-                          discussions(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-                            nodes {
-                                """ + DISCUSSION_FIELDS + """
+                    query($query: String!, $after: String) {
+                        search(query: $query, type: DISCUSSION, first: 100, after: $after) {
+                            pageInfo {
+                                endCursor
+                                hasNextPage
                             }
-                          }
+                            nodes {
+                                ... on Discussion {
+                                    """ + DISCUSSION_FIELDS + """
+                                }
+                            }
                         }
-                      }
-                    """, variables);
+                    }
+                        """, variables);
             if (response.hasError()) {
                 break;
             }
-            JsonObject allDiscussions = JsonAttribute.discussions.extractObjectFrom(response.getData(),
-                    JsonAttribute.repository);
 
-            JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(allDiscussions);
-            discussions.addAll(nodes.stream()
+            JsonObject search = JsonAttribute.search.jsonObjectFrom(response.getData());
+            JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(search);
+            allDiscussions.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
                     .map(DataDiscussion::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allDiscussions);
+            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(search);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
         } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
-        return discussions;
+        return allDiscussions;
     }
 
     /**

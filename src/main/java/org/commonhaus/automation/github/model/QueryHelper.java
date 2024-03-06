@@ -14,6 +14,7 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
+import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -46,6 +47,10 @@ public class QueryHelper {
         return newQueryContext(eventData)
                 .addExisting(github)
                 .addExisting(graphQLClient);
+    }
+
+    public ScheduledQueryContext newScheduledQueryContext(GHRepository repository, GHAppInstallation installation) {
+        return new ScheduledQueryContext(this, botConfig, gitHubClientProvider, repository, installation);
     }
 
     /** Package private. */
@@ -446,9 +451,7 @@ public class QueryHelper {
             }
 
             switch (eventType) {
-                case discussion, discussion_comment -> {
-                    DataDiscussion.editDiscussion(this, nodeId, bodyString);
-                }
+                case discussion, discussion_comment -> DataDiscussion.editDiscussion(this, nodeId, bodyString);
                 case issue, pull_request, issue_comment ->
                     DataCommonItem.editIssueDescription(this, nodeId, bodyString);
                 default -> Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());

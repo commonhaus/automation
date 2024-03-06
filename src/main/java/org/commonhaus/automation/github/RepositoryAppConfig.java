@@ -8,7 +8,7 @@ import org.commonhaus.automation.github.rules.Rule;
 public class RepositoryAppConfig {
     public static final String NAME = "cf-automation.yml";
 
-    static class File {
+    public static class File {
         public final Notice.Config notice = new Notice.Config();
         public final Voting.Config voting = new Voting.Config();
     }

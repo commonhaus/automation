@@ -3,7 +3,6 @@ package org.commonhaus.automation.github;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.ActionType;
-import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
 import org.commonhaus.automation.github.model.EventType;
@@ -12,7 +11,6 @@ import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHUser;
 
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkus.logging.Log;
@@ -31,8 +29,6 @@ public class EventData {
     final ActionType actionType;
     final EventType eventType;
 
-    private DataActor sender;
-    private GHUser ghSender;
     private EventPayload eventPayload;
     private String nodeId;
     private String nodeUrl;
@@ -50,9 +46,7 @@ public class EventData {
             this.repository = payload.getRepository();
             this.organization = payload.getOrganization();
             this.installation = payload.getInstallation();
-            this.ghSender = payload.getSender();
         } else {
-            this.sender = JsonAttribute.sender.actorFrom(jsonData);
             this.repository = JsonAttribute.repository.repositoryFrom(jsonData);
             this.organization = JsonAttribute.organization.organizationFrom(jsonData);
             this.installation = JsonAttribute.installation.appInstallationFrom(jsonData);
@@ -72,12 +66,6 @@ public class EventData {
 
     public JsonObject getJsonData() {
         return jsonData;
-    }
-
-    public String getSenderLogin() {
-        return ghSender == null
-                ? sender.login
-                : ghSender.getLogin();
     }
 
     public String getAction() {

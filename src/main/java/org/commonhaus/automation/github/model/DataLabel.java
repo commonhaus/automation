@@ -147,8 +147,9 @@ public class DataLabel extends DataCommonType {
                 }""";
 
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(queryContext, query, variables, labels, (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
-                JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable));
+        paginateLabels(queryContext, query, variables, labels,
+                (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
+                        JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable));
 
         Log.infof("[%s] modifyLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
         return labels;

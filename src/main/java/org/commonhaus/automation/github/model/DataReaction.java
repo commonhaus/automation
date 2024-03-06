@@ -17,7 +17,7 @@ import io.smallrye.graphql.client.Response;
 
 /**
  * Represents a reaction to a GraphQL Reactable object.
- *
+ * <p>
  * This is not available to webhook events.
  */
 public class DataReaction {

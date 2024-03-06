@@ -50,105 +50,57 @@ import io.quarkus.logging.Log;
  * </ul>
  */
 public enum JsonAttribute {
-    action,
-    activeLockReason,
     addDiscussionComment,
     addLabelsToLabelable,
     answer,
-    answerChosenAt,
     author,
-    authorAssociation,
     avatarUrl("avatar_url"),
     body,
     category,
     changes,
     closed,
     closedAt,
-    color,
     comment,
     commentEdge,
     comments,
-    confused,
     content,
     createdAt("created_at"),
     databaseId,
-    deletedAt,
-    description,
     discussion,
     discussionCategories,
     discussion_id,
-    discussions,
-    editedAt,
-    editor,
-    emoji,
     endCursor,
-    eyes,
     from,
-    full_name,
     hasNextPage,
-    heart,
-    hooray,
     id,
-    includesCreatedEdit,
     installation,
-    isAnswer,
-    isAnswered,
-    isDefault("default"),
     issue,
     issueComment,
     label,
     labelable,
     labels,
-    lastEditedAt,
-    laugh,
-    locked,
     login,
-    minusOne,
     name,
-    new_discussion,
-    new_repository,
     node,
     node_id,
     nodes,
     number,
-    old_answer,
     organization,
-    owner,
     pageInfo,
-    parent_id,
-    plusOne,
-    publishedAt,
     pullRequest,
     reactableId,
     reactions,
-    replyTo,
     repository,
-    rocket,
-    sender,
-    slug,
-    state,
-    stateReason,
+    search,
     title,
-    total_count,
     updateDiscussionComment,
     updateIssue,
     updateIssueComment,
     updatePullRequest,
     updatedAt("updated_at"),
-    upvoteCount,
     url("html_url"),
     user,
     viewer,
-    viewerCanDelete,
-    viewerCanMarkAsAnswer,
-    viewerCanMinimize,
-    viewerCanReact,
-    viewerCanUnmarkAsAnswer,
-    viewerCanUpdate,
-    viewerCanUpvote,
-    viewerCannotUpdateReasons,
-    viewerDidAuthor,
-    viewerHasUpvoted,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -169,14 +121,6 @@ public enum JsonAttribute {
         this.alternateName = true;
     }
 
-    public String getNodeName() {
-        return nodeName;
-    }
-
-    public boolean existsIn(JsonObject object) {
-        return object != null && (object.containsKey(nodeName) || object.containsKey(name()));
-    }
-
     /**
      * @return boolean with value from nodeName (or name()) attribute of object or false
      */
@@ -190,18 +134,6 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return boolean with value from nodeName (or name()) attribute of object or defaultValue
-     */
-    public boolean booleanFrom(JsonObject object, boolean defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        return alternateName
-                ? object.getBoolean(nodeName, object.getBoolean(name(), defaultValue))
-                : object.getBoolean(nodeName, defaultValue);
-    }
-
-    /**
      * @return String with value from nodeName (or name()) attribute of object or null
      */
     public String stringFrom(JsonObject object) {
@@ -211,18 +143,6 @@ public enum JsonAttribute {
         return alternateName
                 ? object.getString(nodeName, object.getString(name(), null))
                 : object.getString(nodeName, null);
-    }
-
-    /**
-     * @return String with value from nodeName (or name()) attribute of object or defaultValue
-     */
-    public String stringFrom(JsonObject object, String defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        return alternateName
-                ? object.getString(nodeName, object.getString(name(), defaultValue))
-                : object.getString(nodeName, defaultValue);
     }
 
     /**
@@ -239,19 +159,6 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return int with value from nodeName (or name()) attribute of object or default value
-     */
-    public int integerFrom(JsonObject object, int defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? defaultValue : ((JsonNumber) value).intValue();
-    }
-
-    /**
      * @return Long with value from nodeName (or name()) attribute of object or null
      */
     public Long longFrom(JsonObject object) {
@@ -262,20 +169,6 @@ public enum JsonAttribute {
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
         return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).longValue();
-    }
-
-    /**
-     * @return long with value from nodeName (or name()) attribute of object or default value
-     */
-    public long longFrom(JsonObject object, long defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? defaultValue
-                : ((JsonNumber) value).longValue();
     }
 
     /**
@@ -462,16 +355,6 @@ public enum JsonAttribute {
             }
         }
         return this.jsonArrayFrom(object);
-    }
-
-    public String stringifyNodeFrom(JsonObject object) {
-        if (object == null) {
-            return null;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : value.toString();
     }
 
     private <T> T tryOrNull(String string, Class<T> clazz) {

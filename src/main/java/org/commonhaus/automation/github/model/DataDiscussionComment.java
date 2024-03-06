@@ -3,10 +3,8 @@ package org.commonhaus.automation.github.model;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 import io.smallrye.graphql.client.Response;
@@ -27,14 +25,11 @@ public class DataDiscussionComment extends DataCommonComment {
 
     /** {@literal discussion_id} for webhook events (may be null) */
     public final Integer discussion_id;
-    /** {@literal parent_id} for webhook events (may be null) */
-    public final Integer parent_id;
     public final DataDiscussion discussion;
 
     public DataDiscussionComment(JsonObject object) {
         super(object);
         this.discussion_id = JsonAttribute.discussion_id.integerFrom(object);
-        this.parent_id = JsonAttribute.parent_id.integerFrom(object);
 
         // discussion may be null (webhook)
         this.discussion = JsonAttribute.discussion.discussionFrom(object);
@@ -100,21 +95,5 @@ public class DataDiscussionComment extends DataCommonComment {
         }
         JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());
         return JsonAttribute.comment.discussionCommentFrom(result);
-    }
-
-    /** package private. See QueryHelper / QueryContext */
-    static DataDiscussionComment createFakeComment(EventData eventData, String markdownText) {
-        JsonObject discussion = JsonAttribute.discussion.jsonObjectFrom(eventData.getJsonData());
-        JsonObject object = Json.createObjectBuilder()
-                .add("id", "placeholder")
-                .add("databaseId", 0)
-                .add("author", JsonAttribute.user.jsonObjectFrom(discussion))
-                .add("discussion", discussion)
-                .add("body", markdownText)
-                .add("createdAt", JsonAttribute.createdAt.stringFrom(discussion))
-                .add("publishedAt", JsonAttribute.createdAt.stringFrom(discussion))
-                .add("updatedAt", JsonAttribute.createdAt.stringFrom(discussion))
-                .build();
-        return new DataDiscussionComment(object);
     }
 }

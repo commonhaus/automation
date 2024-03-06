@@ -6,7 +6,7 @@ import org.kohsuke.github.GHUser;
 
 /**
  * Represents a user or bot that interacts with GitHub.
- *
+ * <p>
  * The WebHook provides an id (read by GHType), GraphQL doesn't.
  */
 public class DataActor extends DataCommonType {

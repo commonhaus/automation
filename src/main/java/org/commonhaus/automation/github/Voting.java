@@ -20,7 +20,7 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 
 /**
  * Highlevel workflow to manage voting.
- *
+ * <p>
  * This acts as a mixin: stored with CFGH RepoInfo if voting is enabled.
  */
 public class Voting {
@@ -57,7 +57,7 @@ public class Voting {
         bus.requestAndForget("voting", new VoteEvent(qc, votingConfig, eventData));
     }
 
-    static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
+    public static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
         if (repoConfigFile == null) {
             return Voting.Config.DISABLED;
         }

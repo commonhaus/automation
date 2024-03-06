@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.model;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 
+import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
@@ -17,6 +18,9 @@ public enum QueryCache {
             .build()),
     RECENT_BOT_CONTENT(Caffeine.newBuilder()
             .expireAfterWrite(6, TimeUnit.HOURS)
+            .build()),
+    RECENT_VOTE_CHECK(Caffeine.newBuilder()
+            .expireAfterAccess(6, TimeUnit.HOURS)
             .build()),
     TEAM(Caffeine.newBuilder()
             .expireAfterWrite(6, TimeUnit.HOURS)
@@ -56,10 +60,15 @@ public enum QueryCache {
     }
 
     @SuppressWarnings("unchecked")
+    public <T> T computeIfAbsent(String key, Function<String, T> mappingFunction) {
+        Log.debugf(":: UPDATE %s/%s ::: ", this.name(), key);
+        return (T) cache.asMap().computeIfAbsent(key, mappingFunction::apply);
+    }
+
+    @SuppressWarnings("unchecked")
     public <T> T computeIfPresent(String key, BiFunction<String, Object, T> mappingFunction) {
         Log.debugf(":: UPDATE %s/%s ::: ", this.name(), key);
-        Object value = cache.asMap().computeIfPresent(key, mappingFunction);
-        return (T) value;
+        return (T) cache.asMap().computeIfPresent(key, mappingFunction);
     }
 
     public void invalidate(String key) {

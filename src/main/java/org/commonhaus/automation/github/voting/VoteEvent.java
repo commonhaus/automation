@@ -5,11 +5,13 @@ import java.time.Instant;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
+import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 
 public class VoteEvent {
+    private final boolean isScheduled;
     private final QueryContext qc;
     private final Voting.Config votingConfig;
 
@@ -25,7 +27,10 @@ public class VoteEvent {
     /** Repo-scoped Number of existing node containing votes */
     private final int number;
 
+    private final String logId;
+
     public VoteEvent(QueryContext qc, Config votingConfig, EventData eventData) {
+        this.isScheduled = false;
         this.qc = qc;
         this.votingConfig = votingConfig;
         this.eventType = eventData.getEventType();
@@ -35,6 +40,25 @@ public class VoteEvent {
         this.nodeUrl = eventData.getNodeUrl();
         this.body = eventData.getBody();
         this.number = eventData.getNumber();
+        this.logId = eventData.getLogId();
+    }
+
+    public VoteEvent(QueryContext qc, Config votingConfig, DataDiscussion discussion) {
+        this.isScheduled = true;
+        this.qc = qc;
+        this.votingConfig = votingConfig;
+        this.eventType = EventType.discussion;
+        this.eventTime = Instant.now().toString();
+
+        this.nodeId = discussion.id;
+        this.nodeUrl = discussion.url;
+        this.number = discussion.number;
+        this.body = discussion.body;
+        this.logId = qc.getLogId() + "#" + number;
+    }
+
+    public boolean isScheduled() {
+        return isScheduled;
     }
 
     public QueryContext getQueryContext() {
@@ -70,7 +94,7 @@ public class VoteEvent {
     }
 
     public String getLogId() {
-        return qc.getLogId();
+        return logId;
     }
 
     public GHOrganization getOrganization() {
