@@ -5,7 +5,7 @@ import java.time.Instant;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
-import org.commonhaus.automation.github.model.DataDiscussion;
+import org.commonhaus.automation.github.model.DataCommonItem;
 import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
@@ -33,7 +33,7 @@ public class VoteEvent {
         this.isScheduled = false;
         this.qc = qc;
         this.votingConfig = votingConfig;
-        this.eventType = eventData.getEventType();
+        this.eventType = qc.getEventType();
         this.eventTime = Instant.now().toString();
 
         this.nodeId = eventData.getNodeId();
@@ -43,17 +43,17 @@ public class VoteEvent {
         this.logId = eventData.getLogId();
     }
 
-    public VoteEvent(QueryContext qc, Config votingConfig, DataDiscussion discussion) {
+    public VoteEvent(QueryContext qc, Config votingConfig, DataCommonItem item) {
         this.isScheduled = true;
         this.qc = qc;
         this.votingConfig = votingConfig;
-        this.eventType = EventType.discussion;
+        this.eventType = qc.getEventType();
         this.eventTime = Instant.now().toString();
 
-        this.nodeId = discussion.id;
-        this.nodeUrl = discussion.url;
-        this.number = discussion.number;
-        this.body = discussion.body;
+        this.nodeId = item.id;
+        this.nodeUrl = item.url;
+        this.number = item.number;
+        this.body = item.body;
         this.logId = qc.getLogId() + "#" + number;
     }
 

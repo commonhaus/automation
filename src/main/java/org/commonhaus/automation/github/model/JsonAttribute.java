@@ -121,6 +121,15 @@ public enum JsonAttribute {
         this.alternateName = true;
     }
 
+    boolean existsIn(JsonObject object) {
+        if (object == null) {
+            return false;
+        }
+        return alternateName
+                ? object.containsKey(nodeName) || object.containsKey(name())
+                : object.containsKey(nodeName);
+    }
+
     /**
      * @return boolean with value from nodeName (or name()) attribute of object or false
      */
@@ -265,9 +274,16 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        JsonArray list = jsonArrayFrom(object);
-        if (list == null) {
+        JsonObject field = jsonObjectFrom(object);
+        if (field == null) {
             return null;
+        }
+
+        JsonArray list;
+        if (field.getValueType() == ValueType.OBJECT) {
+            list = JsonAttribute.nodes.jsonArrayFrom(field);
+        } else {
+            list = jsonArrayFrom(field);
         }
         return list.stream()
                 .map(JsonObject.class::cast)

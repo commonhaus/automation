@@ -1,9 +1,12 @@
 package org.commonhaus.automation.github.model;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
@@ -15,6 +18,7 @@ public class DataCommonItem extends DataCommonObject {
     static final String ISSUE_FIELDS = COMMON_OBJECT_FIELDS + """
             number
             title
+            body
             closed
             closedAt
             """;
@@ -96,5 +100,51 @@ public class DataCommonItem extends DataCommonObject {
         }
         JsonObject result = JsonAttribute.updatePullRequest.jsonObjectFrom(response.getData());
         return JsonAttribute.pullRequest.commonItemFrom(result);
+    }
+
+    public static List<DataCommonItem> findIssuesWithLabel(QueryContext queryContext, String labelName) {
+        List<DataCommonItem> allIssues = new ArrayList<>();
+        Map<String, Object> variables = new HashMap<>();
+
+        variables.put("query", String.format("repo:%s label:%s is:open sort:updated-desc",
+                queryContext.getRepository().getFullName(), labelName));
+
+        JsonObject pageInfo;
+        String cursor = null;
+        do {
+            variables.put("after", cursor);
+            Response response = queryContext.execRepoQuerySync("""
+                    query($query: String!, $after: String) {
+                        search(query: $query, type: ISSUE, first: 100, after: $after) {
+                            pageInfo {
+                                endCursor
+                                hasNextPage
+                            }
+                            nodes {
+                                ... on Issue {
+                                    """ + ISSUE_FIELDS + """
+                    }
+                    ... on PullRequest {
+                        """ + ISSUE_FIELDS + """
+                                }
+                            }
+                        }
+                    }
+                        """, variables);
+            if (response.hasError()) {
+                break;
+            }
+
+            JsonObject search = JsonAttribute.search.jsonObjectFrom(response.getData());
+            JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(search);
+            allIssues.addAll(nodes.stream()
+                    .map(JsonObject.class::cast)
+                    .map(DataCommonItem::new)
+                    .toList());
+
+            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(search);
+            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
+        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+        return allIssues;
     }
 }

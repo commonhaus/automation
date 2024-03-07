@@ -65,7 +65,7 @@ public class EmailAction extends Action {
         final String subject;
         MailTemplateInstance mailTemplateInstance;
         try {
-            mailTemplateInstance = switch (eventData.getEventType()) {
+            mailTemplateInstance = switch (queryContext.getEventType()) {
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
 

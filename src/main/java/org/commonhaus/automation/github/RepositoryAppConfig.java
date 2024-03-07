@@ -19,8 +19,12 @@ public class RepositoryAppConfig {
         CommonConfig() {
         }
 
+        public boolean isDisabled() {
+            return !isEnabled();
+        }
+
         public boolean isEnabled() {
-            return (enabled != null && !enabled);
+            return enabled == null || enabled;
         }
     }
 

@@ -23,8 +23,7 @@ public class MatchPaths {
     List<String> paths;
 
     public boolean matches(EventQueryContext queryContext) {
-        EventData eventData = queryContext.getEventData();
-        if (eventData.getEventType() != EventType.pull_request) {
+        if (queryContext.getEventType() != EventType.pull_request) {
             return false;
         }
         if (paths == null || paths.isEmpty()) {
@@ -32,6 +31,7 @@ public class MatchPaths {
             return true;
         }
 
+        EventData eventData = queryContext.getEventData();
         GHEventPayload.PullRequest pullRequest = eventData.getGHEventPayload();
         GHPullRequest ghPullRequest = pullRequest.getPullRequest();
 

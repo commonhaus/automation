@@ -98,6 +98,14 @@ public class VotingConsumer {
     @ConsumeEvent("voting")
     @Blocking
     public void consume(Message<VoteEvent> msg) {
+        try {
+            checkVotes(msg);
+        } finally {
+            msg.reply(null);
+        }
+    }
+
+    private void checkVotes(Message<VoteEvent> msg) {
         VoteEvent voteEvent = msg.body();
         QueryContext qc = voteEvent.getQueryContext();
         Voting.Config votingConfig = voteEvent.getVotingConfig();
@@ -105,7 +113,7 @@ public class VotingConsumer {
         // Each query context does have a reference to the original event and to the
         // potentially short-lived GitHub connection. Reauthenticate if
         // necessary/possible
-        if (!qc.isCredentialValid()) {
+        if (!qc.isCredentialValid() && !qc.reauthenticate()) {
             Log.infof("[%s] voting.checkVotes: GitHub connection expired and can't be renewed", qc.getLogId());
             return;
         }
@@ -113,11 +121,15 @@ public class VotingConsumer {
         CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
                 voteEvent.getId(), (k) -> new CheckStatus());
 
+        Log.debugf("[%s] voting.checkVotes: process event (running=%s)", voteEvent.getLogId(), checkStatus.running.get());
         if (!checkStatus.startUpdate(voteEvent)) {
             return;
         }
-        Log.debugf("[%s] voting.checkVotes: process event", qc.getLogId());
+        Log.debugf("[%s] voting.checkVotes: process event", voteEvent.getLogId());
         try {
+            if (!repoHasLabels(voteEvent)) {
+                return;
+            }
             if (OPEN_VOTE.matches(qc, voteEvent.getId())) {
                 checkOpenVote(qc, voteEvent, votingConfig);
             }
@@ -125,32 +137,27 @@ public class VotingConsumer {
                 finishVote(qc, voteEvent, votingConfig);
             }
         } catch (RuntimeException e) {
-            Log.errorf(e, "[%s] voting.checkVotes: unexpected error", qc.getLogId());
+            Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         } finally {
             checkStatus.finishUpdate();
         }
-
-        // nothing to do
-        msg.reply(null);
     }
 
     private void finishVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
-        String logId = "[" + qc.getLogId() + "] finishVote";
+        String logId = "[" + voteEvent.getLogId() + "] finishVote";
     }
 
     private void checkOpenVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
-        Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", qc.getLogId(),
-                votingConfig.error_email_address, votingConfig.votingThreshold);
-
-        if (!repoHasLabels(voteEvent)) {
-            return;
-        }
+        Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", voteEvent.getLogId(),
+                List.of(votingConfig.error_email_address), votingConfig.votingThreshold);
 
         VoteInformation voteInfo = getVoteInformation(voteEvent);
         if (voteInfo == null) {
             return;
         }
+
+        Log.debugf("[%s] checkOpenVote: counting votes using %s", voteEvent.getLogId(), voteInfo.voteType);
 
         final Collection<DataReaction> reactions = voteInfo.countComments()
                 ? List.of()
@@ -173,7 +180,7 @@ public class VotingConsumer {
             String jsonData = objectMapper.writeValueAsString(tally);
             commentBody += "\r\n<!-- vote::data " + jsonData + " -->";
         } catch (JsonProcessingException e) {
-            Log.errorf(e, "[%s] voting.checkVotes: unable to serialize voting data", qc.getLogId());
+            Log.errorf(e, "[%s] voting.checkVotes: unable to serialize voting data", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         }
         updateBotComment(voteEvent, commentBody);
@@ -188,6 +195,7 @@ public class VotingConsumer {
         QueryContext qc = voteEvent.getQueryContext();
         List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE);
         Collection<DataLabel> voteLabels = qc.findLabels(requiredLabels);
+
         if (voteLabels.size() != requiredLabels.size()) {
             qc.addBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
             String comment = "The following labels must be defined in this repository:\r\n"
@@ -205,6 +213,8 @@ public class VotingConsumer {
         final VoteInformation voteInfo = new VoteInformation(voteEvent);
         if (!voteInfo.isValid()) {
             qc.addBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
+            Log.debugf("[%s] voting.checkVotes: invalid vote information -- %s", voteEvent.getLogId(),
+                    voteInfo.getErrorContent());
 
             // Add or update a bot comment summarizing what went wrong.
             updateBotComment(voteEvent, voteInfo.getErrorContent());
@@ -254,6 +264,10 @@ public class VotingConsumer {
 
     private void updateBotComment(VoteEvent voteEvent, String commentBody) {
         QueryContext qc = voteEvent.getQueryContext();
+        if (qc.hasErrors()) {
+            return;
+        }
+
         String bodyString = voteEvent.getBody();
         Integer existingId = commentIdFromBody(bodyString);
         DataCommonComment comment = qc.updateBotComment(voteEvent.getEventType(), voteEvent.getId(), commentBody,

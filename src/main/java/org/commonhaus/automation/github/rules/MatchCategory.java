@@ -18,7 +18,7 @@ public class MatchCategory {
 
     public boolean matches(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        if (eventData == null || !eventsWithCategories.contains(eventData.getEventType())) {
+        if (eventData == null || !eventsWithCategories.contains(queryContext.getEventType())) {
             return false;
         }
 

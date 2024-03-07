@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
-import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -14,16 +13,25 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ScheduledQueryContext extends QueryContext {
     private String logId;
-    final private GHAppInstallation installation;
     final private GHRepository repository;
     private GHOrganization organization;
+    private long installationId;
+    private EventType eventType;
 
     ScheduledQueryContext(QueryHelper helper, AppConfig botConfig,
             GitHubClientProvider gitHubClientProvider,
-            GHRepository ghRepository, GHAppInstallation installation) {
+            GHRepository ghRepository, long installationId) {
         super(helper, botConfig, gitHubClientProvider);
         this.repository = ghRepository;
-        this.installation = installation;
+        this.installationId = installationId;
+        this.eventType = EventType.label;
+    }
+
+    ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
+        super(parent.helper, parent.botConfig, parent.gitHubClientProvider);
+        this.repository = parent.repository;
+        this.installationId = parent.installationId;
+        this.eventType = eventType;
     }
 
     @Override
@@ -37,7 +45,7 @@ public class ScheduledQueryContext extends QueryContext {
 
     @Override
     public long installationId() {
-        return installation.getId();
+        return installationId;
     }
 
     @Override
@@ -59,6 +67,10 @@ public class ScheduledQueryContext extends QueryContext {
         return org;
     }
 
+    public EventType getEventType() {
+        return eventType;
+    }
+
     public ScheduledQueryContext addExisting(GitHub github) {
         super.addExisting(github);
         return this;
@@ -71,5 +83,9 @@ public class ScheduledQueryContext extends QueryContext {
 
     public List<DataDiscussion> findDiscussionsWithLabel(String label) {
         return DataDiscussion.findDiscussionsWithLabel(this, label);
+    }
+
+    public List<DataCommonItem> findIssuesWithLabel(String label) {
+        return DataCommonItem.findIssuesWithLabel(this, label);
     }
 }

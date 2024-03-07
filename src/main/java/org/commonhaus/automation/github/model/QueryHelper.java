@@ -14,7 +14,6 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
-import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -49,8 +48,14 @@ public class QueryHelper {
                 .addExisting(graphQLClient);
     }
 
-    public ScheduledQueryContext newScheduledQueryContext(GHRepository repository, GHAppInstallation installation) {
-        return new ScheduledQueryContext(this, botConfig, gitHubClientProvider, repository, installation);
+    public ScheduledQueryContext newScheduledQueryContext(GHRepository repository, long installationId) {
+        return new ScheduledQueryContext(this, botConfig, gitHubClientProvider, repository, installationId);
+    }
+
+    public ScheduledQueryContext newScheduledQueryContext(ScheduledQueryContext ctx, EventType eventType) {
+        return new ScheduledQueryContext(ctx, eventType)
+                .addExisting(ctx.github)
+                .addExisting(ctx.graphQLClient);
     }
 
     /** Package private. */
@@ -107,8 +112,16 @@ public class QueryHelper {
 
         public abstract GHOrganization getOrganization();
 
+        public abstract EventType getEventType();
+
         public boolean isCredentialValid() {
             return github != null && github.isCredentialValid();
+        }
+
+        public boolean reauthenticate() {
+            github = gitHubClientProvider.getInstallationClient(installationId());
+            graphQLClient = null;
+            return isCredentialValid();
         }
 
         public boolean hasErrors() {
@@ -284,7 +297,7 @@ public class QueryHelper {
         public Collection<DataLabel> findLabels(List<String> labels) {
             Collection<DataLabel> repoLabels = getLabels(getRepositoryId());
             if (repoLabels == null) {
-                Log.errorf("[%s] Labels not found in repository", getLogId());
+                Log.errorf("[%s] Labels not found in repository %s", getLogId(), getRepositoryId());
                 return List.of();
             }
 

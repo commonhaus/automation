@@ -62,6 +62,10 @@ public class EventQueryContext extends QueryContext {
         return evt.getOrganization();
     }
 
+    public EventType getEventType() {
+        return evt.getEventType();
+    }
+
     public EventQueryContext addExisting(GitHub github) {
         super.addExisting(github);
         return this;

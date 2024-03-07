@@ -57,9 +57,8 @@ public class DataCommonComment extends DataCommonObject {
             if (response.hasError()) {
                 if (queryContext.hasNotFound()) {
                     queryContext.clearErrors();
-                } else {
-                    return null;
                 }
+                return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
             DataCommonComment ec = new DataCommonComment(node);

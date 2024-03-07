@@ -45,7 +45,7 @@ public class Voting {
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Voting.Config votingConfig = getVotingConfig(repoConfigFile);
-        if (votingConfig.isEnabled()) {
+        if (votingConfig.isDisabled()) {
             return;
         }
 
@@ -57,13 +57,6 @@ public class Voting {
         bus.requestAndForget("voting", new VoteEvent(qc, votingConfig, eventData));
     }
 
-    public static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
-        if (repoConfigFile == null) {
-            return Voting.Config.DISABLED;
-        }
-        return repoConfigFile.voting;
-    }
-
     // How many votes are required for a vote to count?
     public enum Threshold {
         all,
@@ -71,11 +64,18 @@ public class Voting {
         supermajority
     }
 
+    public static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
+        if (repoConfigFile == null) {
+            return Voting.Config.DISABLED;
+        }
+        return repoConfigFile.voting;
+    }
+
     public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
             public boolean isEnabled() {
-                return true;
+                return false;
             }
         };
 
