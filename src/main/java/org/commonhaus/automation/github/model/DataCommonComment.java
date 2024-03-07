@@ -11,19 +11,14 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
+import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
 public class DataCommonComment extends DataCommonObject {
 
-    static final String COMMENT_FIELDS_MIN = COMMON_OBJECT_MIN + """
-            databaseId
-            """;
-
     protected static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
             databaseId
             body
-            includesCreatedEdit
-            viewerDidAuthor
             """;
 
     public final Integer databaseId;
@@ -34,8 +29,9 @@ public class DataCommonComment extends DataCommonObject {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment findBotComment(QueryContext queryContext, String itemId, Integer commentId) {
+    static DataCommonComment findBotComment(QueryContext queryContext, String itemId, String commentId) {
         if (commentId != null) {
+            Log.debugf("[%s] findBotComment with id %s", queryContext.getLogId(), commentId);
             // we have a commentId, so we can just fetch it directly
             Map<String, Object> variables = new HashMap<>();
             variables.put("commentId", commentId);
@@ -43,13 +39,13 @@ public class DataCommonComment extends DataCommonObject {
                     query($commentId: ID!) {
                         node(id: $commentId) {
                             ... on IssueComment {
-                                """ + COMMENT_FIELDS_MIN + """
+                                """ + COMMENT_FIELDS + """
                     }
                     ... on PullRequestReviewComment {
-                        """ + COMMENT_FIELDS_MIN + """
+                        """ + COMMENT_FIELDS + """
                     }
                     ... on DiscussionComment {
-                        """ + COMMENT_FIELDS_MIN + """
+                        """ + COMMENT_FIELDS + """
                             }
                         }
                     }
@@ -67,6 +63,7 @@ public class DataCommonComment extends DataCommonObject {
             }
         }
 
+        Log.debugf("[%s] look for bot comment in all comments", queryContext.getLogId());
         Collection<DataCommonComment> allComments = queryComments(queryContext, itemId, true);
         return allComments == null || allComments.isEmpty() ? null : allComments.iterator().next();
     }
@@ -93,21 +90,21 @@ public class DataCommonComment extends DataCommonObject {
                             ... on Issue {
                                 comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
                                     nodes {
-                                        """ + COMMENT_FIELDS_MIN + """
+                                        """ + COMMENT_FIELDS + """
                             }
                         }
                     }
                     ... on PullRequest {
                         comments(first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
                             nodes {
-                                """ + COMMENT_FIELDS_MIN + """
+                                """ + COMMENT_FIELDS + """
                             }
                         }
                     }
                     ... on Discussion {
                         comments(first: 50, after: $after) {
                             nodes {
-                                """ + COMMENT_FIELDS_MIN + """
+                                """ + COMMENT_FIELDS + """
                                     }
                                 }
                             }

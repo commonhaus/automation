@@ -72,7 +72,7 @@ public class Notice {
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        if (!noticeConfig.isEnabled()) {
+        if (noticeConfig.isDisabled()) {
             return;
         }
 
@@ -123,14 +123,14 @@ public class Notice {
     public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
-            public boolean isEnabled() {
-                return false;
+            public boolean isDisabled() {
+                return true;
             }
         };
 
         @Override
-        public boolean isEnabled() {
-            return super.isEnabled() || actions.isEmpty();
+        public boolean isDisabled() {
+            return super.isDisabled() || actions.isEmpty();
         }
 
         public DiscussionConfig discussion;

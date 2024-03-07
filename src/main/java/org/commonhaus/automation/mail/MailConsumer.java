@@ -9,7 +9,6 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import io.quarkus.logging.Log;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.vertx.ConsumeEvent;
-import io.smallrye.common.annotation.Blocking;
 import io.vertx.mutiny.core.eventbus.Message;
 
 @ApplicationScoped
@@ -44,7 +43,6 @@ public class MailConsumer {
     }
 
     @ConsumeEvent("mail")
-    @Blocking
     public void consume(Message<MailEvent> msg) {
         MailEvent mailEvent = msg.body();
 

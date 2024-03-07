@@ -8,12 +8,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
+import org.commonhaus.automation.github.voting.VoteEvent;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -377,7 +380,7 @@ public class QueryHelper {
             return botLogin.equals(login) || botLogin.replace("[bot]", "").equals(login);
         }
 
-        private String botLogin() {
+        String botLogin() {
             String login = helper.getBotSenderLogin();
             if (login == null) {
                 Response response = execQuerySync("""
@@ -405,52 +408,64 @@ public class QueryHelper {
             DataReaction.removeBotReaction(this, nodeId, reaction);
         }
 
-        public DataCommonComment updateBotComment(EventType eventType, String itemId, String commentBody,
-                Integer commentIdFromBody) {
+        public BotComment updateBotComment(VoteEvent voteEvent, String commentBody) {
+            return updateBotComment(voteEvent.getEventType(), voteEvent.getId(), commentBody, voteEvent.getBody());
+        }
+
+        BotComment updateBotComment(EventType eventType, String itemId, String commentBody, String itemBody) {
             if (hasErrors()) {
                 Log.debugf("[%s] updateBotComment skipping due to errors", getLogId());
                 return null;
             }
 
-            DataCommonComment comment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId);
-            if (comment == null) {
-                comment = DataCommonComment.findBotComment(this, itemId, commentIdFromBody);
+            BotComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId);
+            DataCommonComment comment = null;
+            if (botComment == null) {
+                String commentId = BotComment.getCommentId(itemBody);
+                comment = DataCommonComment.findBotComment(this, itemId, commentId);
+                botComment = comment == null ? null : new BotComment(itemId, comment);
             }
 
-            if (comment == null) {
-                // new comment
-                comment = switch (eventType) {
-                    case discussion, discussion_comment ->
-                        DataDiscussionComment.addComment(this, itemId, commentBody);
-                    case issue, pull_request, issue_comment ->
-                        DataIssueComment.addIssueComment(this, itemId, commentBody);
-                    default -> {
-                        Log.errorf("[%s] addBotComment: Unknown event type", getLogId());
-                        yield null;
-                    }
-                };
-            } else {
+            if (comment == null && botComment == null) {
                 if (isDryRun()) {
-                    Log.debugf("[%s] updateBotComment would add comment: %s", getLogId(), commentBody);
-                    comment.body = commentBody;
-                    return comment;
+                    // Create a fake comment based on one in commonhaus/automation-test
+                    botComment = new BotComment(itemId).setBodyString(commentBody);
+                } else {
+                    // new comment
+                    comment = switch (eventType) {
+                        case discussion, discussion_comment ->
+                            DataDiscussionComment.addComment(this, itemId, commentBody);
+                        case issue, pull_request, issue_comment ->
+                            DataIssueComment.addIssueComment(this, itemId, commentBody);
+                        default -> {
+                            Log.errorf("[%s] addBotComment: Unknown event type", getLogId());
+                            yield null;
+                        }
+                    };
+                    botComment = comment == null ? null : new BotComment(itemId, comment);
                 }
-                comment = switch (eventType) {
-                    case discussion, discussion_comment ->
-                        DataDiscussionComment.editComment(this, comment, commentBody);
-                    case issue, pull_request, issue_comment ->
-                        DataIssueComment.editIssueComment(this, comment, commentBody);
-                    default -> {
-                        Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
-                        yield null;
-                    }
-                };
+            } else if (botComment.requiresUpdate(commentBody)) {
+                if (isDryRun()) {
+                    Log.debugf("[%s] updateBotComment would edit comment %s with %s", getLogId(), botComment.getCommentId(),
+                            commentBody);
+                    botComment.setBodyString(commentBody);
+                } else {
+                    comment = switch (eventType) {
+                        case discussion, discussion_comment ->
+                            DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
+                        case issue, pull_request, issue_comment ->
+                            DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
+                        default -> {
+                            Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
+                            yield null;
+                        }
+                    };
+                    // if an error happened, comment will be null, we should clear the cache
+                    botComment = comment == null ? null : botComment.setBodyString(commentBody);
+                }
             }
-            // if we created or updated comment, update cache
-            if (comment != null) {
-                QueryCache.RECENT_BOT_CONTENT.putCachedValue(itemId, comment);
-            }
-            return comment;
+            QueryCache.RECENT_BOT_CONTENT.putCachedValue(itemId, botComment);
+            return botComment;
         }
 
         public void updateItemDescription(EventType eventType, String nodeId, String bodyString) {
@@ -483,6 +498,89 @@ public class QueryHelper {
                 return List.of();
             }
             return DataCommonComment.queryComments(this, nodeId);
+        }
+    }
+
+    public static class BotComment {
+        static final String prefix = "**Vote progress** tracked in ";
+        static final Pattern botCommentPattern = Pattern.compile(
+                prefix.replace("*", "\\*") + "\\[this comment\\]\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.",
+                Pattern.CASE_INSENSITIVE);
+
+        final private String itemId;
+        private String id;
+        private int databaseId;
+        private String url;
+        private String bodyString;
+
+        BotComment(String itemId, DataCommonComment comment) {
+            this.itemId = itemId;
+            this.id = comment.id;
+            this.databaseId = comment.databaseId;
+            this.url = comment.url;
+            this.bodyString = comment.body;
+        }
+
+        // For dry run: this comment exists (in test repo), but probably not on the original item
+        BotComment(String itemId) {
+            this.itemId = itemId;
+            this.id = "DC_kwDOLDuJqs4AfJV4";
+            this.databaseId = 8164728;
+            this.url = "https://github.com/commonhaus/automation-test/discussions/6#discussioncomment-8164728";
+            this.bodyString = "";
+        }
+
+        public String getItemId() {
+            return itemId;
+        }
+
+        public String getCommentId() {
+            return id;
+        }
+
+        public int getCommentDatabaseId() {
+            return databaseId;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public String getBodyString() {
+            return bodyString;
+        }
+
+        BotComment setBodyString(String bodyString) {
+            this.bodyString = bodyString;
+            return this;
+        }
+
+        public boolean requiresUpdate(String bodyString) {
+            return !this.bodyString.equals(bodyString);
+        }
+
+        public String markdownLink() {
+            return String.format("[this comment](%s \"%s\")", url, id);
+        }
+
+        public String updateItemText(String itemBody) {
+            Matcher matcher = botCommentPattern.matcher(itemBody);
+            if (matcher.find()) {
+                return matcher.replaceFirst(prefix + markdownLink() + ".");
+            }
+            return prefix + markdownLink() + ".\r\n\r\n" + itemBody;
+        }
+
+        public static String getCommentId(String itemBody) {
+            Matcher matcher = botCommentPattern.matcher(itemBody);
+            if (matcher.find()) {
+                if (matcher.group(2) != null) {
+                    return matcher.group(2);
+                }
+                int lastDash = matcher.group(1).lastIndexOf("-");
+                return matcher.group(1).substring(lastDash + 1);
+            }
+            return null;
         }
     }
 }

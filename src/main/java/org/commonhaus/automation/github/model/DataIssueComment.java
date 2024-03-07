@@ -11,11 +11,6 @@ import io.smallrye.graphql.client.Response;
 
 public class DataIssueComment extends DataCommonComment {
 
-    static final String ISSUE_COMMENT_MIN = COMMENT_FIELDS_MIN + """
-            issue {
-                id
-            }
-            """;
     static final String ISSUE_COMMENT = COMMENT_FIELDS + """
             issue {
                 id
@@ -64,10 +59,10 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    protected static DataIssueComment editIssueComment(QueryContext queryContext, DataCommonComment comment,
+    protected static DataIssueComment editIssueComment(QueryContext queryContext, String commentId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
-        variables.put("id", comment.id);
+        variables.put("id", commentId);
         variables.put("body", commentBody);
 
         Response response = queryContext.execQuerySync("""
@@ -78,7 +73,7 @@ public class DataIssueComment extends DataCommonComment {
                     }) {
                         clientMutationId
                         issueComment {
-                            """ + ISSUE_COMMENT_MIN + """
+                            """ + ISSUE_COMMENT + """
                         }
                     }
                 }

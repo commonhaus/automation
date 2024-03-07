@@ -30,12 +30,14 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.ConfigFile.Source;
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkiverse.githubapp.GitHubConfigFileProvider;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Startup;
 import io.quarkus.scheduler.Scheduled;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 @ApplicationScoped
+@UnlessBuildProfile("test")
 public class VoteDiscovery {
 
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
@@ -73,11 +75,12 @@ public class VoteDiscovery {
 
                 for (GHRepository ghRepository : ghai.listRepositories()) {
                     Voting.Config voteConfig = getConfiguration(ghRepository);
-                    if (voteConfig.isEnabled()) {
-                        votingRepositories.put(ghRepository.getFullName(), ghiId);
-                        queryRepository(queryHelper.newScheduledQueryContext(ghRepository, ghiId),
-                                voteConfig);
+                    if (voteConfig.isDisabled()) {
+                        continue;
                     }
+                    votingRepositories.put(ghRepository.getFullName(), ghiId);
+                    queryRepository(queryHelper.newScheduledQueryContext(ghRepository, ghiId),
+                            voteConfig);
                 }
             }
         } catch (GHIOException e) {
@@ -114,12 +117,12 @@ public class VoteDiscovery {
 
                 GHRepository ghRepository = github.getRepository(repoFullName);
                 Voting.Config voteConfig = getConfiguration(ghRepository);
-                if (voteConfig.isEnabled()) {
-                    queryRepository(queryHelper.newScheduledQueryContext(ghRepository, installationId),
-                            voteConfig);
-                } else {
+                if (voteConfig.isDisabled()) {
                     // Voting no longer enabled. Remove it
                     i.remove();
+                } else {
+                    queryRepository(queryHelper.newScheduledQueryContext(ghRepository, installationId),
+                            voteConfig);
                 }
             }
         } catch (GHIOException e) {
@@ -163,7 +166,7 @@ public class VoteDiscovery {
             slowDown();
             Log.debugf("[%s] discoverVotes: queue discussion#%s", ctx.getLogId(), discussion.number);
             ScheduledQueryContext discussionCtx = queryHelper.newScheduledQueryContext(ctx, EventType.discussion);
-            eventBus.requestAndForget("voting", new VoteEvent(discussionCtx, voteConfig, discussion));
+            eventBus.send("voting", new VoteEvent(discussionCtx, voteConfig, discussion));
         }
     }
 
@@ -176,7 +179,7 @@ public class VoteDiscovery {
             slowDown();
             Log.debugf("[%s] discoverVotes: queue issue #%s", ctx.getLogId(), issue.number);
             ScheduledQueryContext issueCtx = queryHelper.newScheduledQueryContext(ctx, EventType.issue);
-            eventBus.request("voting", new VoteEvent(issueCtx, voteConfig, issue));
+            eventBus.send("voting", new VoteEvent(issueCtx, voteConfig, issue));
         }
     }
 

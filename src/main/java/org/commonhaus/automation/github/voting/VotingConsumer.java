@@ -7,8 +7,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,6 +18,7 @@ import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.DataReaction;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper;
+import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.MatchLabel;
 import org.commonhaus.automation.mail.MailConsumer;
@@ -76,10 +75,6 @@ public class VotingConsumer {
     static final MatchLabel OPEN_VOTE = new MatchLabel(List.of(VOTE_OPEN));
     static final MatchLabel FINISH_VOTE = new MatchLabel(List.of(VOTE_DONE, "!" + VOTE_PROCEED, "!" + VOTE_REVISE));
 
-    static final Pattern botCommentPattern = Pattern.compile(
-            "Progress tracked \\[below\\]\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.",
-            Pattern.CASE_INSENSITIVE);
-
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance votingErrorEvent(VoteEvent voteEvent, String title, String body,
@@ -98,14 +93,6 @@ public class VotingConsumer {
     @ConsumeEvent("voting")
     @Blocking
     public void consume(Message<VoteEvent> msg) {
-        try {
-            checkVotes(msg);
-        } finally {
-            msg.reply(null);
-        }
-    }
-
-    private void checkVotes(Message<VoteEvent> msg) {
         VoteEvent voteEvent = msg.body();
         QueryContext qc = voteEvent.getQueryContext();
         Voting.Config votingConfig = voteEvent.getVotingConfig();
@@ -136,7 +123,7 @@ public class VotingConsumer {
             if (FINISH_VOTE.matches(qc, voteEvent.getId())) {
                 finishVote(qc, voteEvent, votingConfig);
             }
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         } finally {
@@ -150,7 +137,8 @@ public class VotingConsumer {
 
     private void checkOpenVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
         Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", voteEvent.getLogId(),
-                List.of(votingConfig.error_email_address), votingConfig.votingThreshold);
+                votingConfig.error_email_address == null ? "no error emails" : List.of(votingConfig.error_email_address),
+                votingConfig.votingThreshold);
 
         VoteInformation voteInfo = getVoteInformation(voteEvent);
         if (voteInfo == null) {
@@ -193,7 +181,7 @@ public class VotingConsumer {
     // Make sure other labels are present
     private boolean repoHasLabels(VoteEvent voteEvent) {
         QueryContext qc = voteEvent.getQueryContext();
-        List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE);
+        List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE, VOTE_QUORUM);
         Collection<DataLabel> voteLabels = qc.findLabels(requiredLabels);
 
         if (voteLabels.size() != requiredLabels.size()) {
@@ -267,36 +255,13 @@ public class VotingConsumer {
         if (qc.hasErrors()) {
             return;
         }
-
-        String bodyString = voteEvent.getBody();
-        Integer existingId = commentIdFromBody(bodyString);
-        DataCommonComment comment = qc.updateBotComment(voteEvent.getEventType(), voteEvent.getId(), commentBody,
-                existingId);
-        if (comment != null && (existingId == null || !existingId.equals(comment.databaseId))) {
-            String prefix = String.format("Progress tracked [below](%s \"%s\").",
-                    comment.url, comment.databaseId);
-            Matcher matcher = botCommentPattern.matcher(bodyString);
-            if (matcher.find()) {
-                bodyString = matcher.replaceFirst(prefix);
-            } else {
-                bodyString = prefix + "\r\n\r\n" + bodyString;
-            }
-            qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), bodyString);
-        }
-    }
-
-    private Integer commentIdFromBody(String body) {
-        Matcher matcher = botCommentPattern.matcher(body);
-        if (matcher.find()) {
-            if (matcher.group(2) != null) {
-                return Integer.parseInt(matcher.group(2));
-            }
-            int pos = matcher.group(1).lastIndexOf("-");
-            if (pos > 0) {
-                return Integer.parseInt(matcher.group(1).substring(pos + 1));
+        BotComment comment = qc.updateBotComment(voteEvent, commentBody);
+        if (comment != null) {
+            String newBody = comment.updateItemText(voteEvent.getBody());
+            if (!newBody.equals(voteEvent.getBody())) {
+                qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), newBody);
             }
         }
-        return null;
     }
 
     private List<DataActor> getTeamLogins(VoteEvent voteEvent, VoteInformation voteInfo) {
@@ -309,7 +274,7 @@ public class VotingConsumer {
         return logins;
     }
 
-    private void sendErrorEmail(Voting.Config votingConfig, VoteEvent voteEvent, Exception e) {
+    private void sendErrorEmail(Voting.Config votingConfig, VoteEvent voteEvent, Throwable e) {
         // If configured to do so, send an email to the error_email_address
         if (votingConfig.sendErrorEmail()) {
             StringWriter sw = new StringWriter();
@@ -326,7 +291,7 @@ public class VotingConsumer {
                     messageBody,
                     htmlBody);
 
-            bus.requestAndForget("mail", new MailConsumer.MailEvent(voteEvent.getLogId(),
+            bus.send("mail", new MailConsumer.MailEvent(voteEvent.getLogId(),
                     mail, subject, votingConfig.error_email_address));
         }
     }

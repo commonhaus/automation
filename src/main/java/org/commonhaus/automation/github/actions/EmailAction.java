@@ -100,7 +100,7 @@ public class EmailAction extends Action {
             Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
             MailConsumer.MailEvent mailEvent = new MailConsumer.MailEvent(eventData.getLogId(),
                     mailTemplateInstance, subject, addresses);
-            Arc.container().instance(EventBus.class).get().requestAndForget("mail", mailEvent);
+            Arc.container().instance(EventBus.class).get().send("mail", mailEvent);
         }
     }
 

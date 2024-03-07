@@ -55,7 +55,11 @@ public enum QueryCache {
      */
     public <T> T putCachedValue(String key, T value) {
         Log.debugf(":: PUT %s/%s ::: ", this.name(), key);
-        cache.put(key, value);
+        if (value == null) {
+            cache.invalidate(key);
+        } else {
+            cache.put(key, value);
+        }
         return value;
     }
 

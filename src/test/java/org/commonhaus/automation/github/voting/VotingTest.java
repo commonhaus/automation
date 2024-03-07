@@ -61,8 +61,6 @@ public class VotingTest extends GithubTest {
     static final Set<DataLabel> ITEM_CLOSING = Set.of(VOTE_DONE, VOTE_OPEN);
 
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
-    static final String botCommentId = "DC_kwDOLDuJqs4Agx94";
-    static final Integer botCommentDatabaseId = 8593272;
 
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -77,19 +75,6 @@ public class VotingTest extends GithubTest {
                 .thenReturn(Set.of(user1, user2, user3));
 
         QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
-    }
-
-    void setupBotComment() {
-        QueryCache.RECENT_BOT_CONTENT.putCachedValue(discussionId, new DataCommonComment(
-                Json.createObjectBuilder()
-                        .add("id", botCommentId)
-                        .add("databaseId", botCommentDatabaseId)
-                        .add("url", "https://github.com/commonhaus/automation-test/discussions/25#discussioncomment-8593272")
-                        .add("body", "This is a test comment")
-                        .add("author", Json.createObjectBuilder()
-                                .add("login", "commonhaus-test-bot")
-                                .build())
-                        .build()));
     }
 
     @BeforeEach
@@ -203,8 +188,9 @@ public class VotingTest extends GithubTest {
         setLabels(discussionId, ITEM_OPEN);
 
         Response addReaction = mockResponse(Path.of("src/test/resources/github/addConfusedReaction.json"));
-        Response botComment = mockResponse(Path.of("src/test/resources/github/responseBotComment.json"));
+        Response responseBotComment = mockResponse(Path.of("src/test/resources/github/responseBotComment.json"));
         Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
+        Response updateDescription = mockResponse(Path.of("src/test/resources/github/updateDiscussion.json"));
 
         given()
                 .github(mocks -> {
@@ -220,10 +206,13 @@ public class VotingTest extends GithubTest {
                             .thenReturn(addReaction);
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("query($commentId: ID!) {"), anyMap()))
-                            .thenReturn(botComment);
+                            .thenReturn(responseBotComment);
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("updateDiscussionComment("), anyMap()))
                             .thenReturn(updateComment);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussion("), anyMap()))
+                            .thenReturn(updateDescription);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionEditedNoMarthas.json")
                 .event(GHEvent.DISCUSSION)
@@ -234,6 +223,8 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("query($commentId: ID!) {"), anyMap());
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("updateDiscussionComment("), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussion("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
@@ -251,6 +242,7 @@ public class VotingTest extends GithubTest {
 
         Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsNone.json"));
         Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
+        Response updateDescription = mockResponse(Path.of("src/test/resources/github/updateDiscussion.json"));
 
         given()
                 .github(mocks -> {
@@ -259,7 +251,7 @@ public class VotingTest extends GithubTest {
                             .thenReturn(true);
 
                     setupTeamReactions(mocks);
-                    setupBotComment();
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("... on Reactable {"), anyMap()))
@@ -267,7 +259,9 @@ public class VotingTest extends GithubTest {
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("updateDiscussionComment("), anyMap()))
                             .thenReturn(updateComment);
-
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussion("), anyMap()))
+                            .thenReturn(updateDescription);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionEditedValidVote.json")
                 .event(GHEvent.DISCUSSION)
@@ -276,6 +270,8 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("... on Reactable {"), anyMap());
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("updateDiscussionComment("), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussion("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
@@ -302,7 +298,7 @@ public class VotingTest extends GithubTest {
                             .thenReturn(true);
 
                     setupTeamReactions(mocks);
-                    setupBotComment();
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("... on Reactable {"), anyMap()))
@@ -317,7 +313,7 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("addLabelsToLabelable("), anyMap()))
                             .thenReturn(addLabel);
                 })
-                .when().payloadFromClasspath("/github/eventDiscussionEditedValidVote.json")
+                .when().payloadFromClasspath("/github/eventDiscussionEditedValidVoteCorrectComment.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
@@ -355,7 +351,7 @@ public class VotingTest extends GithubTest {
                             .thenReturn(true);
 
                     setupTeamReactions(mocks);
-                    setupBotComment();
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("... on Reactable {"), anyMap()))
@@ -364,7 +360,7 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("updateDiscussionComment("), anyMap()))
                             .thenReturn(updateComment);
                 })
-                .when().payloadFromClasspath("/github/eventDiscussionEditedValidVote.json")
+                .when().payloadFromClasspath("/github/eventDiscussionEditedValidVoteCorrectComment.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))

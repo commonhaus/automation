@@ -54,7 +54,7 @@ public class Voting {
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionEvent: voting enabled; queue event", qc.getLogId());
-        bus.requestAndForget("voting", new VoteEvent(qc, votingConfig, eventData));
+        bus.send("voting", new VoteEvent(qc, votingConfig, eventData));
     }
 
     // How many votes are required for a vote to count?
@@ -74,8 +74,8 @@ public class Voting {
     public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
-            public boolean isEnabled() {
-                return false;
+            public boolean isDisabled() {
+                return true;
             }
         };
 

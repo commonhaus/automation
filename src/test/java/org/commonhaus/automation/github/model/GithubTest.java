@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -42,6 +43,9 @@ public class GithubTest {
 
     public static final DataLabel bug = new DataLabel.Builder().name("bug").id("LA_kwDOLDuJqs8AAAABfqsdNQ").build();
     public static final DataLabel notice = new DataLabel.Builder().name("notice").id("LA_kwDOLDuJqs8AAAABgn2hGA").build();
+
+    public static final String botCommentId = "DC_kwDOLDuJqs4Agx94";
+    public static final Integer botCommentDatabaseId = 8593272;
 
     @BeforeEach
     protected void beforeEach() {
@@ -99,15 +103,30 @@ public class GithubTest {
         }
     }
 
+    protected void setupBotComment(String nodeId) {
+        DataCommonComment comment = new DataCommonComment(
+                Json.createObjectBuilder()
+                        .add("id", botCommentId)
+                        .add("databaseId", botCommentDatabaseId)
+                        .add("url", "https://github.com/commonhaus/automation-test/discussions/25#discussioncomment-8593272")
+                        .add("body", "This is a test comment")
+                        .add("author", Json.createObjectBuilder()
+                                .add("login", "commonhaus-test-bot")
+                                .build())
+                        .build());
+        BotComment botComment = new BotComment(nodeId, comment);
+        QueryCache.RECENT_BOT_CONTENT.putCachedValue(nodeId, botComment);
+    }
+
     public void verifyBotCommentCache(String nodeId, String commentId) {
         // We're always updating the cache, but that often happens in a separate thread.
         // let's make sure all of the updates are done before proceeding to the next test
         await().atMost(5, SECONDS)
                 .until(() -> QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId) != null);
 
-        DataCommonComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId);
-        Assertions.assertEquals(commentId, botComment.id,
-                "Cached Bot Comment ID for " + nodeId + " should equal " + commentId + ", was " + botComment);
+        BotComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId);
+        Assertions.assertEquals(commentId, botComment.getCommentId(),
+                "Cached Bot Comment ID for " + nodeId + " should equal " + commentId + ", was " + botComment.getCommentId());
     }
 
     public void verifyNoLabelCache(String labelId) {

@@ -20,11 +20,7 @@ public class RepositoryAppConfig {
         }
 
         public boolean isDisabled() {
-            return !isEnabled();
-        }
-
-        public boolean isEnabled() {
-            return enabled == null || enabled;
+            return enabled != null && !enabled;
         }
     }
 
