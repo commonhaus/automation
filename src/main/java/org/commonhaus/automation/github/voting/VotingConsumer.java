@@ -258,7 +258,9 @@ public class VotingConsumer {
         BotComment comment = qc.updateBotComment(voteEvent, commentBody);
         if (comment != null) {
             String newBody = comment.updateItemText(voteEvent.getBody());
-            if (!newBody.equals(voteEvent.getBody())) {
+            if (newBody.equals(voteEvent.getBody())) {
+                Log.debugf("[%s] voting.checkVotes: item description unchanged", voteEvent.getLogId());
+            } else {
                 qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), newBody);
             }
         }

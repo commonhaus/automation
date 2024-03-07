@@ -463,6 +463,8 @@ public class QueryHelper {
                     // if an error happened, comment will be null, we should clear the cache
                     botComment = comment == null ? null : botComment.setBodyString(commentBody);
                 }
+            } else {
+                Log.debugf("[%s] updateBotComment: comment %s unchanged", getLogId(), botComment.getCommentId());
             }
             QueryCache.RECENT_BOT_CONTENT.putCachedValue(itemId, botComment);
             return botComment;

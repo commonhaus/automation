@@ -38,7 +38,7 @@ public class ScheduledQueryContext extends QueryContext {
     public String getLogId() {
         String id = logId;
         if (id == null) {
-            id = logId = String.format("%s::scheduled", repository.getFullName());
+            id = logId = String.format("%s:scheduled.%s", repository.getFullName(), eventType);
         }
         return id;
     }
