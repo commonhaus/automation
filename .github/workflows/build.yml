@@ -122,7 +122,7 @@ jobs:
 
     - name: Log in to the Container registry
       if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
-      uses: docker/login-action@3d58c274f17dffee475a5520cbe67f0a882c4dbb
+      uses: docker/login-action@5139682d94efc37792e6b54386b5b470a68a4737
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
