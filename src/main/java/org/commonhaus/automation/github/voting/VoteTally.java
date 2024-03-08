@@ -29,14 +29,14 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public class VoteTally {
     public static final Comparator<DataReaction> compareReactions = Comparator
-            .comparing(DataReaction::date)
+            .comparing(DataReaction::date, Comparator.reverseOrder())
             .thenComparing(DataReaction::sortOrder);
 
     public static final Comparator<DataActor> compareActors = Comparator
             .comparing(DataActor::login);
 
     @JsonProperty
-    final boolean useReactions;
+    final VoteInformation.Type voteType;
 
     @JsonProperty
     final boolean hasQuorum;
@@ -74,7 +74,7 @@ public class VoteTally {
             List<DataActor> teamMembers) {
         missingGroupActors = new HashSet<>(teamMembers);
 
-        useReactions = info.voteType != VoteInformation.Type.manualComments;
+        voteType = info.voteType;
         group = info.group;
         groupSize = teamMembers.size();
         votingThreshold = info.votingThreshold;
@@ -90,8 +90,12 @@ public class VoteTally {
             droppedVotes = duplicates.size() + ignoredVotes();
         }
 
-        groupVotes = categories.values().stream().mapToInt(c -> c.teamTotal).sum();
-        countedVotes = categories.values().stream().mapToInt(c -> c.total).sum();
+        groupVotes = categories.entrySet().stream()
+                .filter(e -> !"ignored".equals(e.getKey()))
+                .mapToInt(e -> e.getValue().teamTotal).sum();
+        countedVotes = categories.entrySet().stream()
+                .filter(e -> !"ignored".equals(e.getKey()))
+                .mapToInt(e -> e.getValue().total).sum();
         hasQuorum = switch (votingThreshold) {
             case all -> groupVotes >= groupSize;
             case majority -> groupVotes > groupSize / 2;
@@ -104,7 +108,7 @@ public class VoteTally {
         return String.format("\r\n%s%d of %d members of @%s have voted (%s).\r\n%s",
                 (hasQuorum ? "✅ " : ""),
                 groupVotes, groupSize, group,
-                useReactions ? "reaction" : "comment",
+                voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
                 summarizeResults());
     }
 
@@ -127,19 +131,24 @@ public class VoteTally {
 
         for (DataReaction reaction : votes) {
             DataActor user = reaction.user;
+
+            final Category c;
+            if (info.voteType != VoteInformation.Type.marthas) {
+                c = categories.computeIfAbsent(DataReaction.toEmoji(reaction.reactionContent), k -> new Category());
+            } else if (info.approve.contains(reaction.reactionContent)) {
+                c = categories.computeIfAbsent("approve", k -> new Category());
+            } else if (info.ok.contains(reaction.reactionContent)) {
+                c = categories.computeIfAbsent("ok", k -> new Category());
+            } else if (info.revise.contains(reaction.reactionContent)) {
+                c = categories.computeIfAbsent("revise", k -> new Category());
+            } else {
+                // This does not count against other votes
+                c = categories.computeIfAbsent("ignored", k -> new Category());
+                c.add(reaction, teamLogins);
+                continue;
+            }
+
             if (seenLogins.add(user)) {
-                final Category c;
-                if (info.voteType != VoteInformation.Type.marthas) {
-                    c = categories.computeIfAbsent(DataReaction.toEmoji(reaction.reactionContent), k -> new Category());
-                } else if (info.approve.contains(reaction.reactionContent)) {
-                    c = categories.computeIfAbsent("approve", k -> new Category());
-                } else if (info.ok.contains(reaction.reactionContent)) {
-                    c = categories.computeIfAbsent("ok", k -> new Category());
-                } else if (info.revise.contains(reaction.reactionContent)) {
-                    c = categories.computeIfAbsent("revise", k -> new Category());
-                } else {
-                    c = categories.computeIfAbsent("ignored", k -> new Category());
-                }
                 c.add(reaction, teamLogins);
                 missingGroupActors.remove(user);
             } else {
@@ -149,7 +158,7 @@ public class VoteTally {
     }
 
     String summarizeResults() {
-        if (useReactions) {
+        if (voteType != VoteInformation.Type.manualComments) {
             return "\r\n"
                     + "| Reaction | Total | Team | Voting members |\r\n"
                     + "| --- | --- | --- | --- |\r\n"
@@ -252,7 +261,7 @@ public class VoteTally {
         @Override
         public void serialize(DataReaction reaction, JsonGenerator gen, SerializerProvider provider) throws IOException {
             gen.writeStartObject();
-            gen.writeObjectField("user", reaction.user);
+            provider.defaultSerializeField("user", reaction.user, gen);
             gen.writeObjectField("createdAt", reaction.createdAt);
             gen.writeStringField("reaction", DataReaction.toEmoji(reaction));
             gen.writeEndObject();

@@ -164,7 +164,7 @@ public class VoteDiscovery {
         }
         for (var discussion : discussions) {
             slowDown();
-            Log.debugf("[%s] discoverVotes: queue discussion#%s", ctx.getLogId(), discussion.number);
+            Log.infof("[%s] discoverVotes: queue discussion#%s", ctx.getLogId(), discussion.number);
             ScheduledQueryContext discussionCtx = queryHelper.newScheduledQueryContext(ctx, EventType.discussion);
             eventBus.send("voting", new VoteEvent(discussionCtx, voteConfig, discussion));
         }
@@ -177,7 +177,7 @@ public class VoteDiscovery {
         }
         for (var issue : issues) {
             slowDown();
-            Log.debugf("[%s] discoverVotes: queue issue #%s", ctx.getLogId(), issue.number);
+            Log.infof("[%s] discoverVotes: queue issue #%s", ctx.getLogId(), issue.number);
             ScheduledQueryContext issueCtx = queryHelper.newScheduledQueryContext(ctx, EventType.issue);
             eventBus.send("voting", new VoteEvent(issueCtx, voteConfig, issue));
         }

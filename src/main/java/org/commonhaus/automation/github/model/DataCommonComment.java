@@ -18,7 +18,6 @@ public class DataCommonComment extends DataCommonObject {
 
     protected static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
             databaseId
-            body
             """;
 
     public final Integer databaseId;
@@ -40,9 +39,6 @@ public class DataCommonComment extends DataCommonObject {
                         node(id: $commentId) {
                             ... on IssueComment {
                                 """ + COMMENT_FIELDS + """
-                    }
-                    ... on PullRequestReviewComment {
-                        """ + COMMENT_FIELDS + """
                     }
                     ... on DiscussionComment {
                         """ + COMMENT_FIELDS + """
