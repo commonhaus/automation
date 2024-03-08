@@ -18,7 +18,7 @@ public class VoteEvent {
     public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment\\]";
     // when a badge is configured, this is the prefix
     public static final String badgeMatch = "\\[!\\[.*?\\]\\(.*?\\)\\]";
-    public static final String linkMatch = "\\[Vote progress\\]";
+    public static final String linkMatch = "\\[.*?Vote progress\\]";
 
     public static final Pattern botCommentPattern = Pattern.compile(
             "(?:" + prefixMatch + "|" + badgeMatch + "|" + linkMatch + ")" +
@@ -130,9 +130,9 @@ public class VoteEvent {
                     .replace("{{repoName}}", qc.getRepository().getFullName())
                     .replace("{{number}}", number + "");
 
-            return comment.markdownLink("![Vote progress](" + badgeLink + ")");
+            return comment.markdownLink("![🗳️ Vote progress](" + badgeLink + ")");
         } else {
-            return comment.markdownLink("Vote progress");
+            return comment.markdownLink("🗳️ Vote progress");
         }
     }
 
