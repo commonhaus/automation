@@ -22,6 +22,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
+import org.commonhaus.automation.github.voting.VoteEvent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -114,7 +115,7 @@ public class GithubTest {
                                 .add("login", "commonhaus-test-bot")
                                 .build())
                         .build());
-        BotComment botComment = new BotComment(nodeId, comment);
+        BotComment botComment = new BotComment(VoteEvent.botCommentPattern, nodeId, comment);
         QueryCache.RECENT_BOT_CONTENT.putCachedValue(nodeId, botComment);
     }
 

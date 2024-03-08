@@ -257,7 +257,8 @@ public class VotingConsumer {
         }
         BotComment comment = qc.updateBotComment(voteEvent, commentBody);
         if (comment != null) {
-            String newBody = comment.updateItemText(voteEvent.getBody());
+            // Use informaton from the existing comment to construct replacement text
+            String newBody = voteEvent.updateItemText(comment);
             if (newBody.equals(voteEvent.getBody())) {
                 Log.debugf("[%s] voting.checkVotes: item description unchanged", voteEvent.getLogId());
             } else {

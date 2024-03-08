@@ -409,10 +409,12 @@ public class QueryHelper {
         }
 
         public BotComment updateBotComment(VoteEvent voteEvent, String commentBody) {
-            return updateBotComment(voteEvent.getEventType(), voteEvent.getId(), commentBody, voteEvent.getBody());
+            return updateBotComment(voteEvent.commentPattern(), voteEvent.getEventType(), voteEvent.getId(), commentBody,
+                    voteEvent.getBody());
         }
 
-        BotComment updateBotComment(EventType eventType, String itemId, String commentBody, String itemBody) {
+        BotComment updateBotComment(Pattern botCommentPattern, EventType eventType, String itemId, String commentBody,
+                String itemBody) {
             if (hasErrors()) {
                 Log.debugf("[%s] updateBotComment skipping due to errors", getLogId());
                 return null;
@@ -421,15 +423,15 @@ public class QueryHelper {
             BotComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(itemId);
             DataCommonComment comment = null;
             if (botComment == null) {
-                String commentId = BotComment.getCommentId(itemBody);
+                String commentId = BotComment.getCommentId(botCommentPattern, itemBody);
                 comment = DataCommonComment.findBotComment(this, itemId, commentId);
-                botComment = comment == null ? null : new BotComment(itemId, comment);
+                botComment = comment == null ? null : new BotComment(botCommentPattern, itemId, comment);
             }
 
             if (comment == null && botComment == null) {
                 if (isDryRun()) {
                     // Create a fake comment based on one in commonhaus/automation-test
-                    botComment = new BotComment(itemId).setBodyString(commentBody);
+                    botComment = new BotComment(botCommentPattern, itemId).setBodyString(commentBody);
                 } else {
                     // new comment
                     comment = switch (eventType) {
@@ -442,7 +444,7 @@ public class QueryHelper {
                             yield null;
                         }
                     };
-                    botComment = comment == null ? null : new BotComment(itemId, comment);
+                    botComment = comment == null ? null : new BotComment(botCommentPattern, itemId, comment);
                 }
             } else if (botComment.requiresUpdate(commentBody)) {
                 if (isDryRun()) {
@@ -504,18 +506,16 @@ public class QueryHelper {
     }
 
     public static class BotComment {
-        static final String prefix = "**Vote progress** tracked in ";
-        static final Pattern botCommentPattern = Pattern.compile(
-                prefix.replace("*", "\\*") + "\\[this comment\\]\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.",
-                Pattern.CASE_INSENSITIVE);
 
+        final Pattern botCommentPattern;
         final private String itemId;
         private String id;
         private int databaseId;
         private String url;
         private String bodyString;
 
-        BotComment(String itemId, DataCommonComment comment) {
+        BotComment(Pattern botCommentPattern, String itemId, DataCommonComment comment) {
+            this.botCommentPattern = botCommentPattern;
             this.itemId = itemId;
             this.id = comment.id;
             this.databaseId = comment.databaseId;
@@ -524,7 +524,8 @@ public class QueryHelper {
         }
 
         // For dry run: this comment exists (in test repo), but probably not on the original item
-        BotComment(String itemId) {
+        BotComment(Pattern botCommentPattern, String itemId) {
+            this.botCommentPattern = botCommentPattern;
             this.itemId = itemId;
             this.id = "DC_kwDOLDuJqs4AfJV4";
             this.databaseId = 8164728;
@@ -561,19 +562,11 @@ public class QueryHelper {
             return !this.bodyString.equals(bodyString);
         }
 
-        public String markdownLink() {
-            return String.format("[this comment](%s \"%s\")", url, id);
+        public String markdownLink(String linkText) {
+            return String.format("[%s](%s \"%s\")", linkText, url, id);
         }
 
-        public String updateItemText(String itemBody) {
-            Matcher matcher = botCommentPattern.matcher(itemBody);
-            if (matcher.find()) {
-                return matcher.replaceFirst(prefix + markdownLink() + ".");
-            }
-            return prefix + markdownLink() + ".\r\n\r\n" + itemBody;
-        }
-
-        public static String getCommentId(String itemBody) {
+        public static String getCommentId(Pattern botCommentPattern, String itemBody) {
             Matcher matcher = botCommentPattern.matcher(itemBody);
             if (matcher.find()) {
                 if (matcher.group(2) != null) {

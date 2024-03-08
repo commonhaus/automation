@@ -391,11 +391,15 @@ public class VotingTest extends GithubTest {
 
         List<DataReaction> teamReactions = new ArrayList<>(50);
         List<DataActor> teamLogins = new ArrayList<>(50);
+        List<DataReaction> unignore = new ArrayList<>(3);
         for (int i = 1; i < 51; i++) {
             DataActor user = new DataActor(mockGHUser("user" + i));
             teamLogins.add(user);
             teamReactions.add(new DataReaction(user,
                     i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
+            if (i % 13 == 0) {
+                unignore.add(new DataReaction(user, "eyes"));
+            }
         }
         List<DataReaction> extraReactions = new ArrayList<>(10);
         for (int i = 1; i < 11; i++) {
@@ -425,29 +429,32 @@ public class VotingTest extends GithubTest {
         assertThat(voteInfo.revise).containsExactlyInAnyOrder(ReactionContent.MINUS_ONE);
         assertThat(voteInfo.voteType).isEqualTo(VoteInformation.Type.marthas);
 
-        // All have voted
+        // All have voted: but some are ignored!
 
-        VoteTally voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions, teamLogins);
         assertThat(voteTally.categories.get("approve")).isNotNull();
         assertThat(voteTally.categories.get("ok")).isNotNull();
         assertThat(voteTally.categories.get("revise")).isNotNull();
         assertThat(voteTally.categories.get("ignored")).isNotNull();
-        assertThat(voteTally.missingGroupActors).isEmpty();
-        assertVoteTally(49, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertThat(voteTally.missingGroupActors).size().isEqualTo(3);
 
-        // Majority have voted
+        // now add the missing votes with valid (not ignored) values
+        extraReactions.addAll(unignore);
+        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
+
+        // Majority have voted (addition of ignored votes bumps the obvious ratio)
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(25, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(24, 26, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(23, 25, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
         // Supermajority (2/3) have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(33, 34, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(32, 33, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
         // Manual (count reactions implied)
 
@@ -508,6 +515,14 @@ public class VotingTest extends GithubTest {
             List<DataReaction> extraReactions,
             List<DataReaction> teamReactions,
             List<DataActor> teamLogins) throws JsonProcessingException {
+        return assertVoteTally(numUsers, numUsers, expectHasQuorum, voteInfo, extraReactions, teamReactions, teamLogins);
+    }
+
+    VoteTally assertVoteTally(int numUsers, int numVotes, boolean expectHasQuorum,
+            VoteInformation voteInfo,
+            List<DataReaction> extraReactions,
+            List<DataReaction> teamReactions,
+            List<DataActor> teamLogins) throws JsonProcessingException {
 
         List<DataReaction> reactions = Stream
                 .concat(teamReactions.stream().limit(numUsers), extraReactions.stream())
@@ -538,7 +553,7 @@ public class VotingTest extends GithubTest {
         String markdown = voteTally.toMarkdown();
         assertThat(markdown)
                 .as("should contain number of team member votes")
-                .contains(numUsers + " of " + teamLogins.size() + " members");
+                .contains(numVotes + " of " + teamLogins.size() + " members");
 
         if (expectHasQuorum) {
             assertThat(voteTally.hasQuorum)

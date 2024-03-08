@@ -115,9 +115,12 @@ public class VoteTally {
     private void countComments(VoteInformation info, Collection<DataCommonComment> comments,
             Map<String, DataActor> teamLogins) {
         Category c = categories.computeIfAbsent("comment", k -> new Category());
+        Set<DataActor> seenLogins = new HashSet<>();
         for (DataCommonComment comment : comments) {
-            c.add(comment.author, teamLogins);
-            missingGroupActors.remove(comment.author);
+            if (seenLogins.add(comment.author)) {
+                c.add(comment.author, teamLogins);
+                missingGroupActors.remove(comment.author);
+            }
         }
     }
 

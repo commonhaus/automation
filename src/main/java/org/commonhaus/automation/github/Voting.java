@@ -64,6 +64,11 @@ public class Voting {
         supermajority
     }
 
+    public static class StatusLinks {
+        public String badge;
+        public String page;
+    }
+
     public static Voting.Config getVotingConfig(RepositoryAppConfig.File repoConfigFile) {
         if (repoConfigFile == null) {
             return Voting.Config.DISABLED;
@@ -81,6 +86,7 @@ public class Voting {
 
         public String[] error_email_address;
         public Map<String, Threshold> votingThreshold;
+        public StatusLinks status;
 
         public boolean sendErrorEmail() {
             return error_email_address != null && error_email_address.length > 0;

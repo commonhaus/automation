@@ -1,16 +1,30 @@
 package org.commonhaus.automation.github.voting;
 
 import java.time.Instant;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
 import org.commonhaus.automation.github.model.DataCommonItem;
 import org.commonhaus.automation.github.model.EventType;
+import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 
 public class VoteEvent {
+    // standard prefix, used when no badge is configured
+    public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment\\]";
+    // when a badge is configured, this is the prefix
+    public static final String badgeMatch = "\\[!\\[.*?\\]\\(.*?\\)\\]";
+    public static final String linkMatch = "\\[Vote progress\\]";
+
+    public static final Pattern botCommentPattern = Pattern.compile(
+            "(?:" + prefixMatch + "|" + badgeMatch + "|" + linkMatch + ")" +
+                    "\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.?", // the juicy part of the URL
+            Pattern.CASE_INSENSITIVE);
+
     private final boolean isScheduled;
     private final QueryContext qc;
     private final Voting.Config votingConfig;
@@ -104,5 +118,30 @@ public class VoteEvent {
     /** Used in error email */
     public String eventTime() {
         return eventTime;
+    }
+
+    public Pattern commentPattern() {
+        return botCommentPattern;
+    }
+
+    public String getVoteHeaderText(BotComment comment) {
+        if (votingConfig.status != null && votingConfig.status.badge != null) {
+            String badgeLink = votingConfig.status.badge
+                    .replace("{{repoName}}", qc.getRepository().getFullName())
+                    .replace("{{number}}", number + "");
+
+            return comment.markdownLink("![Vote progress](" + badgeLink + ")");
+        } else {
+            return comment.markdownLink("Vote progress");
+        }
+    }
+
+    public String updateItemText(BotComment comment) {
+        String prefix = getVoteHeaderText(comment);
+        Matcher matcher = botCommentPattern.matcher(body);
+        if (matcher.find()) {
+            return matcher.replaceFirst(prefix);
+        }
+        return prefix + "\r\n\r\n" + body;
     }
 }
