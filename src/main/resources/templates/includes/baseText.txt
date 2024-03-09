@@ -4,12 +4,9 @@
 
 {#insert body}{/}
 
+[1]: {#insert ghUrl}https://github.com{/}
+[2]: {#insert authorUrl}{/}
 
 ---
 - created {#insert createdAt}{/} by {#insert authorLogin}{/} [2]
 {#insert dateTime}{/}
-
-[1]: {#insert ghUrl}https://github.com{/}
-[2]: {#insert authorUrl}{/}
-
-
