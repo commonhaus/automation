@@ -2,11 +2,8 @@ package org.commonhaus.automation.github.voting;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -17,7 +14,6 @@ import org.commonhaus.automation.github.model.DataCommonComment;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.DataReaction;
 import org.commonhaus.automation.github.model.QueryCache;
-import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.MatchLabel;
@@ -38,34 +34,6 @@ import io.vertx.mutiny.core.eventbus.Message;
 @ApplicationScoped
 public class VotingConsumer {
 
-    public static class CheckStatus {
-        private Instant lastCheck;
-        private final AtomicBoolean running = new AtomicBoolean(false);
-
-        public CheckStatus() {
-        }
-
-        public boolean startScheduledUpdate() {
-            // Don't check more than once every 15 minutes
-            if (lastCheck != null && lastCheck.plus(15, ChronoUnit.MINUTES).isBefore(Instant.now())) {
-                return false;
-            }
-            return running.compareAndSet(false, true);
-        }
-
-        public boolean startUpdate(VoteEvent voteEvent) {
-            if (voteEvent.isScheduled()) {
-                return startScheduledUpdate();
-            }
-            return running.compareAndSet(false, true);
-        }
-
-        public void finishUpdate() {
-            lastCheck = Instant.now();
-            running.set(false);
-        }
-    }
-
     public static final String VOTE_DONE = "vote/done";
     public static final String VOTE_OPEN = "vote/open";
     public static final String VOTE_PROCEED = "vote/proceed";
@@ -83,9 +51,6 @@ public class VotingConsumer {
 
     @Inject
     ObjectMapper objectMapper;
-
-    @Inject
-    QueryHelper queryHelper;
 
     @Inject
     EventBus bus;

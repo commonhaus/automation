@@ -20,7 +20,6 @@ import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.model.ScheduledQueryContext;
-import org.commonhaus.automation.github.voting.VotingConsumer.CheckStatus;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHAuthenticatedAppInstallation;
 import org.kohsuke.github.GHIOException;
