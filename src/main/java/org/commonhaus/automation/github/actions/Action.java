@@ -35,8 +35,7 @@ public abstract class Action {
             ObjectMapper mapper = (ObjectMapper) jp.getCodec();
             JsonNode root = mapper.readTree(jp);
             if (root.isArray()) {
-                LabelAction labelsAction = new LabelAction();
-                labelsAction.labels = mapper.convertValue(root, LIST_STRING);
+                LabelAction labelsAction = new LabelAction(mapper.convertValue(root, LIST_STRING));
                 return labelsAction;
             } else if (root.has("address")) {
                 return new EmailAction(root.get("address"));

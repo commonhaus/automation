@@ -90,6 +90,7 @@ public enum JsonAttribute {
     pullRequest,
     reactableId,
     reactions,
+    removeLabelsFromLabelable,
     repository,
     search,
     title,
@@ -281,6 +282,9 @@ public enum JsonAttribute {
 
         JsonArray list;
         if (field.getValueType() == ValueType.OBJECT) {
+            if (JsonAttribute.id.existsIn(field)) {
+                return List.of(new DataLabel(field));
+            }
             list = JsonAttribute.nodes.jsonArrayFrom(field);
         } else {
             list = jsonArrayFrom(field);

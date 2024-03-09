@@ -1,0 +1,23 @@
+{
+  "removeLabelsFromLabelable": {
+    "clientMutationId": null,
+    "labelable": {
+      "labels": {
+        "nodes": [
+          {
+            "color": "74B08A",
+            "description": "",
+            "id": "LA_kwDOLDuJqs8AAAABgn2hGA",
+            "isDefault": false,
+            "name": "notice",
+            "url": "https://github.com/commonhaus/automation-test/labels/notice"
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "MQ"
+        }
+      }
+    }
+  }
+}

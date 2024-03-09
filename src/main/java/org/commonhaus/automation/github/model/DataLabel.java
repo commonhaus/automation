@@ -155,6 +155,34 @@ public class DataLabel extends DataCommonType {
         return labels;
     }
 
+    /** package private. See QueryHelper / QueryContext */
+    static Set<DataLabel> removeLabels(QueryContext queryContext, String labeledId, Collection<DataLabel> oldLabels) {
+        Log.debugf("[%s] removeLabels for labelable %s with %s", queryContext.getLogId(), labeledId, oldLabels);
+        String[] labelIds = oldLabels.stream().map(l -> l.id).toArray(String[]::new);
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("labelableId", labeledId);
+        variables.put("labelIds", labelIds);
+
+        String query = """
+                mutation RemoveLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
+                    removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
+                        clientMutationId
+                        labelable {
+                            """ + PAGINATED_LABELS + """
+                        }
+                    }
+                }""";
+
+        Set<DataLabel> labels = new HashSet<>();
+        paginateLabels(queryContext, query, variables, labels,
+                (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
+                        JsonAttribute.removeLabelsFromLabelable, JsonAttribute.labelable));
+
+        Log.infof("[%s] modifyLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
+        return labels;
+    }
+
     static void paginateLabels(QueryContext queryContext, String query, Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
         JsonObject pageInfo;

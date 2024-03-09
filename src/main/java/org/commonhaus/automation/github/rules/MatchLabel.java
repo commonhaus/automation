@@ -23,18 +23,24 @@ public class MatchLabel {
     }
 
     public boolean matches(QueryContext queryContext, String nodeId) {
+        return matches(queryContext, List.of(), nodeId);
+    }
+
+    public boolean matches(QueryContext queryContext, List<DataLabel> eventLabels, String nodeId) {
         if (nodeId == null) {
             return false;
         }
 
-        Collection<DataLabel> eventLabels = queryContext.getLabels(nodeId);
-        if (!include.isEmpty() && (eventLabels == null || eventLabels.isEmpty())) {
+        Collection<DataLabel> itemLabels = queryContext.getLabels(nodeId);
+        itemLabels.addAll(eventLabels);
+
+        if (!include.isEmpty() && (itemLabels == null || itemLabels.isEmpty())) {
             return false;
         }
 
-        if (!exclude.isEmpty() && eventLabels.stream().anyMatch(x -> exclude.contains(x.name) || exclude.contains(x.id))) {
+        if (!exclude.isEmpty() && itemLabels.stream().anyMatch(x -> exclude.contains(x.name) || exclude.contains(x.id))) {
             return false;
         }
-        return include.isEmpty() || eventLabels.stream().anyMatch(x -> include.contains(x.name) || include.contains(x.id));
+        return include.isEmpty() || itemLabels.stream().anyMatch(x -> include.contains(x.name) || include.contains(x.id));
     }
 }
