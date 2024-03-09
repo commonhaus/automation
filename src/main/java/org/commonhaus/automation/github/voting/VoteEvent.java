@@ -13,6 +13,9 @@ import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 
+import io.quarkus.qute.TemplateData;
+
+@TemplateData
 public class VoteEvent {
     // standard prefix, used when no badge is configured
     public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment\\]";

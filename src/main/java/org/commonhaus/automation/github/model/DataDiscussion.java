@@ -10,8 +10,10 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
+import io.quarkus.qute.TemplateData;
 import io.smallrye.graphql.client.Response;
 
+@TemplateData
 public class DataDiscussion extends DataCommonItem {
 
     static final String DISCUSSION_FIELDS = ISSUE_FIELDS + """
