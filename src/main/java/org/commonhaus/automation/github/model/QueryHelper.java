@@ -371,6 +371,16 @@ public class QueryHelper {
             return null;
         }
 
+        public Collection<DataLabel> removeLabels(String nodeId, List<String> labels) {
+            Collection<DataLabel> oldLabels = findLabels(labels);
+            if (!oldLabels.isEmpty()) {
+                Set<DataLabel> currentLabels = DataLabel.removeLabels(this, nodeId, oldLabels);
+                QueryCache.LABELS.putCachedValue(nodeId, currentLabels);
+                return currentLabels;
+            }
+            return null;
+        }
+
         public boolean isDryRun() {
             return botConfig.isDryRun();
         }

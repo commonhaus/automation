@@ -23,6 +23,7 @@ import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.voting.VoteEvent;
+import org.commonhaus.automation.github.voting.VotingConsumer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -44,6 +45,13 @@ public class GithubTest {
 
     public static final DataLabel bug = new DataLabel.Builder().name("bug").id("LA_kwDOLDuJqs8AAAABfqsdNQ").build();
     public static final DataLabel notice = new DataLabel.Builder().name("notice").id("LA_kwDOLDuJqs8AAAABgn2hGA").build();
+    public static final DataLabel VOTE_OPEN = new DataLabel.Builder().name(VotingConsumer.VOTE_OPEN)
+            .id("LA_kwDOKRPTI88AAAABgkXEVQ").build();
+    public static final DataLabel VOTE_PROCEED = new DataLabel.Builder().name(VotingConsumer.VOTE_PROCEED).build();
+    public static final DataLabel VOTE_QUORUM = new DataLabel.Builder().name(VotingConsumer.VOTE_QUORUM).build();
+    public static final DataLabel VOTE_REVISE = new DataLabel.Builder().name(VotingConsumer.VOTE_REVISE).build();
+    public static final DataLabel VOTE_DONE = new DataLabel.Builder().name(VotingConsumer.VOTE_DONE)
+            .id("LA_kwDOKRPTI88AAAABhGp_7g").build();
 
     public static final String botCommentId = "DC_kwDOLDuJqs4Agx94";
     public static final Integer botCommentDatabaseId = 8593272;
@@ -62,11 +70,11 @@ public class GithubTest {
     }
 
     public void setLabels(String id, DataLabel... labels) {
-        QueryCache.LABELS.putCachedValue(id, new HashSet<>(Set.of(labels)));
+        QueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(List.of(labels));
     }
 
     public void setLabels(String id, Set<DataLabel> labels) {
-        QueryCache.LABELS.putCachedValue(id, new HashSet<>(labels));
+        QueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
     }
 
     public Response mockResponse(Path filename) {

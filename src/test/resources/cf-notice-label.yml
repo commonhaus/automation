@@ -6,6 +6,10 @@ notice:
         category: [Announcements, Reviews]
         action: [created, category_changed]
         then: [label_notice]
+      - # If the vote/done label is applied, remove the vote/open label
+        action: [labeled]
+        label: ["vote/done"]
+        then: [label_done]
   pull_request:
     rules:
       - # If a pull request is created that touches bylaws or policies
@@ -23,4 +27,4 @@ notice:
         then: [label_notice]
   actions:
     label_notice: [notice]
-
+    label_done: ["!vote/open"]

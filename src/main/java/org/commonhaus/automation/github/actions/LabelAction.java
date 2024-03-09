@@ -11,14 +11,32 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 @JsonDeserialize(as = LabelAction.class)
 public class LabelAction extends Action {
 
-    List<String> labels = new ArrayList<>();
+    public final List<String> add = new ArrayList<>(1);
+    public final List<String> remove = new ArrayList<>(1);
+    private final boolean inactive;
+
+    public LabelAction(List<String> actions) {
+        actions.forEach(x -> {
+            if (x.startsWith("!")) {
+                remove.add(x.substring(1));
+            } else {
+                add.add(x);
+            }
+        });
+        inactive = add.isEmpty() && remove.isEmpty();
+    }
 
     @Override
     public void apply(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        if (eventData == null || labels.isEmpty()) {
+        if (eventData == null || inactive) {
             return;
         }
-        queryContext.addLabels(eventData, labels);
+        if (!add.isEmpty()) {
+            queryContext.addLabels(eventData, add);
+        }
+        if (!remove.isEmpty()) {
+            queryContext.removeLabels(eventData, remove);
+        }
     }
 }

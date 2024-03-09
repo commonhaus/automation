@@ -173,7 +173,9 @@ public class NotifyLabelsTest extends GithubTest {
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
+                })
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -184,6 +186,42 @@ public class NotifyLabelsTest extends GithubTest {
                 });
 
         verifyLabelCache(discussionId, 0, List.of());
+    }
+
+    @Test
+    void discussionAddRemoveLabel() throws Exception {
+        // When a discussion is unlabeled, ...
+        // from src/test/resources/github/eventDiscussionUnlabeled.json
+        String discussionId = "D_kwDOLDuJqs4AXNhB";
+
+        // preload the cache: no request to fetch labels (and check our work)
+        setLabels(discussionId, VOTE_OPEN);
+        verifyLabelCache(discussionId, 1, List.of("vote/open"));
+
+        setLabels(repositoryId, notice, VOTE_OPEN, VOTE_DONE);
+        verifyLabelCache(repositoryId, 3, List.of("vote/open"));
+
+        Response removeLabel = mockResponse(Path.of("src/test/resources/github/removeLabelsFromLabelableResponse.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
+                            .thenReturn(removeLabel);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionLabeledVoteDone.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("removeLabelsFromLabelable("), anyMap());
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        verifyLabelCache(discussionId, 2, List.of("vote/done", "notice"));
     }
 
     @Test

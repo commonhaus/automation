@@ -35,7 +35,8 @@ public class Rule {
             matches = paths.matches(queryContext);
         }
         if (matches && label != null) {
-            matches = label.matches(queryContext, queryContext.getEventData().getNodeId());
+            matches = label.matches(queryContext, queryContext.getEventData().getEventLabels(),
+                    queryContext.getEventData().getNodeId());
         }
         return matches;
     }

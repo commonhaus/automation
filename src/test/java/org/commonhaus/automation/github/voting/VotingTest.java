@@ -49,12 +49,6 @@ import io.smallrye.graphql.client.Response;
 @QuarkusTest
 @GitHubAppTest
 public class VotingTest extends GithubTest {
-    static final DataLabel VOTE_OPEN = new DataLabel.Builder().name(VotingConsumer.VOTE_OPEN).build();
-    static final DataLabel VOTE_PROCEED = new DataLabel.Builder().name(VotingConsumer.VOTE_PROCEED).build();
-    static final DataLabel VOTE_QUORUM = new DataLabel.Builder().name(VotingConsumer.VOTE_QUORUM).build();
-    static final DataLabel VOTE_REVISE = new DataLabel.Builder().name(VotingConsumer.VOTE_REVISE).build();
-    static final DataLabel VOTE_DONE = new DataLabel.Builder().name(VotingConsumer.VOTE_DONE).build();
-
     static final Set<DataLabel> REPO_LABELS = Set.of(
             VOTE_DONE, VOTE_OPEN, VOTE_PROCEED, VOTE_QUORUM, VOTE_REVISE);
     static final Set<DataLabel> ITEM_OPEN = Set.of(VOTE_OPEN);

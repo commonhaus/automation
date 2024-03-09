@@ -86,4 +86,8 @@ public class EventQueryContext extends QueryContext {
     public Collection<DataLabel> addLabels(EventData eventData, List<String> labels) {
         return super.addLabels(eventData.getNodeId(), labels);
     }
+
+    public Collection<DataLabel> removeLabels(EventData eventData, List<String> labels) {
+        return super.removeLabels(eventData.getNodeId(), labels);
+    }
 }
