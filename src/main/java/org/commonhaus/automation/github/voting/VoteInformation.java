@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.voting;
 
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -12,7 +13,10 @@ import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.ReactionContent;
+
+import io.quarkus.logging.Log;
 
 public class VoteInformation {
     enum Type {
@@ -37,33 +41,39 @@ public class VoteInformation {
     public final List<ReactionContent> approve;
 
     public final String group;
-    public final GHTeam team;
+    public final TeamList teamList;
     public final Voting.Threshold votingThreshold;
 
     public VoteInformation(VoteEvent event) {
         QueryContext qc = event.getQueryContext();
         Voting.Config voteConfig = event.getVotingConfig();
         String bodyString = event.getBody();
+        TeamList teamList = null;
 
         // Body contains voting group? "Voting group"
         Matcher m = groupPattern.matcher(bodyString);
-        GHTeam team = null;
         if (m.find()) {
             this.group = m.group(1);
 
             GHOrganization org = event.getOrganization();
-            team = QueryCache.TEAM.getCachedValue(this.group);
-            if (team == null) {
+            teamList = QueryCache.TEAM.getCachedValue(this.group);
+            if (teamList == null) {
                 String teamName = this.group.replace(org.getLogin() + "/", "");
-                team = qc.execGitHubSync((gh, dryRun) -> org.getTeamByName(teamName));
+                Set<GHUser> members = qc.execGitHubSync((gh, dryRun) -> {
+                    GHTeam team = org.getTeamByName(teamName);
+                    return team == null ? Set.of() : team.getMembers();
+                });
+
                 if (!qc.hasErrors()) {
-                    QueryCache.TEAM.putCachedValue(this.group, team);
+                    teamList = new TeamList(teamName, members);
+                    Log.debugf("[%s] %s members: %s", qc.getLogId(), teamList.name, teamList.members);
+                    QueryCache.TEAM.putCachedValue(this.group, teamList);
                 }
             }
         } else {
             this.group = null;
         }
-        this.team = team;
+        this.teamList = teamList;
         this.votingThreshold = voteConfig.votingThreshold(this.group);
 
         m = consensusPattern.matcher(bodyString);
@@ -93,7 +103,7 @@ public class VoteInformation {
     }
 
     public boolean invalidGroup() {
-        return team == null;
+        return teamList == null;
     }
 
     public boolean invalidReactions() {
@@ -120,7 +130,7 @@ public class VoteInformation {
                 %s\r
                 """,
                 group,
-                team != null,
+                teamList != null,
                 invalidGroup() ? validTeamComment : "",
                 explainVoteCounting(),
                 invalidReactions() ? validReactionsComment : "");

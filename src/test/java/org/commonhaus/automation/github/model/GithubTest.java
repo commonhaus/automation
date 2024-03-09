@@ -51,7 +51,6 @@ public class GithubTest {
     @BeforeEach
     protected void beforeEach() {
         QueryCache.TEAM.invalidateAll();
-        QueryCache.TEAM_LIST.invalidateAll();
         QueryCache.LABELS.invalidateAll();
         QueryCache.RECENT_BOT_CONTENT.invalidateAll();
         verifyNoLabelCache(repositoryId);

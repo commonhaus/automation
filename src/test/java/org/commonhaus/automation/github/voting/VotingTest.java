@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -33,7 +34,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHOrganization;
-import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.ReactionContent;
 import org.mockito.Mockito;
@@ -70,11 +70,8 @@ public class VotingTest extends GithubTest {
         GHUser user3 = mockGHUser("user3");
         mockGHUser("user4");
 
-        var team = mocks.ghObject(GHTeam.class, 1);
-        when(team.getMembers())
-                .thenReturn(Set.of(user1, user2, user3));
-
-        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
+        TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2, user3));
+        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
     }
 
     @BeforeEach
@@ -324,8 +321,6 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("updateDiscussionComment("), anyMap());
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
-                    verify(mocks.ghObject(GHTeam.class, 1), timeout(500))
-                            .getMembers();
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
@@ -367,8 +362,60 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("... on Reactable {"), anyMap());
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("updateDiscussionComment("), anyMap());
-                    verify(mocks.ghObject(GHTeam.class, 1), timeout(500))
-                            .getMembers();
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+        verifyBotCommentCache(discussionId, botCommentId);
+    }
+
+    @Test
+    void testVoteOpenValidCommentsVote() throws Exception {
+        // Valid vote; only some team have voted + extra; update comment
+
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_OPEN);
+
+        Response teamComments = mockResponse(Path.of("src/test/resources/github/queryManualCommentsResult.json"));
+        Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
+        Response addLabel = mockResponse(Path.of("src/test/resources/github/addVotingQuorumLabelResponse.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-voting.yml");
+                    when(mocks.installationClient(installationId).isCredentialValid())
+                            .thenReturn(true);
+
+                    GHUser user1 = mockGHUser("nmcl");
+                    GHUser user2 = mockGHUser("evanchooly");
+                    GHUser user3 = mockGHUser("kenfinnigan");
+                    mockGHUser("ebullient");
+
+                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2, user3));
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+
+                    setupBotComment(discussionId);
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("query($itemId: ID!, $after: String) {"), anyMap()))
+                            .thenReturn(teamComments);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussionComment("), anyMap()))
+                            .thenReturn(updateComment);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(addLabel);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionEditedComments.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("query($itemId: ID!, $after: String) {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussionComment("), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
@@ -386,11 +433,8 @@ public class VotingTest extends GithubTest {
         GHOrganization org = Mockito.mock(GHOrganization.class);
         when(org.getLogin()).thenReturn("commonhaus");
 
-        GHTeam team = Mockito.mock(GHTeam.class);
-        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
-
         List<DataReaction> teamReactions = new ArrayList<>(50);
-        List<DataActor> teamLogins = new ArrayList<>(50);
+        Set<DataActor> teamLogins = new HashSet<>(50);
         List<DataReaction> unignore = new ArrayList<>(3);
         for (int i = 1; i < 51; i++) {
             DataActor user = new DataActor(mockGHUser("user" + i));
@@ -408,6 +452,9 @@ public class VotingTest extends GithubTest {
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
         }
 
+        TeamList team = new TeamList(teamLogins, "test-quorum-default");
+        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
+
         EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
         when(queryContext.getOrganization()).thenReturn(org);
 
@@ -415,7 +462,8 @@ public class VotingTest extends GithubTest {
         votingConfig.votingThreshold = new java.util.HashMap<>();
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
 
-        VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all,
+        VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default",
+                Voting.Threshold.all,
                 body);
 
         // Martha's
@@ -463,7 +511,8 @@ public class VotingTest extends GithubTest {
                 <!--vote::manual -->
                 """;
 
-        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all, body);
+        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all,
+                body);
 
         voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
@@ -487,7 +536,8 @@ public class VotingTest extends GithubTest {
                 <!--vote::manual comments -->
                 """;
 
-        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all, body);
+        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", Voting.Threshold.all,
+                body);
 
         voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
@@ -500,7 +550,8 @@ public class VotingTest extends GithubTest {
         assertThat(voteTally.categories).hasSize(1);
     }
 
-    VoteEvent createVoteEvent(QueryContext queryContext, Voting.Config votingConfig, String group, Voting.Threshold threshold,
+    VoteEvent createVoteEvent(QueryContext queryContext, Voting.Config votingConfig, String group,
+            Voting.Threshold threshold,
             String body) {
         EventData eventData = Mockito.mock(EventData.class);
         when(eventData.getBody()).thenReturn(body);
@@ -514,15 +565,16 @@ public class VotingTest extends GithubTest {
             VoteInformation voteInfo,
             List<DataReaction> extraReactions,
             List<DataReaction> teamReactions,
-            List<DataActor> teamLogins) throws JsonProcessingException {
-        return assertVoteTally(numUsers, numUsers, expectHasQuorum, voteInfo, extraReactions, teamReactions, teamLogins);
+            Set<DataActor> teamLogins) throws JsonProcessingException {
+        return assertVoteTally(numUsers, numUsers, expectHasQuorum, voteInfo, extraReactions, teamReactions,
+                teamLogins);
     }
 
     VoteTally assertVoteTally(int numUsers, int numVotes, boolean expectHasQuorum,
             VoteInformation voteInfo,
             List<DataReaction> extraReactions,
             List<DataReaction> teamReactions,
-            List<DataActor> teamLogins) throws JsonProcessingException {
+            Set<DataActor> teamLogins) throws JsonProcessingException {
 
         List<DataReaction> reactions = Stream
                 .concat(teamReactions.stream().limit(numUsers), extraReactions.stream())
@@ -541,10 +593,10 @@ public class VotingTest extends GithubTest {
                     .toList();
         }
 
-        VoteTally voteTally = new VoteTally(voteInfo, reactions, comments, teamLogins);
+        VoteTally voteTally = new VoteTally(voteInfo, reactions, comments);
 
         String json = objectMapper.writeValueAsString(voteTally);
-        //System.out.println(json);
+        // System.out.println(json);
         assertThat(json)
                 .contains(List.of("hasQuorum", "votingThreshold",
                         "group", "groupSize", "groupVotes", "countedVotes", "droppedVotes",

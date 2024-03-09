@@ -70,8 +70,8 @@ public class VoteTally {
     @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
     Collection<DataActor> missingGroupActors;
 
-    public VoteTally(VoteInformation info, Collection<DataReaction> votes, Collection<DataCommonComment> comments,
-            List<DataActor> teamMembers) {
+    public VoteTally(VoteInformation info, Collection<DataReaction> votes, Collection<DataCommonComment> comments) {
+        Set<DataActor> teamMembers = info.teamList.members;
         missingGroupActors = new HashSet<>(teamMembers);
 
         voteType = info.voteType;

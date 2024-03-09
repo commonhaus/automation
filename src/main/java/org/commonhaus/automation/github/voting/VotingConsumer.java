@@ -9,7 +9,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.Voting;
-import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataCommonComment;
 import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.DataReaction;
@@ -122,10 +121,8 @@ public class VotingConsumer {
             return;
         }
 
-        List<DataActor> logins = getTeamLogins(voteEvent, voteInfo);
-
         // Tally the votes
-        VoteTally tally = new VoteTally(voteInfo, reactions, comments, logins);
+        VoteTally tally = new VoteTally(voteInfo, reactions, comments);
 
         // Add or update a bot comment summarizing the vote.
         String commentBody = tally.toMarkdown();
@@ -230,16 +227,6 @@ public class VotingConsumer {
                 qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), newBody);
             }
         }
-    }
-
-    private List<DataActor> getTeamLogins(VoteEvent voteEvent, VoteInformation voteInfo) {
-        QueryContext qc = voteEvent.getQueryContext();
-        List<DataActor> logins = QueryCache.TEAM_LIST.getCachedValue(voteInfo.group);
-        if (logins == null) {
-            logins = qc.execGitHubSync((gh, dryRun) -> voteInfo.team.getMembers().stream().map(DataActor::new).toList());
-            QueryCache.TEAM_LIST.putCachedValue(voteInfo.group, logins);
-        }
-        return logins;
     }
 
     private void sendErrorEmail(Voting.Config votingConfig, VoteEvent voteEvent, Throwable e) {

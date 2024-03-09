@@ -35,4 +35,29 @@ public class DataActor extends DataCommonType {
     public String toString() {
         return String.format("Actor[%s]", this.login);
     }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = super.hashCode();
+        result = prime * result + ((login == null) ? 0 : login.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (!super.equals(obj))
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        DataActor other = (DataActor) obj;
+        if (login == null) {
+            if (other.login != null)
+                return false;
+        } else if (!login.equals(other.login))
+            return false;
+        return true;
+    }
 }
