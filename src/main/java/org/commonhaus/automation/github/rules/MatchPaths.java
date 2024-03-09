@@ -3,9 +3,9 @@ package org.commonhaus.automation.github.rules;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.EventType;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestFileDetail;
@@ -22,9 +22,8 @@ import io.quarkus.logging.Log;
 public class MatchPaths {
     List<String> paths;
 
-    public boolean matches(QueryContext queryContext) {
-        EventData eventData = queryContext.getEventData();
-        if (eventData.getEventType() != EventType.pull_request) {
+    public boolean matches(EventQueryContext queryContext) {
+        if (queryContext.getEventType() != EventType.pull_request) {
             return false;
         }
         if (paths == null || paths.isEmpty()) {
@@ -32,6 +31,7 @@ public class MatchPaths {
             return true;
         }
 
+        EventData eventData = queryContext.getEventData();
         GHEventPayload.PullRequest pullRequest = eventData.getGHEventPayload();
         GHPullRequest ghPullRequest = pullRequest.getPullRequest();
 
@@ -50,7 +50,8 @@ public class MatchPaths {
                                 return true;
                             }
                         } catch (Exception e) {
-                            Log.error("Error evaluating glob expression: " + p, e);
+                            Log.errorf(e, "[%s] Error evaluating glob expression %s: %s",
+                                    queryContext.getLogId(), p, e.toString());
                         }
                     }
                 }
@@ -60,9 +61,9 @@ public class MatchPaths {
     }
 
     MatchingEngine compileGlob(String filenamePattern) {
-        MatchingEngine me = QueryHelper.QueryCache.GLOB.getCachedValue(filenamePattern, MatchingEngine.class);
+        MatchingEngine me = QueryCache.GLOB.getCachedValue(filenamePattern);
         if (me == null) {
-            me = QueryHelper.QueryCache.GLOB.putCachedValue(filenamePattern, GlobPattern.compile(filenamePattern));
+            me = QueryCache.GLOB.putCachedValue(filenamePattern, GlobPattern.compile(filenamePattern));
         }
         return me;
     }

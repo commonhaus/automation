@@ -5,19 +5,14 @@ import java.util.List;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
-
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
 public class DataDiscussionCategory {
 
     static final String DISCUSSION_CATEGORY_FIELDS = """
-            description
-            emoji
             id
             name
-            slug
             """;
 
     /**
@@ -28,9 +23,6 @@ public class DataDiscussionCategory {
     public final Integer webhook_id;
 
     public final String name;
-    public final String slug;
-    public final String description;
-    public final String emoji;
 
     DataDiscussionCategory(JsonObject category) {
         String node_id = JsonAttribute.node_id.stringFrom(category);
@@ -45,21 +37,14 @@ public class DataDiscussionCategory {
         }
 
         this.name = JsonAttribute.name.stringFrom(category);
-        this.description = JsonAttribute.description.stringFrom(category);
-        this.emoji = JsonAttribute.emoji.stringFrom(category);
-        this.slug = JsonAttribute.slug.stringFrom(category);
     }
 
     public String toString() {
-        return String.format("Discussion [%s] %s %s", this.id, this.emoji, this.name);
+        return String.format("Discussion [%s] %s", this.id, this.name);
     }
 
-    /**
-     * Exceptions and errors are captured for caller in the queryContext
-     *
-     * @return list of discussion categories
-     */
-    public static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
+    /** package private. See QueryHelper / QueryContext */
+    static List<DataDiscussionCategory> queryDiscussionCategories(EventQueryContext queryContext) {
         if (queryContext.hasErrors()) {
             return List.of();
         }
@@ -74,7 +59,7 @@ public class DataDiscussionCategory {
                         }
                     }
                 """);
-        Log.debugf("discussion categories: %s", response.getData());
+        Log.debugf("[%s] discussion categories: %s", queryContext.getLogId(), response.getData());
         if (response.hasError()) {
             return List.of();
         }

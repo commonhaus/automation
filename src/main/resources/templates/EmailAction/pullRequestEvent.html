@@ -7,14 +7,12 @@
 {#authorAvatarUrl}{pullRequest.user.avatarUrl}{/authorAvatarUrl}
 {#dateTime}
     <div class="posted">created <time>{time:format(pullRequest.createdAt, "dd MMM yyyy")}</time></div>
-{#if pullRequest.updatedAt 
-        && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
-        || pullRequest.updatedAt != pullRequest.createdAt}
-    <div class="updated">updated <time>{time:format(pullRequest.updatedAt, "dd MMM yyyy")}</time></div>
-{/if}{#if pullRequest.closedAt 
-        && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
-        || pullRequest.closedAt != pullRequest.createdAt}
-    <div class="closed">closed <time>{time:format(pullRequest.closedAt, "dd MMM yyyy")}</time></div>
-{/if}{/dateTime}
+    {#if pullRequest.closedAt && pullRequest.closedAt != pullRequest.createdAt}
+        <div class="closed">closed <time>{time:format(pullRequest.closedAt, "dd MMM yyyy")}</time></div>
+    {/if}
+    {#if pullRequest.updatedAt && pullRequest.updatedAt != pullRequest.createdAt && (!pullRequest.closedAt || pullRequest.updatedAt != pullRequest.closedAt)}
+        <div class="updated">updated <time>{time:format(pullRequest.updatedAt, "dd MMM yyyy")}</time></div>
+    {/if}
+{/dateTime}
 {#body}{htmlBody.raw}{/body}
 {/include}

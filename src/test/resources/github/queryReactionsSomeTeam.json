@@ -1,0 +1,92 @@
+{
+  "node": {
+    "reactions": {
+      "nodes": [
+        {
+          "user": {
+            "id": "user1",
+            "login": "user1",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "THUMBS_UP",
+          "createdAt": "2024-01-16T19:42:04Z"
+        },
+        {
+          "user": {
+            "id": "user2",
+            "login": "user2",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "THUMBS_UP",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user2",
+            "login": "user2",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "EYES",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user4",
+            "login": "user4",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "EYES",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user4",
+            "login": "user4",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "THUMBS_DOWN",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user5",
+            "login": "user5",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "THUMBS_UP",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user5",
+            "login": "user5",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "THUMBS_DOWN",
+          "createdAt": "2024-01-16T17:10:38Z"
+        },
+        {
+          "user": {
+            "id": "user5",
+            "login": "user5",
+            "url": "https://github.com/commonhaus-test-bot[bot]",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+          },
+          "content": "HEART",
+          "createdAt": "2024-01-16T17:10:38Z"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOnYyOpHOABI8XQ=="
+      }
+    }
+  }
+}

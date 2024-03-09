@@ -3,10 +3,10 @@ package org.commonhaus.automation.github.rules;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.DataDiscussionCategory;
 import org.commonhaus.automation.github.model.EventPayload;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.EventType;
 
 /**
@@ -16,9 +16,9 @@ public class MatchCategory {
     final static List<EventType> eventsWithCategories = List.of(EventType.discussion, EventType.discussion_comment);
     List<String> category;
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        if (eventData == null || !eventsWithCategories.contains(eventData.getEventType())) {
+        if (eventData == null || !eventsWithCategories.contains(queryContext.getEventType())) {
             return false;
         }
 
@@ -31,8 +31,7 @@ public class MatchCategory {
         DataDiscussionCategory discussionCategory = discussion.category;
         for (String cat : category) {
             if (cat.equals(discussionCategory.id)
-                    || cat.equalsIgnoreCase(discussionCategory.name)
-                    || cat.equals(discussionCategory.id)) {
+                    || cat.equalsIgnoreCase(discussionCategory.name)) {
                 return true;
             }
         }

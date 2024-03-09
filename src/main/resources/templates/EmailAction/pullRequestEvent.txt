@@ -4,13 +4,11 @@
 {#authorLogin}{pullRequest.user.login}{/authorLogin}
 {#authorUrl}{pullRequest.user.url}{/authorUrl}
 {#createdAt}{pullRequest.createdAt}{/createdAt}
-{#dateTime}{#if pullRequest.closedAt 
-          && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
-          || pullRequest.closedAt != pullRequest.createdAt}
+{#dateTime}
+{#if pullRequest.closedAt && pullRequest.closedAt != pullRequest.createdAt}
 - closed {pullRequest.closedAt}
-{/if}{#if pullRequest.updatedAt 
-          && (pullRequest.updatedAt && pullRequest.closedAt != pullRequest.updatedAt) 
-          || pullRequest.updatedAt != pullRequest.createdAt}
+{/if}
+{#if pullRequest.updatedAt && pullRequest.updatedAt != pullRequest.createdAt && (!pullRequest.closedAt || pullRequest.updatedAt != pullRequest.closedAt)}
 - updated {pullRequest.updatedAt}
 {/if}
 {/dateTime}

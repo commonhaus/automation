@@ -1,0 +1,7 @@
+{#include includes/errorText}
+{#title}{title}{/title}
+{#repoSlug}{voteEvent.getRepoSlug()}{/repoSlug}
+{#ghUrl}{voteEvent.getUrl()}{/ghUrl}
+{#dateTime}{voteEvent.eventTime()}{/dateTime}
+{#body}{body}{/body}
+{/include}

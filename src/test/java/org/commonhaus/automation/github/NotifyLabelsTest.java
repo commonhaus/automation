@@ -3,17 +3,18 @@ package org.commonhaus.automation.github;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-import org.commonhaus.automation.github.model.DataLabel;
+import org.commonhaus.automation.github.model.GithubTest;
+import org.commonhaus.automation.github.model.QueryCache;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
@@ -21,7 +22,6 @@ import org.kohsuke.github.GHPullRequestFileDetail;
 import org.kohsuke.github.PagedIterable;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
-import io.quarkus.arc.Arc;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
 
@@ -38,24 +38,16 @@ public class NotifyLabelsTest extends GithubTest {
         String discussionId = "D_kwDOLDuJqs4AXaZU";
         verifyNoLabelCache(discussionId);
 
-        Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-automation.yml");
-
-                    when(mocks.installationGraphQLClient(installationId)
-                            .executeSync(anyString(), anyMap()))
-                            .thenReturn(noLabels);
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
-                    verify(mocks.installationGraphQLClient(installationId), times(1))
-                            .executeSync(anyString(), anyMap());
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        verifyLabelCache(discussionId, 0, List.of());
+        verifyNoLabelCache(discussionId);
     }
 
     @Test
@@ -72,17 +64,23 @@ public class NotifyLabelsTest extends GithubTest {
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
+
                     when(mocks.installationGraphQLClient(installationId)
-                            .executeSync(anyString(), anyMap()))
-                            .thenReturn(repoLabels, modifiedLabel);
+                            .executeSync(contains("repository(owner: $owner, name: $name) {"), anyMap()))
+                            .thenReturn(repoLabels);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(modifiedLabel);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
-                    // 2 times: repo labels, add new label
-                    verify(mocks.installationGraphQLClient(installationId), times(2))
-                            .executeSync(anyString(), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("repository(owner: $owner, name: $name) {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
+
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
@@ -99,25 +97,22 @@ public class NotifyLabelsTest extends GithubTest {
         String discussionId = "D_kwDOLDuJqs4AXaZQ";
 
         // preload the cache: no request to fetch repo labels (and check our work)
-        Set<DataLabel> existing = new HashSet<>();
-        existing.add(new DataLabel.Builder().name("notice").build());
-        QueryHelper.QueryCache.LABELS.putCachedValue(repositoryId, existing);
+        setLabels(repositoryId, notice);
         verifyLabelCache(repositoryId, 1, List.of("notice"));
 
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponseBug.json"));
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
                     when(mocks.installationGraphQLClient(installationId)
-                            .executeSync(anyString(), anyMap()))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
                             .thenReturn(modifiedLabel);
                 })
                 .when().payloadFromClasspath("/github/eventDiscussionCreatedReviewsLabel.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
-                    // 2 times: item labels, repo labels (cached), add new label
-                    verify(mocks.installationGraphQLClient(installationId), times(1))
-                            .executeSync(anyString(), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
@@ -131,15 +126,11 @@ public class NotifyLabelsTest extends GithubTest {
         String discussionId = "D_kwDOLDuJqs4AXNhB";
 
         // preload the cache: no request to fetch labels (and check our work)
-        Set<DataLabel> existing = new HashSet<>();
-        existing.add(bug);
-        QueryHelper.QueryCache.LABELS.putCachedValue(discussionId, existing);
+        setLabels(discussionId, bug);
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionLabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -158,14 +149,13 @@ public class NotifyLabelsTest extends GithubTest {
         verifyNoLabelCache(discussionId);
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
                     verify(mocks.installationGraphQLClient(installationId), times(0))
                             .executeSync(anyString(), anyMap());
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
@@ -179,20 +169,17 @@ public class NotifyLabelsTest extends GithubTest {
         String discussionId = "D_kwDOLDuJqs4AXNhB";
 
         // preload the cache: no request to fetch labels (and check our work)
-        Set<DataLabel> existing = new HashSet<>();
-        existing.add(bug);
-        QueryHelper.QueryCache.LABELS.putCachedValue(discussionId, existing);
+        setLabels(discussionId, bug);
         verifyLabelCache(discussionId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventDiscussionUnlabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
                     verify(mocks.installationGraphQLClient(installationId), times(0))
                             .executeSync(anyString(), anyMap());
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
@@ -202,24 +189,29 @@ public class NotifyLabelsTest extends GithubTest {
     @Test
     void testRelevantPr() throws Exception {
         // test query for sender login
-        Arc.container().instance(QueryHelper.class).get().setBotSenderLogin(null);
+        setLogin(null);
 
         String prNodeId = "PR_kwDOLDuJqs5mlMVl";
         verifyNoLabelCache(prNodeId);
 
         long id = 1721025893;
-        Response viewer = mockResponse(Path.of("src/test/resources/github/queryViewer.json"));
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
         Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
 
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml");
                     // 2 GraphQL queries to fetch labels
                     when(mocks.installationGraphQLClient(installationId)
-                            .executeSync(anyString(), anyMap()))
-                            .thenReturn(viewer, noLabels, repoLabels, modifiedLabel);
+                            .executeSync(contains("... on Labelable {"), anyMap()))
+                            .thenReturn(noLabels);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("repository(owner: $owner, name: $name) {"), anyMap()))
+                            .thenReturn(repoLabels);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(modifiedLabel);
 
                     // Mocked REST request
                     PagedIterable<GHPullRequestFileDetail> paths = mockPagedIterable(
@@ -229,14 +221,22 @@ public class NotifyLabelsTest extends GithubTest {
                 .when().payloadFromClasspath("/github/eventPullRequestOpenedBylaws.json")
                 .event(GHEvent.PULL_REQUEST)
                 .then().github(mocks -> {
-                    verify(mocks.installationGraphQLClient(installationId), times(4))
-                            .executeSync(anyString(), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("... on Labelable {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("repository(owner: $owner, name: $name) {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
+                    verify(mocks.pullRequest(id)).listFiles();
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         verifyLabelCache(prNodeId, 1, List.of("notice"));
-        Assertions.assertNotNull(QueryHelper.QueryCache.GLOB.getCachedValue("bylaws/*", Object.class),
+        Assertions.assertNotNull(QueryCache.GLOB.getCachedValue("bylaws/*"),
                 "bylaws/* GLOB cache should exist");
-        Assertions.assertNull(QueryHelper.QueryCache.GLOB.getCachedValue("policy/*", Object.class),
+        Assertions.assertNull(QueryCache.GLOB.getCachedValue("policy/*"),
                 "policy/* GLOB cache should not exist");
     }
 
@@ -245,18 +245,15 @@ public class NotifyLabelsTest extends GithubTest {
         String repoId = "R_kgDOLDuJqg";
 
         // preload the cache: no request to fetch labels (and check our work)
-        Set<DataLabel> existing = new HashSet<>();
-        existing.add(bug);
-        QueryHelper.QueryCache.LABELS.putCachedValue(repoId, existing);
+        setLabels(repoId, bug);
         verifyLabelCache(repoId, 1, List.of("bug"));
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-label.yml");
-                })
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-label.yml"))
                 .when().payloadFromClasspath("/github/eventLabelCreated.json")
                 .event(GHEvent.LABEL)
                 .then().github(mocks -> {
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 

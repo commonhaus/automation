@@ -4,15 +4,13 @@ import java.net.URL;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
-import org.commonhaus.automation.github.model.EventPayload.DiscussionPayload;
+import org.commonhaus.automation.github.model.EventQueryContext;
+import org.commonhaus.automation.mail.MailConsumer;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
-import org.eclipse.microprofile.config.ConfigProvider;
-import org.eclipse.microprofile.context.ManagedExecutor;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 
@@ -24,25 +22,12 @@ import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.qute.CheckedTemplate;
+import io.vertx.mutiny.core.eventbus.EventBus;
 
 @JsonDeserialize(as = EmailAction.class)
 public class EmailAction extends Action {
     static final Parser parser = Parser.builder().build();
     static final HtmlRenderer renderer = HtmlRenderer.builder().build();
-
-    static boolean initialized = false;
-    static String replyToAddress = null;
-
-    static void addReplyTo(MailTemplateInstance mailTemplateInstance) {
-        String replyTo = replyToAddress;
-        if (replyTo == null && !initialized) {
-            replyToAddress = replyTo = ConfigProvider.getConfig().getValue("automation.replyTo", String.class);
-            initialized = true;
-        }
-        if (replyTo != null) {
-            mailTemplateInstance.replyTo(replyTo);
-        }
-    }
 
     @CheckedTemplate
     static class Templates {
@@ -71,65 +56,55 @@ public class EmailAction extends Action {
     }
 
     @Override
-    public void apply(QueryContext queryContext) {
+    public void apply(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
-        // Fire and forget: mail construction and sending happens in a separate thread
-        Arc.container().instance(ManagedExecutor.class).get().submit(() -> {
-            Log.debugf("EmailAction.apply: Preparing email to %s for %s.%s", List.of(addresses), eventData.getEventType(),
-                    eventData.getAction());
 
-            final String subject;
-            MailTemplateInstance mailTemplateInstance;
-            try {
-                mailTemplateInstance = switch (eventData.getEventType()) {
-                    case pull_request -> {
-                        GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
+        Log.debugf("[%s] EmailAction.apply: Preparing email to %s",
+                eventData.getLogId(), List.of(addresses));
 
-                        subject = "PR #" + payload.getNumber() + " " + payload.getPullRequest().getTitle();
-                        yield Templates.pullRequestEvent(subject,
-                                toHtmlBody(payload.getPullRequest().getBody()),
-                                payload.getPullRequest());
-                    }
-                    case discussion -> {
-                        EventPayload.DiscussionPayload payload = (DiscussionPayload) eventData.getEventPayload();
-                        DataDiscussion discussion = payload.discussion;
+        final String subject;
+        MailTemplateInstance mailTemplateInstance;
+        try {
+            mailTemplateInstance = switch (queryContext.getEventType()) {
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
 
-                        subject = "#" + discussion.number + " " + discussion.title + " (" + discussion.category.name + ")";
-                        yield Templates.discussionEvent(subject,
-                                toHtmlBody(discussion.body),
-                                discussion,
-                                eventData.getRepository().getFullName(),
-                                eventData.getRepository().getUrl());
-                    }
-                    default -> {
-                        Log.warnf("EmailAction.apply: unsupported event type %s", eventData.getEventType());
-                        subject = null;
-                        yield null;
-                    }
-                };
-            } catch (Exception e) {
-                mailTemplateInstance = null;
-                Log.errorf(e, "EmailAction.apply: Failed to prepare email to %s", List.of(addresses));
-                return;
-            }
+                    subject = "PR #" + payload.getNumber() + " " + payload.getPullRequest().getTitle();
+                    yield Templates.pullRequestEvent(subject,
+                            toHtmlBody(eventData, payload.getPullRequest().getBody()),
+                            payload.getPullRequest());
+                }
+                case discussion -> {
+                    EventPayload.DiscussionPayload payload = eventData.getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
 
-            if (mailTemplateInstance != null) {
-                Log.debugf("EmailAction.apply: Sending email to %s; %s", List.of(addresses), subject);
-                addReplyTo(mailTemplateInstance);
-                mailTemplateInstance
-                        .to(addresses)
-                        .subject(subject)
-                        .send()
-                        .subscribe().with(
-                                success -> Log.infof("EmailAction.apply: Email sent to %s; %s", List.of(addresses), subject),
-                                failure -> Log.errorf(failure, "EmailAction.apply: Failed to send email to %s",
-                                        List.of(addresses),
-                                        subject));
-            }
-        });
+                    subject = "#" + discussion.number + " " + discussion.title + " (" + discussion.category.name + ")";
+                    yield Templates.discussionEvent(subject,
+                            toHtmlBody(eventData, discussion.body),
+                            discussion,
+                            eventData.getRepository().getFullName(),
+                            eventData.getRepository().getUrl());
+                }
+                default -> {
+                    Log.warnf("[%s] EmailAction.apply: unsupported event type", eventData.getLogId());
+                    subject = null;
+                    yield null;
+                }
+            };
+        } catch (Exception e) {
+            Log.errorf(e, "[%s] EmailAction.apply: Failed to prepare email to %s", eventData.getLogId(), List.of(addresses));
+            return;
+        }
+
+        if (mailTemplateInstance != null) {
+            Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
+            MailConsumer.MailEvent mailEvent = new MailConsumer.MailEvent(eventData.getLogId(),
+                    mailTemplateInstance, subject, addresses);
+            Arc.container().instance(EventBus.class).get().send("mail", mailEvent);
+        }
     }
 
-    private String toHtmlBody(String body) {
+    private String toHtmlBody(EventData eventData, String body) {
         if (body == null) {
             return "<p></p>";
         }
@@ -137,7 +112,7 @@ public class EmailAction extends Action {
             Node document = parser.parse(body);
             return renderer.render(document);
         } catch (Exception e) {
-            Log.errorf(e, "EmailAction.toHtmlBody: Failed to render body as HTML");
+            Log.errorf(e, "[%s] EmailAction.toHtmlBody: Failed to render body as HTML", eventData.getLogId());
             return body;
         }
     }

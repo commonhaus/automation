@@ -50,95 +50,57 @@ import io.quarkus.logging.Log;
  * </ul>
  */
 public enum JsonAttribute {
-    action,
-    activeLockReason,
     addDiscussionComment,
+    addLabelsToLabelable,
     answer,
-    answerChosenAt,
     author,
-    authorAssociation,
     avatarUrl("avatar_url"),
     body,
     category,
     changes,
     closed,
     closedAt,
-    color,
     comment,
-    confused,
+    commentEdge,
+    comments,
     content,
     createdAt("created_at"),
-    deletedAt,
-    description,
+    databaseId,
     discussion,
     discussionCategories,
     discussion_id,
-    discussions,
-    editedAt,
-    editor,
-    emoji,
     endCursor,
-    eyes,
     from,
-    full_name,
     hasNextPage,
-    heart,
-    hooray,
     id,
-    includesCreatedEdit,
     installation,
-    isAnswer,
-    isAnswered,
-    isDefault("default"),
+    issue,
+    issueComment,
     label,
+    labelable,
     labels,
-    lastEditedAt,
-    laugh,
-    locked,
     login,
-    minusOne,
     name,
-    new_discussion,
-    new_repository,
     node,
     node_id,
     nodes,
     number,
-    old_answer,
     organization,
-    owner,
     pageInfo,
-    parent_id,
-    plusOne,
-    publishedAt,
+    pullRequest,
     reactableId,
     reactions,
-    replyTo,
     repository,
-    rocket,
-    sender,
-    state,
-    stateReason,
+    search,
     title,
-    total_count,
+    updateDiscussionComment,
+    updateIssue,
+    updateIssueComment,
+    updatePullRequest,
     updatedAt("updated_at"),
-    upvoteCount,
     url("html_url"),
     user,
     viewer,
-    viewerCanDelete,
-    viewerCanMarkAsAnswer,
-    viewerCanMinimize,
-    viewerCanReact,
-    viewerCanUnmarkAsAnswer,
-    viewerCanUpdate,
-    viewerCanUpvote,
-    viewerCannotUpdateReasons,
-    viewerDidAuthor,
-    viewerHasUpvoted,
-    slug,
-    labelable,
-    addLabelsToLabelable,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -149,18 +111,23 @@ public enum JsonAttribute {
     private final String nodeName;
     private final boolean alternateName;
 
-    private JsonAttribute() {
+    JsonAttribute() {
         this.nodeName = this.name();
         this.alternateName = false;
     }
 
-    private JsonAttribute(String nodeName) {
+    JsonAttribute(String nodeName) {
         this.nodeName = nodeName;
         this.alternateName = true;
     }
 
-    public String getNodeName() {
-        return nodeName;
+    boolean existsIn(JsonObject object) {
+        if (object == null) {
+            return false;
+        }
+        return alternateName
+                ? object.containsKey(nodeName) || object.containsKey(name())
+                : object.containsKey(nodeName);
     }
 
     /**
@@ -176,18 +143,6 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return boolean with value from nodeName (or name()) attribute of object or defaultValue
-     */
-    public boolean booleanFrom(JsonObject object, boolean defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        return alternateName
-                ? object.getBoolean(nodeName, object.getBoolean(name(), defaultValue))
-                : object.getBoolean(nodeName, defaultValue);
-    }
-
-    /**
      * @return String with value from nodeName (or name()) attribute of object or null
      */
     public String stringFrom(JsonObject object) {
@@ -200,18 +155,6 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return String with value from nodeName (or name()) attribute of object or defaultValue
-     */
-    public String stringFrom(JsonObject object, String defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        return alternateName
-                ? object.getString(nodeName, object.getString(name(), defaultValue))
-                : object.getString(nodeName, defaultValue);
-    }
-
-    /**
      * @return Integer with value from nodeName (or name()) attribute of object or null
      */
     public Integer integerFrom(JsonObject object) {
@@ -221,20 +164,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).intValue();
-    }
-
-    /**
-     * @return int with value from nodeName (or name()) attribute of object or default value
-     */
-    public int integerFrom(JsonObject object, int defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? defaultValue : JsonNumber.class.cast(value).intValue();
+        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).intValue();
     }
 
     /**
@@ -247,21 +177,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonNumber.class.cast(value).longValue();
-    }
-
-    /**
-     * @return long with value from nodeName (or name()) attribute of object or default value
-     */
-    public long longFrom(JsonObject object, long defaultValue) {
-        if (object == null) {
-            return defaultValue;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? defaultValue
-                : JsonNumber.class.cast(value).longValue();
+        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).longValue();
     }
 
     /**
@@ -289,6 +205,17 @@ public enum JsonAttribute {
     }
 
     /**
+     * @return DataCommonItem constructed from nodeName (or name()) attribute of object
+     */
+    public DataCommonItem commonItemFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataCommonItem(field);
+    }
+
+    /**
      * @return Discussion constructed from nodeName (or name()) attribute of object
      */
     public DataDiscussion discussionFrom(JsonObject object) {
@@ -311,7 +238,7 @@ public enum JsonAttribute {
     }
 
     /**
-     * @return DiscussionComment constructed from nodeName (or name()) attribute of object
+     * @return DataDiscussionComment constructed from nodeName (or name()) attribute of object
      */
     public DataDiscussionComment discussionCommentFrom(JsonObject object) {
         if (object == null) {
@@ -319,6 +246,17 @@ public enum JsonAttribute {
         }
         JsonObject field = jsonObjectFrom(object);
         return field == null ? null : new DataDiscussionComment(field);
+    }
+
+    /**
+     * @return DataIssueComment constructed from nodeName (or name()) attribute of object
+     */
+    public DataIssueComment issueCommentFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataIssueComment(field);
     }
 
     /**
@@ -336,9 +274,16 @@ public enum JsonAttribute {
         if (object == null) {
             return null;
         }
-        JsonArray list = jsonArrayFrom(object);
-        if (list == null) {
+        JsonObject field = jsonObjectFrom(object);
+        if (field == null) {
             return null;
+        }
+
+        JsonArray list;
+        if (field.getValueType() == ValueType.OBJECT) {
+            list = JsonAttribute.nodes.jsonArrayFrom(field);
+        } else {
+            list = jsonArrayFrom(field);
         }
         return list.stream()
                 .map(JsonObject.class::cast)
@@ -378,7 +323,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonObject.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonObject) value;
     }
 
     /**
@@ -407,7 +352,7 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : JsonArray.class.cast(value);
+        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonArray) value;
     }
 
     /**
@@ -428,16 +373,6 @@ public enum JsonAttribute {
         return this.jsonArrayFrom(object);
     }
 
-    public String stringifyNodeFrom(JsonObject object) {
-        if (object == null) {
-            return null;
-        }
-        JsonValue value = alternateName
-                ? object.getOrDefault(nodeName, object.get(name()))
-                : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : value.toString();
-    }
-
     private <T> T tryOrNull(String string, Class<T> clazz) {
         try {
             return ghApiReader.readValue(string, clazz);
@@ -448,7 +383,7 @@ public enum JsonAttribute {
     }
 
     /** Parses to Date as GitHubClient.parseDate does */
-    public static final Date parseDate(String timestamp) {
+    public static Date parseDate(String timestamp) {
         if (timestamp == null) {
             return null;
         }

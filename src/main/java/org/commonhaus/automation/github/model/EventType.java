@@ -10,6 +10,7 @@ import io.quarkus.logging.Log;
 public enum EventType {
     discussion,
     discussion_comment,
+    issue,
     issue_comment,
     label,
     pull_request,

@@ -1,0 +1,6 @@
+voting:
+  error_email_address:
+    - test@commonhaus.org
+  status:
+    badge: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.svg
+    page: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.html

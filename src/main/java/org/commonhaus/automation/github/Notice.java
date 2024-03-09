@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -7,11 +8,12 @@ import java.util.Set;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.DiscussionConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig.PullRequestConfig;
 import org.commonhaus.automation.github.actions.Action;
+import org.commonhaus.automation.github.model.EventQueryContext;
+import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.rules.Rule;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
@@ -23,6 +25,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkus.logging.Log;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class Notice {
 
@@ -37,63 +40,53 @@ public class Notice {
      * @param discussionPayload GitHub API parsed payload; connected GHRepository and GHOrganization
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
-    void onDiscussionEvent(GitHubEvent event, GitHub github,
+    void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Discussion GHEventPayload.Discussion discussionPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        if (!noticeConfig.isEnabled()) {
+        if (noticeConfig.isDisabled()) {
             return;
         }
 
-        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, discussionPayload), github);
-        if (queryContext.isFromMe()) {
-            Log.debugf("notice.onDiscussionEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            //return;
-        }
-        Log.debugf("notice.onDiscussionEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
+        EventData eventData = new EventData(event, discussionPayload);
+        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
 
-        Set<String> actions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
-        Log.infof("notice.onDiscussionEvent (%s): Discussion #%s triggered (%s) actions: %s",
-                event.getEventAction(), discussionPayload.getDiscussion().getNumber(), actions.size(), actions);
+        Log.infof("[%s] notice.onDiscussionEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onDiscussionEvent", event.getEventAction(), queryContext,
-                actions, noticeConfig.actions);
+        applyMatchingActions("notice.onDiscussionEvent", queryContext, desiredActions, noticeConfig.actions);
     }
 
     /**
-     * Called when there is a discussion event.
+     * Called when there is a pull request event.
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param pullRequestPayload GitHub API parsed payload
      * @param repoConfigFile CFGH RepoConfig (if exists)
      */
-    void onPullRequestEvent(GitHubEvent event, GitHub github,
+    void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @PullRequest GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
-        if (!noticeConfig.isEnabled()) {
+        if (noticeConfig.isDisabled()) {
             return;
         }
 
-        QueryContext queryContext = queryHelper.newQueryContext(new EventData(event, pullRequestPayload), github);
-        if (queryContext.isFromMe()) {
-            Log.debugf("notice.onPullRequestEvent (%s): Bot sender detected, skipping", event.getEventAction());
-            //return;
-        }
-        Log.debugf("notice.onPullRequestEvent (%s): %s", noticeConfig.isEnabled(), event.getEventAction());
+        EventData eventData = new EventData(event, pullRequestPayload);
+        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.pullRequest.rules);
-        Log.infof("notice.onPullRequestEvent (%s): Pull Request #%s triggered (%s) actions: %s",
-                event.getEventAction(), pullRequestPayload.getPullRequest().getNumber(), desiredActions.size(), desiredActions);
+        Log.infof("[%s] notice.onPullRequestEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onPullRequestEvent", event.getEventAction(), queryContext,
-                desiredActions, noticeConfig.actions);
+        applyMatchingActions("notice.onPullRequestEvent", queryContext, desiredActions, noticeConfig.actions);
     }
 
-    private Set<String> findMatchingActions(QueryContext queryContext, List<Rule> rules) {
+    private Set<String> findMatchingActions(EventQueryContext queryContext, List<Rule> rules) {
         Set<String> actions = new HashSet<>();
         for (Rule rule : rules) {
             if (rule.matches(queryContext)) {
@@ -103,7 +96,7 @@ public class Notice {
         return actions;
     }
 
-    private void applyMatchingActions(String method, String eventAction, QueryContext queryContext,
+    private void applyMatchingActions(String method, EventQueryContext queryContext,
             Set<String> desiredActions, Map<String, Action> actionsMap) {
         if (desiredActions.isEmpty()) {
             return;
@@ -111,15 +104,17 @@ public class Notice {
         for (String actionName : desiredActions) {
             Action action = actionsMap.get(actionName);
             if (action == null) {
-                Log.warnf("%s (%s): Action '%s' not found", method, eventAction, actionName);
+                Log.warnf("[%s] %s: Action '%s' not found",
+                        queryContext.getLogId(),
+                        method, actionName);
                 continue;
             }
             action.apply(queryContext);
         }
     }
 
-    static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
-        if (repoConfigFile == null || repoConfigFile.notice == null) {
+    public static Notice.Config getNoticeConfig(RepositoryAppConfig.File repoConfigFile) {
+        if (repoConfigFile == null) {
             return Notice.Config.DISABLED;
         }
         return repoConfigFile.notice;
@@ -128,14 +123,21 @@ public class Notice {
     public static class Config extends CommonConfig {
         public static final Config DISABLED = new Config() {
             @Override
-            public boolean isEnabled() {
-                return false;
+            public boolean isDisabled() {
+                return true;
             }
         };
+
+        @Override
+        public boolean isDisabled() {
+            return super.isDisabled() || actions.isEmpty();
+        }
 
         public DiscussionConfig discussion;
 
         @JsonProperty("pull_request")
         public PullRequestConfig pullRequest;
+
+        public final Map<String, Action> actions = new HashMap<>();
     }
 }

@@ -1,0 +1,10 @@
+{
+  "updateDiscussionComment": {
+    "clientMutationId": null,
+    "discussion": {
+      "id": "D_kwDOLDuJqs4AXteZ",
+      "databaseId": 6215577,
+      "url": "https://github.com/commonhaus/automation-test/discussions/25"
+    }
+  }
+}

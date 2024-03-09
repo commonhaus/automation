@@ -4,12 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 
 public class MatchAction {
 
-    public List<String> include = new ArrayList<>(1);
-    public List<String> exclude = new ArrayList<>(1);
+    public final List<String> include = new ArrayList<>(1);
+    public final List<String> exclude = new ArrayList<>(1);
 
     public MatchAction(List<String> actions) {
         actions.forEach(x -> {
@@ -21,7 +21,7 @@ public class MatchAction {
         });
     }
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         EventData eventData = queryContext.getEventData();
         if (eventData == null) {
             return false;

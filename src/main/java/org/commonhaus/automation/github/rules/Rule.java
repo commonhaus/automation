@@ -2,7 +2,7 @@ package org.commonhaus.automation.github.rules;
 
 import java.util.List;
 
-import org.commonhaus.automation.github.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.rules.Rule.RuleDeserializer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -23,19 +23,19 @@ public class Rule {
 
     public List<String> then;
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(EventQueryContext queryContext) {
         boolean matches = true;
         if (action != null) {
-            matches &= action.matches(queryContext);
+            matches = action.matches(queryContext);
         }
         if (matches && category != null) {
-            matches &= category.matches(queryContext);
+            matches = category.matches(queryContext);
         }
         if (matches && paths != null) {
-            matches &= paths.matches(queryContext);
+            matches = paths.matches(queryContext);
         }
         if (matches && label != null) {
-            matches &= label.matches(queryContext);
+            matches = label.matches(queryContext, queryContext.getEventData().getNodeId());
         }
         return matches;
     }
@@ -52,7 +52,7 @@ public class Rule {
         @Override
         public Rule deserialize(com.fasterxml.jackson.core.JsonParser p,
                 com.fasterxml.jackson.databind.DeserializationContext ctxt)
-                throws java.io.IOException, com.fasterxml.jackson.core.JsonProcessingException {
+                throws java.io.IOException {
             ObjectMapper mapper = (ObjectMapper) p.getCodec();
             JsonNode node = mapper.readTree(p);
             Rule rule = new Rule();
