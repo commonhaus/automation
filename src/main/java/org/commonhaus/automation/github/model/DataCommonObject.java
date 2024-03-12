@@ -4,9 +4,12 @@ import java.util.Date;
 
 import jakarta.json.JsonObject;
 
+import io.quarkus.qute.TemplateData;
+
 /**
  * Common elements for Discussions, Issues, and Pull Requests
  */
+@TemplateData
 public class DataCommonObject extends DataCommonType {
 
     static final String COMMON_OBJECT_MIN = """

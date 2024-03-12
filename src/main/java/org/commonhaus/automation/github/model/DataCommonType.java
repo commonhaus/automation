@@ -4,6 +4,9 @@ import jakarta.json.JsonObject;
 
 import org.kohsuke.github.GHObject;
 
+import io.quarkus.qute.TemplateData;
+
+@TemplateData
 public class DataCommonType {
     public boolean isWebhookData() {
         return this.webhook_id != null;
