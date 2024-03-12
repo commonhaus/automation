@@ -14,6 +14,7 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
+import io.quarkiverse.githubapp.event.DiscussionComment;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
@@ -54,6 +55,23 @@ public class Voting {
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionEvent: voting enabled; queue event", qc.getLogId());
+        bus.send("voting", new VoteEvent(qc, votingConfig, eventData));
+    }
+
+    void onDiscussionCommentEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @DiscussionComment GHEventPayload.DiscussionComment payload,
+            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
+        Voting.Config votingConfig = getVotingConfig(repoConfigFile);
+        if (votingConfig.isDisabled()) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+
+        // potentially multiple events at once to one event at a time...
+        Log.debugf("[%s] voting.onDiscussionCommentEvent: voting enabled; queue event", qc.getLogId());
         bus.send("voting", new VoteEvent(qc, votingConfig, eventData));
     }
 

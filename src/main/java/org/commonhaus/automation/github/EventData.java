@@ -172,10 +172,14 @@ public class EventData {
         String result = body;
         if (result == null) {
             result = body = switch (eventType) {
-                case discussion -> {
+                case discussion, discussion_comment -> {
                     EventPayload.DiscussionPayload payload = getEventPayload();
                     DataDiscussion discussion = payload.discussion;
                     yield discussion.body;
+                }
+                case issue, issue_comment -> {
+                    GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getBody();
                 }
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
