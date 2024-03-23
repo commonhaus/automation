@@ -1,12 +1,13 @@
-
+{@java.lang.String status}
+{@java.lang.String title}
 [{#insert repoSlug}{/}]
-{title} [1]
+({status}) {title} [1]
 
 {#insert body}{/}
 
+--
+created {#insert createdAt}{/} by {#insert authorLogin}{/} [2]
+{#insert dateTime}{/}
+
 [1]: {#insert ghUrl}https://github.com{/}
 [2]: {#insert authorUrl}{/}
-
----
-- created {#insert createdAt}{/} by {#insert authorLogin}{/} [2]
-{#insert dateTime}{/}
