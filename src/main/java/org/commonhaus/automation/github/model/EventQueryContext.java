@@ -76,6 +76,14 @@ public class EventQueryContext extends QueryContext {
         return this;
     }
 
+    public String getStatus() {
+        if (evt.getActionType() == ActionType.labeled) {
+            return String.join(", ",
+                    evt.getEventLabels().stream().map(x -> x.name).toList());
+        }
+        return evt.getActionType().name();
+    }
+
     /**
      * Add label by name or id to event item
      *

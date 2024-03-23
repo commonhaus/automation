@@ -1,6 +1,5 @@
 package org.commonhaus.automation.github.actions;
 
-import java.net.URL;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventData;
@@ -32,10 +31,10 @@ public class EmailAction extends Action {
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance pullRequestEvent(String title, String htmlBody,
-                GHPullRequest pullRequest);
+                GHPullRequest pullRequest, String status);
 
         public static native MailTemplateInstance discussionEvent(String title, String htmlBody,
-                DataDiscussion discussion, String repoSlug, URL repoUrl);
+                DataDiscussion discussion, String repoSlug, String status);
     }
 
     @JsonProperty
@@ -62,32 +61,38 @@ public class EmailAction extends Action {
         Log.debugf("[%s] EmailAction.apply: Preparing email to %s",
                 eventData.getLogId(), List.of(addresses));
 
-        final String subject;
+        final String title;
+        final String status = queryContext.getStatus();
         MailTemplateInstance mailTemplateInstance;
         try {
             mailTemplateInstance = switch (queryContext.getEventType()) {
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
 
-                    subject = "PR #" + payload.getNumber() + " " + payload.getPullRequest().getTitle();
-                    yield Templates.pullRequestEvent(subject,
+                    title = String.format("PR #%s %s",
+                            payload.getNumber(), payload.getPullRequest().getTitle());
+
+                    yield Templates.pullRequestEvent(title,
                             toHtmlBody(eventData, payload.getPullRequest().getBody()),
-                            payload.getPullRequest());
+                            payload.getPullRequest(),
+                            status);
                 }
                 case discussion -> {
                     EventPayload.DiscussionPayload payload = eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
 
-                    subject = "#" + discussion.number + " " + discussion.title + " (" + discussion.category.name + ")";
-                    yield Templates.discussionEvent(subject,
+                    title = String.format("#%s %s",
+                            discussion.number, discussion.title);
+
+                    yield Templates.discussionEvent(title,
                             toHtmlBody(eventData, discussion.body),
                             discussion,
                             eventData.getRepository().getFullName(),
-                            eventData.getRepository().getUrl());
+                            status);
                 }
                 default -> {
                     Log.warnf("[%s] EmailAction.apply: unsupported event type", eventData.getLogId());
-                    subject = null;
+                    title = null;
                     yield null;
                 }
             };
@@ -95,6 +100,8 @@ public class EmailAction extends Action {
             Log.errorf(e, "[%s] EmailAction.apply: Failed to prepare email to %s", eventData.getLogId(), List.of(addresses));
             return;
         }
+
+        String subject = "(" + status + ") " + title;
 
         if (mailTemplateInstance != null) {
             Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
