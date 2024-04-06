@@ -12,7 +12,7 @@ import io.quarkus.vertx.ConsumeEvent;
 import io.vertx.mutiny.core.eventbus.Message;
 
 @ApplicationScoped
-public class MailConsumer {
+class MailConsumer {
 
     static boolean initialized = false;
     static String replyToAddress = null;
@@ -28,21 +28,7 @@ public class MailConsumer {
         }
     }
 
-    public static class MailEvent {
-        final String logId;
-        final MailTemplateInstance mailTemplateInstance;
-        final String subject;
-        final String[] addresses;
-
-        public MailEvent(String logId, MailTemplateInstance mailTemplateInstance, String subject, String[] addresses) {
-            this.logId = logId;
-            this.mailTemplateInstance = mailTemplateInstance;
-            this.subject = subject;
-            this.addresses = addresses;
-        }
-    }
-
-    @ConsumeEvent("mail")
+    @ConsumeEvent(MailEvent.ADDRESS)
     public void consume(Message<MailEvent> msg) {
         MailEvent mailEvent = msg.body();
 

@@ -16,7 +16,7 @@ import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.commonhaus.automation.github.rules.MatchLabel;
-import org.commonhaus.automation.mail.MailConsumer;
+import org.commonhaus.automation.mail.MailEvent;
 import org.kohsuke.github.ReactionContent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -246,7 +246,7 @@ public class VotingConsumer {
                     messageBody,
                     htmlBody);
 
-            bus.send("mail", new MailConsumer.MailEvent(voteEvent.getLogId(),
+            bus.send(MailEvent.ADDRESS, new MailEvent(voteEvent.getLogId(),
                     mail, subject, votingConfig.error_email_address));
         }
     }

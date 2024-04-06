@@ -6,7 +6,7 @@ import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventPayload;
 import org.commonhaus.automation.github.model.EventQueryContext;
-import org.commonhaus.automation.mail.MailConsumer;
+import org.commonhaus.automation.mail.MailEvent;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
@@ -105,9 +105,9 @@ public class EmailAction extends Action {
 
         if (mailTemplateInstance != null) {
             Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
-            MailConsumer.MailEvent mailEvent = new MailConsumer.MailEvent(eventData.getLogId(),
+            MailEvent mailEvent = new MailEvent(eventData.getLogId(),
                     mailTemplateInstance, subject, addresses);
-            Arc.container().instance(EventBus.class).get().send("mail", mailEvent);
+            Arc.container().instance(EventBus.class).get().send(MailEvent.ADDRESS, mailEvent);
         }
     }
 
