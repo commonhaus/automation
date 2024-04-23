@@ -34,10 +34,7 @@ public class DataReaction {
 
     static final String REACTION_FIELDS = """
             user {
-                id
-                login
-                url
-                avatarUrl
+                """ + DataCommonObject.ACTOR_FIELDS + """
             }
             content
             createdAt

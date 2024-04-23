@@ -35,6 +35,11 @@ public class DataCommonType {
         this.webhook_id = ghObject.getId();
     }
 
+    DataCommonType(DataCommonType other) {
+        this.id = other.id;
+        this.webhook_id = other.webhook_id;
+    }
+
     /** Direct construction using a node_id (for converting from webhook payload) */
     DataCommonType(String id) {
         this.id = id;

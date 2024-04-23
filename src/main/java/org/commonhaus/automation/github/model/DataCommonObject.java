@@ -12,12 +12,16 @@ import io.quarkus.qute.TemplateData;
 @TemplateData
 public class DataCommonObject extends DataCommonType {
 
+    static final String ACTOR_FIELDS = """
+            login
+            url
+            avatarUrl
+            """;
+
     static final String COMMON_OBJECT_MIN = """
             id
             author {
-                login
-                url
-                avatarUrl
+                """ + ACTOR_FIELDS + """
             }
             url
             """;
@@ -25,9 +29,7 @@ public class DataCommonObject extends DataCommonType {
     static final String COMMON_OBJECT_FIELDS = """
             id
             author {
-                login
-                url
-                avatarUrl
+                """ + ACTOR_FIELDS + """
             }
             body
             createdAt
@@ -58,5 +60,14 @@ public class DataCommonObject extends DataCommonType {
 
         this.url = JsonAttribute.url.stringFrom(object);
         this.body = JsonAttribute.body.stringFrom(object);
+    }
+
+    public DataCommonObject(DataCommonObject other) {
+        super(other);
+        this.author = other.author;
+        this.createdAt = other.createdAt;
+        this.updatedAt = other.updatedAt;
+        this.url = other.url;
+        this.body = other.body;
     }
 }

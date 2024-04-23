@@ -1,0 +1,21 @@
+{
+  "updateIssueComment": {
+    "clientMutationId": null,
+    "issueComment": {
+      "id": "IC_kwDOLDuJqs57jhAU",
+      "author": {
+        "login": "commonhaus-test-bot",
+        "url": "https://github.com/apps/commonhaus-test-bot",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+      },
+      "body": "Configuration for item is invalid:\r\n\r\n- Team for specified group (null) must exist (false)\r\n\r\n> [!TIP]\r\n> Item description should contain text that matches the following (case-insensitive):  \r\n> `voting group[^@]+@([^ ]+)`\r\n>\r\n> For example:\r\n>\r\n> ```md\r\n> ## Voting group\r\n> @commonhaus/test-quorum-default\r\n> ```\r\n>\r\n> Or:\r\n>\r\n> ```md\r\n> - voting group: @commonhaus/test-quorum-default\r\n> ```\r\n\r\n- Counting non-empty valid reactions and review responses in the following categories::\r\n    - approve: +1, PR review approved\r\n    - ok: eyes, PR review closed with comments\r\n    - revise: -1, PR review requires changes\r\n\r\n",
+      "createdAt": "2024-04-23T16:47:27Z",
+      "updatedAt": "2024-04-23T18:59:34Z",
+      "url": "https://github.com/commonhaus/automation-test/pull/22#issuecomment-2072907796",
+      "databaseId": 2072907796,
+      "issue": {
+        "id": "PR_kwDOLDuJqs5mlMVl"
+      }
+    }
+  }
+}

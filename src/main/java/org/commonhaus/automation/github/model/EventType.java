@@ -14,7 +14,16 @@ public enum EventType {
     issue_comment,
     label,
     pull_request,
+    pull_request_review,
     ;
+
+    public boolean isDiscussion() {
+        return this == discussion || this == discussion_comment;
+    }
+
+    public boolean isPullRequest() {
+        return this == pull_request || this == pull_request_review;
+    }
 
     public static EventType fromString(String action) {
         return EventType.valueOf(action.toLowerCase());

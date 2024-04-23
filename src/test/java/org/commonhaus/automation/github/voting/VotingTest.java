@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.voting;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.timeout;
@@ -15,8 +16,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import jakarta.inject.Inject;
 import jakarta.json.Json;
 
 import org.commonhaus.automation.github.EventData;
@@ -30,6 +33,7 @@ import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.GithubTest;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
@@ -43,6 +47,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
+import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
 
@@ -51,8 +56,8 @@ import io.smallrye.graphql.client.Response;
 public class VotingTest extends GithubTest {
     static final Set<DataLabel> REPO_LABELS = Set.of(
             VOTE_DONE, VOTE_OPEN, VOTE_PROCEED, VOTE_QUORUM, VOTE_REVISE);
-    static final Set<DataLabel> ITEM_OPEN = Set.of(VOTE_OPEN);
-    static final Set<DataLabel> ITEM_CLOSING = Set.of(VOTE_DONE, VOTE_OPEN);
+    static final Set<DataLabel> ITEM_VOTE_OPEN = Set.of(VOTE_OPEN);
+    static final Set<DataLabel> ITEM_VOTE_CLOSING = Set.of(VOTE_DONE, VOTE_OPEN);
 
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
 
@@ -68,11 +73,21 @@ public class VotingTest extends GithubTest {
         QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
     }
 
+    @Inject
+    MockMailbox mailbox;
+
     @BeforeEach
     @Override
     protected void beforeEach() {
         super.beforeEach();
         setLogin("commonhaus-test-bot");
+        mailbox.clear();
+    }
+
+    @AfterEach
+    protected void noErrorMail() throws Exception {
+        await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
+                .atMost(5, TimeUnit.SECONDS);
     }
 
     @Test
@@ -81,7 +96,7 @@ public class VotingTest extends GithubTest {
 
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response addReaction = mockResponse(Path.of("src/test/resources/github/addConfusedReaction.json"));
         Response hasNoComments = mockResponse(Path.of("src/test/resources/github/responseNoComments.json"));
@@ -132,7 +147,7 @@ public class VotingTest extends GithubTest {
         // add confused reaction, update existing comment
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response addReaction = mockResponse(Path.of("src/test/resources/github/addConfusedReaction.json"));
         Response hasComments = mockResponse(Path.of("src/test/resources/github/responseHasComments.json"));
@@ -176,7 +191,7 @@ public class VotingTest extends GithubTest {
     void testVoteOpenMarthas() throws Exception {
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response addReaction = mockResponse(Path.of("src/test/resources/github/addConfusedReaction.json"));
         Response responseBotComment = mockResponse(Path.of("src/test/resources/github/responseBotComment.json"));
@@ -229,7 +244,7 @@ public class VotingTest extends GithubTest {
 
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsNone.json"));
         Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
@@ -275,7 +290,7 @@ public class VotingTest extends GithubTest {
     void testVoteOpenValidVoteRemoveReaction() throws Exception {
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsAllTeam.json"));
         Response removeReaction = mockResponse(Path.of("src/test/resources/github/removeConfusedReaction.json"));
@@ -328,7 +343,7 @@ public class VotingTest extends GithubTest {
 
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsSomeTeam.json"));
         Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
@@ -369,7 +384,7 @@ public class VotingTest extends GithubTest {
 
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_OPEN);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
 
         Response teamComments = mockResponse(Path.of("src/test/resources/github/queryManualCommentsResult.json"));
         Response updateComment = mockResponse(Path.of("src/test/resources/github/updateDiscussionComment.json"));
@@ -415,6 +430,65 @@ public class VotingTest extends GithubTest {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
         verifyBotCommentCache(discussionId, botCommentId);
+    }
+
+    @Test
+    void testVoteOpenPullRequest() throws Exception {
+        String pullRequestId = "PR_kwDOLDuJqs5mlMVl";
+
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(pullRequestId, ITEM_VOTE_OPEN);
+
+        Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsSomeTeam.json"));
+        Response reviews = mockResponse(Path.of("src/test/resources/github/queryPullRequestReviews.json"));
+        Response updateComment = mockResponse(Path.of("src/test/resources/github/updateIssueComment.json"));
+        Response updatePullRequest = mockResponse(Path.of("src/test/resources/github/updatePullRequest.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-voting.yml");
+                    when(mocks.installationClient(installationId).isCredentialValid())
+                            .thenReturn(true);
+
+                    GHUser user1 = mockGHUser("commonhaus-bot");
+                    GHUser user2 = mockGHUser("ebullient");
+
+                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2));
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+
+                    setupBotComment(pullRequestId);
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("... on Reactable {"), anyMap()))
+                            .thenReturn(reactions);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("... on PullRequest {"), anyMap()))
+                            .thenReturn(reviews);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateIssueComment("), anyMap()))
+                            .thenReturn(updateComment);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updatePullRequest("), anyMap()))
+                            .thenReturn(updatePullRequest);
+                })
+                .when().payloadFromClasspath("/github/eventPullRequestReviewRequested.json")
+                .event(GHEvent.PULL_REQUEST)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("... on Reactable {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("... on PullRequest {"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateIssueComment("), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updatePullRequest("), anyMap());
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        verifyBotCommentCache(pullRequestId, botCommentId);
     }
 
     @Test
@@ -590,7 +664,6 @@ public class VotingTest extends GithubTest {
         VoteTally voteTally = new VoteTally(voteInfo, reactions, comments);
 
         String json = objectMapper.writeValueAsString(voteTally);
-        // System.out.println(json);
         assertThat(json)
                 .contains(List.of("hasQuorum", "votingThreshold",
                         "group", "groupSize", "groupVotes", "countedVotes", "droppedVotes",

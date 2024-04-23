@@ -15,6 +15,8 @@ import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.DiscussionComment;
+import io.quarkiverse.githubapp.event.PullRequest;
+import io.quarkiverse.githubapp.event.PullRequestReview;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
@@ -37,12 +39,12 @@ public class Voting {
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param discussionPayload GitHub API parsed payload; connected GHRepository
-     *        and GHOrganization
-     * @param repoConfigFile CFGH RepoConfig (if exists)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @Discussion GHEventPayload.Discussion discussionPayload,
+            @Discussion GHEventPayload.Discussion payload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Voting.Config votingConfig = getVotingConfig(repoConfigFile);
@@ -50,14 +52,23 @@ public class Voting {
             return;
         }
 
-        EventData eventData = new EventData(event, discussionPayload);
+        EventData eventData = new EventData(event, payload);
         EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionEvent: voting enabled; queue event", qc.getLogId());
-        bus.send("voting", new VoteEvent(qc, votingConfig, eventData));
+        bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
     }
 
+    /**
+     * Called when there is a discussion comment event.
+     *
+     * @param event GitHubEvent (raw payload)
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
     void onDiscussionCommentEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @DiscussionComment GHEventPayload.DiscussionComment payload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
@@ -72,7 +83,59 @@ public class Voting {
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionCommentEvent: voting enabled; queue event", qc.getLogId());
-        bus.send("voting", new VoteEvent(qc, votingConfig, eventData));
+        bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+    }
+
+    /**
+     * Called when there is a pull request event.
+     *
+     * @param event GitHubEvent (raw payload)
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @PullRequest GHEventPayload.PullRequest payload,
+            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
+        Voting.Config votingConfig = getVotingConfig(repoConfigFile);
+        if (votingConfig.isDisabled()) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+
+        // potentially multiple events at once to one event at a time...
+        Log.debugf("[%s] voting.onPullRequestEvent: voting enabled; queue event", qc.getLogId());
+        bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+    }
+
+    /**
+     * Called when there is a pull request review event.
+     *
+     * @param event GitHubEvent (raw payload)
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onPullRequestReviewEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @PullRequestReview GHEventPayload.PullRequestReview payload,
+            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
+        Voting.Config votingConfig = getVotingConfig(repoConfigFile);
+        if (votingConfig.isDisabled()) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+
+        // potentially multiple events at once to one event at a time...
+        Log.debugf("[%s] voting.onPullRequestReviewEvent: voting enabled; queue event", qc.getLogId());
+        bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
     }
 
     // How many votes are required for a vote to count?

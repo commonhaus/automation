@@ -1,0 +1,17 @@
+{
+  "updatePullRequest": {
+    "clientMutationId": null,
+    "pullRequest": {
+      "id": "PR_kwDOLDuJqs5mlMVl",
+      "author": {
+        "login": "ebullient",
+        "url": "https://github.com/ebullient",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4"
+      },
+      "url": "https://github.com/commonhaus/automation-test/pull/22",
+      "number": 22,
+      "title": "Update 1-purpose.md",
+      "reviewDecision": null
+    }
+  }
+}

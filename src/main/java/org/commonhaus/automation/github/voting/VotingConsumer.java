@@ -72,8 +72,8 @@ public class VotingConsumer {
         CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
                 voteEvent.getId(), (k) -> new CheckStatus());
 
-        Log.debugf("[%s] voting.checkVotes: process event (running=%s)", voteEvent.getLogId(), checkStatus.running.get());
         if (!checkStatus.startUpdate(voteEvent)) {
+            Log.debugf("[%s] voting.checkVotes: skip event (running/recent)", voteEvent.getLogId());
             return;
         }
         Log.debugf("[%s] voting.checkVotes: process event", voteEvent.getLogId());
@@ -84,19 +84,12 @@ public class VotingConsumer {
             if (OPEN_VOTE.matches(qc, voteEvent.getId())) {
                 checkOpenVote(qc, voteEvent, votingConfig);
             }
-            if (FINISH_VOTE.matches(qc, voteEvent.getId())) {
-                finishVote(qc, voteEvent, votingConfig);
-            }
         } catch (Throwable e) {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         } finally {
             checkStatus.finishUpdate();
         }
-    }
-
-    private void finishVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
-        String logId = "[" + voteEvent.getLogId() + "] finishVote";
     }
 
     private void checkOpenVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
@@ -111,13 +104,18 @@ public class VotingConsumer {
 
         Log.debugf("[%s] checkOpenVote: counting votes using %s", voteEvent.getLogId(), voteInfo.voteType);
 
-        final Collection<DataReaction> reactions = voteInfo.countComments()
+        final List<DataReaction> reactions = voteInfo.countComments()
                 ? List.of()
                 : getFilteredReactions(voteEvent);
-        final Collection<DataCommonComment> comments = voteInfo.countComments()
+        final List<DataCommonComment> comments = voteInfo.countComments()
                 ? getFilteredComments(voteEvent)
                 : List.of();
-        if (reactions.isEmpty() && comments.isEmpty()) {
+
+        final boolean prNoReviews = !voteEvent.isPullRequest() || voteEvent.getReviews().isEmpty();
+
+        // If we have no comments and no reactions (and no reviews if this is a pull request), we're done (nothing to count)
+        if (reactions.isEmpty() && comments.isEmpty() && prNoReviews) {
+            Log.debugf("[%s] checkOpenVote: done (nothing to count)", voteEvent.getLogId());
             return;
         }
 
@@ -173,26 +171,26 @@ public class VotingConsumer {
         return new VoteInformation(voteEvent);
     }
 
-    private Collection<DataCommonComment> getFilteredComments(VoteEvent voteEvent) {
+    private List<DataCommonComment> getFilteredComments(VoteEvent voteEvent) {
         QueryContext qc = voteEvent.getQueryContext();
 
-        Collection<DataCommonComment> comments = qc.getComments(voteEvent.getId());
+        List<DataCommonComment> comments = qc.getComments(voteEvent.getId());
 
         // The bot's votes/comments never count.
         comments.removeIf(x -> qc.isBot(x.author.login));
 
-        if (comments.isEmpty()) {
+        if (comments.isEmpty() && voteEvent.getReviews().isEmpty()) {
             updateBotComment(voteEvent, "No votes (non-bot comments) found on this item.");
         }
         return comments;
     }
 
-    private Collection<DataReaction> getFilteredReactions(VoteEvent voteEvent) {
+    private List<DataReaction> getFilteredReactions(VoteEvent voteEvent) {
         QueryContext qc = voteEvent.getQueryContext();
 
         // GraphQL fetch of all reactions on item (return if none)
         // Could query by group first, but pagination happens either way.
-        Collection<DataReaction> reactions = qc.getReactions(voteEvent.getId());
+        List<DataReaction> reactions = qc.getReactions(voteEvent.getId());
 
         // The bot's votes never count.
         reactions.removeIf(x -> {
@@ -206,7 +204,7 @@ public class VotingConsumer {
             return false;
         });
 
-        if (reactions.isEmpty()) {
+        if (reactions.isEmpty() && voteEvent.getReviews().isEmpty()) {
             updateBotComment(voteEvent, "No votes (reactions) found on this item.");
         }
         return reactions;
