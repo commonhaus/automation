@@ -15,9 +15,11 @@ import java.util.stream.Collectors;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.DataCommonComment;
+import org.commonhaus.automation.github.model.DataPullRequestReview;
 import org.commonhaus.automation.github.model.DataReaction;
 import org.kohsuke.github.ReactionContent;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -70,7 +72,10 @@ public class VoteTally {
     @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
     Collection<DataActor> missingGroupActors;
 
-    public VoteTally(VoteInformation info, Collection<DataReaction> votes, Collection<DataCommonComment> comments) {
+    @JsonIgnore
+    final boolean notMarthasMethod;
+
+    public VoteTally(VoteInformation info, List<DataReaction> votes, List<DataCommonComment> comments) {
         Set<DataActor> teamMembers = info.teamList.members;
         missingGroupActors = new HashSet<>(teamMembers);
 
@@ -78,17 +83,26 @@ public class VoteTally {
         group = info.group;
         groupSize = teamMembers.size();
         votingThreshold = info.votingThreshold;
+        notMarthasMethod = (info.ok.size() + info.revise.size() + info.approve.size()) == 0;
 
         Map<String, DataActor> teamLogins = teamMembers.stream().collect(Collectors.toMap(a -> a.login, a -> a));
+        Set<DataActor> seenLogins = new HashSet<>();
 
         if (info.voteType == VoteInformation.Type.manualComments) {
-            countComments(info, comments, teamLogins);
+            if (info.isPullRequest()) {
+                reviewsToComments(info.getReviews(), comments);
+            }
+            countComments(info, comments, seenLogins, teamLogins);
             droppedVotes = 0;
         } else {
-            countReactions(info, votes, teamLogins);
+            if (info.isPullRequest()) {
+                reviewsToVotes(info.getReviews(), votes);
+            }
+            countReactions(info, votes, seenLogins, teamLogins);
             // count how many were ignored (outside category) or dropped (duplicate)
             droppedVotes = duplicates.size() + ignoredVotes();
         }
+        missingGroupActors.removeAll(seenLogins);
 
         groupVotes = categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey()))
@@ -112,20 +126,43 @@ public class VoteTally {
                 summarizeResults());
     }
 
+    private void reviewsToComments(Collection<DataPullRequestReview> reviews, List<DataCommonComment> comments) {
+        List<DataCommonComment> reactions = new ArrayList<>();
+        // translate review states into reaction votes
+        for (DataPullRequestReview review : reviews) {
+            reactions.add(new DataCommonComment(review));
+        }
+        comments.addAll(0, reactions);
+    }
+
+    private void reviewsToVotes(Collection<DataPullRequestReview> reviews, List<DataReaction> votes) {
+        List<DataReaction> reactions = new ArrayList<>();
+        // translate review states into reaction votes
+        for (DataPullRequestReview review : reviews) {
+            if (review.state.equals("APPROVED")) {
+                reactions.add(new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent()));
+            } else if (review.state.equals("CHANGES_REQUESTED")) {
+                reactions.add(new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent()));
+            } else if (review.state.equals("COMMENTED")) {
+                reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent()));
+            }
+        }
+        votes.addAll(0, reactions);
+    }
+
     private void countComments(VoteInformation info, Collection<DataCommonComment> comments,
-            Map<String, DataActor> teamLogins) {
+            Set<DataActor> seenLogins, Map<String, DataActor> teamLogins) {
         Category c = categories.computeIfAbsent("comment", k -> new Category());
-        Set<DataActor> seenLogins = new HashSet<>();
+
         for (DataCommonComment comment : comments) {
             if (seenLogins.add(comment.author)) {
                 c.add(comment.author, teamLogins);
-                missingGroupActors.remove(comment.author);
             }
         }
     }
 
-    private void countReactions(VoteInformation info, Collection<DataReaction> reactions, Map<String, DataActor> teamLogins) {
-        Set<DataActor> seenLogins = new HashSet<>();
+    private void countReactions(VoteInformation info, Collection<DataReaction> reactions,
+            Set<DataActor> seenLogins, Map<String, DataActor> teamLogins) {
 
         // We will count the most recent vote of each user
         // Sort by date then by order of reaction (positive to negative)
@@ -136,7 +173,7 @@ public class VoteTally {
             DataActor user = reaction.user;
 
             final Category c;
-            if (info.voteType != VoteInformation.Type.marthas) {
+            if (notMarthasMethod) {
                 c = categories.computeIfAbsent(DataReaction.toEmoji(reaction.reactionContent), k -> new Category());
             } else if (info.approve.contains(reaction.reactionContent)) {
                 c = categories.computeIfAbsent("approve", k -> new Category());
@@ -153,7 +190,6 @@ public class VoteTally {
 
             if (seenLogins.add(user)) {
                 c.add(reaction, teamLogins);
-                missingGroupActors.remove(user);
             } else {
                 duplicates.add(reaction);
             }

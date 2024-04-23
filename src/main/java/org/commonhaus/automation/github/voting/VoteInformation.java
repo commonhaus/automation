@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github.voting;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -8,6 +9,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.commonhaus.automation.github.Voting;
+import org.commonhaus.automation.github.model.DataPullRequestReview;
 import org.commonhaus.automation.github.model.DataReaction;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
@@ -35,6 +37,8 @@ public class VoteInformation {
 
     static final Pattern manualPattern = Pattern.compile("<!--vote::manual (.*?)-->", Pattern.CASE_INSENSITIVE);
 
+    private final VoteEvent event;
+
     public final Type voteType;
     public final List<ReactionContent> revise;
     public final List<ReactionContent> ok;
@@ -45,15 +49,17 @@ public class VoteInformation {
     public final Voting.Threshold votingThreshold;
 
     public VoteInformation(VoteEvent event) {
+        this.event = event;
+
         QueryContext qc = event.getQueryContext();
         Voting.Config voteConfig = event.getVotingConfig();
         String bodyString = event.getBody();
         TeamList teamList = null;
 
-        // Body contains voting group? "Voting group"
-        Matcher m = groupPattern.matcher(bodyString);
-        if (m.find()) {
-            this.group = m.group(1);
+        // Test body for "Voting group" followed by a team name
+        Matcher groupM = groupPattern.matcher(bodyString);
+        if (groupM.find()) {
+            this.group = groupM.group(1);
 
             GHOrganization org = event.getOrganization();
             teamList = QueryCache.TEAM.getCachedValue(this.group);
@@ -76,22 +82,40 @@ public class VoteInformation {
         this.teamList = teamList;
         this.votingThreshold = voteConfig.votingThreshold(this.group);
 
-        m = consensusPattern.matcher(bodyString);
-        if (m.find()) {
+        // Test body for "vote::marthas" or "vote::manual"
+        Matcher consensusM = consensusPattern.matcher(bodyString);
+        boolean hasConsensus = consensusM.find();
+        Matcher manualM = manualPattern.matcher(bodyString);
+        boolean hasManual = manualM.find();
+        if (hasConsensus) {
             this.voteType = Type.marthas;
-            this.approve = listFrom(m.group(1));
-            this.ok = listFrom(m.group(2));
-            this.revise = listFrom(m.group(3));
+            this.approve = listFrom(consensusM.group(1));
+            this.ok = listFrom(consensusM.group(2));
+            this.revise = listFrom(consensusM.group(3));
+        } else if (hasManual) {
+            this.voteType = manualM.group(1).contains("comments") ? Type.manualComments : Type.manualReactions;
+            this.approve = List.of();
+            this.ok = List.of();
+            this.revise = List.of();
+        } else if (isPullRequest()) {
+            this.voteType = Type.marthas;
+            this.approve = List.of(ReactionContent.PLUS_ONE);
+            this.ok = List.of(ReactionContent.EYES);
+            this.revise = List.of(ReactionContent.MINUS_ONE);
         } else {
-            m = manualPattern.matcher(bodyString);
-            boolean manual = m.find();
-            this.voteType = manual && m.group(1) != null && m.group(1).contains("comments")
-                    ? Type.manualComments
-                    : manual ? Type.manualReactions : Type.undefined;
+            this.voteType = Type.undefined;
             this.approve = List.of();
             this.ok = List.of();
             this.revise = List.of();
         }
+    }
+
+    public Collection<DataPullRequestReview> getReviews() {
+        return event.getReviews();
+    }
+
+    public boolean isPullRequest() {
+        return event.isPullRequest();
     }
 
     public boolean countComments() {
@@ -115,8 +139,7 @@ public class VoteInformation {
             // all reactions are valid if they are being counted by humans
             return false;
         }
-        return approve.isEmpty() || ok.isEmpty() || revise.isEmpty()
-                || approve.contains(null) || ok.contains(null) || revise.contains(null);
+        return approve.isEmpty() || ok.isEmpty() || revise.isEmpty();
     }
 
     public String getErrorContent() {
@@ -146,14 +169,19 @@ public class VoteInformation {
     }
 
     private String showReactionGroups() {
+        String description = isPullRequest()
+                ? "Counting non-empty valid reactions and review responses in the following categories:"
+                : "Counting non-empty valid reactions in the following categories:";
+
         return String.format("""
-                - Reactions must be non-empty and use valid reactions:\r
+                - %s:\r
                     - approve: %s\r
                     - ok: %s\r
                     - revise: %s""",
-                showReactions(approve),
-                showReactions(ok),
-                showReactions(revise));
+                description,
+                showReactions(approve) + (isPullRequest() ? ", PR review approved" : ""),
+                showReactions(ok) + (isPullRequest() ? ", PR review closed with comments" : ""),
+                showReactions(revise) + (isPullRequest() ? ", PR review requires changes" : ""));
     }
 
     private static final String validTeamComment = """

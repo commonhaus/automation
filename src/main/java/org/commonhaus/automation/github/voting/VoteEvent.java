@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.voting;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -8,6 +9,7 @@ import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
 import org.commonhaus.automation.github.model.DataCommonItem;
+import org.commonhaus.automation.github.model.DataPullRequestReview;
 import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
@@ -17,6 +19,8 @@ import io.quarkus.qute.TemplateData;
 
 @TemplateData
 public class VoteEvent {
+    public final static String ADDRESS = "voting";
+
     // standard prefix, used when no badge is configured
     public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment\\]";
     // when a badge is configured, this is the prefix
@@ -45,6 +49,7 @@ public class VoteEvent {
     private final int number;
 
     private final String logId;
+    private List<DataPullRequestReview> prReviews;
 
     public VoteEvent(QueryContext qc, Config votingConfig, EventData eventData) {
         this.isScheduled = false;
@@ -123,8 +128,24 @@ public class VoteEvent {
         return eventTime;
     }
 
+    public boolean isPullRequest() {
+        return eventType != null && eventType.isPullRequest();
+    }
+
     public Pattern commentPattern() {
         return botCommentPattern;
+    }
+
+    public List<DataPullRequestReview> getReviews() {
+        if (!eventType.isPullRequest()) {
+            return List.of();
+        }
+        if (prReviews == null) {
+            prReviews = DataPullRequestReview.queryReviews(qc, this.nodeId);
+            // The bot's reviews are not counted
+            prReviews.removeIf(x -> qc.isBot(x.author.login));
+        }
+        return prReviews;
     }
 
     public String getVoteHeaderText(BotComment comment) {

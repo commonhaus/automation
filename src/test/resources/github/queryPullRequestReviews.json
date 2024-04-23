@@ -1,0 +1,20 @@
+{
+  "node": {
+    "latestReviews": {
+      "nodes": [
+        {
+          "author": {
+            "login": "commonhaus-bot",
+            "url": "https://github.com/commonhaus-bot",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?u=434747bc94bd694e66bfdb283f4c944dc2cf7e53&v=4"
+          },
+          "state": "CHANGES_REQUESTED"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "MQ"
+      }
+    }
+  }
+}

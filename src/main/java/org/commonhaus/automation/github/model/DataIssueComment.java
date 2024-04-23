@@ -54,19 +54,18 @@ public class DataIssueComment extends DataCommonComment {
         }
         JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());
         JsonObject commentEdge = JsonAttribute.commentEdge.jsonObjectFrom(result);
-        JsonObject node = JsonAttribute.node.jsonObjectFrom(commentEdge);
-        return new DataCommonComment(node);
+        return JsonAttribute.node.issueCommentFrom(commentEdge);
     }
 
     /** package private. See QueryHelper / QueryContext */
     protected static DataIssueComment editIssueComment(QueryContext queryContext, String commentId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
-        variables.put("id", commentId);
+        variables.put("commentId", commentId);
         variables.put("body", commentBody);
 
         Response response = queryContext.execQuerySync("""
-                mutation($id: ID!, $body: String!) {
+                mutation($commentId: ID!, $body: String!) {
                     updateIssueComment(input: {
                         id: $commentId,
                         body: $body

@@ -25,9 +25,17 @@ public class DataCommonItem extends DataCommonObject {
             closedAt
             """;
 
+    static final String PR_FIELDS = ISSUE_FIELDS + """
+            reviewDecision
+            """;
+
     static final String ISSUE_FIELDS_MIN = COMMON_OBJECT_MIN + """
             number
             title
+            """;
+
+    static final String PR_FIELDS_MIN = ISSUE_FIELDS_MIN + """
+            reviewDecision
             """;
 
     /** Issue/Discussion/PR number within repository */
@@ -37,6 +45,7 @@ public class DataCommonItem extends DataCommonObject {
     // Closable
     public final Date closedAt;
     public final boolean closed;
+    public final boolean isPullRequest;
 
     public DataCommonItem(JsonObject object) {
         super(object);
@@ -46,6 +55,8 @@ public class DataCommonItem extends DataCommonObject {
 
         this.closedAt = JsonAttribute.closedAt.dateFrom(object);
         this.closed = JsonAttribute.closed.booleanFromOrFalse(object);
+
+        this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
     public static DataCommonItem editIssueDescription(QueryContext queryContext, String nodeId, String bodyString) {
@@ -56,7 +67,7 @@ public class DataCommonItem extends DataCommonObject {
         Response response = queryContext.execQuerySync("""
                 mutation($id: ID!, $body: String!) {
                     updateIssue(input: {
-                        id: $commentId,
+                        id: $id,
                         body: $body
                     }) {
                         clientMutationId
@@ -84,12 +95,12 @@ public class DataCommonItem extends DataCommonObject {
         Response response = queryContext.execQuerySync("""
                 mutation($id: ID!, $body: String!) {
                     updatePullRequest(input: {
-                        id: $commentId,
+                        pullRequestId: $id,
                         body: $body
                     }) {
                         clientMutationId
                         pullRequest {
-                            """ + ISSUE_FIELDS_MIN + """
+                            """ + PR_FIELDS_MIN + """
                         }
                     }
                 }
@@ -127,12 +138,13 @@ public class DataCommonItem extends DataCommonObject {
                                     """ + ISSUE_FIELDS + """
                     }
                     ... on PullRequest {
-                        """ + ISSUE_FIELDS + """
+                        """ + PR_FIELDS + """
                                 }
                             }
                         }
                     }
                         """, variables);
+
             if (response.hasError()) {
                 break;
             }

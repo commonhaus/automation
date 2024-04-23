@@ -163,12 +163,13 @@ public class VoteDiscovery {
         }
         for (var discussion : discussions) {
             slowDown();
-            Log.infof("[%s] discoverVotes: queue discussion#%s", ctx.getLogId(), discussion.number);
+            Log.infof("[%s] discoverVotes: queue discussion #%s", ctx.getLogId(), discussion.number);
             ScheduledQueryContext discussionCtx = queryHelper.newScheduledQueryContext(ctx, EventType.discussion);
-            eventBus.send("voting", new VoteEvent(discussionCtx, voteConfig, discussion));
+            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(discussionCtx, voteConfig, discussion));
         }
     }
 
+    // Issues or pull requests
     void queryIssues(ScheduledQueryContext ctx, Voting.Config voteConfig) {
         List<DataCommonItem> issues = ctx.findIssuesWithLabel("vote/open");
         if (issues == null) {
@@ -177,8 +178,9 @@ public class VoteDiscovery {
         for (var issue : issues) {
             slowDown();
             Log.infof("[%s] discoverVotes: queue issue #%s", ctx.getLogId(), issue.number);
-            ScheduledQueryContext issueCtx = queryHelper.newScheduledQueryContext(ctx, EventType.issue);
-            eventBus.send("voting", new VoteEvent(issueCtx, voteConfig, issue));
+            ScheduledQueryContext issueCtx = queryHelper.newScheduledQueryContext(ctx,
+                    issue.isPullRequest ? EventType.pull_request : EventType.issue);
+            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(issueCtx, voteConfig, issue));
         }
     }
 

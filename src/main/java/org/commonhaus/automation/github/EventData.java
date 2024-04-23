@@ -133,6 +133,10 @@ public class EventData {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
                     yield payload.getPullRequest().getNodeId();
                 }
+                case pull_request_review -> {
+                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
+                    yield payload.getPullRequest().getNodeId();
+                }
                 default -> {
                     Log.errorf("[%s] EventData.getNodeId: unsupported event type", logId);
                     yield null;
@@ -171,7 +175,7 @@ public class EventData {
     public String getBody() {
         String result = body;
         if (result == null) {
-            result = body = switch (eventType) {
+            result = switch (eventType) {
                 case discussion, discussion_comment -> {
                     EventPayload.DiscussionPayload payload = getEventPayload();
                     DataDiscussion discussion = payload.discussion;
@@ -190,6 +194,7 @@ public class EventData {
                     yield null;
                 }
             };
+            result = body = result == null ? "" : result;
         }
         return result;
     }
@@ -213,6 +218,10 @@ public class EventData {
                 }
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getNumber();
+                }
+                case pull_request_review -> {
+                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
                     yield payload.getPullRequest().getNumber();
                 }
                 case label -> -1;

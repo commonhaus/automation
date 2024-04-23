@@ -447,7 +447,7 @@ public class QueryHelper {
                     comment = switch (eventType) {
                         case discussion, discussion_comment ->
                             DataDiscussionComment.addComment(this, itemId, commentBody);
-                        case issue, pull_request, issue_comment ->
+                        case issue, pull_request, issue_comment, pull_request_review ->
                             DataIssueComment.addIssueComment(this, itemId, commentBody);
                         default -> {
                             Log.errorf("[%s] addBotComment: Unknown event type", getLogId());
@@ -465,7 +465,7 @@ public class QueryHelper {
                     comment = switch (eventType) {
                         case discussion, discussion_comment ->
                             DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
-                        case issue, pull_request, issue_comment ->
+                        case issue, pull_request, issue_comment, pull_request_review ->
                             DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
                         default -> {
                             Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
@@ -493,9 +493,12 @@ public class QueryHelper {
             }
 
             switch (eventType) {
-                case discussion, discussion_comment -> DataDiscussion.editDiscussion(this, nodeId, bodyString);
-                case issue, pull_request, issue_comment ->
+                case discussion, discussion_comment ->
+                    DataDiscussion.editDiscussion(this, nodeId, bodyString);
+                case issue, issue_comment ->
                     DataCommonItem.editIssueDescription(this, nodeId, bodyString);
+                case pull_request, pull_request_review ->
+                    DataCommonItem.editPullRequestDescription(this, nodeId, bodyString);
                 default -> Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
             }
         }
@@ -507,7 +510,7 @@ public class QueryHelper {
             return DataReaction.queryReactions(this, nodeId);
         }
 
-        public Collection<DataCommonComment> getComments(String nodeId) {
+        public List<DataCommonComment> getComments(String nodeId) {
             if (hasErrors()) {
                 return List.of();
             }

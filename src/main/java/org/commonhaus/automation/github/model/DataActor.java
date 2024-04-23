@@ -36,20 +36,27 @@ public class DataActor extends DataCommonType {
         return String.format("Actor[%s]", this.login);
     }
 
+    /**
+     * Use only the login for hashcode and equals.
+     * Sometimes the id is present, and sometimes it isn't,
+     * it depends on the invocation path and query results.
+     */
     @Override
     public int hashCode() {
         final int prime = 31;
-        int result = super.hashCode();
-        result = prime * result + ((login == null) ? 0 : login.hashCode());
+        int result = prime * ((login == null) ? 0 : login.hashCode());
         return result;
     }
 
+    /**
+     * Use only the login for hashcode and equals.
+     * Sometimes the id is present, and sometimes it isn't,
+     * it depends on the invocation path and query results.
+     */
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
-        if (!super.equals(obj))
-            return false;
         if (getClass() != obj.getClass())
             return false;
         DataActor other = (DataActor) obj;

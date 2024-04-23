@@ -1,0 +1,21 @@
+{
+  "updateIssueComment": {
+    "clientMutationId": null,
+    "issueComment": {
+      "id": "IC_kwDOLDuJqs57jhAU",
+      "author": {
+        "login": "commonhaus-test-bot",
+        "url": "https://github.com/apps/commonhaus-test-bot",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/156364140?v=4"
+      },
+      "body": "\r\n1 of 2 members of @commonhaus/test-quorum-default have voted (reaction).\r\n\r\n| Reaction | Total | Team | Voting members |\r\n| --- | --- | --- | --- |\r\n| approve | 1 | 1 | [ebullient](https://github.com/ebullient) |\r\n\r\n<!-- vote::data {\"voteType\":\"marthas\",\"hasQuorum\":false,\"group\":\"commonhaus/test-quorum-default\",\"groupSize\":2,\"groupVotes\":1,\"countedVotes\":1,\"droppedVotes\":0,\"votingThreshold\":\"all\",\"categories\":{\"approve\":{\"reactions\":[\"+1\"],\"team\":[{\"login\":\"ebullient\",\"url\":\"https://github.com/ebullient\",\"avatarUrl\":\"https://avatars.githubusercontent.com/u/808713?u=8c50c6169b230fc62777f6910f6669b753ae95a8&v=4\"}],\"teamTotal\":1,\"total\":1}},\"duplicates\":[],\"missingGroupActors\":[{\"login\":\"commonhaus-bot\",\"url\":\"https://api.github.com/users/commonhaus-bot\",\"avatarUrl\":\"https://avatars.githubusercontent.com/u/156364140?v=4\"},{\"login\":\"ebullient\",\"url\":\"https://api.github.com/users/ebullient\",\"avatarUrl\":\"https://avatars.githubusercontent.com/u/808713?v=4\"}]} -->",
+      "createdAt": "2024-04-23T16:47:27Z",
+      "updatedAt": "2024-04-23T18:57:33Z",
+      "url": "https://github.com/commonhaus/automation-test/pull/22#issuecomment-2072907796",
+      "databaseId": 2072907796,
+      "issue": {
+        "id": "PR_kwDOLDuJqs5mlMVl"
+      }
+    }
+  }
+}

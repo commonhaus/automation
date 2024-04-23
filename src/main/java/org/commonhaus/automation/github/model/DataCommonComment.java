@@ -27,6 +27,11 @@ public class DataCommonComment extends DataCommonObject {
         this.databaseId = JsonAttribute.databaseId.integerFrom(object);
     }
 
+    public DataCommonComment(DataCommonObject object) {
+        super(object);
+        this.databaseId = null;
+    }
+
     /** package private. See QueryHelper / QueryContext */
     static DataCommonComment findBotComment(QueryContext queryContext, String itemId, String commentId) {
         if (commentId != null) {
@@ -64,11 +69,11 @@ public class DataCommonComment extends DataCommonObject {
         return allComments == null || allComments.isEmpty() ? null : allComments.iterator().next();
     }
 
-    public static Collection<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {
+    public static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {
         return queryComments(queryContext, nodeId, false);
     }
 
-    private static Collection<DataCommonComment> queryComments(QueryContext queryContext, String nodeId,
+    private static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId,
             boolean findBotComment) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("itemId", nodeId);

@@ -13,6 +13,7 @@ public enum ActionType {
     pinned,
     reopened,
     review_requested,
+    submitted,
     synchronize,
     transferred,
     unanswered,
