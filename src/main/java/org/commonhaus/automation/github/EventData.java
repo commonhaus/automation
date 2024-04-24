@@ -129,6 +129,14 @@ public class EventData {
                     DataDiscussion discussion = payload.discussion;
                     yield discussion.id;
                 }
+                case issue -> {
+                    GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getNodeId();
+                }
+                case issue_comment -> {
+                    GHEventPayload.IssueComment payload = getGHEventPayload();
+                    yield payload.getIssue().getNodeId();
+                }
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
                     yield payload.getPullRequest().getNodeId();
@@ -138,7 +146,7 @@ public class EventData {
                     yield payload.getPullRequest().getNodeId();
                 }
                 default -> {
-                    Log.errorf("[%s] EventData.getNodeId: unsupported event type", logId);
+                    Log.errorf("[%s] EventData.getNodeId: unsupported event type: %s", logId, eventType);
                     yield null;
                 }
             };
@@ -155,16 +163,24 @@ public class EventData {
                     DataDiscussion discussion = payload.discussion;
                     yield discussion.url;
                 }
-                case issue, issue_comment -> {
+                case issue -> {
                     GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getHtmlUrl().toString();
+                }
+                case issue_comment -> {
+                    GHEventPayload.IssueComment payload = getGHEventPayload();
                     yield payload.getIssue().getHtmlUrl().toString();
                 }
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
                     yield payload.getPullRequest().getHtmlUrl().toString();
                 }
+                case pull_request_review -> {
+                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
+                    yield payload.getPullRequest().getHtmlUrl().toString();
+                }
                 default -> {
-                    Log.errorf("[%s] EventData.getNodeUrl: unsupported event type", logId);
+                    Log.errorf("[%s] EventData.getNodeUrl: unsupported event type %s", logId, eventType);
                     yield null;
                 }
             };
@@ -181,16 +197,24 @@ public class EventData {
                     DataDiscussion discussion = payload.discussion;
                     yield discussion.body;
                 }
-                case issue, issue_comment -> {
+                case issue -> {
                     GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getBody();
+                }
+                case issue_comment -> {
+                    GHEventPayload.IssueComment payload = getGHEventPayload();
                     yield payload.getIssue().getBody();
                 }
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = getGHEventPayload();
                     yield payload.getPullRequest().getBody();
                 }
+                case pull_request_review -> {
+                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
+                    yield payload.getPullRequest().getBody();
+                }
                 default -> {
-                    Log.errorf("[%s] EventData.getBody: unsupported event type", logId);
+                    Log.errorf("[%s] EventData.getBody: unsupported event type %s", logId, eventType);
                     yield null;
                 }
             };
