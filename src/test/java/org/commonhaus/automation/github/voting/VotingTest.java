@@ -519,6 +519,7 @@ public class VotingTest extends GithubTest {
             extraReactions.add(new DataReaction(user,
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
         }
+        teamLogins.add(new DataActor(mockGHUser("excluded"))); // should be excluded from totals
 
         TeamList team = new TeamList(teamLogins, "test-quorum-default");
         QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
@@ -529,6 +530,9 @@ public class VotingTest extends GithubTest {
         Voting.Config votingConfig = new Voting.Config();
         votingConfig.votingThreshold = new java.util.HashMap<>();
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
+        votingConfig.exclude_login = List.of("excluded");
+
+        team.removeExcludedLogins(queryContext, votingConfig); // this should remove excluded login!
 
         VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default",
                 Voting.Threshold.all,

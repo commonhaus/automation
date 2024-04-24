@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.commonhaus.automation.github.Voting.Config;
 import org.commonhaus.automation.github.model.DataActor;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHUser;
@@ -25,8 +26,8 @@ public class TeamList {
         this.members = members;
     }
 
-    public TeamList removeBot(QueryContext qc) {
-        members.removeIf(a -> qc.isBot(a.login));
+    public TeamList removeExcludedLogins(QueryContext qc, Config voteConfig) {
+        members.removeIf(a -> qc.isBot(a.login) || voteConfig.isLoginExcluded(a.login));
         return this;
     }
 }

@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github;
 
+import java.util.List;
 import java.util.Map;
 
 import jakarta.inject.Inject;
@@ -165,6 +166,7 @@ public class Voting {
             }
         };
 
+        public List<String> exclude_login;
         public String[] error_email_address;
         public Map<String, Threshold> votingThreshold;
         public StatusLinks status;
@@ -178,6 +180,13 @@ public class Voting {
                 return Threshold.all;
             }
             return votingThreshold.getOrDefault(group, Threshold.all);
+        }
+
+        public boolean isLoginExcluded(String login) {
+            if (exclude_login == null || exclude_login.isEmpty()) {
+                return false;
+            }
+            return exclude_login.contains(login);
         }
     }
 }
