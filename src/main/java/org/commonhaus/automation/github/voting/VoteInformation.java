@@ -71,7 +71,7 @@ public class VoteInformation {
                 });
 
                 if (!qc.hasErrors()) {
-                    teamList = new TeamList(teamName, members);
+                    teamList = new TeamList(teamName, members).removeBot(qc);
                     Log.debugf("[%s] %s members: %s", qc.getLogId(), teamList.name, teamList.members);
                     QueryCache.TEAM.putCachedValue(this.group, teamList);
                 }
