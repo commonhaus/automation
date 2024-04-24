@@ -74,8 +74,12 @@ public class VoteTally {
 
     @JsonIgnore
     final boolean notMarthasMethod;
+    @JsonIgnore
+    final boolean isPullRequest;
 
     public VoteTally(VoteInformation info, List<DataReaction> votes, List<DataCommonComment> comments) {
+        this.isPullRequest = info.isPullRequest();
+
         Set<DataActor> teamMembers = info.teamList.members;
         missingGroupActors = new HashSet<>(teamMembers);
 
@@ -89,13 +93,13 @@ public class VoteTally {
         Set<DataActor> seenLogins = new HashSet<>();
 
         if (info.voteType == VoteInformation.Type.manualComments) {
-            if (info.isPullRequest()) {
+            if (isPullRequest) {
                 reviewsToComments(info.getReviews(), comments);
             }
             countComments(info, comments, seenLogins, teamLogins);
             droppedVotes = 0;
         } else {
-            if (info.isPullRequest()) {
+            if (isPullRequest) {
                 reviewsToVotes(info.getReviews(), votes);
             }
             countReactions(info, votes, seenLogins, teamLogins);
@@ -119,10 +123,11 @@ public class VoteTally {
 
     public String toMarkdown() {
         // GH Markdown likes \r\n line endings
-        return String.format("\r\n%s%d of %d members of @%s have voted (%s).\r\n%s",
+        return String.format("\r\n%s%d of %d members of @%s have voted (%s%s).\r\n%s",
                 (hasQuorum ? "✅ " : ""),
                 groupVotes, groupSize, group,
                 voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
+                isPullRequest ? " or review" : "",
                 summarizeResults());
     }
 
