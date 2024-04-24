@@ -116,7 +116,8 @@ public class EmailAction extends Action {
             return "<p></p>";
         }
         try {
-            Node document = parser.parse(body);
+            // Do not include HTML comments in the rendered email body
+            Node document = parser.parse(body.replaceAll("<!--.*?-->", body));
             return renderer.render(document);
         } catch (Exception e) {
             Log.errorf(e, "[%s] EmailAction.toHtmlBody: Failed to render body as HTML", eventData.getLogId());
