@@ -3,9 +3,7 @@ package org.commonhaus.automation.github;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
 
 import jakarta.inject.Inject;
 
@@ -13,8 +11,6 @@ import org.commonhaus.automation.github.model.GithubTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHPullRequestFileDetail;
-import org.kohsuke.github.PagedIterable;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.mailer.MockMailbox;
@@ -32,7 +28,7 @@ public class NotifyEmailTest extends GithubTest {
     }
 
     @Test
-    void discussionCreated() throws Exception {
+    void discussionCreated_NoEmail() throws Exception {
         // When a general, not-interesting, discussion is created,
         // - no rules or actions are triggered
         given()
@@ -49,10 +45,16 @@ public class NotifyEmailTest extends GithubTest {
     }
 
     @Test
-    void discussionCreatedAnnouncements() throws Exception {
-        // When a discussion is created in announcements
+    void discussionCreatedAnnouncements_SendEmail() throws Exception {
+        // When a discussion is created in Announcements
         // - labels are fetched (label rule)
-        // - the notice label is added
+        // - if notice label is present, an email is sent
+
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+        verifyNoLabelCache(discussionId);
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, notice);
 
         given()
                 .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml"))
@@ -68,28 +70,75 @@ public class NotifyEmailTest extends GithubTest {
     }
 
     @Test
-    void testRelevantPr() throws Exception {
-        String prNodeId = "PR_kwDOLDuJqs5mlMVl";
-        verifyNoLabelCache(prNodeId);
-        long id = 1721025893;
+    void discussionCreatedAnnouncementsNoLabel_NoEmail() throws Exception {
+        // When a discussion is created in Announcements
+        // - labels are fetched (label rule)
+        // - if notice label is NOT present, an email is NOT sent
+
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+        verifyNoLabelCache(discussionId);
+
+        // preset cache to avoid requests
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
 
         given()
-                .github(mocks -> {
-                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
-                    // Mocked REST request
-                    PagedIterable<GHPullRequestFileDetail> paths = mockPagedIterable(
-                            mockGHPullRequestFileDetail("bylaws/README.md"));
-                    when(mocks.pullRequest(id).listFiles()).thenReturn(paths);
-                })
-                .when().payloadFromClasspath("/github/eventPullRequestOpenedBylaws.json")
-                .event(GHEvent.PULL_REQUEST)
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml"))
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
-                    verify(mocks.pullRequest(id)).listFiles();
-
+                    // 1 times: repo labels
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().atMost(10, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
+                .atMost(5, SECONDS);
+    }
+
+    @Test
+    void discussionAnnouncementsLabeledNotice_SendEmail() throws Exception {
+        // When a the notice label is added to a discussion, send an email
+
+        String discussionId = "D_kwDOLDuJqs4AXNhB";
+
+        // preset cache to avoid requests
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
+
+        given()
+                .github(mocks -> mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml"))
+                .when().payloadFromClasspath("/github/eventDiscussionLabeled.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+    }
+
+    @Test
+    void testPrLabeledNotice_SendEmail() throws Exception {
+        // If a PR is labeled with notice, send an email
+
+        String prNodeId = "PR_kwDOLDuJqs5mDkwX";
+
+        // preset cache to avoid requests
+        setLabels(repositoryId, notice);
+        setLabels(prNodeId, bug);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-notice-email.yml");
+                })
+                .when().payloadFromClasspath("/github/eventPullRequestLabeled.json")
+                .event(GHEvent.PULL_REQUEST)
+                .then().github(mocks -> {
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
     }
 }

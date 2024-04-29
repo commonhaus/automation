@@ -24,11 +24,7 @@ public class RepositoryAppConfig {
         }
     }
 
-    public static class DiscussionConfig {
-        public List<Rule> rules;
-    }
-
-    public static class PullRequestConfig {
+    public static class RuleConfig {
         public List<Rule> rules;
     }
 

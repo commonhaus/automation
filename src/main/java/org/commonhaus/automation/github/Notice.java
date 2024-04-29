@@ -9,8 +9,7 @@ import java.util.Set;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
-import org.commonhaus.automation.github.RepositoryAppConfig.DiscussionConfig;
-import org.commonhaus.automation.github.RepositoryAppConfig.PullRequestConfig;
+import org.commonhaus.automation.github.RepositoryAppConfig.RuleConfig;
 import org.commonhaus.automation.github.actions.Action;
 import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.QueryHelper;
@@ -23,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
+import io.quarkiverse.githubapp.event.Issue;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
@@ -35,13 +35,13 @@ public class Notice {
     /**
      * Called when there is a discussion event.
      *
-     * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param discussionPayload GitHub API parsed payload; connected GHRepository and GHOrganization
-     * @param repoConfigFile CFGH RepoConfig (if exists)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @Discussion GHEventPayload.Discussion discussionPayload,
+            @Discussion GHEventPayload.Discussion payload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
@@ -49,7 +49,7 @@ public class Notice {
             return;
         }
 
-        EventData eventData = new EventData(event, discussionPayload);
+        EventData eventData = new EventData(event, payload);
         EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
 
@@ -60,15 +60,15 @@ public class Notice {
     }
 
     /**
-     * Called when there is a pull request event.
+     * Called when there is an issue event.
      *
-     * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
-     * @param pullRequestPayload GitHub API parsed payload
-     * @param repoConfigFile CFGH RepoConfig (if exists)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
      */
-    void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @PullRequest GHEventPayload.PullRequest pullRequestPayload,
+    void onIssueEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @Issue GHEventPayload.Issue payload,
             @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
 
         Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
@@ -76,7 +76,34 @@ public class Notice {
             return;
         }
 
-        EventData eventData = new EventData(event, pullRequestPayload);
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
+
+        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.issue.rules);
+        Log.infof("[%s] notice.onIssueEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
+
+        applyMatchingActions("notice.onIssueEvent", queryContext, desiredActions, noticeConfig.actions);
+    }
+
+    /**
+     * Called when there is a pull request event.
+     *
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @PullRequest GHEventPayload.PullRequest payload,
+            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
+        Notice.Config noticeConfig = getNoticeConfig(repoConfigFile);
+        if (noticeConfig.isDisabled()) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
         EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
         Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.pullRequest.rules);
@@ -133,10 +160,12 @@ public class Notice {
             return super.isDisabled() || actions.isEmpty();
         }
 
-        public DiscussionConfig discussion;
+        public RuleConfig discussion;
+
+        public RuleConfig issue;
 
         @JsonProperty("pull_request")
-        public PullRequestConfig pullRequest;
+        public RuleConfig pullRequest;
 
         public final Map<String, Action> actions = new HashMap<>();
     }

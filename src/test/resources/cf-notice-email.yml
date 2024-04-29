@@ -1,25 +1,33 @@
 notice:
   discussion:
     rules:
-      - # If a discussion is created in the Announcements or Reviews 
-        # category, apply the notice label
-        category: [Announcements, Reviews]
-        action: [created, category_changed]
-        then: [email_activity]
+      - # If a discussion is created in Announcements or Consensus Building
+        # and it already has the notice label, send an email
+        category:
+          - Announcements
+          - Consensus Building
+        action: 
+          - created
+        label: [notice]
+        then: [announce]
+      - # If the notice or vote/open label is applied, send email
+        action: [labeled]
+        label:
+          - notice
+          - "vote/open"
+        then: [announce]
   pull_request:
     rules:
-      - # If a pull request is created that touches bylaws or policies
-        # that does not have the notice label:
-        #   apply the notice label
-        #   send an email to the announcement list
-        action:
-          - opened
-        paths:
-          - bylaws/*
-          - policies/*
-        then: [email_activity]
+      - # If the notice or vote/open label is applied, send email
+        action: [labeled]
+        label:
+          - notice
+          - "vote/open"
+        then: [announce]
   actions:
-    email_activity: 
+    apply_notice: [notice]
+    remove_open: ["!vote/open"]
+    announce:
       address: 
       - test@commonhaus.org
       - automation@commonhaus.org
