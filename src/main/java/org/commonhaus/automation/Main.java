@@ -40,7 +40,10 @@ public class Main {
 
         @Override
         public int run(String... args) {
+            System.out.println("cronExpr=" + botConfig.cronExpr().orElse("N/A"));
+            System.out.println("discoveryEnabled=" + botConfig.isDiscoveryEnabled());
             System.out.println("dryRun=" + botConfig.isDryRun());
+            System.out.println("replyTo=" + botConfig.replyTo().orElse("N/A"));
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()
             Quarkus.waitForExit();

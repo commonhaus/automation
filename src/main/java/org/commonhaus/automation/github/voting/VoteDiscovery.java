@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.RepositoryAppConfig;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
@@ -42,6 +43,9 @@ public class VoteDiscovery {
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
 
     @Inject
+    AppConfig appConfig;
+
+    @Inject
     EventBus eventBus;
 
     @Inject
@@ -58,9 +62,11 @@ public class VoteDiscovery {
 
     @Startup
     void init() {
-        executorService.submit(() -> {
-            discoverRepositories();
-        });
+        if (appConfig.isDiscoveryEnabled()) {
+            executorService.submit(() -> {
+                discoverRepositories();
+            });
+        }
     }
 
     void discoverRepositories() {
@@ -97,7 +103,7 @@ public class VoteDiscovery {
         }
     }
 
-    @Scheduled(cron = "${automation.cron.expr:13 27 */5 * * ?}")
+    @Scheduled(cron = "${automation.cron-expr:13 27 */5 * * ?}")
     void discoverVotes() {
         CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
                 "discoverVotes", (k) -> new CheckStatus());

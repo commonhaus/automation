@@ -7,8 +7,19 @@ import io.smallrye.config.ConfigMapping;
 /**
  * Mapping for GitHub App and Discord Bot configuration
  */
-@ConfigMapping(prefix = "commonhaus-bot")
+@ConfigMapping(prefix = "automation")
 public interface AppConfig {
+
+    Optional<String> replyTo();
+
+    Optional<String> cronExpr();
+
+    Optional<Boolean> discoveryEnabled();
+
+    default boolean isDiscoveryEnabled() {
+        Optional<Boolean> discoveryEnabled = discoveryEnabled();
+        return discoveryEnabled.isEmpty() || discoveryEnabled.get();
+    }
 
     Optional<Boolean> dryRun();
 

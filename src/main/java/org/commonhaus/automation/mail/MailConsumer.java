@@ -20,7 +20,7 @@ class MailConsumer {
     static void addReplyTo(MailTemplateInstance mailTemplateInstance) {
         String replyTo = replyToAddress;
         if (replyTo == null && !initialized) {
-            replyToAddress = replyTo = ConfigProvider.getConfig().getValue("automation.replyTo", String.class);
+            replyToAddress = replyTo = ConfigProvider.getConfig().getValue("automation.reply-to", String.class);
             initialized = true;
         }
         if (replyTo != null) {
