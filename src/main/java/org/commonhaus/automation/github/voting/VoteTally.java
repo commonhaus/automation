@@ -34,8 +34,8 @@ public class VoteTally {
             .comparing(DataReaction::date, Comparator.reverseOrder())
             .thenComparing(DataReaction::sortOrder);
 
-    public static final Comparator<DataActor> compareActors = Comparator
-            .comparing(DataActor::login);
+    public static final Comparator<VoteRecord> compareRecords = Comparator
+            .comparing(VoteRecord::login);
 
     @JsonProperty
     final VoteInformation.Type voteType;
@@ -65,8 +65,7 @@ public class VoteTally {
     public final Map<String, Category> categories = new HashMap<>();
 
     @JsonProperty
-    @JsonSerialize(contentUsing = VoteTally.ReactionSerializer.class)
-    final List<DataReaction> duplicates = new ArrayList<>();
+    final List<VoteRecord> duplicates = new ArrayList<>();
 
     @JsonProperty
     @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
@@ -145,9 +144,11 @@ public class VoteTally {
         // translate review states into reaction votes
         for (DataPullRequestReview review : reviews) {
             if (review.state.equals("APPROVED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
+                reactions.add(
+                        new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
             } else if (review.state.equals("CHANGES_REQUESTED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
+                reactions.add(
+                        new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
             } else if (review.state.equals("COMMENTED")) {
                 reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
             }
@@ -161,7 +162,7 @@ public class VoteTally {
 
         for (DataCommonComment comment : comments) {
             if (seenLogins.add(comment.author)) {
-                c.add(comment.author, teamLogins);
+                c.add(new VoteRecord(comment.author, comment.createdAt), teamLogins);
             }
         }
     }
@@ -196,7 +197,7 @@ public class VoteTally {
             if (seenLogins.add(user)) {
                 c.add(reaction, teamLogins);
             } else {
-                duplicates.add(reaction);
+                duplicates.add(new VoteRecord(reaction));
             }
         }
     }
@@ -237,7 +238,7 @@ public class VoteTally {
         return "\r\nThe following votes were not counted (duplicates):\r\n"
                 + duplicates.stream()
                         .map(d -> String.format("[%s](%s)(%s)",
-                                d.user.login, d.user.url, DataReaction.toEmoji(d.reactionContent)))
+                                d.login, d.url, d.reaction))
                         .collect(Collectors.joining(", "))
                 + "\r\n";
     }
@@ -254,7 +255,7 @@ public class VoteTally {
                 + "\r\n";
     }
 
-    String actorsToString(Collection<DataActor> actors) {
+    String actorsToString(Collection<VoteRecord> actors) {
         return actors.stream()
                 .map(actor -> String.format("[%s](%s)", actor.login, actor.url))
                 .collect(Collectors.joining(", "));
@@ -271,8 +272,7 @@ public class VoteTally {
         final Set<ReactionContent> reactions = new HashSet<>();
 
         @JsonProperty
-        @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
-        final Set<DataActor> team = new TreeSet<>(compareActors);
+        final Set<VoteRecord> team = new TreeSet<>(compareRecords);
 
         @JsonProperty
         int teamTotal = 0;
@@ -281,37 +281,15 @@ public class VoteTally {
 
         void add(DataReaction reaction, Map<String, DataActor> teamLogins) {
             reactions.add(reaction.reactionContent);
-            add(reaction.user, teamLogins);
+            add(new VoteRecord(reaction), teamLogins);
         }
 
-        void add(DataActor actor, Map<String, DataActor> teamLogins) {
+        void add(VoteRecord record, Map<String, DataActor> teamLogins) {
             total++;
-            if (teamLogins.get(actor.login) != null) {
+            if (teamLogins.get(record.login) != null) {
                 teamTotal++;
-                team.add(actor);
+                team.add(record);
             }
-        }
-    }
-
-    public static class ReactionSerializer extends StdSerializer<DataReaction> {
-        public ReactionSerializer() {
-            this(null);
-        }
-
-        public ReactionSerializer(Class<DataReaction> t) {
-            super(t);
-        }
-
-        @Override
-        public void serialize(DataReaction reaction, JsonGenerator gen, SerializerProvider provider) throws IOException {
-            gen.writeStartObject();
-            gen.writeObjectFieldStart("user");
-            gen.writeStringField("login", reaction.user.login);
-            gen.writeStringField("url", reaction.user.url);
-            gen.writeEndObject();
-            gen.writeObjectField("createdAt", reaction.createdAt);
-            gen.writeStringField("reaction", DataReaction.toEmoji(reaction));
-            gen.writeEndObject();
         }
     }
 
