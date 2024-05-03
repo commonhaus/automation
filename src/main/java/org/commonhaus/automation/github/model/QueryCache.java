@@ -24,6 +24,9 @@ public enum QueryCache {
             .build()),
     TEAM(Caffeine.newBuilder()
             .expireAfterWrite(6, TimeUnit.HOURS)
+            .build()),
+    REPO_CONFIG(Caffeine.newBuilder()
+            .expireAfterWrite(6, TimeUnit.HOURS)
             .build());
 
     private final Cache<String, Object> cache;

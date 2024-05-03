@@ -3,16 +3,15 @@ package org.commonhaus.automation.github.voting;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.AppConfig;
-import org.commonhaus.automation.github.RepositoryAppConfig;
+import org.commonhaus.automation.github.RepositoryDiscovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
 import org.commonhaus.automation.github.model.DataCommonItem;
@@ -21,24 +20,31 @@ import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.model.ScheduledQueryContext;
-import org.kohsuke.github.GHAppInstallation;
-import org.kohsuke.github.GHAuthenticatedAppInstallation;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
-import io.quarkiverse.githubapp.ConfigFile.Source;
 import io.quarkiverse.githubapp.GitHubClientProvider;
-import io.quarkiverse.githubapp.GitHubConfigFileProvider;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Startup;
 import io.quarkus.scheduler.Scheduled;
+import io.quarkus.vertx.ConsumeEvent;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 @ApplicationScoped
 @UnlessBuildProfile("test")
 public class VoteDiscovery {
+    static final String ADDRESS = "vote-discovery";
+
+    static class DiscoveryQueueMsg {
+        ScheduledQueryContext ctx;
+        Voting.Config voteConfig;
+
+        public DiscoveryQueueMsg(ScheduledQueryContext ctx, Config voteConfig) {
+            this.ctx = ctx;
+            this.voteConfig = voteConfig;
+        }
+    }
 
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
 
@@ -54,51 +60,27 @@ public class VoteDiscovery {
     @Inject
     GitHubClientProvider gitHubService;
 
-    @Inject
-    GitHubConfigFileProvider configProvider;
+    /**
+     * Update the configuration for a repository (received with a recent repository event)
+     *
+     * @param repoEvent
+     */
+    public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+        long ghiId = repoEvent.installationId;
+        GHRepository ghRepository = repoEvent.ghRepository;
 
-    @Inject
-    ExecutorService executorService;
+        Voting.Config voteConfig = Voting.getVotingConfig(repoEvent.repoConfig.orElse(null));
+        if (voteConfig.isDisabled()) {
+            votingRepositories.remove(repoEvent.ghRepository.getFullName());
+        } else {
+            // update map.
+            votingRepositories.put(repoEvent.ghRepository.getFullName(), ghiId);
 
-    @Startup
-    void init() {
-        if (appConfig.isDiscoveryEnabled()) {
-            executorService.submit(() -> {
-                discoverRepositories();
-            });
-        }
-    }
-
-    void discoverRepositories() {
-        Log.debug("VoteDiscovery initialized: initial scan for repositories");
-        try {
-            GitHub ac = gitHubService.getApplicationClient();
-            for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {
-                long ghiId = ghAppInstallation.getId();
-                GitHub github = gitHubService.getInstallationClient(ghiId);
-                GHAuthenticatedAppInstallation ghai = github.getInstallation();
-
-                for (GHRepository ghRepository : ghai.listRepositories()) {
-                    Voting.Config voteConfig = getConfiguration(ghRepository);
-                    if (voteConfig.isDisabled()) {
-                        continue;
-                    }
-                    votingRepositories.put(ghRepository.getFullName(), ghiId);
-                    queryRepository(queryHelper.newScheduledQueryContext(ghRepository, ghiId),
-                            voteConfig);
-                }
-            }
-        } catch (GHIOException e) {
-            Log.errorf(e, "[discoverRepositories] Error making GH Request: %s", e.toString());
-            if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
-                e.getResponseHeaderFields()
-                        .forEach((k, v) -> Log.debugf("%s: %s", k, v));
-                e.printStackTrace();
-            }
-        } catch (Throwable t) {
-            Log.errorf(t, "[discoverRepositories] Error making GH Request: %s", t.toString());
-            if (Log.isDebugEnabled()) {
-                t.printStackTrace();
+            // if this is the first event, query the repository
+            if (repoEvent.discovery) {
+                ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, repoEvent.installationId)
+                        .addExisting(repoEvent.github);
+                eventBus.send(VoteDiscovery.ADDRESS, new DiscoveryQueueMsg(ctx, voteConfig));
             }
         }
     }
@@ -119,15 +101,16 @@ public class VoteDiscovery {
                 Long installationId = e.getValue();
 
                 GitHub github = gitHubService.getInstallationClient(installationId);
-
                 GHRepository ghRepository = github.getRepository(repoFullName);
-                Voting.Config voteConfig = getConfiguration(ghRepository);
+
+                Voting.Config voteConfig = Voting.getVotingConfig(queryHelper.getConfiguration(ghRepository));
                 if (voteConfig.isDisabled()) {
                     // Voting no longer enabled. Remove it
                     i.remove();
                 } else {
-                    queryRepository(queryHelper.newScheduledQueryContext(ghRepository, installationId),
-                            voteConfig);
+                    ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, installationId)
+                            .addExisting(github);
+                    eventBus.send(VoteDiscovery.ADDRESS, new DiscoveryQueueMsg(ctx, voteConfig));
                 }
             }
         } catch (GHIOException e) {
@@ -147,22 +130,25 @@ public class VoteDiscovery {
         }
     }
 
-    void queryRepository(ScheduledQueryContext ctx, Voting.Config voteConfig) {
+    @ConsumeEvent(value = VoteDiscovery.ADDRESS, blocking = true)
+    void queryRepository(DiscoveryQueueMsg msg) {
         CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
-                ctx.getRepositoryId(), (k) -> new CheckStatus());
+                msg.ctx.getRepositoryId(), (k) -> new CheckStatus());
         if (!checkStatus.startScheduledUpdate()) {
             return;
         }
         try {
-            Log.debugf("[%s] discoverVotes", ctx.getLogId());
-            queryDiscussions(ctx, voteConfig);
-            queryIssues(ctx, voteConfig);
+            Log.debugf("[%s] queryRepository", msg.ctx.getLogId());
+            queryDiscussions(msg);
+            queryIssues(msg);
         } finally {
             checkStatus.finishUpdate();
         }
     }
 
-    void queryDiscussions(ScheduledQueryContext ctx, Voting.Config voteConfig) {
+    void queryDiscussions(DiscoveryQueueMsg msg) {
+        ScheduledQueryContext ctx = msg.ctx;
+        Voting.Config voteConfig = msg.voteConfig;
         List<DataDiscussion> discussions = ctx.findDiscussionsWithLabel("vote/open");
         if (discussions == null) {
             return;
@@ -176,7 +162,9 @@ public class VoteDiscovery {
     }
 
     // Issues or pull requests
-    void queryIssues(ScheduledQueryContext ctx, Voting.Config voteConfig) {
+    void queryIssues(DiscoveryQueueMsg msg) {
+        ScheduledQueryContext ctx = msg.ctx;
+        Voting.Config voteConfig = msg.voteConfig;
         List<DataCommonItem> issues = ctx.findIssuesWithLabel("vote/open");
         if (issues == null) {
             return;
@@ -192,19 +180,9 @@ public class VoteDiscovery {
 
     private void slowDown() {
         try {
-            TimeUnit.SECONDS.sleep(20);
+            TimeUnit.SECONDS.sleep(15);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-    }
-
-    private Voting.Config getConfiguration(GHRepository ghRepository) {
-        Optional<RepositoryAppConfig.File> repoConfig = configProvider
-                .fetchConfigFile(ghRepository, RepositoryAppConfig.NAME, Source.DEFAULT,
-                        RepositoryAppConfig.File.class);
-        if (repoConfig.isEmpty()) {
-            return Config.DISABLED;
-        }
-        return Voting.getVotingConfig(repoConfig.get());
     }
 }

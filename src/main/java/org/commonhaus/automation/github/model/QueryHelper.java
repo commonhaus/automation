@@ -6,16 +6,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
+import org.commonhaus.automation.github.RepositoryAppConfig;
+import org.commonhaus.automation.github.RepositoryDiscovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.voting.VoteEvent;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
@@ -23,7 +27,9 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.ReactionContent;
 
+import io.quarkiverse.githubapp.ConfigFile.Source;
 import io.quarkiverse.githubapp.GitHubClientProvider;
+import io.quarkiverse.githubapp.GitHubConfigFileProvider;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
@@ -34,11 +40,14 @@ public class QueryHelper {
 
     private final AppConfig botConfig;
     private final GitHubClientProvider gitHubClientProvider;
+    private final GitHubConfigFileProvider configProvider;
     private String botSenderLogin;
 
-    public QueryHelper(AppConfig botConfig, GitHubClientProvider gitHubClientProvider) {
+    public QueryHelper(AppConfig botConfig, GitHubClientProvider gitHubClientProvider,
+            GitHubConfigFileProvider configProvider) {
         this.botConfig = botConfig;
         this.gitHubClientProvider = gitHubClientProvider;
+        this.configProvider = configProvider;
     }
 
     public EventQueryContext newQueryContext(EventData event) {
@@ -74,6 +83,27 @@ public class QueryHelper {
     @FunctionalInterface
     public interface GitHubParameterApiCall<R> {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
+    }
+
+    void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+        if (repoEvent.repoConfig.isPresent()) {
+            // Update repo config cache (will be refreshed on every event. We have it, so use it.)
+            QueryCache.REPO_CONFIG.putCachedValue(repoEvent.ghRepository.getNodeId(), repoEvent.repoConfig.get());
+        }
+    }
+
+    public RepositoryAppConfig.File getConfiguration(GHRepository ghRepository) {
+        RepositoryAppConfig.File configFile = QueryCache.REPO_CONFIG.getCachedValue(ghRepository.getNodeId());
+        if (configFile == null) {
+            Optional<RepositoryAppConfig.File> repoConfig = configProvider
+                    .fetchConfigFile(ghRepository, RepositoryAppConfig.NAME, Source.DEFAULT,
+                            RepositoryAppConfig.File.class);
+            if (repoConfig.isPresent()) {
+                configFile = repoConfig.get();
+                QueryCache.REPO_CONFIG.putCachedValue(ghRepository.getNodeId(), configFile);
+            }
+        }
+        return configFile;
     }
 
     /**
