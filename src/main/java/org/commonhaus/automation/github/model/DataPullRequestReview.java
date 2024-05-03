@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,15 +17,18 @@ import io.smallrye.graphql.client.Response;
 public class DataPullRequestReview extends DataCommonObject {
     static final String REVIEW_FIELDS = DataCommonObject.COMMON_OBJECT_MIN + """
             state
+            submittedAt
             """;
 
     public final DataActor author;
     public final String state;
+    public final Date submittedAt;
 
     public DataPullRequestReview(JsonObject object) {
         super(object);
         this.author = JsonAttribute.author.actorFrom(object);
         this.state = JsonAttribute.state.stringFrom(object);
+        this.submittedAt = JsonAttribute.submittedAt.dateFrom(object);
     }
 
     public String toString() {

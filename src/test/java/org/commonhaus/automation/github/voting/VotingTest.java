@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -505,23 +506,24 @@ public class VotingTest extends GithubTest {
         Set<DataActor> teamLogins = new HashSet<>(50);
         List<DataReaction> unignore = new ArrayList<>(3);
         List<DataReaction> duplicates = new ArrayList<>(3);
+        Date date = new Date();
         for (int i = 1; i < 51; i++) {
             DataActor user = new DataActor(mockGHUser("user" + i));
             teamLogins.add(user);
             teamReactions.add(new DataReaction(user,
-                    i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
+                    i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
             if (i % 13 == 0) {
-                unignore.add(new DataReaction(user, "eyes"));
+                unignore.add(new DataReaction(user, "eyes", date));
             }
             if (i % 19 == 0) {
-                duplicates.add(new DataReaction(user, "thumbs_down"));
+                duplicates.add(new DataReaction(user, "thumbs_down", date));
             }
         }
         List<DataReaction> extraReactions = new ArrayList<>(10);
         for (int i = 1; i < 11; i++) {
             DataActor user = new DataActor(mockGHUser("extra" + i));
             extraReactions.add(new DataReaction(user,
-                    i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
+                    i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
         }
         teamLogins.add(new DataActor(mockGHUser("excluded"))); // should be excluded from totals
 

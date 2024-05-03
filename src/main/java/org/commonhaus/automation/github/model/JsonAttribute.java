@@ -96,6 +96,7 @@ public enum JsonAttribute {
     reviewDecision,
     search,
     state,
+    submittedAt("submitted_at"),
     title,
     updateDiscussionComment,
     updateIssue,

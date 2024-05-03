@@ -12,16 +12,18 @@ import io.quarkus.qute.TemplateData;
 @TemplateData
 public class DataCommonObject extends DataCommonType {
 
-    static final String ACTOR_FIELDS = """
+    static final String ACTOR_FIELDS_MIN = """
             login
             url
+            """;
+    static final String ACTOR_FIELDS = ACTOR_FIELDS_MIN + """
             avatarUrl
             """;
 
     static final String COMMON_OBJECT_MIN = """
             id
             author {
-                """ + ACTOR_FIELDS + """
+                """ + ACTOR_FIELDS_MIN + """
             }
             url
             """;

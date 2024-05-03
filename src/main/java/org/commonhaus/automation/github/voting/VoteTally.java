@@ -145,11 +145,11 @@ public class VoteTally {
         // translate review states into reaction votes
         for (DataPullRequestReview review : reviews) {
             if (review.state.equals("APPROVED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent()));
+                reactions.add(new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
             } else if (review.state.equals("CHANGES_REQUESTED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent()));
+                reactions.add(new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
             } else if (review.state.equals("COMMENTED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent()));
+                reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
             }
         }
         votes.addAll(0, reactions);
@@ -308,7 +308,6 @@ public class VoteTally {
             gen.writeObjectFieldStart("user");
             gen.writeStringField("login", reaction.user.login);
             gen.writeStringField("url", reaction.user.url);
-            gen.writeStringField("avatarUrl", reaction.user.avatarUrl);
             gen.writeEndObject();
             gen.writeObjectField("createdAt", reaction.createdAt);
             gen.writeStringField("reaction", DataReaction.toEmoji(reaction));
@@ -330,7 +329,6 @@ public class VoteTally {
             gen.writeStartObject();
             gen.writeStringField("login", actor.login);
             gen.writeStringField("url", actor.url);
-            gen.writeStringField("avatarUrl", actor.avatarUrl);
             gen.writeEndObject();
         }
     }

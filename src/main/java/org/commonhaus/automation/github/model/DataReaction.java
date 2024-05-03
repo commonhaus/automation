@@ -34,7 +34,7 @@ public class DataReaction {
 
     static final String REACTION_FIELDS = """
             user {
-                """ + DataCommonObject.ACTOR_FIELDS + """
+                """ + DataCommonObject.ACTOR_FIELDS_MIN + """
             }
             content
             createdAt
@@ -56,12 +56,12 @@ public class DataReaction {
         this.sortOrder = sortOrderFor(this.reactionContent);
     }
 
-    public DataReaction(DataActor user, String content) {
+    public DataReaction(DataActor user, String content, Date createdAt) {
         this.user = user;
         this.content = content;
         this.reactionContent = reactionContentFrom(this.content);
         this.sortOrder = sortOrderFor(this.reactionContent);
-        this.createdAt = new Date();
+        this.createdAt = createdAt;
         this.reactableId = null;
     }
 
