@@ -236,7 +236,7 @@ public class VoteTally {
         }
         return "\r\nThe following votes were not counted (duplicates):\r\n"
                 + duplicates.stream()
-                        .map(d -> String.format("[%s](%s):%s",
+                        .map(d -> String.format("[%s](%s)(%s)",
                                 d.user.login, d.user.url, DataReaction.toEmoji(d.reactionContent)))
                         .collect(Collectors.joining(", "))
                 + "\r\n";
@@ -305,7 +305,11 @@ public class VoteTally {
         @Override
         public void serialize(DataReaction reaction, JsonGenerator gen, SerializerProvider provider) throws IOException {
             gen.writeStartObject();
-            provider.defaultSerializeField("user", reaction.user, gen);
+            gen.writeObjectFieldStart("user");
+            gen.writeStringField("login", reaction.user.login);
+            gen.writeStringField("url", reaction.user.url);
+            gen.writeStringField("avatarUrl", reaction.user.avatarUrl);
+            gen.writeEndObject();
             gen.writeObjectField("createdAt", reaction.createdAt);
             gen.writeStringField("reaction", DataReaction.toEmoji(reaction));
             gen.writeEndObject();

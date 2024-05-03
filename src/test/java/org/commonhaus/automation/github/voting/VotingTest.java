@@ -504,6 +504,7 @@ public class VotingTest extends GithubTest {
         List<DataReaction> teamReactions = new ArrayList<>(50);
         Set<DataActor> teamLogins = new HashSet<>(50);
         List<DataReaction> unignore = new ArrayList<>(3);
+        List<DataReaction> duplicates = new ArrayList<>(3);
         for (int i = 1; i < 51; i++) {
             DataActor user = new DataActor(mockGHUser("user" + i));
             teamLogins.add(user);
@@ -511,6 +512,9 @@ public class VotingTest extends GithubTest {
                     i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes"));
             if (i % 13 == 0) {
                 unignore.add(new DataReaction(user, "eyes"));
+            }
+            if (i % 19 == 0) {
+                duplicates.add(new DataReaction(user, "thumbs_down"));
             }
         }
         List<DataReaction> extraReactions = new ArrayList<>(10);
@@ -551,30 +555,32 @@ public class VotingTest extends GithubTest {
 
         // All have voted: but some are ignored!
 
-        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions,
+                teamLogins);
         assertThat(voteTally.categories.get("approve")).isNotNull();
         assertThat(voteTally.categories.get("ok")).isNotNull();
         assertThat(voteTally.categories.get("revise")).isNotNull();
         assertThat(voteTally.categories.get("ignored")).isNotNull();
         assertThat(voteTally.missingGroupActors).size().isEqualTo(3);
 
-        // now add the missing votes with valid (not ignored) values
+        // now add the missing votes with valid (not ignored) and duplicate values
         extraReactions.addAll(unignore);
+        extraReactions.addAll(duplicates);
         voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
 
-        // Majority have voted (addition of ignored votes bumps the obvious ratio)
+        // Majority have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(24, 26, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(23, 25, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(23, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
         // Supermajority (2/3) have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(33, 34, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(32, 33, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions, teamLogins);
 
         // Manual (count reactions implied)
 
@@ -649,7 +655,8 @@ public class VotingTest extends GithubTest {
             Set<DataActor> teamLogins) throws JsonProcessingException {
 
         List<DataReaction> reactions = Stream
-                .concat(teamReactions.stream().limit(numUsers), extraReactions.stream())
+                .concat(teamReactions.stream(), extraReactions.stream())
+                .filter(x -> Integer.parseInt(x.user.id.replace("user", "").replace("extra", "")) <= numUsers)
                 .toList();
         List<DataCommonComment> comments = List.of();
 
@@ -692,6 +699,13 @@ public class VotingTest extends GithubTest {
             assertThat(markdown)
                     .as("markdown should not contain ✅ (no quorum)")
                     .doesNotContain("✅ ");
+        }
+
+        if (!voteTally.duplicates.isEmpty()) {
+            System.out.println(json);
+            assertThat(json)
+                    .as("json duplicate user should be present")
+                    .doesNotContain("{\"user\":{}");
         }
 
         if (voteInfo.voteType == VoteInformation.Type.marthas) {
