@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.AppConfig;
@@ -26,12 +27,10 @@ import io.quarkiverse.githubapp.event.IssueComment;
 import io.quarkiverse.githubapp.event.Label;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkiverse.githubapp.event.PullRequestReview;
-import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
-@UnlessBuildProfile("test")
 public class RepositoryDiscovery {
 
     public static class RepositoryDiscoveryEvent {
@@ -72,17 +71,12 @@ public class RepositoryDiscovery {
     @Inject
     Event<RepositoryDiscoveryEvent> repositoryDiscoveryEvent;
 
-    @Startup
-    void init() {
-        if (appConfig.isDiscoveryEnabled()) {
-            Log.info("Repository discovery is enabled");
-            discoverRepositories();
-        } else {
-            Log.info("Repository discovery is disabled");
+    void discoverRepositories(@Observes StartupEvent ev) {
+        Log.info("Repository discovery is " + (appConfig.isDiscoveryEnabled() ? "enabled" : "disabled"));
+        if (!appConfig.isDiscoveryEnabled()) {
+            return;
         }
-    }
 
-    void discoverRepositories() {
         try {
             GitHub ac = gitHubService.getApplicationClient();
             for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {

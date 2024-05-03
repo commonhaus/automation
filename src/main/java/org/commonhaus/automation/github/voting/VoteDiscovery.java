@@ -80,6 +80,8 @@ public class VoteDiscovery {
             if (repoEvent.discovery) {
                 ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, repoEvent.installationId)
                         .addExisting(repoEvent.github);
+
+                Log.debugf("[%s] queue vote discovery", ctx.getLogId());
                 eventBus.send(VoteDiscovery.ADDRESS, new DiscoveryQueueMsg(ctx, voteConfig));
             }
         }
