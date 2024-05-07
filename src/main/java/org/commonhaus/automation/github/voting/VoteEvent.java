@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.Voting.Config;
+import org.commonhaus.automation.github.model.ActionType;
 import org.commonhaus.automation.github.model.DataCommonItem;
 import org.commonhaus.automation.github.model.DataPullRequestReview;
 import org.commonhaus.automation.github.model.EventType;
@@ -22,17 +23,17 @@ public class VoteEvent {
     public final static String ADDRESS = "voting";
 
     // standard prefix, used when no badge is configured
-    public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment\\]";
+    public static final String prefixMatch = "\\*\\*Vote progress\\*\\* tracked in \\[this comment]";
     // when a badge is configured, this is the prefix
-    public static final String badgeMatch = "\\[!\\[.*?\\]\\(.*?\\)\\]";
-    public static final String linkMatch = "\\[.*?Vote progress\\]";
+    public static final String badgeMatch = "\\[!\\[.*?]\\(.*?\\)]";
+    public static final String linkMatch = "\\[.*?Vote progress]";
 
     public static final Pattern botCommentPattern = Pattern.compile(
             "(?:" + prefixMatch + "|" + badgeMatch + "|" + linkMatch + ")" +
                     "\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.?", // the juicy part of the URL
             Pattern.CASE_INSENSITIVE);
 
-    private final boolean isScheduled;
+    private final ActionType actionType;
     private final QueryContext qc;
     private final Voting.Config votingConfig;
 
@@ -51,7 +52,7 @@ public class VoteEvent {
     private List<DataPullRequestReview> prReviews;
 
     public VoteEvent(QueryContext qc, Config votingConfig, EventData eventData) {
-        this.isScheduled = false;
+        this.actionType = eventData.getActionType();
         this.qc = qc;
         this.votingConfig = votingConfig;
         this.eventType = qc.getEventType();
@@ -65,7 +66,7 @@ public class VoteEvent {
     }
 
     public VoteEvent(QueryContext qc, Config votingConfig, DataCommonItem item) {
-        this.isScheduled = true;
+        this.actionType = ActionType.bot_scheduled;
         this.qc = qc;
         this.votingConfig = votingConfig;
         this.eventType = qc.getEventType();
@@ -79,7 +80,7 @@ public class VoteEvent {
     }
 
     public boolean isScheduled() {
-        return isScheduled;
+        return actionType == ActionType.bot_scheduled;
     }
 
     public QueryContext getQueryContext() {
@@ -108,6 +109,10 @@ public class VoteEvent {
 
     public EventType getEventType() {
         return eventType;
+    }
+
+    public ActionType getActionType() {
+        return actionType;
     }
 
     public String getRepoSlug() {

@@ -2,6 +2,8 @@ package org.commonhaus.automation.github.model;
 
 import java.util.List;
 
+import jakarta.json.JsonObject;
+
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHOrganization;
@@ -24,7 +26,7 @@ public class ScheduledQueryContext extends QueryContext {
         super(helper, botConfig, gitHubClientProvider);
         this.repository = ghRepository;
         this.installationId = installationId;
-        this.eventType = EventType.label;
+        this.eventType = EventType.bot_schedule;
     }
 
     ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
@@ -69,6 +71,16 @@ public class ScheduledQueryContext extends QueryContext {
 
     public EventType getEventType() {
         return eventType;
+    }
+
+    @Override
+    public ActionType getActionType() {
+        return ActionType.bot_scheduled;
+    }
+
+    @Override
+    public JsonObject getJsonData() {
+        return null;
     }
 
     public ScheduledQueryContext addExisting(GitHub github) {
