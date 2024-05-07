@@ -23,16 +23,11 @@ public class MatchLabel {
     }
 
     public boolean matches(QueryContext queryContext, String nodeId) {
-        return matches(queryContext, List.of(), nodeId);
-    }
-
-    public boolean matches(QueryContext queryContext, List<DataLabel> eventLabels, String nodeId) {
         if (nodeId == null) {
             return false;
         }
 
         Collection<DataLabel> itemLabels = queryContext.getLabels(nodeId);
-        itemLabels.addAll(eventLabels);
 
         if (!include.isEmpty() && (itemLabels == null || itemLabels.isEmpty())) {
             return false;

@@ -20,6 +20,7 @@ public class Rule {
     MatchCategory category;
     MatchPaths paths;
     MatchLabel label;
+    MatchChangedLabel changedLabel;
 
     public List<String> then;
 
@@ -35,8 +36,10 @@ public class Rule {
             matches = paths.matches(queryContext);
         }
         if (matches && label != null) {
-            matches = label.matches(queryContext, queryContext.getEventData().getEventLabels(),
-                    queryContext.getEventData().getNodeId());
+            matches = label.matches(queryContext, queryContext.getEventData().getNodeId());
+        }
+        if (matches && changedLabel != null) {
+            matches = changedLabel.matches(queryContext);
         }
         return matches;
     }
@@ -67,6 +70,10 @@ public class Rule {
             if (RuleType.label.existsIn(node)) {
                 rule.label = new MatchLabel(mapper.convertValue(RuleType.label.getFrom(node), LIST_STRING));
             }
+            if (RuleType.label_change.existsIn(node)) {
+                rule.changedLabel = new MatchChangedLabel(
+                        mapper.convertValue(RuleType.label_change.getFrom(node), LIST_STRING));
+            }
             if (RuleType.paths.existsIn(node)) {
                 rule.paths = new MatchPaths();
                 rule.paths.paths = mapper.convertValue(RuleType.paths.getFrom(node), LIST_STRING);
@@ -82,6 +89,7 @@ public class Rule {
         action,
         category,
         label,
+        label_change,
         paths,
         then;
 

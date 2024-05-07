@@ -41,7 +41,6 @@ public class VoteEvent {
     private final EventType eventType;
     private final String eventTime;
 
-    /** Id of existing node containing votes */
     private final String nodeId;
     /** HtmlURL of existing node containing votes */
     private final String nodeUrl;

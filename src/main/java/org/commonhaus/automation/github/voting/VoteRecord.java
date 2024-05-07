@@ -59,10 +59,8 @@ public class VoteRecord {
         } else if (!login.equals(other.login))
             return false;
         if (reaction == null) {
-            if (other.reaction != null)
-                return false;
-        } else if (!reaction.equals(other.reaction))
-            return false;
-        return true;
+            return other.reaction == null;
+        } else
+            return reaction.equals(other.reaction);
     }
 }

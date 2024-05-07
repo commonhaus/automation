@@ -101,7 +101,7 @@ public class DataLabel extends DataCommonType {
                 """;
 
         // A Repository has an id, and it has labels, but it is not a Labelable.
-        // we need to alter the query a little bit to get the labels.
+        // we need to alter the query to get the labels.
         if (labeledId.equals(queryContext.getRepositoryId())) {
             query = """
                     query($owner: String!, $name: String!, $after: String) {

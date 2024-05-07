@@ -78,8 +78,7 @@ public class EventQueryContext extends QueryContext {
 
     public String getStatus() {
         if (evt.getActionType() == ActionType.labeled) {
-            return String.join(", ",
-                    evt.getEventLabels().stream().map(x -> x.name).toList());
+            return evt.getActionType().name() + " " + JsonAttribute.label.labelFrom(evt.getJsonData()).name;
         }
         return evt.getActionType().name();
     }

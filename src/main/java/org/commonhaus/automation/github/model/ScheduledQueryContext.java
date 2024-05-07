@@ -15,8 +15,8 @@ public class ScheduledQueryContext extends QueryContext {
     private String logId;
     final private GHRepository repository;
     private GHOrganization organization;
-    private long installationId;
-    private EventType eventType;
+    private final long installationId;
+    private final EventType eventType;
 
     ScheduledQueryContext(QueryHelper helper, AppConfig botConfig,
             GitHubClientProvider gitHubClientProvider,

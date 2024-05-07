@@ -12,7 +12,7 @@ notice:
         then: [announce]
       - # If the notice or vote/open label is applied, send email
         action: [labeled]
-        label:
+        label_change:
           - notice
           - "vote/open"
         then: [announce]
@@ -20,7 +20,7 @@ notice:
     rules:
       - # If the notice or vote/open label is applied, send email
         action: [labeled]
-        label:
+        label_change:
           - notice
           - "vote/open"
         then: [announce]

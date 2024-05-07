@@ -13,7 +13,7 @@ notice:
         then: [apply_notice]
       - # If the vote/done label is applied, remove the vote/open label
         action: [labeled]
-        label: ["vote/done"]
+        label_change: ["vote/done"]
         then: [remove_open]
   pull_request:
     rules:
@@ -30,7 +30,7 @@ notice:
         then: [apply_notice]
       - # If the vote/done label is applied, remove the vote/open label
         action: [labeled]
-        label: ["vote/done"]
+        label_change: ["vote/done"]
         then: [remove_open]
   actions:
     apply_notice: [notice]

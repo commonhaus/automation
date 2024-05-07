@@ -1,12 +1,9 @@
 package org.commonhaus.automation.github;
 
-import java.util.List;
-
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.model.ActionType;
 import org.commonhaus.automation.github.model.DataDiscussion;
-import org.commonhaus.automation.github.model.DataLabel;
 import org.commonhaus.automation.github.model.EventPayload;
 import org.commonhaus.automation.github.model.EventType;
 import org.commonhaus.automation.github.model.JsonAttribute;
@@ -252,12 +249,5 @@ public class EventData {
             };
         }
         return result;
-    }
-
-    public List<DataLabel> getEventLabels() {
-        if (actionType == ActionType.labeled) {
-            return JsonAttribute.label.labelsFrom(jsonData);
-        }
-        return List.of();
     }
 }

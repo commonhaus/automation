@@ -95,7 +95,7 @@ public class VoteTally {
             if (isPullRequest) {
                 reviewsToComments(info.getReviews(), comments);
             }
-            countComments(info, comments, seenLogins, teamLogins);
+            countComments(comments, seenLogins, teamLogins);
             droppedVotes = 0;
         } else {
             if (isPullRequest) {
@@ -143,20 +143,19 @@ public class VoteTally {
         List<DataReaction> reactions = new ArrayList<>();
         // translate review states into reaction votes
         for (DataPullRequestReview review : reviews) {
-            if (review.state.equals("APPROVED")) {
-                reactions.add(
+            switch (review.state) {
+                case "APPROVED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
-            } else if (review.state.equals("CHANGES_REQUESTED")) {
-                reactions.add(
+                case "CHANGES_REQUESTED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
-            } else if (review.state.equals("COMMENTED")) {
-                reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
+                case "COMMENTED" ->
+                    reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
             }
         }
         votes.addAll(0, reactions);
     }
 
-    private void countComments(VoteInformation info, Collection<DataCommonComment> comments,
+    private void countComments(Collection<DataCommonComment> comments,
             Set<DataActor> seenLogins, Map<String, DataActor> teamLogins) {
         Category c = categories.computeIfAbsent("comment", k -> new Category());
 

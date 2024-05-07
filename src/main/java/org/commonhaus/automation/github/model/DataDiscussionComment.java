@@ -17,7 +17,7 @@ public class DataDiscussionComment extends DataCommonComment {
             }
             """;
 
-    /** {@literal discussion_id} for webhook events (may be null) */
+    /** {@literal discussion_id} for webhook events (possibly null) */
     public final Integer discussion_id;
     public final DataDiscussion discussion;
 

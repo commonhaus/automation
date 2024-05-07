@@ -36,14 +36,7 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 public class VoteDiscovery {
     static final String ADDRESS = "vote-discovery";
 
-    static class DiscoveryQueueMsg {
-        ScheduledQueryContext ctx;
-        Voting.Config voteConfig;
-
-        public DiscoveryQueueMsg(ScheduledQueryContext ctx, Config voteConfig) {
-            this.ctx = ctx;
-            this.voteConfig = voteConfig;
-        }
+    record DiscoveryQueueMsg(ScheduledQueryContext ctx, Config voteConfig) {
     }
 
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
@@ -62,8 +55,6 @@ public class VoteDiscovery {
 
     /**
      * Update the configuration for a repository (received with a recent repository event)
-     *
-     * @param repoEvent
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         long ghiId = repoEvent.installationId;

@@ -31,12 +31,11 @@ public abstract class Action {
         }
 
         @Override
-        public Action deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
+        public Action deserialize(JsonParser jp, DeserializationContext context) throws IOException {
             ObjectMapper mapper = (ObjectMapper) jp.getCodec();
             JsonNode root = mapper.readTree(jp);
             if (root.isArray()) {
-                LabelAction labelsAction = new LabelAction(mapper.convertValue(root, LIST_STRING));
-                return labelsAction;
+                return new LabelAction(mapper.convertValue(root, LIST_STRING));
             } else if (root.has("address")) {
                 return new EmailAction(root.get("address"));
             }

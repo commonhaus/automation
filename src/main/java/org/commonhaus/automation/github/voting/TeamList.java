@@ -10,13 +10,13 @@ import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 import org.kohsuke.github.GHUser;
 
 public class TeamList {
-    String name;
-    Set<DataActor> members;
+    final String name;
+    final Set<DataActor> members;
 
     public TeamList(String name, Collection<GHUser> members) {
         this.name = name;
         this.members = members.stream()
-                .map(u -> new DataActor(u))
+                .map(DataActor::new)
                 .collect(Collectors.toSet());
     }
 

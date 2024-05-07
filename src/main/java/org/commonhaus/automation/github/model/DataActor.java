@@ -44,8 +44,7 @@ public class DataActor extends DataCommonType {
     @Override
     public int hashCode() {
         final int prime = 31;
-        int result = prime * ((login == null) ? 0 : login.hashCode());
-        return result;
+        return prime * ((login == null) ? 0 : login.hashCode());
     }
 
     /**
@@ -61,10 +60,8 @@ public class DataActor extends DataCommonType {
             return false;
         DataActor other = (DataActor) obj;
         if (login == null) {
-            if (other.login != null)
-                return false;
-        } else if (!login.equals(other.login))
-            return false;
-        return true;
+            return other.login == null;
+        } else
+            return login.equals(other.login);
     }
 }

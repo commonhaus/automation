@@ -86,10 +86,8 @@ public class QueryHelper {
     }
 
     void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
-        if (repoEvent.repoConfig.isPresent()) {
-            // Update repo config cache (will be refreshed on every event. We have it, so use it.)
-            QueryCache.REPO_CONFIG.putCachedValue(repoEvent.ghRepository.getNodeId(), repoEvent.repoConfig.get());
-        }
+        // Update repo config cache (will be refreshed on every event. We have it, so use it.)
+        repoEvent.repoConfig.ifPresent(file -> QueryCache.REPO_CONFIG.putCachedValue(repoEvent.ghRepository.getNodeId(), file));
     }
 
     public RepositoryAppConfig.File getConfiguration(GHRepository ghRepository) {
@@ -376,8 +374,8 @@ public class QueryHelper {
         /**
          * Add label by name or id to event item
          *
-         * @param nodeId Id of node(discussion or pull request or issue) to add labels to
-         * @param label label name or id
+         * @param nodeId String node id of item (discussion or pull request or issue) to add labels to
+         * @param label label name or label node id
          * @return updated collection of labels for the item, or null if no labels were found
          */
         public Collection<DataLabel> addLabel(String nodeId, String label) {
@@ -387,7 +385,7 @@ public class QueryHelper {
         /**
          * Add label by name or id to event item
          *
-         * @param nodeId Id of node(discussion or pull request or issue) to add labels to
+         * @param nodeId String node id or item (discussion or pull request or issue) to add labels to
          * @param labels Collection of Label names or ids
          * @return updated collection of labels for the item, or null if no labels were found
          */
@@ -552,9 +550,9 @@ public class QueryHelper {
 
         final Pattern botCommentPattern;
         final private String itemId;
-        private String id;
-        private int databaseId;
-        private String url;
+        private final String id;
+        private final int databaseId;
+        private final String url;
         private String bodyString;
 
         BotComment(Pattern botCommentPattern, String itemId, DataCommonComment comment) {

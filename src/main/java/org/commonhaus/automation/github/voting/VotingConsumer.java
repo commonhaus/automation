@@ -228,7 +228,7 @@ public class VotingConsumer {
     }
 
     private void sendErrorEmail(Voting.Config votingConfig, VoteEvent voteEvent, Throwable e) {
-        // If configured to do so, send an email to the error_email_address
+        // If configured to do so, email the error_email_address
         if (votingConfig.sendErrorEmail()) {
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
