@@ -3,7 +3,11 @@ package org.commonhaus.automation.github.voting;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,7 +21,6 @@ import org.commonhaus.automation.github.Voting.Config;
 import org.commonhaus.automation.github.model.DataCommonItem;
 import org.commonhaus.automation.github.model.DataDiscussion;
 import org.commonhaus.automation.github.model.EventType;
-import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.model.ScheduledQueryContext;
 import org.kohsuke.github.GHIOException;
@@ -27,19 +30,18 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
-import io.quarkus.vertx.ConsumeEvent;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 @ApplicationScoped
 @UnlessBuildProfile("test")
 public class VoteDiscovery {
-    static final String ADDRESS = "vote-discovery";
-
-    record DiscoveryQueueMsg(ScheduledQueryContext ctx, Config voteConfig) {
-    }
-
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
+
+    private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     @Inject
     AppConfig appConfig;
@@ -53,8 +55,23 @@ public class VoteDiscovery {
     @Inject
     GitHubClientProvider gitHubService;
 
+    public void startup(@Observes StartupEvent startup) {
+        // Don't flood. Be leisurely for scheduled/cron queries
+        executor.scheduleAtFixedRate(() -> {
+            Runnable task = taskQueue.poll();
+            if (task != null) {
+                task.run();
+            }
+        }, 0, 10, TimeUnit.SECONDS);
+    }
+
+    public void shutdown(@Observes ShutdownEvent shutdown) {
+        executor.shutdown();
+    }
+
     /**
-     * Update the configuration for a repository (received with a recent repository event)
+     * Update the configuration for a repository (received with a recent repository
+     * event).
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         long ghiId = repoEvent.installationId;
@@ -67,25 +84,15 @@ public class VoteDiscovery {
             // update map.
             votingRepositories.put(repoEvent.ghRepository.getFullName(), ghiId);
 
-            // if this is the first event, query the repository
+            // if this is the first event, schedule a query for votes
             if (repoEvent.discovery) {
-                ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, repoEvent.installationId)
-                        .addExisting(repoEvent.github);
-
-                Log.debugf("[%s] queue vote discovery", ctx.getLogId());
-                eventBus.send(VoteDiscovery.ADDRESS, new DiscoveryQueueMsg(ctx, voteConfig));
+                scheduleQueryRepository(voteConfig, ghRepository, ghiId, repoEvent.github);
             }
         }
     }
 
     @Scheduled(cron = "${automation.cron-expr:13 27 */5 * * ?}")
     void discoverVotes() {
-        CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
-                "discoverVotes", (k) -> new CheckStatus());
-        if (!checkStatus.startScheduledUpdate()) {
-            return;
-        }
-
         try {
             Iterator<Entry<String, Long>> i = votingRepositories.entrySet().iterator();
             while (i.hasNext()) {
@@ -101,9 +108,7 @@ public class VoteDiscovery {
                     // Voting no longer enabled. Remove it
                     i.remove();
                 } else {
-                    ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, installationId)
-                            .addExisting(github);
-                    eventBus.send(VoteDiscovery.ADDRESS, new DiscoveryQueueMsg(ctx, voteConfig));
+                    scheduleQueryRepository(voteConfig, ghRepository, installationId, github);
                 }
             }
         } catch (GHIOException e) {
@@ -118,64 +123,58 @@ public class VoteDiscovery {
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
-        } finally {
-            checkStatus.finishUpdate();
         }
     }
 
-    @ConsumeEvent(value = VoteDiscovery.ADDRESS, blocking = true)
-    void queryRepository(DiscoveryQueueMsg msg) {
-        CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
-                msg.ctx.getRepositoryId(), (k) -> new CheckStatus());
-        if (!checkStatus.startScheduledUpdate()) {
-            return;
-        }
-        try {
-            Log.debugf("[%s] queryRepository", msg.ctx.getLogId());
-            queryDiscussions(msg);
-            queryIssues(msg);
-        } finally {
-            checkStatus.finishUpdate();
-        }
+    void scheduleQueryRepository(Voting.Config voteConfig, GHRepository ghRepository, long installationId,
+            GitHub github) {
+        Log.infof("discoverVotes: queue repository %s", ghRepository.getFullName());
+        taskQueue.add(() -> {
+            ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, installationId)
+                    .addExisting(github);
+            queryRepository(ctx, voteConfig);
+        });
     }
 
-    void queryDiscussions(DiscoveryQueueMsg msg) {
-        ScheduledQueryContext ctx = msg.ctx;
-        Voting.Config voteConfig = msg.voteConfig;
+    void queryRepository(ScheduledQueryContext ctx, Config voteConfig) {
+        queryDiscussions(ctx, voteConfig);
+        queryIssues(ctx, voteConfig);
+    }
+
+    void queryDiscussions(ScheduledQueryContext ctx, Config voteConfig) {
         List<DataDiscussion> discussions = ctx.findDiscussionsWithLabel("vote/open");
         if (discussions == null) {
             return;
         }
         for (var discussion : discussions) {
-            slowDown();
-            Log.infof("[%s] discoverVotes: queue discussion #%s", ctx.getLogId(), discussion.number);
-            ScheduledQueryContext discussionCtx = queryHelper.newScheduledQueryContext(ctx, EventType.discussion);
-            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(discussionCtx, voteConfig, discussion));
+            scheduleQueryIssue(ctx, EventType.discussion, voteConfig, discussion);
         }
     }
 
     // Issues or pull requests
-    void queryIssues(DiscoveryQueueMsg msg) {
-        ScheduledQueryContext ctx = msg.ctx;
-        Voting.Config voteConfig = msg.voteConfig;
+    void queryIssues(ScheduledQueryContext ctx, Config voteConfig) {
         List<DataCommonItem> issues = ctx.findIssuesWithLabel("vote/open");
         if (issues == null) {
             return;
         }
         for (var issue : issues) {
-            slowDown();
-            Log.infof("[%s] discoverVotes: queue issue #%s", ctx.getLogId(), issue.number);
-            ScheduledQueryContext issueCtx = queryHelper.newScheduledQueryContext(ctx,
-                    issue.isPullRequest ? EventType.pull_request : EventType.issue);
-            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(issueCtx, voteConfig, issue));
+            scheduleQueryIssue(ctx, issue.isPullRequest ? EventType.pull_request : EventType.issue, voteConfig, issue);
         }
     }
 
-    private void slowDown() {
-        try {
-            TimeUnit.SECONDS.sleep(15);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    /**
+     * Send an event to {@link VotingConsumer} to check for updates on an open vote.
+     *
+     * @param ctx source scheduled context
+     * @param type type of item (issue, pull_request, or discussion)
+     * @param voteConfig voting configuration for the repository
+     * @param item the item (as a common object)
+     */
+    void scheduleQueryIssue(ScheduledQueryContext ctx, EventType type, Voting.Config voteConfig, DataCommonItem item) {
+        Log.infof("[%s] discoverVotes: queue %s #%s", ctx.getLogId(), type, item.number);
+        taskQueue.add(() -> {
+            ScheduledQueryContext itemCtx = queryHelper.newScheduledQueryContext(ctx, type);
+            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(itemCtx, voteConfig, item));
+        });
     }
 }
