@@ -19,7 +19,7 @@ public enum QueryCache {
     RECENT_BOT_CONTENT(Caffeine.newBuilder()
             .expireAfterWrite(6, TimeUnit.HOURS)
             .build()),
-    RECENT_VOTE_CHECK(Caffeine.newBuilder()
+    VOTE_CHECK(Caffeine.newBuilder()
             .expireAfterAccess(6, TimeUnit.HOURS)
             .build()),
     TEAM(Caffeine.newBuilder()

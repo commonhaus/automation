@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -40,7 +41,6 @@ public class VotingConsumer {
     public static final String VOTE_REVISE = "vote/revise";
 
     static final MatchLabel OPEN_VOTE = new MatchLabel(List.of(VOTE_OPEN));
-    static final MatchLabel FINISH_VOTE = new MatchLabel(List.of(VOTE_DONE, "!" + VOTE_PROCEED, "!" + VOTE_REVISE));
 
     @CheckedTemplate
     static class Templates {
@@ -69,11 +69,11 @@ public class VotingConsumer {
             return;
         }
 
-        CheckStatus checkStatus = QueryCache.RECENT_VOTE_CHECK.computeIfAbsent(
-                voteEvent.getId(), (k) -> new CheckStatus());
+        AtomicBoolean checkRunning = QueryCache.VOTE_CHECK.computeIfAbsent(
+                voteEvent.getId(), (k) -> new AtomicBoolean(false));
 
-        if (!checkStatus.startUpdate(voteEvent)) {
-            Log.debugf("[%s] voting.checkVotes: skip event (running/recent)", voteEvent.getLogId());
+        if (!checkRunning.compareAndSet(false, true)) {
+            Log.debugf("[%s] voting.checkVotes: skip event (running)", voteEvent.getLogId());
             return;
         }
         Log.debugf("[%s] voting.checkVotes: process event", voteEvent.getLogId());
@@ -88,7 +88,7 @@ public class VotingConsumer {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         } finally {
-            checkStatus.finishUpdate();
+            checkRunning.set(false);
         }
     }
 
