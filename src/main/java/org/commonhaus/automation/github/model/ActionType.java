@@ -19,7 +19,8 @@ public enum ActionType {
     unanswered,
     unlabeled,
     unlocked,
-    unpinned;
+    unpinned,
+    bot_scheduled;
 
     public static ActionType fromString(String action) {
         return ActionType.valueOf(action.toLowerCase());

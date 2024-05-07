@@ -245,7 +245,7 @@ public class EventData {
                     GHEventPayload.PullRequestReview payload = getGHEventPayload();
                     yield payload.getPullRequest().getNumber();
                 }
-                case label -> -1;
+                default -> -1;
             };
         }
         return result;

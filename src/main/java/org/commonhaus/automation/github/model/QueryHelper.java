@@ -145,6 +145,10 @@ public class QueryHelper {
 
         public abstract EventType getEventType();
 
+        public abstract ActionType getActionType();
+
+        public abstract JsonObject getJsonData();
+
         public boolean isCredentialValid() {
             return github != null && github.isCredentialValid();
         }

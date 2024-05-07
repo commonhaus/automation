@@ -3,6 +3,8 @@ package org.commonhaus.automation.github.model;
 import java.util.Collection;
 import java.util.List;
 
+import jakarta.json.JsonObject;
+
 import org.commonhaus.automation.AppConfig;
 import org.commonhaus.automation.github.EventData;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
@@ -64,6 +66,16 @@ public class EventQueryContext extends QueryContext {
 
     public EventType getEventType() {
         return evt.getEventType();
+    }
+
+    @Override
+    public ActionType getActionType() {
+        return evt.getActionType();
+    }
+
+    @Override
+    public JsonObject getJsonData() {
+        return evt.getJsonData();
     }
 
     public EventQueryContext addExisting(GitHub github) {

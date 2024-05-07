@@ -15,7 +15,7 @@ public enum EventType {
     label,
     pull_request,
     pull_request_review,
-    ;
+    bot_schedule;
 
     public boolean isDiscussion() {
         return this == discussion || this == discussion_comment;
