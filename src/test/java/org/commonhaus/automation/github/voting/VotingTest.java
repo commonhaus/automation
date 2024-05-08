@@ -450,10 +450,6 @@ public class VotingTest extends GithubTest {
         Response updateComment = mockResponse(
                 Path.of("src/test/resources/github/mutableUpdateDiscussionComment.json"));
         Response updateDescription = mockResponse(Path.of("src/test/resources/github/mutableUpdateDiscussion.json"));
-        Response removeLabel = mockResponse(
-                Path.of("src/test/resources/github/mutableRemoveLabelsFromLabelable.json"));
-        Response addLabel = mockResponse(
-                Path.of("src/test/resources/github/mutableAddLabelsToLabelable.VotingDone.json"));
 
         given()
                 .github(mocks -> {
@@ -473,6 +469,59 @@ public class VotingTest extends GithubTest {
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("updateDiscussion("), anyMap()))
                             .thenReturn(updateDescription);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCommentCreated.VoteResult.NonManager.json")
+                .event(GHEvent.DISCUSSION_COMMENT)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("reactions(first: 100"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussionComment("), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussion("), anyMap());
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
+        botComment.getBodyString().contains("This vote has been [closed]");
+    }
+
+    @Test
+    public void testManualResultsCommentAddedByManager() throws Exception {
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsNone.json"));
+        Response updateComment = mockResponse(
+                Path.of("src/test/resources/github/mutableUpdateDiscussionComment.json"));
+        Response updateDescription = mockResponse(Path.of("src/test/resources/github/mutableUpdateDiscussion.json"));
+        Response removeLabel = mockResponse(
+                Path.of("src/test/resources/github/mutableRemoveLabelsFromLabelable.json"));
+        Response addLabel = mockResponse(
+                Path.of("src/test/resources/github/mutableAddLabelsToLabelable.VotingDone.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryAppConfig.NAME).fromClasspath("/cf-voting.yml");
+
+                    setupBotComment(discussionId);
+
+                    GHUser manager = mockGHUser("ebullient");
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(manager));
+
+                    when(mocks.installationClient(installationId).isCredentialValid())
+                            .thenReturn(true);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("reactions(first: 100"), anyMap()))
+                            .thenReturn(reactions);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussionComment("), anyMap()))
+                            .thenReturn(updateComment);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussion("), anyMap()))
+                            .thenReturn(updateDescription);
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
                             .thenReturn(removeLabel);
@@ -480,7 +529,7 @@ public class VotingTest extends GithubTest {
                             .executeSync(contains("addLabelsToLabelable("), anyMap()))
                             .thenReturn(addLabel);
                 })
-                .when().payloadFromClasspath("/github/eventDiscussionResultCommentCreated.json")
+                .when().payloadFromClasspath("/github/eventDiscussionCommentCreated.VoteResult.Manager.json")
                 .event(GHEvent.DISCUSSION_COMMENT)
                 .then().github(mocks -> {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
@@ -755,9 +804,9 @@ public class VotingTest extends GithubTest {
         QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamUsers);
 
         Voting.Config votingConfig = new Voting.Config();
-        votingConfig.votingThreshold = new java.util.HashMap<>();
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
-        votingConfig.exclude_login = List.of("excluded");
+        votingConfig.voteThreshold = new java.util.HashMap<>();
+        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
+        votingConfig.excludeLogin = List.of("excluded");
 
         VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default",
                 Voting.Threshold.all, body);
@@ -789,14 +838,14 @@ public class VotingTest extends GithubTest {
 
         // Majority have voted
 
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
+        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
         voteInfo = new VoteInformation(event);
         assertVoteTally(26, true, voteInfo, extraReactions, teamReactions);
         assertVoteTally(23, false, voteInfo, extraReactions, teamReactions);
 
         // Supermajority (2/3) have voted
 
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
+        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
         voteInfo = new VoteInformation(event);
         assertVoteTally(34, true, voteInfo, extraReactions, teamReactions);
         assertVoteTally(33, false, voteInfo, extraReactions, teamReactions);
@@ -853,7 +902,7 @@ public class VotingTest extends GithubTest {
         when(eventData.getBody()).thenReturn(body);
         when(eventData.getEventType()).thenReturn(EventType.discussion);
 
-        votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
+        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
 
         return new VoteEvent(queryContext, votingConfig, eventData);
     }

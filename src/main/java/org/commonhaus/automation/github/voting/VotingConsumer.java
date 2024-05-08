@@ -138,9 +138,9 @@ public class VotingConsumer {
     private void countVotes(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig,
             List<DataCommonComment> resultComments) {
         Log.debugf("[%s] countVotes: checking open vote (%s, %s)", voteEvent.getLogId(),
-                votingConfig.error_email_address == null ? "no error emails"
-                        : List.of(votingConfig.error_email_address),
-                votingConfig.votingThreshold);
+                votingConfig.errorEmailAddress == null ? "no error emails"
+                        : List.of(votingConfig.errorEmailAddress),
+                votingConfig.voteThreshold);
 
         VoteInformation voteInfo = getVoteInformation(voteEvent);
         if (voteInfo == null) {
@@ -296,7 +296,7 @@ public class VotingConsumer {
                     htmlBody);
 
             bus.send(MailEvent.ADDRESS, new MailEvent(voteEvent.getLogId(),
-                    mail, subject, votingConfig.error_email_address));
+                    mail, subject, votingConfig.errorEmailAddress));
         }
     }
 }
