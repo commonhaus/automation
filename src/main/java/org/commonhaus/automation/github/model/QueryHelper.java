@@ -329,6 +329,22 @@ public class QueryHelper {
             return teamList;
         }
 
+        public boolean loginIncluded(String login, List<String> groups) {
+            if (groups == null) {
+                return true;
+            } else if (groups.isEmpty()) {
+                return false;
+            }
+            for (var g : groups) {
+                if (g.startsWith("@")) {
+                    TeamList team = getTeamList(g.substring(1));
+                    return team.members.stream().anyMatch(m -> m.login.equals(login));
+                }
+                return g.equals(login);
+            }
+            return false;
+        }
+
         /**
          * Get labels for the labelable item or repository
          *

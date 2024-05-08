@@ -15,6 +15,8 @@ import org.commonhaus.automation.github.voting.VoteEvent.ManualVoteEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
@@ -219,27 +221,52 @@ public class Voting {
             }
         };
 
-        public List<String> exclude_login;
-        public String[] error_email_address;
-        public Map<String, Threshold> votingThreshold;
+        /**
+         * List of logins that can provide manual vote results
+         * to close/finish a vote.
+         */
+        @JsonAlias("managers")
+        public List<String> managers;
+
+        /**
+         * List of logins to exclude from vote results
+         */
+        @JsonAlias("exclude_login")
+        public List<String> excludeLogin;
+
+        /**
+         * Email addresses to send error notifications to.
+         */
+        @JsonAlias("error_email_address")
+        public String[] errorEmailAddress;
+
+        /**
+         * Map of voting group to required threshold to reach quorum for electronic participation.
+         */
+        @JsonAlias("vote_threshold")
+        public Map<String, Threshold> voteThreshold;
+
+        /**
+         * Link templates for status badges and pages.
+         */
         public StatusLinks status;
 
         public boolean sendErrorEmail() {
-            return error_email_address != null && error_email_address.length > 0;
+            return errorEmailAddress != null && errorEmailAddress.length > 0;
         }
 
         public Threshold votingThreshold(String group) {
-            if (votingThreshold == null) {
+            if (voteThreshold == null) {
                 return Threshold.all;
             }
-            return votingThreshold.getOrDefault(group, Threshold.all);
+            return voteThreshold.getOrDefault(group, Threshold.all);
         }
 
         public boolean isMemberExcluded(String login) {
-            if (exclude_login == null || exclude_login.isEmpty()) {
+            if (excludeLogin == null || excludeLogin.isEmpty()) {
                 return false;
             }
-            return exclude_login.contains(login);
+            return excludeLogin.contains(login);
         }
     }
 }

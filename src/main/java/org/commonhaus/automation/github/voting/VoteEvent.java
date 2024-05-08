@@ -206,7 +206,7 @@ public class VoteEvent {
     }
 
     public static boolean isManualVoteResult(QueryContext qc, Voting.Config votingConfig, DataCommonComment comment) {
-        return comment.body.contains(MANUAL_VOTE_RESULT);
+        return qc.loginIncluded(comment.author.login, votingConfig.managers) && comment.body.contains(MANUAL_VOTE_RESULT);
     }
 
     public static class ManualVoteEvent extends VoteEvent {

@@ -1,4 +1,6 @@
 voting:
+  managers:
+    - "@commonhaus/test-quorum-default"
   error_email_address:
     - test@commonhaus.org
   status:
