@@ -25,6 +25,8 @@ import org.commonhaus.automation.github.voting.VoteEvent;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.ReactionContent;
 
@@ -305,6 +307,26 @@ public class QueryHelper {
             variables.putIfAbsent("owner", repo.getOwnerName());
             variables.putIfAbsent("name", repo.getName());
             return execQuerySync(query, variables);
+        }
+
+        public TeamList getTeamList(String group) {
+            GHOrganization org = getOrganization();
+            String teamName = group.replace(org.getLogin() + "/", "");
+
+            Set<GHUser> members = QueryCache.TEAM.getCachedValue(group);
+            if (members == null) {
+                members = execGitHubSync((gh, dryRun) -> {
+                    GHTeam team = org.getTeamByName(teamName);
+                    return team == null ? Set.of() : team.getMembers();
+                });
+                if (hasErrors() || members == null) {
+                    return null;
+                }
+                QueryCache.TEAM.putCachedValue(group, members);
+            }
+            TeamList teamList = new TeamList(teamName, members);
+            Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
+            return teamList;
         }
 
         /**

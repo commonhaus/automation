@@ -17,7 +17,6 @@ import org.commonhaus.automation.github.model.DataReaction;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
-import org.commonhaus.automation.github.rules.MatchChangedLabel;
 import org.commonhaus.automation.github.rules.MatchLabel;
 import org.commonhaus.automation.github.voting.VoteEvent.ManualVoteEvent;
 import org.commonhaus.automation.mail.MailEvent;
@@ -237,7 +236,7 @@ public class VotingConsumer {
     private List<DataCommonComment> findResultComments(VoteEvent voteEvent) {
         QueryContext qc = voteEvent.getQueryContext();
         List<DataCommonComment> comments = qc.getComments(voteEvent.getId(),
-                x -> x.body.contains(ManualVoteEvent.MANUAL_VOTE_RESULT));
+                x -> VoteEvent.isManualVoteResult(qc, voteEvent.getVotingConfig(), x));
         return comments;
     }
 

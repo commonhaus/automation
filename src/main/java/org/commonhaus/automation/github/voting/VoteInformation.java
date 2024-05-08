@@ -2,7 +2,6 @@ package org.commonhaus.automation.github.voting;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -11,14 +10,9 @@ import java.util.stream.Stream;
 import org.commonhaus.automation.github.Voting;
 import org.commonhaus.automation.github.model.DataPullRequestReview;
 import org.commonhaus.automation.github.model.DataReaction;
-import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
-import org.kohsuke.github.GHOrganization;
-import org.kohsuke.github.GHTeam;
-import org.kohsuke.github.GHUser;
+import org.commonhaus.automation.github.model.TeamList;
 import org.kohsuke.github.ReactionContent;
-
-import io.quarkus.logging.Log;
 
 public class VoteInformation {
     enum Type {
@@ -54,32 +48,20 @@ public class VoteInformation {
         QueryContext qc = event.getQueryContext();
         Voting.Config voteConfig = event.getVotingConfig();
         String bodyString = event.getBody();
-        TeamList teamList = null;
 
         // Test body for "Voting group" followed by a team name
         Matcher groupM = groupPattern.matcher(bodyString);
         if (groupM.find()) {
             this.group = groupM.group(1);
-
-            GHOrganization org = event.getOrganization();
-            teamList = QueryCache.TEAM.getCachedValue(this.group);
-            if (teamList == null) {
-                String teamName = this.group.replace(org.getLogin() + "/", "");
-                Set<GHUser> members = qc.execGitHubSync((gh, dryRun) -> {
-                    GHTeam team = org.getTeamByName(teamName);
-                    return team == null ? Set.of() : team.getMembers();
-                });
-
-                if (!qc.hasErrors()) {
-                    teamList = new TeamList(teamName, members).removeExcludedLogins(qc, voteConfig);
-                    Log.debugf("[%s] %s members: %s", qc.getLogId(), teamList.name, teamList.members);
-                    QueryCache.TEAM.putCachedValue(this.group, teamList);
-                }
+            this.teamList = qc.getTeamList(this.group);
+            if (teamList != null) {
+                teamList.removeExcludedMembers(
+                        a -> qc.isBot(a.login) || voteConfig.isMemberExcluded(a.login));
             }
         } else {
             this.group = null;
+            this.teamList = null;
         }
-        this.teamList = teamList;
         this.votingThreshold = voteConfig.votingThreshold(this.group);
 
         // Test body for "vote::marthas" or "vote::manual"

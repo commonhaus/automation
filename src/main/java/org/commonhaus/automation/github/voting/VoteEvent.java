@@ -205,6 +205,10 @@ public class VoteEvent {
         return prefix + "\r\n\r\n" + body;
     }
 
+    public static boolean isManualVoteResult(QueryContext qc, Voting.Config votingConfig, DataCommonComment comment) {
+        return comment.body.contains(MANUAL_VOTE_RESULT);
+    }
+
     public static class ManualVoteEvent extends VoteEvent {
         private final DataCommonComment comment;
 
