@@ -136,25 +136,24 @@ public class VoteTally {
     public String toMarkdown(boolean isClosed) {
         // GH Markdown likes \r\n line endings
         String markdown = "";
-        if (manualCloseComments == null || countedVotes > 0) {
+        if (manualCloseComments != null) {
+            markdown += String.format("This vote has been [closed](%s) by [%s](%s):\r\n\r\n",
+                    manualCloseComments.url, manualCloseComments.author.login, manualCloseComments.author.url)
+                    + "> " + manualCloseComments.body
+                            .replaceAll("\\r\\n", "\r\n> ")
+                    + "\r\n\r\n---\r\n\r\n";
+        } else if (isClosed) {
+            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed without explaining the outcome."
+                    + "\r\n\r\n---\r\n\r\n";
+        }
+
+        if (countedVotes > 0) {
             markdown = String.format("\r\n%s%d of %d members of @%s have voted (%s%s).",
                     (hasQuorum ? "✅ " : "🗳️"),
                     groupVotes, groupSize, group,
                     voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
                     isPullRequest ? " or review" : "");
             markdown += "\r\n" + summarizeResults();
-        }
-        if (manualCloseComments != null && countedVotes > 0) {
-            markdown += "\r\n\r\n";
-        }
-        if (manualCloseComments != null) {
-            markdown += "This vote has been [closed]("
-                    + manualCloseComments.url
-                    + "):\r\n\r\n> "
-                    + manualCloseComments.body
-                            .replaceAll("\\r\\n", "\r\n> ");
-        } else if (isClosed) {
-            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed without explaining the outcome.";
         }
         return markdown;
     }
@@ -331,7 +330,9 @@ public class VoteTally {
      */
     @RegisterForReflection
     public static class ManualResult {
+        @JsonSerialize(using = VoteTally.ActorSerializer.class)
         public final DataActor author;
+
         public final Date createdAt;
         public final String body;
         public final String url;
