@@ -126,7 +126,7 @@ public class GithubTest {
         QueryCache.RECENT_BOT_CONTENT.putCachedValue(nodeId, botComment);
     }
 
-    public void verifyBotCommentCache(String nodeId, String commentId) {
+    public BotComment verifyBotCommentCache(String nodeId, String commentId) {
         // We're always updating the cache, but that often happens in a separate thread.
         // let's make sure all of the updates are done before proceeding to the next test
         await().atMost(5, SECONDS)
@@ -135,6 +135,7 @@ public class GithubTest {
         BotComment botComment = QueryCache.RECENT_BOT_CONTENT.getCachedValue(nodeId);
         Assertions.assertEquals(commentId, botComment.getCommentId(),
                 "Cached Bot Comment ID for " + nodeId + " should equal " + commentId + ", was " + botComment.getCommentId());
+        return botComment;
     }
 
     public void verifyNoLabelCache(String labelId) {

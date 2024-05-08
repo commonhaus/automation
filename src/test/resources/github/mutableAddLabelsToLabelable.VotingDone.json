@@ -1,0 +1,24 @@
+{
+  "addLabelsToLabelable": {
+    "clientMutationId": null,
+    "labelable": {
+      "labels": {
+        "nodes": [
+          {
+            "id": 6420110657,
+            "node_id": "LA_kwDOKRPTI88AAAABhGp_7g",
+            "url": "https://github.com/commonhaus/foundation-draft/labels/vote%2Fdone",
+            "name": "vote/done",
+            "color": "cfd3d7",
+            "default": true,
+            "description": "Vote done"
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "MQ"
+        }
+      }
+    }
+  }
+}

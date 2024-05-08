@@ -6,9 +6,12 @@ import java.util.Map;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.RepositoryAppConfig.CommonConfig;
+import org.commonhaus.automation.github.model.DataCommonComment;
 import org.commonhaus.automation.github.model.EventQueryContext;
+import org.commonhaus.automation.github.model.JsonAttribute;
 import org.commonhaus.automation.github.model.QueryHelper;
 import org.commonhaus.automation.github.voting.VoteEvent;
+import org.commonhaus.automation.github.voting.VoteEvent.ManualVoteEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -16,6 +19,7 @@ import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.DiscussionComment;
+import io.quarkiverse.githubapp.event.IssueComment;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkiverse.githubapp.event.PullRequestReview;
 import io.quarkus.logging.Log;
@@ -41,7 +45,8 @@ public class Voting {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param graphQLClient GraphQL API (connection instance)
-     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param payload GitHub API parsed payload; connected GHRepository and
+     *        GHOrganization
      * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onDiscussionEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
@@ -67,7 +72,8 @@ public class Voting {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param graphQLClient GraphQL API (connection instance)
-     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param payload GitHub API parsed payload; connected GHRepository and
+     *        GHOrganization
      * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onDiscussionCommentEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
@@ -82,9 +88,19 @@ public class Voting {
         EventData eventData = new EventData(event, payload);
         EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
+        DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(eventData.getJsonData());
+        if (qc.isBot(comment.author.login)) {
+            // skip bot comments
+            return;
+        }
+
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionCommentEvent: voting enabled; queue event", qc.getLogId());
-        bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+        if (comment.body.contains(VoteEvent.MANUAL_VOTE_RESULT)) {
+            bus.send(VoteEvent.MANUAL_ADDRESS, new ManualVoteEvent(qc, votingConfig, eventData, comment));
+        } else {
+            bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+        }
     }
 
     /**
@@ -93,7 +109,8 @@ public class Voting {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param graphQLClient GraphQL API (connection instance)
-     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param payload GitHub API parsed payload; connected GHRepository and
+     *        GHOrganization
      * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onPullRequestEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
@@ -119,7 +136,8 @@ public class Voting {
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param graphQLClient GraphQL API (connection instance)
-     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param payload GitHub API parsed payload; connected GHRepository and
+     *        GHOrganization
      * @param repoConfigFile Bot Repo Configuration (if exists)
      */
     void onPullRequestReviewEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
@@ -137,6 +155,41 @@ public class Voting {
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onPullRequestReviewEvent: voting enabled; queue event", qc.getLogId());
         bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+    }
+
+    /**
+     * Called when there is a issue or pull request comment event.
+     *
+     * @param event GitHubEvent (raw payload)
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and
+     *        GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onIssueComment(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @IssueComment GHEventPayload.IssueComment payload,
+            @ConfigFile(RepositoryAppConfig.NAME) RepositoryAppConfig.File repoConfigFile) {
+
+        Voting.Config votingConfig = getVotingConfig(repoConfigFile);
+        if (votingConfig.isDisabled()) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(eventData.getJsonData());
+        if (qc.isBot(comment.author.login)) {
+            return;
+        }
+
+        // potentially multiple events at once to one event at a time...
+        Log.debugf("[%s] voting.onIssueComment: voting enabled; queue event", qc.getLogId());
+        if (comment.body.contains(VoteEvent.MANUAL_VOTE_RESULT)) {
+            bus.send(VoteEvent.MANUAL_ADDRESS, new ManualVoteEvent(qc, votingConfig, eventData, comment));
+        } else {
+            bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
+        }
     }
 
     // How many votes are required for a vote to count?

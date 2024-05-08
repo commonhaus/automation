@@ -88,7 +88,7 @@ public enum JsonAttribute {
     number,
     organization,
     pageInfo,
-    pullRequest,
+    pullRequest("pull_request"),
     reactableId,
     reactions,
     removeLabelsFromLabelable,
@@ -126,7 +126,7 @@ public enum JsonAttribute {
         this.alternateName = true;
     }
 
-    boolean existsIn(JsonObject object) {
+    public boolean existsIn(JsonObject object) {
         if (object == null) {
             return false;
         }
@@ -218,6 +218,14 @@ public enum JsonAttribute {
         }
         JsonObject field = jsonObjectFrom(object);
         return field == null ? null : new DataCommonItem(field);
+    }
+
+    public DataCommonComment commonCommentFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataCommonComment(field);
     }
 
     /**

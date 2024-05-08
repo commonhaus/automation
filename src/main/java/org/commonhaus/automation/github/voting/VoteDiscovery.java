@@ -174,7 +174,7 @@ public class VoteDiscovery {
         Log.infof("[%s] discoverVotes: queue %s #%s", ctx.getLogId(), type, item.number);
         taskQueue.add(() -> {
             ScheduledQueryContext itemCtx = queryHelper.newScheduledQueryContext(ctx, type);
-            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(itemCtx, voteConfig, item));
+            eventBus.send(VoteEvent.ADDRESS, new VoteEvent(itemCtx, voteConfig, item, type));
         });
     }
 }

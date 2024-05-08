@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +45,9 @@ public class VoteTally {
     final boolean hasQuorum;
 
     @JsonProperty
+    final boolean isDone;
+
+    @JsonProperty
     final String group;
 
     @JsonProperty
@@ -62,7 +66,7 @@ public class VoteTally {
     final Voting.Threshold votingThreshold;
 
     @JsonProperty
-    public final Map<String, Category> categories = new HashMap<>();
+    final Map<String, Category> categories = new HashMap<>();
 
     @JsonProperty
     final List<VoteRecord> duplicates = new ArrayList<>();
@@ -71,12 +75,16 @@ public class VoteTally {
     @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
     Collection<DataActor> missingGroupActors;
 
+    @JsonProperty
+    final ManualResult manualCloseComments;
+
     @JsonIgnore
     final boolean notMarthasMethod;
     @JsonIgnore
     final boolean isPullRequest;
 
-    public VoteTally(VoteInformation info, List<DataReaction> votes, List<DataCommonComment> comments) {
+    public VoteTally(VoteInformation info, List<DataReaction> votes,
+            List<DataCommonComment> comments, List<DataCommonComment> resultComments) {
         this.isPullRequest = info.isPullRequest();
 
         Set<DataActor> teamMembers = info.teamList.members;
@@ -118,16 +126,37 @@ public class VoteTally {
             case majority -> groupVotes > groupSize / 2;
             case supermajority -> groupVotes > groupSize * 2 / 3;
         };
+
+        manualCloseComments = resultComments.isEmpty()
+                ? null
+                : new ManualResult(resultComments);
+        isDone = manualCloseComments != null;
     }
 
-    public String toMarkdown() {
+    public String toMarkdown(boolean isClosed) {
         // GH Markdown likes \r\n line endings
-        return String.format("\r\n%s%d of %d members of @%s have voted (%s%s).\r\n%s",
-                (hasQuorum ? "✅ " : ""),
-                groupVotes, groupSize, group,
-                voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
-                isPullRequest ? " or review" : "",
-                summarizeResults());
+        String markdown = "";
+        if (manualCloseComments == null || countedVotes > 0) {
+            markdown = String.format("\r\n%s%d of %d members of @%s have voted (%s%s).",
+                    (hasQuorum ? "✅ " : "🗳️"),
+                    groupVotes, groupSize, group,
+                    voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
+                    isPullRequest ? " or review" : "");
+            markdown += "\r\n" + summarizeResults();
+        }
+        if (manualCloseComments != null && countedVotes > 0) {
+            markdown += "\r\n\r\n";
+        }
+        if (manualCloseComments != null) {
+            markdown += "This vote has been [closed]("
+                    + manualCloseComments.url
+                    + "):\r\n\r\n> "
+                    + manualCloseComments.body
+                            .replaceAll("\\r\\n", "\r\n> ");
+        } else if (isClosed) {
+            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed without explaining the outcome.";
+        }
+        return markdown;
     }
 
     private void reviewsToComments(Collection<DataPullRequestReview> reviews, List<DataCommonComment> comments) {
@@ -149,7 +178,8 @@ public class VoteTally {
                 case "CHANGES_REQUESTED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
                 case "COMMENTED" ->
-                    reactions.add(new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
+                    reactions.add(
+                            new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
             }
         }
         votes.addAll(0, reactions);
@@ -290,6 +320,40 @@ public class VoteTally {
                 team.add(record);
             }
         }
+    }
+
+    /**
+     * Representation for a manual counting of results
+     * e.g. a tally of votes collected at a meeting.
+     *
+     * The most recent comment result comment will be used as the
+     * final result.
+     */
+    @RegisterForReflection
+    public static class ManualResult {
+        public final DataActor author;
+        public final Date createdAt;
+        public final String body;
+        public final String url;
+
+        public ManualResult(List<DataCommonComment> resultComments) {
+            if (resultComments.isEmpty()) {
+                throw new IllegalArgumentException();
+            }
+            if (resultComments.size() > 1) {
+                resultComments = new ArrayList<>(resultComments); // modifiable list
+                resultComments.sort((a, b) -> b.createdAt.compareTo(a.createdAt));
+            }
+
+            DataCommonComment result = resultComments.get(0);
+            this.author = result.author;
+            this.createdAt = result.createdAt;
+            this.body = result.body
+                    .replaceAll("\\s*vote::result\\s*", "")
+                    .replaceAll("<!--.*?-->", "");
+            this.url = result.url;
+        }
+
     }
 
     public static class ActorSerializer extends StdSerializer<DataActor> {

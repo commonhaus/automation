@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +17,9 @@ import org.commonhaus.automation.github.model.DataReaction;
 import org.commonhaus.automation.github.model.QueryCache;
 import org.commonhaus.automation.github.model.QueryHelper.BotComment;
 import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
+import org.commonhaus.automation.github.rules.MatchChangedLabel;
 import org.commonhaus.automation.github.rules.MatchLabel;
+import org.commonhaus.automation.github.voting.VoteEvent.ManualVoteEvent;
 import org.commonhaus.automation.mail.MailEvent;
 import org.kohsuke.github.ReactionContent;
 
@@ -54,7 +57,7 @@ public class VotingConsumer {
     @Inject
     EventBus bus;
 
-    @ConsumeEvent("voting")
+    @ConsumeEvent(VoteEvent.ADDRESS)
     @Blocking
     public void consume(Message<VoteEvent> msg) {
         VoteEvent voteEvent = msg.body();
@@ -71,30 +74,73 @@ public class VotingConsumer {
 
         AtomicBoolean checkRunning = QueryCache.VOTE_CHECK.computeIfAbsent(
                 voteEvent.getId(), (k) -> new AtomicBoolean(false));
+        boolean iAmVoteCounter = checkRunning.compareAndSet(false, true);
 
-        if (!checkRunning.compareAndSet(false, true)) {
-            Log.debugf("[%s] voting.checkVotes: skip event (running)", voteEvent.getLogId());
-            return;
-        }
-        Log.debugf("[%s] voting.checkVotes: process event", voteEvent.getLogId());
         try {
-            if (!repoHasLabels(voteEvent)) {
-                return;
-            }
-            if (OPEN_VOTE.matches(qc, voteEvent.getId())) {
-                checkOpenVote(qc, voteEvent, votingConfig);
+            if (iAmVoteCounter && repoHasLabels(voteEvent) && OPEN_VOTE.matches(qc, voteEvent.getId())) {
+                final List<DataCommonComment> resultComments = voteEvent.itemIsClosed()
+                        ? findResultComments(voteEvent)
+                        : List.of();
+                countVotes(qc, voteEvent, votingConfig, resultComments);
+            } else if (!iAmVoteCounter) {
+                Log.debugf("[%s] voting.checkVotes: skip event (running)", voteEvent.getLogId());
             }
         } catch (Throwable e) {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
             sendErrorEmail(votingConfig, voteEvent, e);
         } finally {
-            checkRunning.set(false);
+            if (iAmVoteCounter) {
+                checkRunning.set(false);
+            }
         }
     }
 
-    private void checkOpenVote(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig) {
-        Log.debugf("[%s] checkOpenVote: checking open vote (%s, %s)", voteEvent.getLogId(),
-                votingConfig.error_email_address == null ? "no error emails" : List.of(votingConfig.error_email_address),
+    @ConsumeEvent(VoteEvent.MANUAL_ADDRESS)
+    @Blocking
+    public void consumeManualResult(Message<ManualVoteEvent> msg) {
+        ManualVoteEvent voteEvent = msg.body();
+        QueryContext qc = voteEvent.getQueryContext();
+        Voting.Config votingConfig = voteEvent.getVotingConfig();
+
+        // Each query context does have a reference to the original event and to the
+        // potentially short-lived GitHub connection. Reauthenticate if
+        // necessary/possible
+        if (!qc.isCredentialValid() && !qc.reauthenticate()) {
+            Log.infof("[%s] voting.consumeManualResult: GitHub connection expired and can't be renewed", qc.getLogId());
+            return;
+        }
+
+        AtomicBoolean checkRunning = QueryCache.VOTE_CHECK.computeIfAbsent(
+                voteEvent.getId(), (k) -> new AtomicBoolean(false));
+        boolean iAmVoteCounter = checkRunning.compareAndSet(false, true);
+
+        try {
+            if (iAmVoteCounter && repoHasLabels(voteEvent)) {
+                countVotes(qc, voteEvent, votingConfig, List.of(voteEvent.getComment()));
+            } else if (!iAmVoteCounter) {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(2));
+                } catch (InterruptedException e) {
+                }
+                // re-queue the message
+                Log.infof("[%s] voting.consumeManualResult: re-queue event", qc.getLogId());
+                bus.send(VoteEvent.MANUAL_ADDRESS, msg);
+            }
+        } catch (Throwable e) {
+            Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
+            sendErrorEmail(votingConfig, voteEvent, e);
+        } finally {
+            if (iAmVoteCounter) {
+                checkRunning.set(false);
+            }
+        }
+    }
+
+    private void countVotes(QueryContext qc, VoteEvent voteEvent, Voting.Config votingConfig,
+            List<DataCommonComment> resultComments) {
+        Log.debugf("[%s] countVotes: checking open vote (%s, %s)", voteEvent.getLogId(),
+                votingConfig.error_email_address == null ? "no error emails"
+                        : List.of(votingConfig.error_email_address),
                 votingConfig.votingThreshold);
 
         VoteInformation voteInfo = getVoteInformation(voteEvent);
@@ -113,17 +159,21 @@ public class VotingConsumer {
 
         final boolean prNoReviews = !voteEvent.isPullRequest() || voteEvent.getReviews().isEmpty();
 
-        // If we have no comments and no reactions (and no reviews if this is a pull request), we're done (nothing to count)
-        if (reactions.isEmpty() && comments.isEmpty() && prNoReviews) {
+        // If we have no comments, no reactions (and no reviews if this is a pull
+        // request), no manual result comments, and item is still open, we're done.
+        if (reactions.isEmpty() && comments.isEmpty() && prNoReviews
+                && resultComments.isEmpty() && voteEvent.itemIsOpen()) {
             Log.debugf("[%s] checkOpenVote: done (nothing to count)", voteEvent.getLogId());
+            updateBotComment(voteEvent, String.format("No votes (non-bot %s) found on this item.",
+                    voteInfo.countComments() ? "comments" : "reactions"));
             return;
         }
 
         // Tally the votes
-        VoteTally tally = new VoteTally(voteInfo, reactions, comments);
+        VoteTally tally = new VoteTally(voteInfo, reactions, comments, resultComments);
 
         // Add or update a bot comment summarizing the vote.
-        String commentBody = tally.toMarkdown();
+        String commentBody = tally.toMarkdown(voteEvent.itemIsClosed());
         try {
             String jsonData = objectMapper.writeValueAsString(tally);
             commentBody += "\r\n<!-- vote::data " + jsonData + " -->";
@@ -135,6 +185,11 @@ public class VotingConsumer {
 
         if (tally.hasQuorum) {
             qc.addLabel(voteEvent.getId(), VOTE_QUORUM);
+        }
+        if (tally.isDone) {
+            // remove the open label first so we don't process votes again
+            qc.removeLabels(voteEvent.getId(), List.of(VOTE_OPEN));
+            qc.addLabel(voteEvent.getId(), VOTE_DONE);
         }
     }
 
@@ -173,15 +228,16 @@ public class VotingConsumer {
 
     private List<DataCommonComment> getFilteredComments(VoteEvent voteEvent) {
         QueryContext qc = voteEvent.getQueryContext();
+        // Skip all bot comments
+        List<DataCommonComment> comments = qc.getComments(voteEvent.getId(),
+                x -> !qc.isBot(x.author.login));
+        return comments;
+    }
 
-        List<DataCommonComment> comments = qc.getComments(voteEvent.getId());
-
-        // The bot's votes/comments never count.
-        comments.removeIf(x -> qc.isBot(x.author.login));
-
-        if (comments.isEmpty() && voteEvent.getReviews().isEmpty()) {
-            updateBotComment(voteEvent, "No votes (non-bot comments) found on this item.");
-        }
+    private List<DataCommonComment> findResultComments(VoteEvent voteEvent) {
+        QueryContext qc = voteEvent.getQueryContext();
+        List<DataCommonComment> comments = qc.getComments(voteEvent.getId(),
+                x -> x.body.contains(ManualVoteEvent.MANUAL_VOTE_RESULT));
         return comments;
     }
 
@@ -203,10 +259,6 @@ public class VotingConsumer {
             }
             return false;
         });
-
-        if (reactions.isEmpty() && voteEvent.getReviews().isEmpty()) {
-            updateBotComment(voteEvent, "No votes (reactions) found on this item.");
-        }
         return reactions;
     }
 
@@ -222,7 +274,7 @@ public class VotingConsumer {
             if (newBody.equals(voteEvent.getBody())) {
                 Log.debugf("[%s] voting.checkVotes: item description unchanged", voteEvent.getLogId());
             } else {
-                qc.updateItemDescription(voteEvent.getEventType(), voteEvent.getId(), newBody);
+                qc.updateItemDescription(voteEvent.getItemType(), voteEvent.getId(), newBody);
             }
         }
     }

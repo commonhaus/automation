@@ -33,6 +33,7 @@ public class EventData {
     private String nodeId;
     private String nodeUrl;
     private String body;
+    private Boolean isClosed;
     private int number = 0;
 
     EventData(GitHubEvent event, GHEventPayload payload) {
@@ -249,5 +250,35 @@ public class EventData {
             };
         }
         return result;
+    }
+
+    public boolean isClosed() {
+        if (isClosed == null) {
+            isClosed = switch (eventType) {
+                case discussion, discussion_comment -> {
+                    EventPayload.DiscussionPayload payload = getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    yield discussion.closed;
+                }
+                case issue -> {
+                    GHEventPayload.Issue payload = getGHEventPayload();
+                    yield payload.getIssue().getClosedAt() != null;
+                }
+                case issue_comment -> {
+                    GHEventPayload.IssueComment payload = getGHEventPayload();
+                    yield payload.getIssue().getClosedAt() != null;
+                }
+                case pull_request -> {
+                    GHEventPayload.PullRequest payload = getGHEventPayload();
+                    yield payload.getPullRequest().getClosedAt() != null;
+                }
+                case pull_request_review -> {
+                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
+                    yield payload.getPullRequest().getClosedAt() != null;
+                }
+                default -> false;
+            };
+        }
+        return isClosed;
     }
 }

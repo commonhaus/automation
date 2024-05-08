@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -126,6 +127,8 @@ public class QueryHelper {
         protected GitHub github;
         /** Short-lived (minutes) CLI for GitHub GraphQL API */
         protected DynamicGraphQLClient graphQLClient;
+
+        private List<DataCommonComment> allComments;
 
         QueryContext(QueryHelper helper, AppConfig botConfig, GitHubClientProvider gitHubClientProvider) {
             this.helper = helper;
@@ -451,7 +454,7 @@ public class QueryHelper {
         }
 
         public BotComment updateBotComment(VoteEvent voteEvent, String commentBody) {
-            return updateBotComment(voteEvent.commentPattern(), voteEvent.getEventType(), voteEvent.getId(), commentBody,
+            return updateBotComment(voteEvent.commentPattern(), voteEvent.getItemType(), voteEvent.getId(), commentBody,
                     voteEvent.getBody());
         }
 
@@ -467,7 +470,16 @@ public class QueryHelper {
             if (botComment == null) {
                 String commentId = BotComment.getCommentId(botCommentPattern, itemBody);
                 comment = DataCommonComment.findBotComment(this, itemId, commentId);
-                botComment = comment == null ? null : new BotComment(botCommentPattern, itemId, comment);
+                if (comment == null) {
+                    List<DataCommonComment> botComments = getComments(itemId, (c) -> isBot(c.author.login));
+                    if (botComments != null && !botComments.isEmpty()) {
+                        comment = botComments.get(0);
+                    }
+                }
+
+                botComment = comment == null
+                        ? null
+                        : new BotComment(botCommentPattern, itemId, comment);
             }
 
             if (comment == null && botComment == null) {
@@ -542,11 +554,15 @@ public class QueryHelper {
             return DataReaction.queryReactions(this, nodeId);
         }
 
-        public List<DataCommonComment> getComments(String nodeId) {
-            if (hasErrors()) {
-                return List.of();
+        public List<DataCommonComment> getComments(String nodeId, Predicate<DataCommonComment> filter) {
+            List<DataCommonComment> comments = allComments;
+            if (comments == null) {
+                if (hasErrors()) {
+                    return List.of();
+                }
+                comments = allComments = DataCommonComment.queryComments(this, nodeId);
             }
-            return DataCommonComment.queryComments(this, nodeId);
+            return comments.stream().filter(c -> filter.test(c)).toList();
         }
     }
 
