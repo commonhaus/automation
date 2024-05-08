@@ -1,7 +1,6 @@
 package org.commonhaus.automation.github.model;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,18 +62,10 @@ public class DataCommonComment extends DataCommonObject {
                 return ec;
             }
         }
-
-        Log.debugf("[%s] look for bot comment in all comments", queryContext.getLogId());
-        Collection<DataCommonComment> allComments = queryComments(queryContext, itemId, true);
-        return allComments == null || allComments.isEmpty() ? null : allComments.iterator().next();
+        return null;
     }
 
-    public static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {
-        return queryComments(queryContext, nodeId, false);
-    }
-
-    private static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId,
-            boolean findBotComment) {
+    static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("itemId", nodeId);
 
@@ -121,20 +112,10 @@ public class DataCommonComment extends DataCommonObject {
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
             JsonObject comments = JsonAttribute.comments.jsonObjectFrom(node);
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(comments);
-            if (findBotComment) {
-                for (JsonObject comment : nodes.getValuesAs(JsonObject.class)) {
-                    DataCommonComment cc = new DataCommonComment(comment);
-                    if (queryContext.isBot(cc.author.login)) {
-                        // we found it! bail ASAP
-                        return List.of(cc);
-                    }
-                }
-            } else {
-                allComments.addAll(nodes.stream()
-                        .map(JsonObject.class::cast)
-                        .map(DataCommonComment::new)
-                        .toList());
-            }
+            allComments.addAll(nodes.stream()
+                    .map(JsonObject.class::cast)
+                    .map(DataCommonComment::new)
+                    .toList());
 
             pageInfo = JsonAttribute.node.jsonObjectFrom(comments);
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);

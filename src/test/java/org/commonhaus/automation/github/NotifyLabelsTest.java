@@ -61,7 +61,7 @@ public class NotifyLabelsTest extends GithubTest {
 
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
-        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/mutableAddLabelsToLabelable.json"));
 
         given()
                 .github(mocks -> {
@@ -132,7 +132,7 @@ public class NotifyLabelsTest extends GithubTest {
         setLabels(repositoryId, notice);
         setLabels(discussionId, bug);
 
-        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponseBug.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/mutableAddLabelsToLabelable.Bug.json"));
 
         given()
                 .github(mocks -> {
@@ -238,7 +238,7 @@ public class NotifyLabelsTest extends GithubTest {
         verifyLabelCache(repositoryId, 3, List.of("vote/open"));
 
         Response removeLabel = mockResponse(
-                Path.of("src/test/resources/github/removeLabelsFromLabelableResponse.json"));
+                Path.of("src/test/resources/github/mutableRemoveLabelsFromLabelable.json"));
 
         given()
                 .github(mocks -> {
@@ -272,7 +272,7 @@ public class NotifyLabelsTest extends GithubTest {
         long id = 1721025893;
         Response repoLabels = mockResponse(Path.of("src/test/resources/github/queryRepositoryLabelsNotice.json"));
         Response noLabels = mockResponse(Path.of("src/test/resources/github/queryLabelEmpty.json"));
-        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/addLabelsToLabelableResponse.json"));
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/mutableAddLabelsToLabelable.json"));
 
         given()
                 .github(mocks -> {

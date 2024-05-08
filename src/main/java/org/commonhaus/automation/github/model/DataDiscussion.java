@@ -43,7 +43,7 @@ public class DataDiscussion extends DataCommonItem {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
-        variables.put("query", String.format("repo:%s label:%s is:open sort:updated-desc",
+        variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
                 queryContext.getRepository().getFullName(), labelName));
 
         JsonObject pageInfo;

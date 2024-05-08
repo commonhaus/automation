@@ -3,10 +3,11 @@ package org.commonhaus.automation.github.rules;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.commonhaus.automation.github.EventData;
+import jakarta.json.JsonObject;
+
 import org.commonhaus.automation.github.model.DataLabel;
-import org.commonhaus.automation.github.model.EventQueryContext;
 import org.commonhaus.automation.github.model.JsonAttribute;
+import org.commonhaus.automation.github.model.QueryHelper.QueryContext;
 
 public class MatchChangedLabel {
     public final List<String> labelAdded = new ArrayList<>(1);
@@ -22,14 +23,14 @@ public class MatchChangedLabel {
         });
     }
 
-    public boolean matches(EventQueryContext queryContext) {
-        EventData event = queryContext.getEventData();
-        DataLabel eventLabel = JsonAttribute.label.labelFrom(event.getJsonData());
+    public boolean matches(QueryContext queryContext) {
+        JsonObject payload = queryContext.getJsonData();
+        DataLabel eventLabel = JsonAttribute.label.labelFrom(payload);
         if (eventLabel == null) {
             return false;
         }
 
-        return switch (event.getActionType()) {
+        return switch (queryContext.getActionType()) {
             case labeled -> labelAdded.contains(eventLabel.name) || labelAdded.contains(eventLabel.id);
             case unlabeled -> labelRemoved.contains(eventLabel.name) || labelRemoved.contains(eventLabel.id);
             default -> false;
