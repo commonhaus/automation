@@ -56,7 +56,7 @@
         <awaitility.version>4.2.1</awaitility.version>
         <glob.version>0.9.0</glob.version>
         <!-- Image attributes -->
-        <quarkus.package.type>uber-jar</quarkus.package.type>
+        <quarkus.package.jar.type>uber-jar</quarkus.package.jar.type>
         <quarkus.container-image.group>commonhaus</quarkus.container-image.group>
         <quarkus.container-image.name>${project.artifactId}</quarkus.container-image.name>
         <quarkus.container-image.tag>${revision}</quarkus.container-image.tag>
