@@ -96,7 +96,7 @@ public class Voting {
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onDiscussionCommentEvent: voting enabled; queue event", qc.getLogId());
-        if (comment.body.contains(VoteEvent.MANUAL_VOTE_RESULT)) {
+        if (VoteEvent.isManualVoteResult(qc, votingConfig, comment)) {
             bus.send(VoteEvent.MANUAL_ADDRESS, new ManualVoteEvent(qc, votingConfig, eventData, comment));
         } else {
             bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
@@ -185,7 +185,7 @@ public class Voting {
 
         // potentially multiple events at once to one event at a time...
         Log.debugf("[%s] voting.onIssueComment: voting enabled; queue event", qc.getLogId());
-        if (comment.body.contains(VoteEvent.MANUAL_VOTE_RESULT)) {
+        if (VoteEvent.isManualVoteResult(qc, votingConfig, comment)) {
             bus.send(VoteEvent.MANUAL_ADDRESS, new ManualVoteEvent(qc, votingConfig, eventData, comment));
         } else {
             bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
@@ -235,7 +235,7 @@ public class Voting {
             return votingThreshold.getOrDefault(group, Threshold.all);
         }
 
-        public boolean isLoginExcluded(String login) {
+        public boolean isMemberExcluded(String login) {
             if (exclude_login == null || exclude_login.isEmpty()) {
                 return false;
             }

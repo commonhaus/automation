@@ -4,13 +4,13 @@ import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Date;
@@ -60,20 +60,17 @@ public class VotingTest extends GithubTest {
     static final Set<DataLabel> REPO_LABELS = Set.of(
             VOTE_DONE, VOTE_OPEN, VOTE_PROCEED, VOTE_QUORUM, VOTE_REVISE);
     static final Set<DataLabel> ITEM_VOTE_OPEN = Set.of(VOTE_OPEN);
-    static final Set<DataLabel> ITEM_VOTE_CLOSING = Set.of(VOTE_DONE, VOTE_OPEN);
-
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
 
     ObjectMapper objectMapper = new ObjectMapper();
 
-    void setupTeamReactions(GitHubMockSetupContext mocks) throws IOException {
+    void setupTeamReactions(GitHubMockSetupContext mocks) {
         GHUser user1 = mockGHUser("user1");
         GHUser user2 = mockGHUser("user2");
         GHUser user3 = mockGHUser("user3");
         mockGHUser("user4");
 
-        TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2, user3));
-        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
     }
 
     @Inject
@@ -413,8 +410,7 @@ public class VotingTest extends GithubTest {
                     GHUser user3 = mockGHUser("kenfinnigan");
                     mockGHUser("ebullient");
 
-                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2, user3));
-                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
 
                     setupBotComment(discussionId);
 
@@ -527,8 +523,7 @@ public class VotingTest extends GithubTest {
                     GHUser user1 = mockGHUser("commonhaus-bot");
                     GHUser user2 = mockGHUser("ebullient");
 
-                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2));
-                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2));
 
                     setupBotComment(pullRequestId);
 
@@ -591,8 +586,7 @@ public class VotingTest extends GithubTest {
                     GHUser user1 = mockGHUser("commonhaus-bot");
                     GHUser user2 = mockGHUser("ebullient");
 
-                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2));
-                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2));
 
                     setupBotComment(pullRequestId);
 
@@ -670,8 +664,7 @@ public class VotingTest extends GithubTest {
                     GHUser user1 = mockGHUser("commonhaus-bot");
                     GHUser user2 = mockGHUser("ebullient");
 
-                    TeamList teamList = new TeamList("test-quorum-default", Set.of(user1, user2));
-                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamList);
+                    QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2));
 
                     setupBotComment(pullRequestId);
 
@@ -730,14 +723,19 @@ public class VotingTest extends GithubTest {
         GHOrganization org = Mockito.mock(GHOrganization.class);
         when(org.getLogin()).thenReturn("commonhaus");
 
-        List<DataReaction> teamReactions = new ArrayList<>(50);
-        Set<DataActor> teamLogins = new HashSet<>(50);
+        EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
+        when(queryContext.getOrganization()).thenReturn(org);
+        when(queryContext.getTeamList(anyString())).thenCallRealMethod();
+
+        List<DataReaction> teamReactions = new ArrayList<>(51);
+        Set<GHUser> teamUsers = new HashSet<>(51);
         List<DataReaction> unignore = new ArrayList<>(3);
         List<DataReaction> duplicates = new ArrayList<>(3);
         Date date = new Date();
         for (int i = 1; i < 51; i++) {
-            DataActor user = new DataActor(mockGHUser("user" + i));
-            teamLogins.add(user);
+            GHUser ghUser = mockGHUser("user" + i);
+            DataActor user = new DataActor(ghUser);
+            teamUsers.add(ghUser);
             teamReactions.add(new DataReaction(user,
                     i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
             if (i % 13 == 0) {
@@ -753,20 +751,13 @@ public class VotingTest extends GithubTest {
             extraReactions.add(new DataReaction(user,
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
         }
-        teamLogins.add(new DataActor(mockGHUser("excluded"))); // should be excluded from totals
-
-        TeamList team = new TeamList(teamLogins, "test-quorum-default");
-        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", team);
-
-        EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
-        when(queryContext.getOrganization()).thenReturn(org);
+        teamUsers.add(mockGHUser("excluded")); // should be excluded from totals
+        QueryCache.TEAM.putCachedValue("commonhaus/test-quorum-default", teamUsers);
 
         Voting.Config votingConfig = new Voting.Config();
         votingConfig.votingThreshold = new java.util.HashMap<>();
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.all);
         votingConfig.exclude_login = List.of("excluded");
-
-        team.removeExcludedLogins(queryContext, votingConfig); // this should remove excluded login!
 
         VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default",
                 Voting.Threshold.all, body);
@@ -784,8 +775,7 @@ public class VotingTest extends GithubTest {
 
         // All have voted: but some are ignored!
 
-        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions,
-                teamLogins);
+        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions);
         assertThat(voteTally.categories.get("approve")).isNotNull();
         assertThat(voteTally.categories.get("ok")).isNotNull();
         assertThat(voteTally.categories.get("revise")).isNotNull();
@@ -795,21 +785,21 @@ public class VotingTest extends GithubTest {
         // now add the missing votes with valid (not ignored) and duplicate values
         extraReactions.addAll(unignore);
         extraReactions.addAll(duplicates);
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
 
         // Majority have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.majority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(23, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(23, false, voteInfo, extraReactions, teamReactions);
 
         // Supermajority (2/3) have voted
 
         votingConfig.votingThreshold.put("commonhaus/test-quorum-default", Voting.Threshold.supermajority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions, teamLogins);
-        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions);
 
         // Manual (count reactions implied)
 
@@ -828,13 +818,13 @@ public class VotingTest extends GithubTest {
         assertThat(voteInfo.revise).isEmpty();
         assertThat(voteInfo.voteType).isEqualTo(VoteInformation.Type.manualReactions);
 
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
         assertThat(voteTally.categories).hasSize(4);
         assertThat(voteTally.categories.get("👍")).isNotNull();
         assertThat(voteTally.categories.get("👀")).isNotNull();
         assertThat(voteTally.categories.get("👎")).isNotNull();
         assertThat(voteTally.categories.get("🚀")).isNotNull();
-        assertVoteTally(49, false, voteInfo, extraReactions, teamReactions, teamLogins);
+        assertVoteTally(49, false, voteInfo, extraReactions, teamReactions);
 
         // Manual: count comments instead of reactions
 
@@ -853,7 +843,7 @@ public class VotingTest extends GithubTest {
         assertThat(voteInfo.revise).isEmpty();
         assertThat(voteInfo.voteType).isEqualTo(VoteInformation.Type.manualComments);
 
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions, teamLogins);
+        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
         assertThat(voteTally.categories).hasSize(1);
     }
 
@@ -871,17 +861,14 @@ public class VotingTest extends GithubTest {
     VoteTally assertVoteTally(int numUsers, boolean expectHasQuorum,
             VoteInformation voteInfo,
             List<DataReaction> extraReactions,
-            List<DataReaction> teamReactions,
-            Set<DataActor> teamLogins) throws JsonProcessingException {
-        return assertVoteTally(numUsers, numUsers, expectHasQuorum, voteInfo, extraReactions, teamReactions,
-                teamLogins);
+            List<DataReaction> teamReactions) throws JsonProcessingException {
+        return assertVoteTally(numUsers, numUsers, expectHasQuorum, voteInfo, extraReactions, teamReactions);
     }
 
     VoteTally assertVoteTally(int numUsers, int numVotes, boolean expectHasQuorum,
             VoteInformation voteInfo,
             List<DataReaction> extraReactions,
-            List<DataReaction> teamReactions,
-            Set<DataActor> teamLogins) throws JsonProcessingException {
+            List<DataReaction> teamReactions) throws JsonProcessingException {
 
         List<DataReaction> reactions = Stream
                 .concat(teamReactions.stream(), extraReactions.stream())
@@ -912,7 +899,7 @@ public class VotingTest extends GithubTest {
         String markdown = voteTally.toMarkdown(false);
         assertThat(markdown)
                 .as("should contain number of team member votes")
-                .contains(numVotes + " of " + teamLogins.size() + " members");
+                .contains(numVotes + " of " + voteInfo.teamList.size() + " members");
 
         if (expectHasQuorum) {
             assertThat(voteTally.hasQuorum)
