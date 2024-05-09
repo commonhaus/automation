@@ -78,9 +78,7 @@ jobs:
       id: metadata
       run: |
         SNAPSHOT=$(yq '.release.snapshot-version' .github/project.yml)
-        ARTIFACT=$(yq '.build.artifact' .github/project.yml)
         echo "snapshot=${SNAPSHOT}" >> $GITHUB_OUTPUT
-        echo "artifact=${ARTIFACT}" >> $GITHUB_OUTPUT
 
     - name: Build with Maven
       run: |
@@ -106,11 +104,10 @@ jobs:
         git config user.name ${{ env.GH_BOT_NAME }}
         git config user.email ${{ env.GH_BOT_EMAIL }}
 
-        ls -al target
-        AV=${{ steps.metadata.outputs.artifact }}-${{ steps.metadata.outputs.snapshot }}-runner
-
-        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}.jar#${AV}.jar
-        gh release upload "${SNAPSHOT}" --clobber ./target/${AV}#${AV}
+        CB=commonhaus-bot-${SNAPSHOT}-runner
+        ls -al ./commonhaus-bot/target
+        gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}.jar#${CB}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}#${CB}
 
         echo "Update tag for $SNAPSHOT"
         git push origin :refs/tags/$SNAPSHOT
