@@ -48,7 +48,6 @@ public class RepositoryDiscovery {
         if (!appConfig.isDiscoveryEnabled()) {
             return;
         }
-
         try {
             GitHub ac = gitHubService.getApplicationClient();
             for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {

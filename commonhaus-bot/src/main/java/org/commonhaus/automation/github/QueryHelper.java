@@ -57,7 +57,7 @@ public class QueryHelper {
     void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         // Update repo config cache (will be refreshed on every event. We have it, so update it.)
         Optional<RepositoryConfigFile> repoConfig = repoEvent.getRepositoryConfig();
-        REPO_CONFIG.putCachedValue(repoEvent.getRepository().getNodeId(), repoConfig);
+        REPO_CONFIG.putCachedValue(repoEvent.repository().getNodeId(), repoConfig);
     }
 
     public void updateConfiguration(GHRepository repository, RepositoryConfigFile repositoryConfig) {

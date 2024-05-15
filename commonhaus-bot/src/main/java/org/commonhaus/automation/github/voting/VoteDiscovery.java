@@ -69,17 +69,17 @@ public class VoteDiscovery {
      * Event handler for repository discovery.
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
-        long ghiId = repoEvent.getInstallationId();
-        GHRepository ghRepository = repoEvent.getRepository();
+        long ghiId = repoEvent.installationId();
+        GHRepository ghRepository = repoEvent.repository();
         Optional<RepositoryConfigFile> repoConfig = repoEvent.getRepositoryConfig();
 
         VoteConfig voteConfig = VoteConfig.getVotingConfig(repoConfig.orElse(null));
         if (voteConfig.isDisabled()) {
-            votingRepositories.remove(repoEvent.getRepository().getFullName());
+            votingRepositories.remove(repoEvent.repository().getFullName());
         } else {
             // update map.
             votingRepositories.put(ghRepository.getFullName(), ghiId);
-            scheduleQueryRepository(voteConfig, ghRepository, ghiId, repoEvent.getGitHub());
+            scheduleQueryRepository(voteConfig, ghRepository, ghiId, repoEvent.github());
         }
     }
 
