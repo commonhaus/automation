@@ -16,12 +16,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
@@ -42,7 +42,7 @@ import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 
-public class ContextHelper extends QueryContext {
+public class ContextHelper extends org.commonhaus.automation.github.AppContextService.AppQueryContext {
     public static final String repoFullName = "commonhaus/automation-test";
     public static final String repositoryId = "R_kgDOLDuJqg";
     public static final long repoId = 742099370;
@@ -83,7 +83,7 @@ public class ContextHelper extends QueryContext {
     }
 
     public ContextHelper() {
-        super(false, installationId, null);
+        super(mock(AppContextService.class), installationId);
     }
 
     public void setLogin(String login) {
@@ -145,7 +145,7 @@ public class ContextHelper extends QueryContext {
         }
     }
 
-    public void setupBotComment(Pattern botCommentPattern, String nodeId) {
+    public void setupBotComment(String nodeId) {
         DataCommonComment comment = new DataCommonComment(
                 Json.createObjectBuilder()
                         .add("id", botCommentId)
@@ -158,7 +158,7 @@ public class ContextHelper extends QueryContext {
                                 .build())
                         .build());
 
-        createBotComment(botCommentPattern, nodeId, comment);
+        createBotComment(nodeId, comment);
     }
 
     public BotComment verifyBotCommentCache(String nodeId, String commentId) {

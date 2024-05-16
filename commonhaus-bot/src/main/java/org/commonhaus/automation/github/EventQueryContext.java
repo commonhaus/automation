@@ -5,17 +5,14 @@ import java.util.List;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.AppConfig;
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
-
-import io.quarkiverse.githubapp.GitHubClientProvider;
 
 /**
  * QueryContext is a helper class to encapsulate the GitHub API and GraphQL
@@ -26,17 +23,15 @@ import io.quarkiverse.githubapp.GitHubClientProvider;
  * <p>
  * It is not thread-safe.
  */
-public class EventQueryContext extends QueryContext {
+public class EventQueryContext extends AppQueryContext {
     /**
      * Event data used to construct this query context
      */
     private final EventData event;
 
     /** Package private. Constructed by QueryHelper */
-    EventQueryContext(AppConfig botConfig,
-            GitHubClientProvider gitHubClientProvider,
-            EventData event) {
-        super(botConfig.isDryRun(), event.getInstallationId(), gitHubClientProvider);
+    EventQueryContext(AppContextService helper, EventData event) {
+        super(helper, event.getInstallationId());
         this.event = event;
     }
 

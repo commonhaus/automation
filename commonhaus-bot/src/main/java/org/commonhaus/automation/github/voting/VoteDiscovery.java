@@ -16,7 +16,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.RepositoryConfigFile;
-import org.commonhaus.automation.github.QueryHelper;
+import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.ScheduledQueryContext;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
@@ -46,7 +46,7 @@ public class VoteDiscovery {
     EventBus eventBus;
 
     @Inject
-    QueryHelper queryHelper;
+    AppContextService ctx;
 
     @Inject
     GitHubClientProvider gitHubService;
@@ -70,20 +70,20 @@ public class VoteDiscovery {
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         long ghiId = repoEvent.installationId();
-        GHRepository ghRepository = repoEvent.repository();
+        GHRepository repo = repoEvent.repository();
         Optional<RepositoryConfigFile> repoConfig = repoEvent.getRepositoryConfig();
-
         VoteConfig voteConfig = VoteConfig.getVotingConfig(repoConfig.orElse(null));
-        if (voteConfig.isDisabled()) {
-            votingRepositories.remove(repoEvent.repository().getFullName());
+
+        if (repoEvent.removed() || voteConfig.isDisabled()) {
+            votingRepositories.remove(repo.getFullName());
         } else {
             // update map.
-            votingRepositories.put(ghRepository.getFullName(), ghiId);
-            scheduleQueryRepository(voteConfig, ghRepository, ghiId, repoEvent.github());
+            votingRepositories.put(repo.getFullName(), ghiId);
+            scheduleQueryRepository(voteConfig, repo, ghiId, repoEvent.github());
         }
     }
 
-    @Scheduled(cron = "${automation.cron-expr:13 27 */5 * * ?}")
+    @Scheduled(cron = "${automation.voting.cron:13 27 */5 * * ?}")
     void discoverVotes() {
         try {
             Iterator<Entry<String, Long>> i = votingRepositories.entrySet().iterator();
@@ -93,26 +93,26 @@ public class VoteDiscovery {
                 Long installationId = e.getValue();
 
                 GitHub github = gitHubService.getInstallationClient(installationId);
-                GHRepository ghRepository = github.getRepository(repoFullName);
+                GHRepository repo = github.getRepository(repoFullName);
 
-                RepositoryConfigFile file = queryHelper.getConfiguration(ghRepository);
+                RepositoryConfigFile file = ctx.getConfiguration(repo);
                 VoteConfig voteConfig = VoteConfig.getVotingConfig(file);
                 if (voteConfig.isDisabled()) {
                     // Voting no longer enabled. Remove it
                     i.remove();
                 } else {
-                    scheduleQueryRepository(voteConfig, ghRepository, installationId, github);
+                    scheduleQueryRepository(voteConfig, repo, installationId, github);
                 }
             }
         } catch (GHIOException e) {
-            Log.errorf(e, "[discoverVotes] Error making GH Request: %s", e.toString());
+            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", e);
             if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                 e.getResponseHeaderFields()
                         .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 e.printStackTrace();
             }
         } catch (Throwable t) {
-            Log.errorf(t, "[discoverVotes] Error making GH Request: %s", t.toString());
+            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", t);
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
@@ -123,35 +123,35 @@ public class VoteDiscovery {
             GitHub github) {
         Log.infof("discoverVotes: queue repository %s", ghRepository.getFullName());
         taskQueue.add(() -> {
-            ScheduledQueryContext ctx = queryHelper.newScheduledQueryContext(ghRepository, installationId)
+            ScheduledQueryContext qc = ctx.newScheduledQueryContext(ghRepository, installationId)
                     .addExisting(github);
-            queryRepository(ctx, voteConfig);
+            queryRepository(qc, voteConfig);
         });
     }
 
-    void queryRepository(ScheduledQueryContext ctx, VoteConfig voteConfig) {
-        queryDiscussions(ctx, voteConfig);
-        queryIssues(ctx, voteConfig);
+    void queryRepository(ScheduledQueryContext qc, VoteConfig voteConfig) {
+        queryDiscussions(qc, voteConfig);
+        queryIssues(qc, voteConfig);
     }
 
-    void queryDiscussions(ScheduledQueryContext ctx, VoteConfig voteConfig) {
-        List<DataDiscussion> discussions = ctx.findDiscussionsWithLabel("vote/open");
+    void queryDiscussions(ScheduledQueryContext qc, VoteConfig voteConfig) {
+        List<DataDiscussion> discussions = qc.findDiscussionsWithLabel("vote/open");
         if (discussions == null) {
             return;
         }
         for (var discussion : discussions) {
-            scheduleQueryIssue(ctx, EventType.discussion, voteConfig, discussion);
+            scheduleQueryIssue(qc, EventType.discussion, voteConfig, discussion);
         }
     }
 
     // Issues or pull requests
-    void queryIssues(ScheduledQueryContext ctx, VoteConfig voteConfig) {
-        List<DataCommonItem> issues = ctx.findIssuesWithLabel("vote/open");
+    void queryIssues(ScheduledQueryContext qc, VoteConfig voteConfig) {
+        List<DataCommonItem> issues = qc.findIssuesWithLabel("vote/open");
         if (issues == null) {
             return;
         }
         for (var issue : issues) {
-            scheduleQueryIssue(ctx, issue.isPullRequest ? EventType.pull_request : EventType.issue, voteConfig, issue);
+            scheduleQueryIssue(qc, issue.isPullRequest ? EventType.pull_request : EventType.issue, voteConfig, issue);
         }
     }
 
@@ -163,10 +163,10 @@ public class VoteDiscovery {
      * @param voteConfig voting configuration for the repository
      * @param item the item (as a common object)
      */
-    void scheduleQueryIssue(ScheduledQueryContext ctx, EventType type, VoteConfig voteConfig, DataCommonItem item) {
-        Log.infof("[%s] discoverVotes: queue %s #%s", ctx.getLogId(), type, item.number);
+    void scheduleQueryIssue(ScheduledQueryContext qc, EventType type, VoteConfig voteConfig, DataCommonItem item) {
+        Log.infof("[%s] discoverVotes: queue %s #%s", qc.getLogId(), type, item.number);
         taskQueue.add(() -> {
-            ScheduledQueryContext itemCtx = queryHelper.newScheduledQueryContext(ctx, type);
+            ScheduledQueryContext itemCtx = ctx.newScheduledQueryContext(qc, type);
             eventBus.send(VoteEvent.ADDRESS, new VoteEvent(itemCtx, voteConfig, item, type));
         });
     }

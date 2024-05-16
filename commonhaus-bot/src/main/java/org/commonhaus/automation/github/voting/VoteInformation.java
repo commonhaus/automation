@@ -7,9 +7,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.DataPullRequestReview;
 import org.commonhaus.automation.github.context.DataReaction;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.context.TeamList;
 import org.kohsuke.github.ReactionContent;
 
@@ -44,7 +44,7 @@ public class VoteInformation {
     public VoteInformation(VoteEvent event) {
         this.event = event;
 
-        QueryContext qc = event.getQueryContext();
+        AppQueryContext qc = event.getQueryContext();
         VoteConfig voteConfig = event.getVotingConfig();
         String bodyString = event.getBody();
 

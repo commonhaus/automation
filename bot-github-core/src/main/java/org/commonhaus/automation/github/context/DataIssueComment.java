@@ -24,7 +24,8 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment addIssueComment(QueryContext queryContext, String itemId, String commentBody) {
+    static DataCommonComment addIssueComment(QueryContext queryContext, String itemId,
+            String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", itemId);
         variables.put("body", commentBody);

@@ -5,9 +5,9 @@ import java.util.List;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.context.QueryContext;
 
 public class MatchChangedLabel {
     public final List<String> labelAdded = new ArrayList<>(1);
@@ -23,7 +23,7 @@ public class MatchChangedLabel {
         });
     }
 
-    public boolean matches(QueryContext queryContext) {
+    public boolean matches(AppQueryContext queryContext) {
         JsonObject payload = queryContext.getJsonData();
         DataLabel eventLabel = JsonAttribute.label.labelFrom(payload);
         if (eventLabel == null) {

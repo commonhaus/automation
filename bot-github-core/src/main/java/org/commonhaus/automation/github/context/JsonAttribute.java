@@ -92,6 +92,7 @@ public enum JsonAttribute {
     reactableId,
     reactions,
     removeLabelsFromLabelable,
+    repositories,
     repository,
     reviewDecision,
     search,

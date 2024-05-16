@@ -22,7 +22,6 @@ import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.ReactionContent;
 
-import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
@@ -47,21 +46,19 @@ public abstract class QueryContext {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
     }
 
-    protected final boolean dryRun;
-    protected final long installationId;
-    protected final GitHubClientProvider gitHubClientProvider;
-
     final List<GraphQLError> errors = new ArrayList<>(1);
     final List<Throwable> exceptions = new ArrayList<>(1);
+
+    protected final ContextService ctx;
+    protected final long installationId;
 
     GitHub github;
     DynamicGraphQLClient graphQLClient;
     List<DataCommonComment> allComments;
 
-    protected QueryContext(boolean dryRun, long installationId, GitHubClientProvider gitHubClientProvider) {
-        this.dryRun = dryRun;
+    protected QueryContext(ContextService contextService, long installationId) {
+        this.ctx = contextService;
         this.installationId = installationId;
-        this.gitHubClientProvider = gitHubClientProvider;
     }
 
     public abstract String getLogId();
@@ -76,10 +73,12 @@ public abstract class QueryContext {
 
     public abstract ActionType getActionType();
 
-    public abstract JsonObject getJsonData();
+    public JsonObject getJsonData() {
+        return null;
+    }
 
     public boolean isDryRun() {
-        return dryRun;
+        return ctx.isDryRun();
     }
 
     public QueryContext addExisting(GitHub github) {
@@ -93,7 +92,7 @@ public abstract class QueryContext {
      */
     public GitHub getGitHub() {
         if (github == null) {
-            github = gitHubClientProvider.getInstallationClient(installationId);
+            github = ctx.getInstallationClient(installationId);
         }
         return github;
     }
@@ -109,7 +108,7 @@ public abstract class QueryContext {
      */
     public DynamicGraphQLClient getGraphQLClient() {
         if (graphQLClient == null) {
-            graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
+            graphQLClient = ctx.getInstallationGraphQLClient(installationId);
         }
         return graphQLClient;
     }
@@ -118,14 +117,12 @@ public abstract class QueryContext {
         return installationId;
     }
 
-    public boolean isCredentialValid() {
-        return github != null && github.isCredentialValid();
-    }
-
-    public boolean reauthenticate() {
-        github = gitHubClientProvider.getInstallationClient(getInstallationId());
-        graphQLClient = null;
-        return isCredentialValid();
+    public boolean checkExpiredConnection() {
+        if (github == null) {
+            github = ctx.getInstallationClient(getInstallationId());
+            graphQLClient = null;
+        }
+        return !github.isCredentialValid();
     }
 
     public void addException(Exception e) {
@@ -162,15 +159,14 @@ public abstract class QueryContext {
         try {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHIOException e) {
-            // TODO: Config to handle GHIOException (retry? quit? ensure notification?)
-            Log.errorf(e, "[%s] Error making GH Request: %s", getLogId(), e.toString());
+            ctx.logAndSendEmail(getLogId(), "Error making GH Request", e);
             if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                 e.getResponseHeaderFields()
                         .forEach((k, v) -> Log.debugf("%s: %s", k, v));
             }
             addException(e);
         } catch (IOException | RuntimeException e) {
-            Log.errorf(e, "[%s] Error making GH Request: %s", getLogId(), e.toString());
+            ctx.logAndSendEmail(getLogId(), "Error making GH Request", e);
             addException(e);
         }
         return null;
@@ -199,13 +195,12 @@ public abstract class QueryContext {
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
             if (response != null && response.hasError()) {
-                Log.errorf("[%s] Error executing GraphQL query: %s",
-                        getLogId(), response.getErrors());
+                ctx.logAndSendEmail(getLogId(), "Error executing GraphQL query", response.getErrors().toString(),
+                        null);
                 errors.addAll(response.getErrors());
             }
         } catch (ExecutionException | InterruptedException | RuntimeException e) {
-            Log.errorf(e, "[%s] Error executing GraphQL query: %s",
-                    getLogId(), e.toString());
+            ctx.logAndSendEmail(getLogId(), "Error executing GraphQL query", e);
             exceptions.add(e);
         }
         return response;
@@ -307,13 +302,13 @@ public abstract class QueryContext {
 
             botComment = comment == null
                     ? null
-                    : new BotComment(botCommentPattern, itemId, comment);
+                    : new BotComment(itemId, comment);
         }
 
         if (comment == null && botComment == null) {
             if (isDryRun()) {
                 // Create a fake comment based on one in commonhaus/automation-test
-                botComment = new BotComment(botCommentPattern, itemId).setBodyString(commentBody);
+                botComment = new BotComment(itemId).setBodyString(commentBody);
             } else {
                 // new comment
                 comment = switch (itemType) {
@@ -322,11 +317,11 @@ public abstract class QueryContext {
                     case issue, pull_request ->
                         DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
-                        Log.errorf("[%s] addBotComment: Unknown event type", getLogId());
+                        ctx.logAndSendEmail(getLogId(), "addBotComment: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
-                botComment = comment == null ? null : new BotComment(botCommentPattern, itemId, comment);
+                botComment = comment == null ? null : new BotComment(itemId, comment);
             }
         } else if (botComment.requiresUpdate(commentBody)) {
             if (isDryRun()) {
@@ -340,7 +335,7 @@ public abstract class QueryContext {
                     case issue, pull_request ->
                         DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
                     default -> {
-                        Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
+                        ctx.logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -354,8 +349,8 @@ public abstract class QueryContext {
         return botComment;
     }
 
-    protected BotComment createBotComment(Pattern botCommentPattern, String nodeId, DataCommonComment comment) {
-        BotComment botComment = new BotComment(botCommentPattern, nodeId, comment);
+    protected BotComment createBotComment(String nodeId, DataCommonComment comment) {
+        BotComment botComment = new BotComment(nodeId, comment);
         QueryContext.RECENT_BOT_CONTENT.putCachedValue(nodeId, botComment);
         return botComment;
     }
@@ -377,7 +372,7 @@ public abstract class QueryContext {
                 DataCommonItem.editIssueDescription(this, nodeId, bodyString);
             case pull_request, pull_request_review ->
                 DataCommonItem.editPullRequestDescription(this, nodeId, bodyString);
-            default -> Log.errorf("[%s] updateItemDescription: Unknown event type", getLogId());
+            default -> ctx.logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
         }
     }
 
@@ -518,21 +513,24 @@ public abstract class QueryContext {
     }
 
     public TeamList getTeamList(String group) {
-        GHOrganization org = getOrganization();
-        String teamName = group.replace(org.getLogin() + "/", "");
+        return getTeamList(getOrganization(), group);
+    }
 
-        Set<GHUser> members = TEAM.getCachedValue(group);
+    public TeamList getTeamList(GHOrganization org, String team) {
+        String relativeName = team.replace(org.getLogin() + "/", "");
+
+        Set<GHUser> members = TEAM.getCachedValue(team);
         if (members == null) {
             members = execGitHubSync((gh, dryRun) -> {
-                GHTeam team = org.getTeamByName(teamName);
-                return team == null ? Set.of() : team.getMembers();
+                GHTeam ghTeam = org.getTeamByName(relativeName);
+                return ghTeam == null ? Set.of() : ghTeam.getMembers();
             });
             if (hasErrors() || members == null) {
                 return null;
             }
-            TEAM.putCachedValue(group, members);
+            TEAM.putCachedValue(team, members);
         }
-        TeamList teamList = new TeamList(teamName, members);
+        TeamList teamList = new TeamList(team, members);
         Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
         return teamList;
     }

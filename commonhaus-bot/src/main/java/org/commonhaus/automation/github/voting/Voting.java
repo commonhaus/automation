@@ -3,8 +3,8 @@ package org.commonhaus.automation.github.voting;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.RepositoryConfigFile;
+import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.EventQueryContext;
-import org.commonhaus.automation.github.QueryHelper;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.JsonAttribute;
@@ -31,7 +31,7 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 public class Voting {
 
     @Inject
-    QueryHelper queryHelper;
+    AppContextService queryHelper;
 
     @Inject
     EventBus bus;

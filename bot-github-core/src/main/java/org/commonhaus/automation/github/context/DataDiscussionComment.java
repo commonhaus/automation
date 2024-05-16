@@ -32,7 +32,8 @@ public class DataDiscussionComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataDiscussionComment addComment(QueryContext queryContext, String discussionId, String markdownText) {
+    static DataDiscussionComment addComment(QueryContext queryContext, String discussionId,
+            String markdownText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussionId);
         variables.put("comment", markdownText);
@@ -61,7 +62,8 @@ public class DataDiscussionComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataDiscussionComment editComment(QueryContext queryContext, String commentId, String commentBody) {
+    static DataDiscussionComment editComment(QueryContext queryContext, String commentId,
+            String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("commentId", commentId);
         variables.put("body", commentBody);

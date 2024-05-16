@@ -8,8 +8,8 @@ import java.util.Set;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.RepositoryConfigFile;
+import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.EventQueryContext;
-import org.commonhaus.automation.github.QueryHelper;
 import org.commonhaus.automation.github.actions.Action;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.rules.Rule;
@@ -27,7 +27,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 public class Notice {
 
     @Inject
-    QueryHelper queryHelper;
+    AppContextService queryHelper;
 
     /**
      * Called when there is a discussion event.

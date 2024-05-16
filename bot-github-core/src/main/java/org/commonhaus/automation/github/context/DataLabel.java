@@ -127,7 +127,8 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> addLabels(QueryContext queryContext, String labeledId, Collection<DataLabel> newLabels) {
+    static Set<DataLabel> addLabels(QueryContext queryContext, String labeledId,
+            Collection<DataLabel> newLabels) {
         Log.debugf("[%s] addLabels for labelable %s with %s", queryContext.getLogId(), labeledId, newLabels);
         String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
 
@@ -155,7 +156,8 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> removeLabels(QueryContext queryContext, String labeledId, Collection<DataLabel> oldLabels) {
+    static Set<DataLabel> removeLabels(QueryContext queryContext, String labeledId,
+            Collection<DataLabel> oldLabels) {
         Log.debugf("[%s] removeLabels for labelable %s with %s", queryContext.getLogId(), labeledId, oldLabels);
         String[] labelIds = oldLabels.stream().map(l -> l.id).toArray(String[]::new);
 
@@ -182,7 +184,8 @@ public class DataLabel extends DataCommonType {
         return labels;
     }
 
-    static void paginateLabels(QueryContext queryContext, String query, Map<String, Object> variables, Set<DataLabel> labels,
+    static void paginateLabels(QueryContext queryContext, String query,
+            Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
         JsonObject pageInfo;
         String cursor = null;

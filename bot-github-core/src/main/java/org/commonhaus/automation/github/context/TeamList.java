@@ -19,7 +19,7 @@ public class TeamList {
     }
 
     /** testing */
-    public TeamList(Set<DataActor> members, String name) {
+    public TeamList(String name, Set<DataActor> members) {
         this.name = name;
         this.members = members;
     }

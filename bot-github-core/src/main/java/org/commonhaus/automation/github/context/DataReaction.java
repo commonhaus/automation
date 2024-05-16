@@ -178,7 +178,8 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void addBotReaction(QueryContext queryContext, String subjectId, ReactionContent reaction) {
+    static void addBotReaction(QueryContext queryContext, String subjectId,
+            ReactionContent reaction) {
         Log.debugf("[%s] addBotReaction %s to reactable %s", queryContext.getLogId(), reaction.name(), subjectId);
 
         Map<String, Object> variables = new HashMap<>();
@@ -198,7 +199,8 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void removeBotReaction(QueryContext queryContext, String subjectId, ReactionContent reaction) {
+    static void removeBotReaction(QueryContext queryContext, String subjectId,
+            ReactionContent reaction) {
         if (queryContext.isDryRun()) {
             Log.infof("[%s] would remove reaction %s from %s", queryContext.getLogId(), reaction.name(), subjectId);
             return;

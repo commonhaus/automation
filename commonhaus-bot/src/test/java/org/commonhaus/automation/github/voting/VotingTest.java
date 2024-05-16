@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.voting;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -24,6 +25,7 @@ import jakarta.inject.Inject;
 import jakarta.json.Json;
 
 import org.commonhaus.automation.RepositoryConfigFile;
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.EventQueryContext;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataActor;
@@ -32,7 +34,6 @@ import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.DataReaction;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.test.ContextHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -248,7 +249,7 @@ public class VotingTest extends ContextHelper {
                             .thenReturn(true);
 
                     setupMockTeam(mocks);
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("reactions(first: 100"), anyMap()))
@@ -298,7 +299,7 @@ public class VotingTest extends ContextHelper {
                             .thenReturn(true);
 
                     setupMockTeam(mocks);
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("reactions(first: 100"), anyMap()))
@@ -350,7 +351,7 @@ public class VotingTest extends ContextHelper {
                             .thenReturn(true);
 
                     setupMockTeam(mocks);
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("reactions(first: 100"), anyMap()))
@@ -400,7 +401,7 @@ public class VotingTest extends ContextHelper {
 
                     setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
 
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("query($itemId: ID!, $after: String) {"), anyMap()))
@@ -444,7 +445,7 @@ public class VotingTest extends ContextHelper {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
 
                     setupMockTeam(mocks);
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
@@ -494,7 +495,7 @@ public class VotingTest extends ContextHelper {
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
 
-                    setupBotComment(VoteEvent.botCommentPattern, discussionId);
+                    setupBotComment(discussionId);
 
                     GHUser manager = mockGHUser("ebullient");
                     setupMockTeam("commonhaus/test-quorum-default", Set.of(manager));
@@ -562,7 +563,7 @@ public class VotingTest extends ContextHelper {
 
                     setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
 
-                    setupBotComment(VoteEvent.botCommentPattern, pullRequestId);
+                    setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("reactions(first: 100"), anyMap()))
@@ -625,7 +626,7 @@ public class VotingTest extends ContextHelper {
 
                     setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
 
-                    setupBotComment(VoteEvent.botCommentPattern, pullRequestId);
+                    setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("comments(first: 50"), anyMap()))
@@ -702,7 +703,7 @@ public class VotingTest extends ContextHelper {
                     GHUser user2 = mockGHUser("ebullient");
                     setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
 
-                    setupBotComment(VoteEvent.botCommentPattern, pullRequestId);
+                    setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("comments(first: 50"), anyMap()))
@@ -762,6 +763,7 @@ public class VotingTest extends ContextHelper {
         EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
         when(queryContext.getOrganization()).thenReturn(org);
         when(queryContext.getTeamList(anyString())).thenCallRealMethod();
+        when(queryContext.getTeamList(any(GHOrganization.class), anyString())).thenCallRealMethod();
 
         List<DataReaction> teamReactions = new ArrayList<>(51);
         Set<GHUser> teamUsers = new HashSet<>(51);
@@ -883,7 +885,7 @@ public class VotingTest extends ContextHelper {
         assertThat(voteTally.categories).hasSize(1);
     }
 
-    VoteEvent createVoteEvent(QueryContext queryContext, VoteConfig votingConfig, String group,
+    VoteEvent createVoteEvent(AppQueryContext queryContext, VoteConfig votingConfig, String group,
             VoteConfig.Threshold threshold, String body) {
         EventData eventData = Mockito.mock(EventData.class);
         when(eventData.getBody()).thenReturn(body);
