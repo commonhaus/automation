@@ -32,13 +32,13 @@ public class DataDiscussionComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataDiscussionComment addComment(QueryContext queryContext, String discussionId,
+    static DataDiscussionComment addComment(QueryContext qc, String discussionId,
             String markdownText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("discussionId", discussionId);
         variables.put("comment", markdownText);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation AddDiscussionComment($discussionId: ID!, $comment: String!) {
                     addDiscussionComment(input: {
                         discussionId: $discussionId,
@@ -52,8 +52,8 @@ public class DataDiscussionComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }
@@ -62,13 +62,13 @@ public class DataDiscussionComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataDiscussionComment editComment(QueryContext queryContext, String commentId,
+    static DataDiscussionComment editComment(QueryContext qc, String commentId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("commentId", commentId);
         variables.put("body", commentBody);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation($commentId: ID!, $body: String!) {
                     updateDiscussionComment(input: {
                         commentId: $commentId,
@@ -82,8 +82,8 @@ public class DataDiscussionComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }

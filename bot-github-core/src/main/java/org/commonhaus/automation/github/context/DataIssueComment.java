@@ -24,13 +24,13 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment addIssueComment(QueryContext queryContext, String itemId,
+    static DataCommonComment addIssueComment(QueryContext qc, String itemId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", itemId);
         variables.put("body", commentBody);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation AddComment($subjectId: ID!, $body: String!) {
                     addComment(input: {
                         subjectId: $subjectId,
@@ -46,8 +46,8 @@ public class DataIssueComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }
@@ -57,13 +57,13 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataIssueComment editIssueComment(QueryContext queryContext, String commentId,
+    static DataIssueComment editIssueComment(QueryContext qc, String commentId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("commentId", commentId);
         variables.put("body", commentBody);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation($commentId: ID!, $body: String!) {
                     updateIssueComment(input: {
                         id: $commentId,
@@ -77,8 +77,8 @@ public class DataIssueComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }

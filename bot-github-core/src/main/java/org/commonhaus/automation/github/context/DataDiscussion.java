@@ -34,22 +34,22 @@ public class DataDiscussion extends DataCommonItem {
     }
 
     public String toString() {
-        return String.format("Discussion [%s] %s", this.id, this.title);
+        return "Discussion [%s] %s".formatted(this.id, this.title);
     }
 
-    public static List<DataDiscussion> findDiscussionsWithLabel(QueryContext queryContext,
+    public static List<DataDiscussion> findDiscussionsWithLabel(QueryContext qc,
             String labelName) {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
         variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
-                queryContext.getRepository().getFullName(), labelName));
+                qc.getRepository().getFullName(), labelName));
 
         JsonObject pageInfo;
         String cursor = null;
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execRepoQuerySync("""
+            Response response = qc.execRepoQuerySync("""
                     query($query: String!, $after: String) {
                         search(query: $query, type: DISCUSSION, first: 100, after: $after) {
                             pageInfo {
@@ -84,13 +84,13 @@ public class DataDiscussion extends DataCommonItem {
     /**
      * package private. See QueryHelper / QueryContext
      */
-    static void editDiscussion(QueryContext queryContext, String nodeId,
+    static void editDiscussion(QueryContext qc, String nodeId,
             String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", modifiedText);
 
-        Response response = queryContext.execRepoQuerySync("""
+        Response response = qc.execRepoQuerySync("""
                 mutation UpdateDiscussion($id: ID!, $body: String!) {
                     updateDiscussion(input: { discussionId: $id, body: $body }) {
                         clientMutationId
@@ -102,8 +102,8 @@ public class DataDiscussion extends DataCommonItem {
                 """,
                 variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return;
         }

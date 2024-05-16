@@ -55,17 +55,17 @@ public class EmailAction extends Action {
     }
 
     @Override
-    public void apply(EventQueryContext queryContext) {
-        EventData eventData = queryContext.getEventData();
+    public void apply(EventQueryContext qc) {
+        EventData eventData = qc.getEventData();
 
         Log.debugf("[%s] EmailAction.apply: Preparing email to %s",
                 eventData.getLogId(), List.of(addresses));
 
         final String title;
-        final String status = queryContext.getStatus();
+        final String status = qc.getStatus();
         MailTemplateInstance mailTemplateInstance;
         try {
-            mailTemplateInstance = switch (queryContext.getEventType()) {
+            mailTemplateInstance = switch (qc.getEventType()) {
                 case pull_request -> {
                     GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
 

@@ -5,12 +5,12 @@ import java.util.List;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.JsonAttribute;
+import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 
@@ -23,7 +23,7 @@ import org.kohsuke.github.GHRepository;
  * <p>
  * It is not thread-safe.
  */
-public class EventQueryContext extends AppQueryContext {
+public class EventQueryContext extends QueryContext {
     /**
      * Event data used to construct this query context
      */

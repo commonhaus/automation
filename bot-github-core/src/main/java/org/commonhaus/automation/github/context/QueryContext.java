@@ -61,6 +61,11 @@ public abstract class QueryContext {
         this.installationId = installationId;
     }
 
+    protected QueryContext(QueryContext other) {
+        this.ctx = other.ctx;
+        this.installationId = other.installationId;
+    }
+
     public abstract String getLogId();
 
     public abstract String getRepositoryId();

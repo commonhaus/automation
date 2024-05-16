@@ -19,7 +19,7 @@ public abstract class Action {
     final static TypeReference<List<String>> LIST_STRING = new TypeReference<>() {
     };
 
-    public abstract void apply(EventQueryContext queryContext);
+    public abstract void apply(EventQueryContext qc);
 
     public static class ActionDeserializer extends StdDeserializer<Action> {
         public ActionDeserializer() {

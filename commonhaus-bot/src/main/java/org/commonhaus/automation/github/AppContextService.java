@@ -9,7 +9,6 @@ import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
@@ -25,16 +24,6 @@ public class AppContextService extends BaseContextService {
     @ConfigMapping(prefix = "automation.voting")
     interface AppConfig {
         Optional<String> cron();
-    }
-
-    public static abstract class AppQueryContext extends QueryContext {
-        protected AppQueryContext(AppContextService contextService, long installationId) {
-            super(contextService, installationId);
-        }
-
-        public AppQueryContext(AppQueryContext parent) {
-            super(parent.ctx, parent.installationId);
-        }
     }
 
     AppConfig appConfig;

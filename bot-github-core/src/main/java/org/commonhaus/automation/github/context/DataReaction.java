@@ -93,7 +93,7 @@ public class DataReaction {
     }
 
     public String toString() {
-        return String.format("Reaction [%s] on %s by %s", this.content, this.reactableId, this.user);
+        return "Reaction [%s] on %s by %s".formatted(this.content, this.reactableId, this.user);
     }
 
     private static int sortOrderFor(ReactionContent content) {
@@ -124,11 +124,11 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataReaction> queryReactions(QueryContext queryContext, String reactorId) {
-        if (queryContext.hasErrors()) {
+    static List<DataReaction> queryReactions(QueryContext qc, String reactorId) {
+        if (qc.hasErrors()) {
             return List.of();
         }
-        Log.debugf("[%s] queryReactions for reactable %s", queryContext.getLogId(), reactorId);
+        Log.debugf("[%s] queryReactions for reactable %s", qc.getLogId(), reactorId);
         List<DataReaction> reactions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);
@@ -139,7 +139,7 @@ public class DataReaction {
         // paginated...
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execRepoQuerySync("""
+            Response response = qc.execRepoQuerySync("""
                     query($id: ID!, $after: String) {
                         node(id: $id) {
                             ... on Reactable {
@@ -157,8 +157,8 @@ public class DataReaction {
                         }
                     """, variables);
             if (response.hasError()) {
-                if (queryContext.hasNotFound()) {
-                    queryContext.clearErrors();
+                if (qc.hasNotFound()) {
+                    qc.clearErrors();
                 }
                 break;
             }
@@ -178,14 +178,14 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void addBotReaction(QueryContext queryContext, String subjectId,
+    static void addBotReaction(QueryContext qc, String subjectId,
             ReactionContent reaction) {
-        Log.debugf("[%s] addBotReaction %s to reactable %s", queryContext.getLogId(), reaction.name(), subjectId);
+        Log.debugf("[%s] addBotReaction %s to reactable %s", qc.getLogId(), reaction.name(), subjectId);
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", subjectId);
         variables.put("content", reaction.name());
-        queryContext.execQuerySync("""
+        qc.execQuerySync("""
                 mutation AddReaction($subjectId: ID!, $content: ReactionContent!) {
                     addReaction(input: {
                             subjectId: $subjectId,
@@ -193,28 +193,28 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
-        if (queryContext.hasNotFound()) {
-            queryContext.clearErrors();
+        if (qc.hasNotFound()) {
+            qc.clearErrors();
         }
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void removeBotReaction(QueryContext queryContext, String subjectId,
+    static void removeBotReaction(QueryContext qc, String subjectId,
             ReactionContent reaction) {
-        if (queryContext.isDryRun()) {
-            Log.infof("[%s] would remove reaction %s from %s", queryContext.getLogId(), reaction.name(), subjectId);
+        if (qc.isDryRun()) {
+            Log.infof("[%s] would remove reaction %s from %s", qc.getLogId(), reaction.name(), subjectId);
             return;
         }
-        if (queryContext.hasErrors()) {
-            Log.debugf("[%s] removeBotReaction to reactable %s; skipping modify (errors)", queryContext.getLogId(), subjectId);
+        if (qc.hasErrors()) {
+            Log.debugf("[%s] removeBotReaction to reactable %s; skipping modify (errors)", qc.getLogId(), subjectId);
             return;
         }
-        Log.debugf("[%s] removeBotReaction %s to reactable %s", queryContext.getLogId(), reaction.name(), subjectId);
+        Log.debugf("[%s] removeBotReaction %s to reactable %s", qc.getLogId(), reaction.name(), subjectId);
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", subjectId);
         variables.put("content", reaction.name());
-        queryContext.execQuerySync("""
+        qc.execQuerySync("""
                 mutation RemoveReaction($subjectId: ID!, $content: ReactionContent!) {
                     removeReaction(input: {
                             subjectId: $subjectId,
@@ -222,8 +222,8 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
-        if (queryContext.hasNotFound()) {
-            queryContext.clearErrors();
+        if (qc.hasNotFound()) {
+            qc.clearErrors();
         }
     }
 }

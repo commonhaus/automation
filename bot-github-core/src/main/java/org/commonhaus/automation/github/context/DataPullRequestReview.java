@@ -33,12 +33,12 @@ public class DataPullRequestReview extends DataCommonObject {
         return String.format("Review [%s] by %s", this.state, this.author);
     }
 
-    static List<DataPullRequestReview> queryReviews(QueryContext queryContext,
+    static List<DataPullRequestReview> queryReviews(QueryContext qc,
             String pullRequestId) {
-        if (queryContext.hasErrors()) {
+        if (qc.hasErrors()) {
             return List.of();
         }
-        Log.debugf("[%s] queryReviews for pull request %s", queryContext.getLogId(), pullRequestId);
+        Log.debugf("[%s] queryReviews for pull request %s", qc.getLogId(), pullRequestId);
         List<DataPullRequestReview> prReviews = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", pullRequestId);
@@ -49,7 +49,7 @@ public class DataPullRequestReview extends DataCommonObject {
         // paginated...
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execRepoQuerySync("""
+            Response response = qc.execRepoQuerySync("""
                     query($id: ID!, $after: String) {
                         node(id: $id) {
                             ... on PullRequest {
@@ -67,8 +67,8 @@ public class DataPullRequestReview extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (queryContext.hasNotFound()) {
-                    queryContext.clearErrors();
+                if (qc.hasNotFound()) {
+                    qc.clearErrors();
                 }
                 break;
             }

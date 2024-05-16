@@ -33,7 +33,7 @@ public class DataActor extends DataCommonType {
     }
 
     public String toString() {
-        return String.format("Actor[%s]", this.login);
+        return "Actor[%s]".formatted(this.login);
     }
 
     /**

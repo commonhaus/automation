@@ -84,9 +84,9 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> queryLabels(QueryContext queryContext, String labeledId) {
-        if (queryContext.hasErrors()) {
-            Log.debugf("[%s] queryLabels for labelable %s; skipping modify (errors)", queryContext.getLogId(), labeledId);
+    static Set<DataLabel> queryLabels(QueryContext qc, String labeledId) {
+        if (qc.hasErrors()) {
+            Log.debugf("[%s] queryLabels for labelable %s; skipping modify (errors)", qc.getLogId(), labeledId);
             return null;
         }
         String query = """
@@ -101,7 +101,7 @@ public class DataLabel extends DataCommonType {
 
         // A Repository has an id, and it has labels, but it is not a Labelable.
         // we need to alter the query to get the labels.
-        if (labeledId.equals(queryContext.getRepositoryId())) {
+        if (labeledId.equals(qc.getRepositoryId())) {
             query = """
                     query($owner: String!, $name: String!, $after: String) {
                         repository(owner: $owner, name: $name) {
@@ -112,24 +112,24 @@ public class DataLabel extends DataCommonType {
         }
 
         final var repositoryQuery = query.contains("repository");
-        Log.debugf("[%s] queryLabels for labelable %s", queryContext.getLogId(), labeledId);
+        Log.debugf("[%s] queryLabels for labelable %s", qc.getLogId(), labeledId);
 
         Set<DataLabel> labels = new HashSet<>();
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", labeledId);
 
-        paginateLabels(queryContext, query, variables, labels, (obj) -> repositoryQuery
+        paginateLabels(qc, query, variables, labels, (obj) -> repositoryQuery
                 ? JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.repository)
                 : JsonAttribute.labels.extractObjectFrom(obj, JsonAttribute.node));
 
-        Log.infof("[%s] queryLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
+        Log.infof("[%s] queryLabels for labelable %s; result=%s", qc.getLogId(), labeledId, labels);
         return labels;
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> addLabels(QueryContext queryContext, String labeledId,
+    static Set<DataLabel> addLabels(QueryContext qc, String labeledId,
             Collection<DataLabel> newLabels) {
-        Log.debugf("[%s] addLabels for labelable %s with %s", queryContext.getLogId(), labeledId, newLabels);
+        Log.debugf("[%s] addLabels for labelable %s with %s", qc.getLogId(), labeledId, newLabels);
         String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
 
         Map<String, Object> variables = new HashMap<>();
@@ -147,18 +147,18 @@ public class DataLabel extends DataCommonType {
                 }""";
 
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(queryContext, query, variables, labels,
+        paginateLabels(qc, query, variables, labels,
                 (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
                         JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable));
 
-        Log.infof("[%s] modifyLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
+        Log.infof("[%s] modifyLabels for labelable %s; result=%s", qc.getLogId(), labeledId, labels);
         return labels;
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> removeLabels(QueryContext queryContext, String labeledId,
+    static Set<DataLabel> removeLabels(QueryContext qc, String labeledId,
             Collection<DataLabel> oldLabels) {
-        Log.debugf("[%s] removeLabels for labelable %s with %s", queryContext.getLogId(), labeledId, oldLabels);
+        Log.debugf("[%s] removeLabels for labelable %s with %s", qc.getLogId(), labeledId, oldLabels);
         String[] labelIds = oldLabels.stream().map(l -> l.id).toArray(String[]::new);
 
         Map<String, Object> variables = new HashMap<>();
@@ -176,15 +176,15 @@ public class DataLabel extends DataCommonType {
                 }""";
 
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(queryContext, query, variables, labels,
+        paginateLabels(qc, query, variables, labels,
                 (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
                         JsonAttribute.removeLabelsFromLabelable, JsonAttribute.labelable));
 
-        Log.infof("[%s] modifyLabels for labelable %s; result=%s", queryContext.getLogId(), labeledId, labels);
+        Log.infof("[%s] modifyLabels for labelable %s; result=%s", qc.getLogId(), labeledId, labels);
         return labels;
     }
 
-    static void paginateLabels(QueryContext queryContext, String query,
+    static void paginateLabels(QueryContext qc, String query,
             Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
         JsonObject pageInfo;
@@ -192,10 +192,10 @@ public class DataLabel extends DataCommonType {
 
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execRepoQuerySync(query, variables);
+            Response response = qc.execRepoQuerySync(query, variables);
             if (response.hasError()) {
-                if (queryContext.hasNotFound()) {
-                    queryContext.clearErrors();
+                if (qc.hasNotFound()) {
+                    qc.clearErrors();
                 }
                 break;
             }

@@ -57,13 +57,13 @@ public class DataCommonItem extends DataCommonObject {
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
-    public static DataCommonItem editIssueDescription(QueryContext queryContext,
+    public static DataCommonItem editIssueDescription(QueryContext qc,
             String nodeId, String bodyString) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation($id: ID!, $body: String!) {
                     updateIssue(input: {
                         id: $id,
@@ -77,8 +77,8 @@ public class DataCommonItem extends DataCommonObject {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }
@@ -86,13 +86,13 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
-    public static DataCommonItem editPullRequestDescription(QueryContext queryContext,
+    public static DataCommonItem editPullRequestDescription(QueryContext qc,
             String nodeId, String bodyString) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
 
-        Response response = queryContext.execQuerySync("""
+        Response response = qc.execQuerySync("""
                 mutation($id: ID!, $body: String!) {
                     updatePullRequest(input: {
                         pullRequestId: $id,
@@ -106,8 +106,8 @@ public class DataCommonItem extends DataCommonObject {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (queryContext.hasNotFound()) {
-                queryContext.clearErrors();
+            if (qc.hasNotFound()) {
+                qc.clearErrors();
             }
             return null;
         }
@@ -115,19 +115,19 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
-    public static List<DataCommonItem> findIssuesWithLabel(QueryContext queryContext,
+    public static List<DataCommonItem> findIssuesWithLabel(QueryContext qc,
             String labelName) {
         List<DataCommonItem> allIssues = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
         variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
-                queryContext.getRepository().getFullName(), labelName));
+                qc.getRepository().getFullName(), labelName));
 
         JsonObject pageInfo;
         String cursor = null;
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execRepoQuerySync("""
+            Response response = qc.execRepoQuerySync("""
                     query($query: String!, $after: String) {
                         search(query: $query, type: ISSUE, first: 100, after: $after) {
                             pageInfo {

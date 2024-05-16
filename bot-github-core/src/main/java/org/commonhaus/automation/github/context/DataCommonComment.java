@@ -30,13 +30,13 @@ public class DataCommonComment extends DataCommonObject {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment findBotComment(QueryContext queryContext, String itemId, String commentId) {
+    static DataCommonComment findBotComment(QueryContext qc, String itemId, String commentId) {
         if (commentId != null) {
-            Log.debugf("[%s] findBotComment with id %s", queryContext.getLogId(), commentId);
+            Log.debugf("[%s] findBotComment with id %s", qc.getLogId(), commentId);
             // we have a commentId, so we can just fetch it directly
             Map<String, Object> variables = new HashMap<>();
             variables.put("commentId", commentId);
-            Response response = queryContext.execQuerySync("""
+            Response response = qc.execQuerySync("""
                     query($commentId: ID!) {
                         node(id: $commentId) {
                             ... on IssueComment {
@@ -49,21 +49,21 @@ public class DataCommonComment extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (queryContext.hasNotFound()) {
-                    queryContext.clearErrors();
+                if (qc.hasNotFound()) {
+                    qc.clearErrors();
                 }
                 return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
             DataCommonComment ec = new DataCommonComment(node);
-            if (queryContext.isBot(ec.author.login)) {
+            if (qc.isBot(ec.author.login)) {
                 return ec;
             }
         }
         return null;
     }
 
-    static List<DataCommonComment> queryComments(QueryContext queryContext, String nodeId) {
+    static List<DataCommonComment> queryComments(QueryContext qc, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("itemId", nodeId);
 
@@ -74,7 +74,7 @@ public class DataCommonComment extends DataCommonObject {
         List<DataCommonComment> allComments = new ArrayList<>();
         do {
             variables.put("after", cursor);
-            Response response = queryContext.execQuerySync("""
+            Response response = qc.execQuerySync("""
                     query($itemId: ID!, $after: String) {
                         node(id: $itemId) {
                             ... on Issue {
@@ -102,8 +102,8 @@ public class DataCommonComment extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (queryContext.hasNotFound()) {
-                    queryContext.clearErrors();
+                if (qc.hasNotFound()) {
+                    qc.clearErrors();
                 }
                 return null;
             }

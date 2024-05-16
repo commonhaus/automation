@@ -21,8 +21,8 @@ public class MatchAction {
         });
     }
 
-    public boolean matches(EventQueryContext queryContext) {
-        EventData eventData = queryContext.getEventData();
+    public boolean matches(EventQueryContext qc) {
+        EventData eventData = qc.getEventData();
         if (eventData == null) {
             return false;
         }

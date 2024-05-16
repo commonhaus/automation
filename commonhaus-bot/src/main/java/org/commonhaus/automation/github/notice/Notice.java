@@ -48,13 +48,13 @@ public class Notice {
         }
 
         EventData eventData = new EventData(event, payload);
-        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
-        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.discussion.rules);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.discussion.rules);
 
         Log.infof("[%s] notice.onDiscussionEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onDiscussionEvent", queryContext, desiredActions, noticeConfig.actions);
+        applyMatchingActions("notice.onDiscussionEvent", qc, desiredActions, noticeConfig.actions);
     }
 
     /**
@@ -76,13 +76,13 @@ public class Notice {
         }
 
         EventData eventData = new EventData(event, payload);
-        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
-        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.issue.rules);
+        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.issue.rules);
         Log.infof("[%s] notice.onIssueEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onIssueEvent", queryContext, desiredActions, noticeConfig.actions);
+        applyMatchingActions("notice.onIssueEvent", qc, desiredActions, noticeConfig.actions);
     }
 
     /**
@@ -104,26 +104,26 @@ public class Notice {
         }
 
         EventData eventData = new EventData(event, payload);
-        EventQueryContext queryContext = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
-        Set<String> desiredActions = findMatchingActions(queryContext, noticeConfig.pullRequest.rules);
+        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.pullRequest.rules);
         Log.infof("[%s] notice.onPullRequestEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
 
-        applyMatchingActions("notice.onPullRequestEvent", queryContext, desiredActions, noticeConfig.actions);
+        applyMatchingActions("notice.onPullRequestEvent", qc, desiredActions, noticeConfig.actions);
     }
 
-    private Set<String> findMatchingActions(EventQueryContext queryContext, List<Rule> rules) {
+    private Set<String> findMatchingActions(EventQueryContext qc, List<Rule> rules) {
         Set<String> actions = new HashSet<>();
         for (Rule rule : rules) {
-            if (rule.matches(queryContext)) {
+            if (rule.matches(qc)) {
                 actions.addAll(rule.then);
             }
         }
         return actions;
     }
 
-    private void applyMatchingActions(String method, EventQueryContext queryContext,
+    private void applyMatchingActions(String method, EventQueryContext qc,
             Set<String> desiredActions, Map<String, Action> actionsMap) {
         if (desiredActions.isEmpty()) {
             return;
@@ -132,11 +132,11 @@ public class Notice {
             Action action = actionsMap.get(actionName);
             if (action == null) {
                 Log.warnf("[%s] %s: Action '%s' not found",
-                        queryContext.getLogId(),
+                        qc.getLogId(),
                         method, actionName);
                 continue;
             }
-            action.apply(queryContext);
+            action.apply(qc);
         }
     }
 }

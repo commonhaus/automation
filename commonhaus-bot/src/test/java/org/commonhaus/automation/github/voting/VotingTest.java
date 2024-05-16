@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -25,7 +26,6 @@ import jakarta.inject.Inject;
 import jakarta.json.Json;
 
 import org.commonhaus.automation.RepositoryConfigFile;
-import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.EventQueryContext;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataActor;
@@ -34,6 +34,7 @@ import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.DataReaction;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
+import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.test.ContextHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -349,6 +350,8 @@ public class VotingTest extends ContextHelper {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
+                    when(mocks.repository(repoFullName).getFullName())
+                            .thenReturn(repoFullName);
 
                     setupMockTeam(mocks);
                     setupBotComment(discussionId);
@@ -367,6 +370,7 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("reactions(first: 100"), anyMap());
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("updateDiscussionComment("), anyMap());
+                    verify(mocks.repository(repoFullName), atLeastOnce()).getFullName();
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
@@ -760,10 +764,10 @@ public class VotingTest extends ContextHelper {
         GHOrganization org = Mockito.mock(GHOrganization.class);
         when(org.getLogin()).thenReturn("commonhaus");
 
-        EventQueryContext queryContext = Mockito.mock(EventQueryContext.class);
-        when(queryContext.getOrganization()).thenReturn(org);
-        when(queryContext.getTeamList(anyString())).thenCallRealMethod();
-        when(queryContext.getTeamList(any(GHOrganization.class), anyString())).thenCallRealMethod();
+        EventQueryContext qc = Mockito.mock(EventQueryContext.class);
+        when(qc.getOrganization()).thenReturn(org);
+        when(qc.getTeamList(anyString())).thenCallRealMethod();
+        when(qc.getTeamList(any(GHOrganization.class), anyString())).thenCallRealMethod();
 
         List<DataReaction> teamReactions = new ArrayList<>(51);
         Set<GHUser> teamUsers = new HashSet<>(51);
@@ -797,7 +801,8 @@ public class VotingTest extends ContextHelper {
         votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.all);
         votingConfig.excludeLogin = List.of("excluded");
 
-        VoteEvent event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default",
+        VoteEvent event = createVoteEvent(qc, votingConfig,
+                "commonhaus/test-quorum-default",
                 VoteConfig.Threshold.all, body);
 
         // Martha's
@@ -846,7 +851,7 @@ public class VotingTest extends ContextHelper {
                 <!--vote::manual -->
                 """;
 
-        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
+        event = createVoteEvent(qc, votingConfig, "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
                 body);
 
         voteInfo = new VoteInformation(event);
@@ -871,7 +876,7 @@ public class VotingTest extends ContextHelper {
                 <!--vote::manual comments -->
                 """;
 
-        event = createVoteEvent(queryContext, votingConfig, "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
+        event = createVoteEvent(qc, votingConfig, "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
                 body);
 
         voteInfo = new VoteInformation(event);
@@ -885,7 +890,7 @@ public class VotingTest extends ContextHelper {
         assertThat(voteTally.categories).hasSize(1);
     }
 
-    VoteEvent createVoteEvent(AppQueryContext queryContext, VoteConfig votingConfig, String group,
+    VoteEvent createVoteEvent(QueryContext qc, VoteConfig votingConfig, String group,
             VoteConfig.Threshold threshold, String body) {
         EventData eventData = Mockito.mock(EventData.class);
         when(eventData.getBody()).thenReturn(body);
@@ -893,7 +898,7 @@ public class VotingTest extends ContextHelper {
 
         votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.all);
 
-        return new VoteEvent(queryContext, votingConfig, eventData);
+        return new VoteEvent(qc, votingConfig, eventData);
     }
 
     VoteTally assertVoteTally(int numUsers, boolean expectHasQuorum,

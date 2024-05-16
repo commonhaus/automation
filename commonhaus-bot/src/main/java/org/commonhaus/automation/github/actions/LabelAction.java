@@ -26,15 +26,15 @@ public class LabelAction extends Action {
     }
 
     @Override
-    public void apply(EventQueryContext queryContext) {
+    public void apply(EventQueryContext qc) {
         if (inactive) {
             return;
         }
         if (!add.isEmpty()) {
-            queryContext.addLabels(add);
+            qc.addLabels(add);
         }
         if (!remove.isEmpty()) {
-            queryContext.removeLabels(remove);
+            qc.removeLabels(remove);
         }
     }
 }

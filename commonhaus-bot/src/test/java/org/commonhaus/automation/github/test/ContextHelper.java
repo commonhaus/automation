@@ -42,7 +42,7 @@ import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 
-public class ContextHelper extends org.commonhaus.automation.github.AppContextService.AppQueryContext {
+public class ContextHelper extends QueryContext {
     public static final String repoFullName = "commonhaus/automation-test";
     public static final String repositoryId = "R_kgDOLDuJqg";
     public static final long repoId = 742099370;
@@ -268,10 +268,5 @@ public class ContextHelper extends org.commonhaus.automation.github.AppContextSe
     @Override
     public ActionType getActionType() {
         throw new UnsupportedOperationException("Unimplemented method 'getActionType'");
-    }
-
-    @Override
-    public JsonObject getJsonData() {
-        throw new UnsupportedOperationException("Unimplemented method 'getJsonData'");
     }
 }

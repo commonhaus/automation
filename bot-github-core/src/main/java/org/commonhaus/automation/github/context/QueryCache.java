@@ -55,14 +55,18 @@ public class QueryCache {
 
     @SuppressWarnings("unchecked")
     public <T> T computeIfAbsent(String key, Function<String, T> mappingFunction) {
-        Log.debugf(":: PUT_IF_ABSENT %s/%s ::: ", name, key);
-        return (T) cache.asMap().computeIfAbsent(key, mappingFunction::apply);
+        return (T) cache.asMap().computeIfAbsent(key, k -> {
+            Log.debugf(":: PUT_IF_ABSENT %s/%s ::: ", name, key);
+            return mappingFunction.apply(k);
+        });
     }
 
     @SuppressWarnings("unchecked")
     public <T> T computeIfPresent(String key, BiFunction<String, Object, T> mappingFunction) {
-        Log.debugf(":: PUT_IF_PRESENT %s/%s ::: ", name, key);
-        return (T) cache.asMap().computeIfPresent(key, mappingFunction::apply);
+        return (T) cache.asMap().computeIfPresent(key, (k, v) -> {
+            Log.debugf(":: PUT_IF_PRESENT %s/%s ::: ", name, key);
+            return mappingFunction.apply(k, v);
+        });
     }
 
     public void invalidate(String key) {

@@ -24,22 +24,22 @@ public class Rule {
 
     public List<String> then;
 
-    public boolean matches(EventQueryContext queryContext) {
+    public boolean matches(EventQueryContext qc) {
         boolean matches = true;
         if (action != null) {
-            matches = action.matches(queryContext);
+            matches = action.matches(qc);
         }
         if (matches && category != null) {
-            matches = category.matches(queryContext);
+            matches = category.matches(qc);
         }
         if (matches && paths != null) {
-            matches = paths.matches(queryContext);
+            matches = paths.matches(qc);
         }
         if (matches && label != null) {
-            matches = label.matches(queryContext, queryContext.getNodeId());
+            matches = label.matches(qc, qc.getNodeId());
         }
         if (matches && changedLabel != null) {
-            matches = changedLabel.matches(queryContext);
+            matches = changedLabel.matches(qc);
         }
         return matches;
     }

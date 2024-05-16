@@ -40,15 +40,15 @@ public class DataDiscussionCategory {
     }
 
     public String toString() {
-        return String.format("Discussion [%s] %s", this.id, this.name);
+        return "Discussion [%s] %s".formatted(this.id, this.name);
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext queryContext) {
-        if (queryContext.hasErrors()) {
+    static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext qc) {
+        if (qc.hasErrors()) {
             return List.of();
         }
-        Response response = queryContext.execRepoQuerySync("""
+        Response response = qc.execRepoQuerySync("""
                 query($name: String!, $owner: String!) {
                     repository(owner: $owner, name: $name) {
                         discussionCategories(first: 25) {
@@ -59,7 +59,7 @@ public class DataDiscussionCategory {
                         }
                     }
                 """);
-        Log.debugf("[%s] discussion categories: %s", queryContext.getLogId(), response.getData());
+        Log.debugf("[%s] discussion categories: %s", qc.getLogId(), response.getData());
         if (response.hasError()) {
             return List.of();
         }

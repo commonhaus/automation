@@ -25,8 +25,8 @@ public class MatchPaths {
 
     List<String> paths;
 
-    public boolean matches(EventQueryContext queryContext) {
-        if (queryContext.getEventType() != EventType.pull_request) {
+    public boolean matches(EventQueryContext qc) {
+        if (qc.getEventType() != EventType.pull_request) {
             return false;
         }
         if (paths == null || paths.isEmpty()) {
@@ -34,7 +34,7 @@ public class MatchPaths {
             return true;
         }
 
-        EventData eventData = queryContext.getEventData();
+        EventData eventData = qc.getEventData();
         GHEventPayload.PullRequest pullRequest = eventData.getGHEventPayload();
         GHPullRequest ghPullRequest = pullRequest.getPullRequest();
 
@@ -55,7 +55,7 @@ public class MatchPaths {
                             }
                         } catch (Exception e) {
                             Log.errorf(e, "[%s] Error evaluating glob expression %s: %s",
-                                    queryContext.getLogId(), p, e.toString());
+                                    qc.getLogId(), p, e.toString());
                         }
                     }
                 }
