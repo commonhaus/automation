@@ -37,7 +37,8 @@ public class DataDiscussion extends DataCommonItem {
         return String.format("Discussion [%s] %s", this.id, this.title);
     }
 
-    public static List<DataDiscussion> findDiscussionsWithLabel(QueryContext queryContext, String labelName) {
+    public static List<DataDiscussion> findDiscussionsWithLabel(QueryContext queryContext,
+            String labelName) {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
@@ -83,7 +84,8 @@ public class DataDiscussion extends DataCommonItem {
     /**
      * package private. See QueryHelper / QueryContext
      */
-    static void editDiscussion(QueryContext queryContext, String nodeId, String modifiedText) {
+    static void editDiscussion(QueryContext queryContext, String nodeId,
+            String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", modifiedText);

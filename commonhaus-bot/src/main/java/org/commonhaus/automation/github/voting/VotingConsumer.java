@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
@@ -61,13 +62,13 @@ public class VotingConsumer {
     @Blocking
     public void consume(Message<VoteEvent> msg) {
         VoteEvent voteEvent = msg.body();
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         VoteConfig votingConfig = voteEvent.getVotingConfig();
 
         // Each query context does have a reference to the original event and to the
-        // potentially short-lived GitHub connection. Reauthenticate if
-        // necessary/possible
-        if (!qc.isCredentialValid() && !qc.reauthenticate()) {
+        // potentially short-lived GitHub connection.
+        // Will reauthenticate if necessary/possible
+        if (qc.checkExpiredConnection()) {
             Log.infof("[%s] voting.checkVotes: GitHub connection expired and can't be renewed", qc.getLogId());
             return;
         }
@@ -98,13 +99,13 @@ public class VotingConsumer {
     @Blocking
     public void consumeManualResult(Message<ManualVoteEvent> msg) {
         ManualVoteEvent voteEvent = msg.body();
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         VoteConfig votingConfig = voteEvent.getVotingConfig();
 
         // Each query context does have a reference to the original event and to the
-        // potentially short-lived GitHub connection. Reauthenticate if
-        // necessary/possible
-        if (!qc.isCredentialValid() && !qc.reauthenticate()) {
+        // potentially short-lived GitHub connection.
+        // Will reauthenticate if necessary/possible
+        if (qc.checkExpiredConnection()) {
             Log.infof("[%s] voting.consumeManualResult: GitHub connection expired and can't be renewed", qc.getLogId());
             return;
         }
@@ -193,7 +194,7 @@ public class VotingConsumer {
 
     // Make sure other labels are present
     private boolean repoHasLabels(VoteEvent voteEvent) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         List<String> requiredLabels = List.of(VOTE_DONE, VOTE_PROCEED, VOTE_REVISE, VOTE_QUORUM);
         Collection<DataLabel> voteLabels = qc.findLabels(requiredLabels);
 
@@ -210,7 +211,7 @@ public class VotingConsumer {
 
     // Get information about vote mechanics (return if bad data)
     private VoteInformation getVoteInformation(VoteEvent voteEvent) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         final VoteInformation voteInfo = new VoteInformation(voteEvent);
         if (!voteInfo.isValid()) {
             qc.addBotReaction(voteEvent.getId(), ReactionContent.CONFUSED);
@@ -225,7 +226,7 @@ public class VotingConsumer {
     }
 
     private List<DataCommonComment> getFilteredComments(VoteEvent voteEvent) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         // Skip all bot comments
         List<DataCommonComment> comments = qc.getComments(voteEvent.getId(),
                 x -> !qc.isBot(x.author.login));
@@ -233,14 +234,14 @@ public class VotingConsumer {
     }
 
     private List<DataCommonComment> findResultComments(VoteEvent voteEvent) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         List<DataCommonComment> comments = qc.getComments(voteEvent.getId(),
                 x -> VoteEvent.isManualVoteResult(qc, voteEvent.getVotingConfig(), x));
         return comments;
     }
 
     private List<DataReaction> getFilteredReactions(VoteEvent voteEvent) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
 
         // GraphQL fetch of all reactions on item (return if none)
         // Could query by group first, but pagination happens either way.
@@ -261,7 +262,7 @@ public class VotingConsumer {
     }
 
     private void updateBotComment(VoteEvent voteEvent, String commentBody) {
-        QueryContext qc = voteEvent.getQueryContext();
+        AppQueryContext qc = voteEvent.getQueryContext();
         if (qc.hasErrors()) {
             return;
         }

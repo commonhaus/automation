@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.QueryContext;
 
 public class MatchLabel {
 
@@ -22,7 +22,7 @@ public class MatchLabel {
         });
     }
 
-    public boolean matches(QueryContext queryContext, String nodeId) {
+    public boolean matches(AppQueryContext queryContext, String nodeId) {
         if (nodeId == null) {
             return false;
         }

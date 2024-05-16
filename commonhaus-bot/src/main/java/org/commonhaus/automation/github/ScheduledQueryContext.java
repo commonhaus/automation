@@ -4,45 +4,35 @@ import java.util.List;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.AppConfig;
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
-import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public class ScheduledQueryContext extends QueryContext {
+public class ScheduledQueryContext extends AppQueryContext {
 
-    private final AppConfig botConfig;
-    private final QueryHelper helper;
     private final GHRepository repository;
     private final EventType eventType;
 
     private String logId;
     private GHOrganization organization;
 
-    ScheduledQueryContext(QueryHelper helper, AppConfig botConfig,
-            GitHubClientProvider gitHubClientProvider,
-            GHRepository ghRepository, long installationId) {
-        super(botConfig.isDryRun(), installationId, gitHubClientProvider);
+    ScheduledQueryContext(AppContextService contextService, GHRepository ghRepository, long installationId) {
+        super(contextService, installationId);
 
-        this.botConfig = botConfig;
-        this.helper = helper;
         this.repository = ghRepository;
         this.eventType = EventType.bot_schedule;
     }
 
     ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
-        super(parent.dryRun, parent.installationId, parent.gitHubClientProvider);
+        super(parent);
 
-        this.botConfig = parent.botConfig;
-        this.helper = parent.helper;
         this.repository = parent.repository;
         this.eventType = eventType;
     }

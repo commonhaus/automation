@@ -22,7 +22,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 public class LabelChanges {
 
     @Inject
-    QueryHelper queryHelper;
+    AppContextService queryHelper;
 
     /**
      * Called when there is a discussion labeled/unlabeled event.

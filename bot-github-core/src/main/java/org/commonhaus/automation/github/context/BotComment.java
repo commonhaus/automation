@@ -4,16 +4,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class BotComment {
-    private final Pattern botCommentPattern;
     private final String itemId;
     private final String id;
     private final int databaseId;
     private final String url;
     private String bodyString;
 
-    BotComment(Pattern botCommentPattern, String itemId, DataCommonComment comment) {
+    BotComment(String itemId, DataCommonComment comment) {
         this.bodyString = comment.body;
-        this.botCommentPattern = botCommentPattern;
         this.databaseId = comment.databaseId;
         this.id = comment.id;
         this.itemId = itemId;
@@ -22,9 +20,8 @@ public class BotComment {
 
     // For dry run: this comment exists (in test repo), but probably not on the
     // original item
-    BotComment(Pattern botCommentPattern, String itemId) {
+    BotComment(String itemId) {
         this.bodyString = "";
-        this.botCommentPattern = botCommentPattern;
         this.databaseId = 8164728;
         this.id = "DC_kwDOLDuJqs4AfJV4";
         this.itemId = itemId;

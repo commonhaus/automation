@@ -57,7 +57,8 @@ public class DataCommonItem extends DataCommonObject {
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
-    public static DataCommonItem editIssueDescription(QueryContext queryContext, String nodeId, String bodyString) {
+    public static DataCommonItem editIssueDescription(QueryContext queryContext,
+            String nodeId, String bodyString) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
@@ -85,7 +86,8 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
-    public static DataCommonItem editPullRequestDescription(QueryContext queryContext, String nodeId, String bodyString) {
+    public static DataCommonItem editPullRequestDescription(QueryContext queryContext,
+            String nodeId, String bodyString) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
@@ -113,7 +115,8 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
-    public static List<DataCommonItem> findIssuesWithLabel(QueryContext queryContext, String labelName) {
+    public static List<DataCommonItem> findIssuesWithLabel(QueryContext queryContext,
+            String labelName) {
         List<DataCommonItem> allIssues = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 

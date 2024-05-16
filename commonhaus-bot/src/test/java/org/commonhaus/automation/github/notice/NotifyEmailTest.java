@@ -3,7 +3,10 @@ package org.commonhaus.automation.github.notice;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import jakarta.inject.Inject;
 
@@ -108,7 +111,9 @@ public class NotifyEmailTest extends ContextHelper {
         setLabels(discussionId, bug);
 
         given()
-                .github(mocks -> mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-email.yml"))
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-email.yml");
+                })
                 .when().payloadFromClasspath("/github/eventDiscussionLabeled.json")
                 .event(GHEvent.DISCUSSION)
                 .then().github(mocks -> {
@@ -124,6 +129,7 @@ public class NotifyEmailTest extends ContextHelper {
         // If a PR is labeled with notice, send an email
 
         String prNodeId = "PR_kwDOLDuJqs5mDkwX";
+        int id = 1712213015;
 
         // preset cache to avoid requests
         setLabels(repositoryId, notice);
@@ -132,10 +138,14 @@ public class NotifyEmailTest extends ContextHelper {
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-email.yml");
+                    when(mocks.pullRequest(id).getClosedAt()).thenReturn(null);
+                    when(mocks.pullRequest(id).getNodeId()).thenReturn(prNodeId);
                 })
                 .when().payloadFromClasspath("/github/eventPullRequestLabeled.json")
                 .event(GHEvent.PULL_REQUEST)
                 .then().github(mocks -> {
+                    verify(mocks.pullRequest(id), atLeastOnce()).getClosedAt();
+                    verify(mocks.pullRequest(id), atLeastOnce()).getNodeId();
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });

@@ -33,7 +33,8 @@ public class DataPullRequestReview extends DataCommonObject {
         return String.format("Review [%s] by %s", this.state, this.author);
     }
 
-    static List<DataPullRequestReview> queryReviews(QueryContext queryContext, String pullRequestId) {
+    static List<DataPullRequestReview> queryReviews(QueryContext queryContext,
+            String pullRequestId) {
         if (queryContext.hasErrors()) {
             return List.of();
         }

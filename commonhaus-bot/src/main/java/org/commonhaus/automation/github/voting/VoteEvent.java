@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.AppContextService.AppQueryContext;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
@@ -15,7 +16,6 @@ import org.commonhaus.automation.github.context.DataPullRequestReview;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHOrganization;
 
 import io.quarkus.qute.TemplateData;
@@ -39,7 +39,7 @@ public class VoteEvent {
             Pattern.CASE_INSENSITIVE);
 
     private final ActionType actionType;
-    private final QueryContext qc;
+    private final AppQueryContext qc;
     private final VoteConfig votingConfig;
 
     private final String body;
@@ -57,7 +57,7 @@ public class VoteEvent {
     private final String logId;
     private List<DataPullRequestReview> prReviews;
 
-    public VoteEvent(QueryContext qc, VoteConfig votingConfig, EventData eventData) {
+    public VoteEvent(AppQueryContext qc, VoteConfig votingConfig, EventData eventData) {
         this.actionType = eventData.getActionType();
         this.qc = qc;
         this.votingConfig = votingConfig;
@@ -86,7 +86,7 @@ public class VoteEvent {
         this.isClosed = eventData.isClosed();
     }
 
-    public VoteEvent(QueryContext qc, VoteConfig votingConfig, DataCommonItem item, EventType type) {
+    public VoteEvent(AppQueryContext qc, VoteConfig votingConfig, DataCommonItem item, EventType type) {
         this.actionType = ActionType.bot_scheduled;
         this.qc = qc;
         this.votingConfig = votingConfig;
@@ -105,7 +105,7 @@ public class VoteEvent {
         return actionType == ActionType.bot_scheduled;
     }
 
-    public QueryContext getQueryContext() {
+    public AppQueryContext getQueryContext() {
         return qc;
     }
 
@@ -203,14 +203,14 @@ public class VoteEvent {
         return prefix + "\r\n\r\n" + body;
     }
 
-    public static boolean isManualVoteResult(QueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {
+    public static boolean isManualVoteResult(AppQueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {
         return qc.isLoginIncluded(comment.author.login, votingConfig.managers) && comment.body.contains(MANUAL_VOTE_RESULT);
     }
 
     public static class ManualVoteEvent extends VoteEvent {
         private final DataCommonComment comment;
 
-        public ManualVoteEvent(QueryContext qc, org.commonhaus.automation.github.voting.VoteConfig votingConfig,
+        public ManualVoteEvent(AppQueryContext qc, org.commonhaus.automation.github.voting.VoteConfig votingConfig,
                 EventData eventData, DataCommonComment comment) {
             super(qc, votingConfig, eventData);
             this.comment = comment;
