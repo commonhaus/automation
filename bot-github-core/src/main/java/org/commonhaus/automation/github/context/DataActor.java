@@ -23,7 +23,7 @@ public class DataActor extends DataCommonType {
 
     public DataActor(GHUser senderUser) {
         super(senderUser);
-        this.url = senderUser.getUrl().toString();
+        this.url = senderUser.getHtmlUrl().toString();
         this.avatarUrl = senderUser.getAvatarUrl();
         this.login = senderUser.getLogin();
     }
