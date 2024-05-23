@@ -1,0 +1,29 @@
+# Sync the member details from the described source
+# with the members of the specified teams
+# (specify team as organization/team-name)
+# If dry_run is true, an email will be sent to the specified email 
+# address with the results of the dry run.
+group_management:
+  sources:
+  - path: CONTACTS.yaml
+    repo: commonhaus/foundation
+    sync:
+      cf-council:
+        field: login
+        preserve_users:
+          - user12
+        teams:
+          - commonhaus-test/cf-council
+          - commonhaus-test/admin
+      egc:
+        field: login
+        teams:
+          - commonhaus-test/test-quorum-default
+    dry_run: true
+
+## Email addresses to notify of errors and dry-run results
+email_address:
+  errors:
+    - repo-errors@example.com
+  dry_run:
+    - dry-run@example.com
