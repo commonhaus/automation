@@ -26,7 +26,7 @@ public class QueryCache {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T getCachedValue(String key) {
+    public <T> T get(String key) {
         T result = (T) cache.getIfPresent(key);
         if (result != null) {
             Log.debugf(":: HIT %s/%s ::: ", name, key);
@@ -43,11 +43,11 @@ public class QueryCache {
      * @param value to be cached
      * @return new value
      */
-    public <T> T putCachedValue(String key, T value) {
-        Log.debugf(":: PUT %s/%s ::: ", name, key);
+    public <T> T put(String key, T value) {
         if (value == null) {
-            cache.invalidate(key);
+            invalidate(key);
         } else {
+            Log.debugf(":: PUT %s/%s ::: ", name, key);
             cache.put(key, value);
         }
         return value;
@@ -67,6 +67,19 @@ public class QueryCache {
             Log.debugf(":: PUT_IF_PRESENT %s/%s ::: ", name, key);
             return mappingFunction.apply(k, v);
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T compute(String key, BiFunction<String, Object, T> mappingFunction) {
+        return (T) cache.asMap().compute(key, (k, v) -> {
+            Log.debugf(":: PUT %s/%s ::: ", name, key);
+            return mappingFunction.apply(k, v);
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T putIfAbsent(String key, T value) {
+        return (T) cache.asMap().putIfAbsent(key, value);
     }
 
     public void invalidate(String key) {

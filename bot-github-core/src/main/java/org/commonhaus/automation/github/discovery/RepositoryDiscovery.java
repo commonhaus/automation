@@ -1,21 +1,20 @@
 package org.commonhaus.automation.github.discovery;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import jakarta.json.JsonArray;
+import jakarta.inject.Singleton;
 import jakarta.json.JsonObject;
-import jakarta.json.JsonValue;
 
 import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHAuthenticatedAppInstallation;
-import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -24,12 +23,11 @@ import io.quarkiverse.githubapp.ConfigFile.Source;
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkiverse.githubapp.GitHubConfigFileProvider;
 import io.quarkiverse.githubapp.GitHubEvent;
-import io.quarkiverse.githubapp.event.Installation;
-import io.quarkiverse.githubapp.event.InstallationRepositories;
+import io.quarkiverse.githubapp.event.RawEvent;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 
-@ApplicationScoped
+@Singleton
 public class RepositoryDiscovery {
 
     @Inject
@@ -46,9 +44,15 @@ public class RepositoryDiscovery {
 
     private ContextService ctx;
 
-    void discoverRepositories(@Observes StartupEvent ev) {
-        ctx = ctxInstance.get();
+    // discoverRepositories is/was being called twice. Avoid double discovery
+    static final AtomicBoolean started = new AtomicBoolean(false);
 
+    void discoverRepositories(@Observes StartupEvent ev) {
+        if (!started.compareAndSet(false, true)) {
+            return;
+        }
+
+        ctx = ctxInstance.get();
         Log.info("Repository discovery is " + (ctx.isDiscoveryEnabled() ? "enabled" : "disabled"));
         if (!ctx.isDiscoveryEnabled()) {
             return;
@@ -68,14 +72,14 @@ public class RepositoryDiscovery {
                 }
             }
         } catch (GHIOException e) {
-            ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", e);
+            ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", e, null);
             if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                 e.getResponseHeaderFields()
                         .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 e.printStackTrace();
             }
         } catch (Throwable t) {
-            ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", t);
+            ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", t, null);
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
@@ -89,27 +93,28 @@ public class RepositoryDiscovery {
      * @param github
      * @param installation
      */
-    void onInstallationChange(GitHubEvent event, GitHub github,
-            @Installation GHEventPayload.Installation installation) {
-        String action = installation.getAction();
-        long ghiId = installation.getInstallation().getId();
+    void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent, GitHub github) {
+        ctx = ctxInstance.get();
+
+        String action = gitHubEvent.getAction();
+        JsonObject payload = JsonAttribute.unpack(gitHubEvent.getPayload());
+        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+        long installationId = JsonAttribute.id.longFrom(installation);
+
+        List<GHRepository> repositories = JsonAttribute.repositories.repositoriesFrom(payload);
+
         switch (action) {
             case "created", "unsuspend" -> {
-                for (GHRepository repo : installation.getRepositories()) {
+                for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.ADDED, github, ghiId,
+                            DiscoveryAction.ADDED, github, installationId,
                             repo, fetchConfigFile(repo)));
                 }
             }
             case "deleted", "suspend" -> {
-                // Reduced payload available. We'll use our own parse to construct slim
-                // disconnected repositories from what we have
-                JsonObject payload = JsonAttribute.unpack(event.getPayload());
-                JsonArray repositories = JsonAttribute.repositories.jsonArrayFrom(payload);
-                for (JsonValue v : repositories) {
-                    GHRepository repo = JsonAttribute.repository.repositoryFrom(v.asJsonObject());
+                for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.REMOVED, github, ghiId,
+                            DiscoveryAction.REMOVED, github, installationId,
                             repo, null));
                 }
             }
@@ -119,24 +124,40 @@ public class RepositoryDiscovery {
     }
 
     /**
-     * Respond to App Installation repository changes
+     * Respond to App Installation repository changes.
+     * Sender may be null if the event is from a webhook, which is not handled
+     * by the GitHub API.
      *
      * @param event
      * @param github
      * @param repositories
      */
-    void onInstallationRepositoryChange(GitHubEvent event, GitHub github,
-            @InstallationRepositories GHEventPayload.InstallationRepositories repositories) {
+    void onInstallationRepositoryChange(@RawEvent(event = "installation_repositories") GitHubEvent gitHubEvent, GitHub github) {
+        ctx = ctxInstance.get();
 
-        for (GHRepository repo : repositories.getRepositoriesAdded()) {
+        JsonObject payload = JsonAttribute.unpack(gitHubEvent.getPayload());
+        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+        long installationId = JsonAttribute.id.longFrom(installation);
+
+        List<GHRepository> added = JsonAttribute.repositoriesAdded.repositoriesFrom(payload);
+        List<GHRepository> removed = JsonAttribute.repositoriesRemoved.repositoriesFrom(payload);
+
+        handleRepositoryChanges(github, installationId,
+                added == null ? List.of() : added,
+                removed == null ? List.of() : removed);
+    }
+
+    protected void handleRepositoryChanges(GitHub github, long installationId,
+            List<GHRepository> added, List<GHRepository> removed) {
+        for (GHRepository repo : added) {
             repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                    DiscoveryAction.ADDED, github, repositories.getInstallation().getId(),
+                    DiscoveryAction.ADDED, github, installationId,
                     repo, fetchConfigFile(repo)));
         }
 
-        for (GHRepository repo : repositories.getRepositoriesRemoved()) {
+        for (GHRepository repo : removed) {
             repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                    DiscoveryAction.REMOVED, github, repositories.getInstallation().getId(),
+                    DiscoveryAction.REMOVED, github, installationId,
                     repo, null));
         }
     }

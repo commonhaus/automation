@@ -14,15 +14,15 @@ public interface ContextService {
 
     boolean isDiscoveryEnabled();
 
-    String errorEmailAddress();
+    String[] botErrorEmailAddress();
 
     GitHub getInstallationClient(long installationId);
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
 
-    void logAndSendEmail(String logId, String title, Throwable t);
+    void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 
-    void logAndSendEmail(String logId, String title, String body, Throwable t);
+    void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses);
 
     void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses);
 }

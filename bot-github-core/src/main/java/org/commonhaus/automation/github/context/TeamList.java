@@ -38,17 +38,4 @@ public class TeamList {
                 .map(actor -> actor.login)
                 .collect(Collectors.joining(",")));
     }
-
-    public String toPlainList() {
-        return members.stream()
-                .map(actor -> "- %s (%s)\n".formatted(actor.login, actor.url))
-                .collect(Collectors.joining(", "));
-    }
-
-    public String toHtmlList() {
-        return "<ul>" + members.stream()
-                .map(actor -> "<li><a href=\"%s\">%s</a></li>".formatted(actor.url, actor.login))
-                .collect(Collectors.joining(", "))
-                + "</ul>";
-    }
 }

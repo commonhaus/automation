@@ -20,7 +20,7 @@ public enum ActionType {
     unlabeled,
     unlocked,
     unpinned,
-    bot_scheduled;
+    bot;
 
     public static ActionType fromString(String action) {
         return ActionType.valueOf(action.toLowerCase());

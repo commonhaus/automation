@@ -11,6 +11,7 @@ import jakarta.json.JsonArray;
 import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
+import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
 
@@ -93,6 +94,8 @@ public enum JsonAttribute {
     reactions,
     removeLabelsFromLabelable,
     repositories,
+    repositoriesAdded("repositories_added"),
+    repositoriesRemoved("repositories_removed"),
     repository,
     reviewDecision,
     search,
@@ -107,6 +110,8 @@ public enum JsonAttribute {
     url("html_url"),
     user,
     viewer,
+    company,
+    bio,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -170,7 +175,14 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).intValue();
+        if (value == null || value.getValueType() == ValueType.NULL) {
+            return null;
+        }
+        if (value.getValueType() == ValueType.STRING) {
+            String stringValue = ((JsonString) value).getString();
+            return Integer.valueOf(stringValue);
+        }
+        return ((JsonNumber) value).intValue();
     }
 
     /**
@@ -183,7 +195,14 @@ public enum JsonAttribute {
         JsonValue value = alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : ((JsonNumber) value).longValue();
+        if (value == null || value.getValueType() == ValueType.NULL) {
+            return null;
+        }
+        if (value.getValueType() == ValueType.STRING) {
+            String stringValue = ((JsonString) value).getString();
+            return Long.valueOf(stringValue);
+        }
+        return ((JsonNumber) value).longValue();
     }
 
     /**
@@ -314,6 +333,19 @@ public enum JsonAttribute {
         return value == null
                 ? null
                 : tryOrNull(value, GHRepository.class);
+    }
+
+    public List<GHRepository> repositoriesFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonArray list = jsonArrayFrom(object);
+        return list == null
+                ? null
+                : list.stream()
+                        .map(JsonObject.class::cast)
+                        .map(x -> tryOrNull(x.toString(), GHRepository.class))
+                        .toList();
     }
 
     /** Bridge to GH* type usually parsed using Jackson; may be incomplete */

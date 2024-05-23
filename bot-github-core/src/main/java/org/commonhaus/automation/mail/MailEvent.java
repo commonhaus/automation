@@ -15,4 +15,8 @@ public class MailEvent {
         this.subject = subject;
         this.addresses = addresses;
     }
+
+    public boolean hasAddresses() {
+        return addresses != null && addresses.length > 0;
+    }
 }

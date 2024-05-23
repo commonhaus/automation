@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <title>{#insert title}{/}</title>
+  <title>{title}</title>
   <style media="all" type="text/css">
     table,
     a {
@@ -34,7 +34,7 @@
         <header style="margin: 1em 0;  padding: .5em;">
           <h1 style="font-size: 1.1em;  margin: .2em;">{#insert title}{/}</h1>
         </header>
-        <main style="margin: 1em 0;  padding: .5em; font-family: monospace; font-size:13px;">{#insert body}No body{/}</main>
+        <main style="margin: 1em 0;  padding: .5em; font-family: monospace; font-size:13px;">{htmlBody.raw}</main>
       </td>
     </tr>
   </table>
