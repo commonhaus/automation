@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Quarkus Chat!</title>
+  <link rel="stylesheet" type="text/css"
+    href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly.min.css">
+  <link rel="stylesheet" type="text/css"
+    href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly-additions.min.css">
+
+  <style>
+    #chat {
+      resize: none;
+      overflow: hidden;
+      min-height: 100px;
+      max-height: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-default navbar-pf" role="navigation">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/">
+        <p><strong>Test some things.. </strong></p>
+      </a>
+    </div>
+  </nav>
+  <div class="container">
+    <br />
+    <div class="row">
+      <input id="name" class="col-md-4" type="text" placeholder="your name" disabled="true">
+      <button id="connect" class="col-md-1 btn btn-primary" type="button">connect</button>
+      <br />
+      <br />
+    </div>
+    <div class="row">
+      <textarea class="col-md-8" id="chat"></textarea>
+    </div>
+    <div class="row">
+      <input class="col-md-6" id="msg" type="text" placeholder="enter your message">
+      <button class="col-md-1 btn btn-primary" id="send" type="button" disabled>send</button>
+    </div>
+
+    <form id="commonhausUserForm">
+      <label for="status">Status:</label><br>
+      <select id="status" name="status">
+        <option value="ACTIVE">Active</option>
+        <option value="INACTIVE">Inactive</option>
+        <option value="COMMITTEE">Committee</option>
+        <option value="PENDING">Pending</option>
+        <option value="REVOKED">Revoked</option>
+        <option value="SPONSOR">Sponsor</option>
+        <option value="SUSPENDED">Suspended</option>
+      </select><br>
+      <input type="submit" value="Submit">
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('commonhausUserForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var status = document.getElementById('status').value;
+
+      var data = { login: login, id: id, status: status };
+
+      fetch('/member/commonhaus', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Success:', data);
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+    });
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/js/patternfly.min.js"></script>
+
+  <script type="text/javascript">
+    let connected = false;
+    let socket;
+    let cookies = {};
+    let id = '';
+
+    const getCookies = (cookieStr) =>
+      cookieStr.split(";")
+        .map(str => {
+          const p = str.indexOf("=");
+          return [str.substr(0, p).trim(), str.substr(p + 1).trim()];
+        })
+        .reduce((acc, curr) => {
+          acc[curr[0]] = curr[1];
+          return acc;
+        }, {});
+
+    $(document).ready(function () {
+      cookies = getCookies(document.cookie);
+      console.log("cookies", cookies);
+
+      if (!cookies["id"]) {
+        window.location.assign("/member/github");
+      } else {
+        id = cookies["id"];
+      }
+
+      $("#connect").click(connect);
+
+      $("#send").click(sendMessage);
+
+      $("#name").val(id);
+
+      $("#msg").keypress(function (event) {
+        if (event.keyCode == 13 || event.which == 13) {
+          sendMessage();
+        }
+      });
+
+      $("#chat").change(function () {
+        scrollToBottom();
+      });
+
+      $("#name").focus();
+    });
+
+    const connect = function () {
+      if (!connected) {
+        socket = new WebSocket("ws://" + location.host + "/member/" + id + "/stream");
+        socket.onopen = function () {
+          connected = true;
+          console.log("Connected to the web socket");
+          $("#send").attr("disabled", false);
+          $("#connect").attr("disabled", true);
+          $("#name").attr("disabled", true);
+          $("#msg").focus();
+        };
+        socket.onmessage = function (m) {
+          console.log("Got message", m);
+          $("#chat").append(m.payload + "\n");
+          scrollToBottom();
+        };
+        socket.onclose = function (e) {
+          connected = false;
+          console.log("Disconnected from the web socket", e.code, e.reason);
+          $("#send").attr("disabled", true);
+          $("#connect").attr("disabled", false);
+          $("#name").attr("disabled", false);
+        };
+        socket.onerror = function (e) {
+          console.log("Error: " + e);
+        };
+      }
+    };
+
+    const sendMessage = function () {
+      if (connected) {
+        var value = $("#msg").val();
+        console.log("Sending " + value);
+        socket.send(value);
+        $("#msg").val("");
+      }
+    };
+
+    const scrollToBottom = function () {
+      $('#chat').scrollTop($('#chat')[0].scrollHeight);
+    };
+
+  </script>
+</body>
+
+</html>

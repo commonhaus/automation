@@ -1,0 +1,107 @@
+{
+  "action": "added",
+  "installation": {
+    "id": 50263360,
+    "account": {
+      "login": "commonhaus-test",
+      "id": 168673220,
+      "node_id": "O_kgDOCg2_xA",
+      "avatar_url": "https://avatars.githubusercontent.com/u/168673220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/commonhaus-test",
+      "html_url": "https://github.com/commonhaus-test",
+      "followers_url": "https://api.github.com/users/commonhaus-test/followers",
+      "following_url": "https://api.github.com/users/commonhaus-test/following{/other_user}",
+      "gists_url": "https://api.github.com/users/commonhaus-test/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/commonhaus-test/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/commonhaus-test/subscriptions",
+      "organizations_url": "https://api.github.com/users/commonhaus-test/orgs",
+      "repos_url": "https://api.github.com/users/commonhaus-test/repos",
+      "events_url": "https://api.github.com/users/commonhaus-test/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/commonhaus-test/received_events",
+      "type": "Organization",
+      "site_admin": false
+    },
+    "repository_selection": "all",
+    "access_tokens_url": "https://api.github.com/app/installations/50263360/access_tokens",
+    "repositories_url": "https://api.github.com/installation/repositories",
+    "html_url": "https://github.com/organizations/commonhaus-test/settings/installations/50263360",
+    "app_id": 794963,
+    "app_slug": "commonhaus-test-bot",
+    "target_id": 168673220,
+    "target_type": "Organization",
+    "permissions": {
+      "issues": "write",
+      "actions": "write",
+      "members": "write",
+      "contents": "write",
+      "metadata": "read",
+      "discussions": "write",
+      "pull_requests": "write",
+      "administration": "read",
+      "repository_projects": "write",
+      "organization_administration": "read"
+    },
+    "events": [
+      "discussion",
+      "discussion_comment",
+      "issues",
+      "issue_comment",
+      "label",
+      "member",
+      "membership",
+      "organization",
+      "project",
+      "project_column",
+      "pull_request",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "pull_request_review_thread",
+      "team",
+      "team_add"
+    ],
+    "created_at": "2024-05-01T14:31:49.000-04:00",
+    "updated_at": "2024-05-01T14:31:49.000-04:00",
+    "single_file_name": null,
+    "has_multiple_single_files": false,
+    "single_file_paths": [
+
+    ],
+    "suspended_by": null,
+    "suspended_at": null
+  },
+  "repository_selection": "all",
+  "repositories_added": [
+    {
+      "id": 801851090,
+      "node_id": "R_kgDOL8tG0g",
+      "name": "ops-test",
+      "full_name": "commonhaus-test/ops-test",
+      "private": true
+    }
+  ],
+  "repositories_removed": [
+
+  ],
+  "requester": null,
+  "sender": {
+    "login": "ebullient",
+    "id": 808713,
+    "node_id": "MDQ6VXNlcjgwODcxMw==",
+    "avatar_url": "https://avatars.githubusercontent.com/u/808713?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/ebullient",
+    "html_url": "https://github.com/ebullient",
+    "followers_url": "https://api.github.com/users/ebullient/followers",
+    "following_url": "https://api.github.com/users/ebullient/following{/other_user}",
+    "gists_url": "https://api.github.com/users/ebullient/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/ebullient/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/ebullient/subscriptions",
+    "organizations_url": "https://api.github.com/users/ebullient/orgs",
+    "repos_url": "https://api.github.com/users/ebullient/repos",
+    "events_url": "https://api.github.com/users/ebullient/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/ebullient/received_events",
+    "type": "User",
+    "site_admin": false
+  }
+}
