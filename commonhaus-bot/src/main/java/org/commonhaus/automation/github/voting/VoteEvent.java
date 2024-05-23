@@ -87,7 +87,7 @@ public class VoteEvent {
     }
 
     public VoteEvent(QueryContext qc, VoteConfig votingConfig, DataCommonItem item, EventType type) {
-        this.actionType = ActionType.bot_scheduled;
+        this.actionType = ActionType.bot;
         this.qc = qc;
         this.votingConfig = votingConfig;
         this.itemType = type;
@@ -102,7 +102,7 @@ public class VoteEvent {
     }
 
     public boolean isScheduled() {
-        return actionType == ActionType.bot_scheduled;
+        return actionType == ActionType.bot;
     }
 
     public QueryContext getQueryContext() {

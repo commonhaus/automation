@@ -1,5 +1,10 @@
 package org.commonhaus.automation.github.context;
 
+import static org.commonhaus.automation.github.context.BaseQueryCache.BOT_LOGIN;
+import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
+import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
+import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,12 +13,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import jakarta.json.JsonObject;
 
+import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -28,19 +33,6 @@ import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public abstract class QueryContext {
-    protected static final QueryCache LABELS = QueryCache.create(
-            "LABELS",
-            b -> b.expireAfterWrite(6, TimeUnit.HOURS));
-    protected static final QueryCache TEAM = QueryCache.create(
-            "TEAM",
-            b -> b.expireAfterWrite(6, TimeUnit.HOURS));
-    protected static final QueryCache BOT_LOGIN = QueryCache.create(
-            "BOT_LOGIN",
-            b -> b.expireAfterWrite(6, TimeUnit.HOURS));
-    protected static final QueryCache RECENT_BOT_CONTENT = QueryCache.create(
-            "RECENT_BOT_CONTENT",
-            b -> b.expireAfterWrite(6, TimeUnit.HOURS));
-
     @FunctionalInterface
     public interface GitHubParameterApiCall<R> {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
@@ -140,12 +132,18 @@ public abstract class QueryContext {
 
     public void clearErrors() {
         errors.clear();
+        exceptions.clear();
+    }
+
+    public RuntimeException bundleExceptions() {
+        return hasErrors()
+                ? new PackagedException(exceptions, errors)
+                : null;
     }
 
     public boolean hasNotFound() {
-        return exceptions.isEmpty()
-                && errors.size() == 1
-                && errors.stream().anyMatch(e -> e.getOtherFields().containsKey("type")
+        return exceptions.stream().anyMatch(e -> e instanceof GHFileNotFoundException)
+                || errors.stream().anyMatch(e -> e.getOtherFields().containsKey("type")
                         && e.getOtherFields().get("type").equals("NOT_FOUND"));
     }
 
@@ -163,15 +161,13 @@ public abstract class QueryContext {
         }
         try {
             return ghApiCall.apply(getGitHub(), isDryRun());
+        } catch (GHFileNotFoundException e) {
+            addException(e);
         } catch (GHIOException e) {
-            ctx.logAndSendEmail(getLogId(), "Error making GH Request", e);
-            if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
-                e.getResponseHeaderFields()
-                        .forEach((k, v) -> Log.debugf("%s: %s", k, v));
-            }
+            logAndSendEmail(getLogId(), "Error making GH Request", e);
             addException(e);
         } catch (IOException | RuntimeException e) {
-            ctx.logAndSendEmail(getLogId(), "Error making GH Request", e);
+            logAndSendEmail(getLogId(), "Error making GH Request", e);
             addException(e);
         }
         return null;
@@ -200,12 +196,12 @@ public abstract class QueryContext {
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
             if (response != null && response.hasError()) {
-                ctx.logAndSendEmail(getLogId(), "Error executing GraphQL query", response.getErrors().toString(),
+                logAndSendEmail(getLogId(), "Error executing GraphQL query", response.getErrors().toString(),
                         null);
                 errors.addAll(response.getErrors());
             }
         } catch (ExecutionException | InterruptedException | RuntimeException e) {
-            ctx.logAndSendEmail(getLogId(), "Error executing GraphQL query", e);
+            logAndSendEmail(getLogId(), "Error executing GraphQL query", e);
             exceptions.add(e);
         }
         return response;
@@ -293,7 +289,7 @@ public abstract class QueryContext {
             return null;
         }
 
-        BotComment botComment = RECENT_BOT_CONTENT.getCachedValue(itemId);
+        BotComment botComment = RECENT_BOT_CONTENT.get(itemId);
         DataCommonComment comment = null;
         if (botComment == null) {
             String commentId = BotComment.getCommentId(botCommentPattern, itemBody);
@@ -322,7 +318,7 @@ public abstract class QueryContext {
                     case issue, pull_request ->
                         DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
-                        ctx.logAndSendEmail(getLogId(), "addBotComment: Unknown event type " + itemType, null);
+                        logAndSendEmail(getLogId(), "addBotComment: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -340,7 +336,7 @@ public abstract class QueryContext {
                     case issue, pull_request ->
                         DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
                     default -> {
-                        ctx.logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + itemType, null);
+                        logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -350,13 +346,13 @@ public abstract class QueryContext {
         } else {
             Log.debugf("[%s] updateBotComment: comment %s unchanged", getLogId(), botComment.getCommentId());
         }
-        RECENT_BOT_CONTENT.putCachedValue(itemId, botComment);
+        RECENT_BOT_CONTENT.put(itemId, botComment);
         return botComment;
     }
 
     protected BotComment createBotComment(String nodeId, DataCommonComment comment) {
         BotComment botComment = new BotComment(nodeId, comment);
-        QueryContext.RECENT_BOT_CONTENT.putCachedValue(nodeId, botComment);
+        RECENT_BOT_CONTENT.put(nodeId, botComment);
         return botComment;
     }
 
@@ -377,7 +373,7 @@ public abstract class QueryContext {
                 DataCommonItem.editIssueDescription(this, nodeId, bodyString);
             case pull_request, pull_request_review ->
                 DataCommonItem.editPullRequestDescription(this, nodeId, bodyString);
-            default -> ctx.logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
+            default -> logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
         }
     }
 
@@ -410,14 +406,14 @@ public abstract class QueryContext {
      * @return collection of labels for the item
      */
     public Collection<DataLabel> getLabels(String itemId) {
-        Set<DataLabel> labels = LABELS.getCachedValue(itemId);
+        Set<DataLabel> labels = LABELS.get(itemId);
         if (labels != null) {
             return labels;
         }
         // fresh fetch graphQL fetch
         labels = DataLabel.queryLabels(this, itemId);
         if (labels != null) {
-            LABELS.putCachedValue(itemId, labels);
+            LABELS.put(itemId, labels);
         }
         return labels;
     }
@@ -478,7 +474,7 @@ public abstract class QueryContext {
         Collection<DataLabel> newLabels = findLabels(labels);
         if (!newLabels.isEmpty()) {
             Set<DataLabel> currentLabels = DataLabel.addLabels(this, nodeId, newLabels);
-            LABELS.putCachedValue(nodeId, currentLabels);
+            LABELS.put(nodeId, currentLabels);
             return currentLabels;
         }
         return null;
@@ -511,7 +507,7 @@ public abstract class QueryContext {
         Collection<DataLabel> oldLabels = findLabels(labels);
         if (!oldLabels.isEmpty()) {
             Set<DataLabel> currentLabels = DataLabel.removeLabels(this, nodeId, oldLabels);
-            LABELS.putCachedValue(nodeId, currentLabels);
+            LABELS.put(nodeId, currentLabels);
             return currentLabels;
         }
         return null;
@@ -521,10 +517,10 @@ public abstract class QueryContext {
         return getTeamList(getOrganization(), group);
     }
 
-    public TeamList getTeamList(GHOrganization org, String team) {
-        String relativeName = team.replace(org.getLogin() + "/", "");
+    public TeamList getTeamList(GHOrganization org, String teamFullName) {
+        String relativeName = teamFullName.replace(org.getLogin() + "/", "");
 
-        Set<GHUser> members = TEAM.getCachedValue(team);
+        Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
         if (members == null) {
             members = execGitHubSync((gh, dryRun) -> {
                 GHTeam ghTeam = org.getTeamByName(relativeName);
@@ -533,10 +529,26 @@ public abstract class QueryContext {
             if (hasErrors() || members == null) {
                 return null;
             }
-            TEAM.putCachedValue(team, members);
+            TEAM_MEMBERS.put(teamFullName, members);
         }
-        TeamList teamList = new TeamList(team, members);
+        TeamList teamList = new TeamList(teamFullName, members);
         Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
         return teamList;
+    }
+
+    public void updateTeamList(String fullTeamName, Set<GHUser> members) {
+        TEAM_MEMBERS.put(fullTeamName, members);
+    }
+
+    public String[] getErrorAddresses() {
+        return ctx.botErrorEmailAddress();
+    }
+
+    public void logAndSendEmail(String logId, String title, Throwable t) {
+        ctx.logAndSendEmail(logId, title, t, getErrorAddresses());
+    }
+
+    public void logAndSendEmail(String logId, String title, String body, Throwable t) {
+        ctx.logAndSendEmail(logId, title, body, t, getErrorAddresses());
     }
 }

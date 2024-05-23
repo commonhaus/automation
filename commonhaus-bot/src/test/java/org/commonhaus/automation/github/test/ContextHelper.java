@@ -17,12 +17,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.context.ActionType;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
@@ -73,10 +75,7 @@ public class ContextHelper extends QueryContext {
 
     @BeforeEach
     protected void beforeEach() {
-        QueryContext.TEAM.invalidateAll();
-        QueryContext.LABELS.invalidateAll();
-        QueryContext.BOT_LOGIN.invalidateAll();
-        QueryContext.RECENT_BOT_CONTENT.invalidateAll();
+        Stream.of(BaseQueryCache.values()).forEach(v -> v.invalidateAll());
 
         verifyNoLabelCache(repositoryId);
         setLogin("login");
@@ -87,7 +86,7 @@ public class ContextHelper extends QueryContext {
     }
 
     public void setLogin(String login) {
-        QueryContext.BOT_LOGIN.putCachedValue("" + installationId, login);
+        BaseQueryCache.BOT_LOGIN.put("" + installationId, login);
     }
 
     public void setupMockTeam(GitHubMockSetupContext mocks) {
@@ -96,19 +95,19 @@ public class ContextHelper extends QueryContext {
         GHUser user3 = mockGHUser("user3");
         mockGHUser("user4");
 
-        QueryContext.TEAM.putCachedValue("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
+        BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
     }
 
     public void setupMockTeam(String teamName, Set<GHUser> users) {
-        QueryContext.TEAM.putCachedValue(teamName, users);
+        BaseQueryCache.TEAM_MEMBERS.put(teamName, users);
     }
 
     public void setLabels(String id, DataLabel... labels) {
-        QueryContext.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(List.of(labels));
+        BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(List.of(labels));
     }
 
     public void setLabels(String id, Set<DataLabel> labels) {
-        QueryContext.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
+        BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
     }
 
     public Response mockResponse(Path filename) {
@@ -166,9 +165,9 @@ public class ContextHelper extends QueryContext {
         // let's make sure all of the updates are done before proceeding to the next
         // test
         await().atMost(5, SECONDS)
-                .until(() -> QueryContext.RECENT_BOT_CONTENT.getCachedValue(nodeId) != null);
+                .until(() -> BaseQueryCache.RECENT_BOT_CONTENT.get(nodeId) != null);
 
-        BotComment botComment = QueryContext.RECENT_BOT_CONTENT.getCachedValue(nodeId);
+        BotComment botComment = BaseQueryCache.RECENT_BOT_CONTENT.get(nodeId);
         Assertions.assertEquals(commentId, botComment.getCommentId(),
                 "Cached Bot Comment ID for " + nodeId + " should equal " + commentId + ", was "
                         + botComment.getCommentId());
@@ -176,12 +175,12 @@ public class ContextHelper extends QueryContext {
     }
 
     public void verifyNoLabelCache(String labelId) {
-        Assertions.assertNull(QueryContext.LABELS.getCachedValue(labelId),
+        Assertions.assertNull(BaseQueryCache.LABELS.get(labelId),
                 "Label cache for " + labelId + " should not exist");
     }
 
     public void verifyLabelCache(String labeledId, int size, List<String> expectedLabels) {
-        Set<DataLabel> labels = QueryContext.LABELS.getCachedValue(labeledId);
+        Set<DataLabel> labels = BaseQueryCache.LABELS.get(labeledId);
 
         Assertions.assertNotNull(labels);
         Assertions.assertEquals(size, labels.size(), stringify(labels));

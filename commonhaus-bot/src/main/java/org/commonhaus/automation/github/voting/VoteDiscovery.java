@@ -105,14 +105,14 @@ public class VoteDiscovery {
                 }
             }
         } catch (GHIOException e) {
-            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", e);
+            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", e, null);
             if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                 e.getResponseHeaderFields()
                         .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 e.printStackTrace();
             }
         } catch (Throwable t) {
-            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", t);
+            ctx.logAndSendEmail("discoverVotes", "Error making GH Request", t, null);
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }

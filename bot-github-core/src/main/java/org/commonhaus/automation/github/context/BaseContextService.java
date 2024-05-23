@@ -1,9 +1,10 @@
 package org.commonhaus.automation.github.context;
 
+import static org.commonhaus.automation.github.context.BaseQueryCache.REPO_CONFIG;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import jakarta.enterprise.event.Observes;
 
@@ -23,9 +24,6 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 public abstract class BaseContextService implements ContextService {
-    private static final QueryCache REPO_CONFIG = QueryCache.create(
-            "REPO_CONFIG", b -> b.expireAfterWrite(6, TimeUnit.HOURS));
-
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance basicEmail(String title, String body, String htmlBody);
@@ -35,6 +33,7 @@ public abstract class BaseContextService implements ContextService {
     private final GitHubConfigFileProvider configProvider;
     private final EventBus bus;
     private final BotConfig data;
+    private final String[] errorAddress;
 
     public BaseContextService(BotConfig data, GitHubClientProvider gitHubClientProvider,
             GitHubConfigFileProvider configProvider, EventBus bus) {
@@ -42,6 +41,13 @@ public abstract class BaseContextService implements ContextService {
         this.configProvider = configProvider;
         this.data = data;
         this.bus = bus;
+        errorAddress = data.errorEmailAddress().isPresent()
+                ? new String[] { data.errorEmailAddress().get() }
+                : null;
+    }
+
+    public EventBus getBus() {
+        return bus;
     }
 
     public Optional<String> replyTo() {
@@ -58,8 +64,8 @@ public abstract class BaseContextService implements ContextService {
         return dryRun.isPresent() && dryRun.get();
     }
 
-    public String errorEmailAddress() {
-        return data.errorEmailAddress().orElse(null);
+    public String[] botErrorEmailAddress() {
+        return errorAddress;
     }
 
     public GitHub getInstallationClient(long installationId) {
@@ -70,22 +76,22 @@ public abstract class BaseContextService implements ContextService {
         return gitHubClientProvider.getInstallationGraphQLClient(installationId);
     }
 
-    void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         if (repoEvent.removed()) {
             REPO_CONFIG.invalidate(repoEvent.repository().getNodeId());
         } else {
             // Update repo config cache on discovery event
             Optional<?> repoConfig = repoEvent.getRepositoryConfig();
-            REPO_CONFIG.putCachedValue(repoEvent.repository().getNodeId(), repoConfig);
+            REPO_CONFIG.put(repoEvent.repository().getNodeId(), repoConfig);
         }
     }
 
     public <F> void updateConfiguration(GHRepository repo, F repositoryConfig) {
-        REPO_CONFIG.putCachedValue(repo.getNodeId(), Optional.of(repositoryConfig));
+        REPO_CONFIG.put(repo.getNodeId(), Optional.of(repositoryConfig));
     }
 
     public <F> F getConfiguration(GHRepository repo) {
-        Optional<F> repoConfig = REPO_CONFIG.getCachedValue(repo.getNodeId());
+        Optional<F> repoConfig = REPO_CONFIG.get(repo.getNodeId());
         if (repoConfig == null) {
             // unless we haven't had an event for a repo in a long while, this should more
             // or less never happen
@@ -93,37 +99,45 @@ public abstract class BaseContextService implements ContextService {
             @SuppressWarnings("unchecked")
             Class<F> configType = (Class<F>) getConfigType();
             repoConfig = configProvider.fetchConfigFile(repo, configFileName, Source.DEFAULT, configType);
-            REPO_CONFIG.putCachedValue(repo.getNodeId(), repoConfig);
+            REPO_CONFIG.put(repo.getNodeId(), repoConfig);
         }
         return repoConfig.orElse(null);
     }
 
-    public void logAndSendEmail(String logId, String title, Throwable t) {
-        Log.errorf(t, "[%s] %s: %s", logId, title, t.toString());
-        if (errorEmailAddress() != null) {
-            MailEvent event = createErrorMailEvent(logId, title, "", t, errorEmailAddress());
+    public void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses) {
+        MailEvent event = new MailEvent(logId, Templates.basicEmail(title, body, htmlBody), title, addresses);
+        if (event.hasAddresses()) {
             bus.send(MailEvent.ADDRESS, event);
         }
     }
 
-    public void logAndSendEmail(String logId, String title, String body, Throwable t) {
+    public void logAndSendEmail(String logId, String title, Throwable t, String[] addresses) {
+        Log.errorf(t, "[%s] %s: %s", logId, title, t.toString());
+        if (Log.isDebugEnabled()) {
+            t.printStackTrace();
+        }
+        MailEvent event = createErrorMailEvent(logId, title, "", t, addresses);
+        if (event.hasAddresses()) {
+            bus.send(MailEvent.ADDRESS, event);
+        }
+    }
+
+    public void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses) {
         if (t == null) {
             Log.errorf(t, "[%s] %s: %s", logId, title, body);
         } else {
             Log.errorf(t, "[%s] %s: %s; %s", logId, title, t.toString(), body);
+            if (Log.isDebugEnabled()) {
+                t.printStackTrace();
+            }
         }
-        if (errorEmailAddress() != null) {
-            MailEvent event = createErrorMailEvent(logId, title, body, t, errorEmailAddress());
+        MailEvent event = createErrorMailEvent(logId, title, body, t, addresses);
+        if (event.hasAddresses()) {
             bus.send(MailEvent.ADDRESS, event);
         }
     }
 
-    public void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses) {
-        MailEvent event = new MailEvent(logId, Templates.basicEmail(title, body, htmlBody), title, addresses);
-        bus.send(MailEvent.ADDRESS, event);
-    }
-
-    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, String addresses) {
+    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, String[] addresses) {
         // If configured to do so, email the error_email_address
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
@@ -140,6 +154,7 @@ public abstract class BaseContextService implements ContextService {
         String htmlBody = messageBody.replace("\n", "<br/>\n");
 
         MailTemplateInstance mail = Templates.basicEmail(title, messageBody, htmlBody);
-        return new MailEvent(logId, mail, title, new String[] { addresses });
+        return new MailEvent(logId, mail, title,
+                addresses == null ? botErrorEmailAddress() : addresses);
     }
 }

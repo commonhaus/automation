@@ -25,7 +25,7 @@ public class ScheduledQueryContext extends QueryContext {
         super(contextService, installationId);
 
         this.repository = ghRepository;
-        this.eventType = EventType.bot_schedule;
+        this.eventType = EventType.bot;
         this.logId = "%s:scheduled.%s".formatted(repository.getFullName(), eventType);
     }
 
@@ -67,7 +67,7 @@ public class ScheduledQueryContext extends QueryContext {
 
     @Override
     public ActionType getActionType() {
-        return ActionType.bot_scheduled;
+        return ActionType.bot;
     }
 
     public ScheduledQueryContext addExisting(GitHub github) {
