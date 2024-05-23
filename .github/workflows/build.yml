@@ -109,6 +109,11 @@ jobs:
         gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}.jar#${CB}.jar
         gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}#${CB}
 
+        CB=cf-admin-bot-${SNAPSHOT}-runner
+        ls -al ./cf-admin-bot/target
+        gh release upload "${SNAPSHOT}" --clobber ./cf-admin-bot/target/${CB}.jar#${CB}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./cf-admin-bot/target/${CB}#${CB}
+
         echo "Update tag for $SNAPSHOT"
         git push origin :refs/tags/$SNAPSHOT
         git tag -f $SNAPSHOT
@@ -133,7 +138,11 @@ jobs:
       run: |
         image="commonhaus/commonhaus-bot:${SNAPSHOT}"
         docker tag "${image}" "ghcr.io/${image}"
-        docker push "ghcr.io/commonhaus/commonhaus-bot:${SNAPSHOT}"
+        docker push "ghcr.io/${image}"
+
+        image="commonhaus/cf-admin-bot:${SNAPSHOT}"
+        docker tag "${image}" "ghcr.io/${image}"
+        docker push "ghcr.io/${image}"
 
     - name: Mark snapshot release as non-draft
       if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
