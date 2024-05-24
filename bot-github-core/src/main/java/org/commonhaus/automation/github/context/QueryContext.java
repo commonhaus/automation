@@ -99,6 +99,30 @@ public abstract class QueryContext {
         return this;
     }
 
+    public GHUser getUser(String login) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHUser user = gh.getUser(login);
+            clearNotFound();
+            return user;
+        });
+    }
+
+    public GHRepository getRepository(String repoName) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHRepository repo = gh.getRepository(repoName);
+            clearNotFound();
+            return repo;
+        });
+    }
+
+    public GHOrganization getOrganization(String orgName) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHOrganization org = gh.getOrganization(orgName);
+            clearNotFound();
+            return org;
+        });
+    }
+
     /**
      * Get GitHub instance for GraphQL API; access should be via helper (DryRun,
      * logging)
@@ -119,7 +143,7 @@ public abstract class QueryContext {
             github = ctx.getInstallationClient(getInstallationId());
             graphQLClient = null;
         }
-        return !github.isCredentialValid();
+        return !github.isCredentialValid() || github.isAnonymous();
     }
 
     public void addException(Exception e) {
@@ -145,6 +169,12 @@ public abstract class QueryContext {
         return exceptions.stream().anyMatch(e -> e instanceof GHFileNotFoundException)
                 || errors.stream().anyMatch(e -> e.getOtherFields().containsKey("type")
                         && e.getOtherFields().get("type").equals("NOT_FOUND"));
+    }
+
+    public void clearNotFound() {
+        if (hasNotFound()) {
+            clearErrors();
+        }
     }
 
     /**

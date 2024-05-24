@@ -56,10 +56,6 @@ public class AdminQueryContext extends QueryContext {
         return repository;
     }
 
-    public GHRepository getRepository(String repoName) {
-        return execGitHubSync((gh, dryRun) -> gh.getRepository(repoName));
-    }
-
     @Override
     public EventType getEventType() {
         return EventType.bot;
@@ -85,13 +81,10 @@ public class AdminQueryContext extends QueryContext {
         return getOrganization(repository.getOwnerName());
     }
 
-    public GHOrganization getOrganization(String orgName) {
-        return execGitHubSync((gh, dryRun) -> gh.getOrganization(orgName));
-    }
-
     public JsonNode readSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
+            clearNotFound();
             Log.warnf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
             return null;
         }
@@ -132,34 +125,39 @@ public class AdminQueryContext extends QueryContext {
     }
 
     public boolean userIsKnown(String login, MemberConfig memberConfig) {
-        if (memberConfig == null) {
+        GHUser ghUser = getUser(login);
+        if (memberConfig == null || ghUser == null) {
             return true;
         }
         if (memberConfig.collaborators().isPresent()) {
             Log.debugf("collaborators: %s",
                     memberConfig.collaborators().get());
             for (String repoName : memberConfig.collaborators().get()) {
-                GHRepository repo = getRepository(repoName);
-                Set<String> names = execGitHubSync((gh, dryRun) -> repo.getCollaboratorNames());
-                if (hasNotFound()) {
-                    clearErrors();
-                } else if (names != null && names.contains(login)) {
+                Set<String> names = execGitHubSync((gh, dryRun) -> {
+                    GHRepository repo = gh.getRepository(repoName);
+                    return repo == null
+                            ? null
+                            : repo.getCollaboratorNames();
+                });
+                clearNotFound();
+                if (names != null && names.contains(login)) {
                     return true;
                 }
             }
         }
         if (memberConfig.organizations().isPresent()) {
-            GHUser user = execGitHubSync((gh, dryRun) -> gh.getUser(login));
-            Log.debugf("user: %s, organizations: %s",
-                    user, memberConfig.organizations().get());
-            for (String orgName : memberConfig.organizations().get()) {
-                GHOrganization org = getOrganization(orgName);
-                if (hasNotFound()) {
-                    clearErrors();
-                } else if (org != null && org.hasMember(user)) {
-                    return true;
+            return execGitHubSync((gh, dryRun) -> {
+                Log.debugf("user: %s, organizations: %s",
+                        ghUser, memberConfig.organizations().get());
+                for (String orgName : memberConfig.organizations().get()) {
+                    GHOrganization org = gh.getOrganization(orgName);
+                    clearNotFound();
+                    if (org != null && org.hasMember(ghUser)) {
+                        return true;
+                    }
                 }
-            }
+                return false;
+            });
         }
         return false;
     }

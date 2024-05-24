@@ -77,9 +77,7 @@ public class DataCommonItem extends DataCommonObject {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (qc.hasNotFound()) {
-                qc.clearErrors();
-            }
+            qc.clearNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateIssue.jsonObjectFrom(response.getData());
@@ -106,9 +104,7 @@ public class DataCommonItem extends DataCommonObject {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (qc.hasNotFound()) {
-                qc.clearErrors();
-            }
+            qc.clearNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updatePullRequest.jsonObjectFrom(response.getData());

@@ -92,9 +92,12 @@ public class AppContextService extends BaseContextService {
     public AdminQueryContext getAdminQueryContext() {
         if (adminData.dataStore() != null && dataStoreInstallationId != DISABLED) {
             AdminQueryContext qc = adminQueryContext;
+
             if (qc == null || qc.checkExpiredConnection()) {
                 try {
                     GitHub github = getInstallationClient(dataStoreInstallationId);
+                    github.getInstallation(); // authenticated installation
+
                     GHRepository repository = github.getRepository(adminData.dataStore());
                     qc = adminQueryContext = new AdminQueryContext(this, repository, dataStoreInstallationId)
                             .addExisting(github);
@@ -124,26 +127,20 @@ public class AppContextService extends BaseContextService {
         String dataStore = getDataStore();
         String attestationRepo = adminData.attestations().repo();
 
+        adminQueryContext = newAdminQueryContext(
+                repoEvent.github(),
+                repo,
+                repoEvent.installationId());
+
         if (Objects.equals(repoFullName, dataStore)) {
             if (repoEvent.removed()) {
                 dataStoreInstallationId = DISABLED;
             } else {
                 dataStoreInstallationId = repoEvent.installationId();
-                AdminQueryContext qc = adminQueryContext;
-                if (qc == null) {
-                    qc = adminQueryContext = newAdminQueryContext(
-                            repoEvent.github(),
-                            repo,
-                            dataStoreInstallationId);
-                }
             }
         }
         if (Objects.equals(repoFullName, attestationRepo)) {
-            AdminQueryContext qc = newAdminQueryContext(
-                    repoEvent.github(),
-                    repo,
-                    repoEvent.installationId());
-            updateValidAttestations(qc);
+            updateValidAttestations(adminQueryContext);
         }
     }
 

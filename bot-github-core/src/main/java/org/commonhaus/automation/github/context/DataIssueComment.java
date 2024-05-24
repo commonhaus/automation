@@ -46,9 +46,7 @@ public class DataIssueComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (qc.hasNotFound()) {
-                qc.clearErrors();
-            }
+            qc.clearNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());
@@ -77,9 +75,7 @@ public class DataIssueComment extends DataCommonComment {
                 }
                 """, variables);
         if (response.hasError()) {
-            if (qc.hasNotFound()) {
-                qc.clearErrors();
-            }
+            qc.clearNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateIssueComment.jsonObjectFrom(response.getData());

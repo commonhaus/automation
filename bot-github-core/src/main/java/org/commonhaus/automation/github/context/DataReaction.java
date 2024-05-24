@@ -157,9 +157,7 @@ public class DataReaction {
                         }
                     """, variables);
             if (response.hasError()) {
-                if (qc.hasNotFound()) {
-                    qc.clearErrors();
-                }
+                qc.clearNotFound();
                 break;
             }
             JsonObject allReactions = JsonAttribute.reactions.extractObjectFrom(response.getData(),
@@ -193,9 +191,7 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
-        if (qc.hasNotFound()) {
-            qc.clearErrors();
-        }
+        qc.clearNotFound();
     }
 
     /** package private. See QueryHelper / QueryContext */
@@ -222,8 +218,6 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
-        if (qc.hasNotFound()) {
-            qc.clearErrors();
-        }
+        qc.clearNotFound();
     }
 }

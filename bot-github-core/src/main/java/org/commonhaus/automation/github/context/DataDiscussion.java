@@ -102,9 +102,7 @@ public class DataDiscussion extends DataCommonItem {
                 """,
                 variables);
         if (response.hasError()) {
-            if (qc.hasNotFound()) {
-                qc.clearErrors();
-            }
+            qc.clearNotFound();
             return;
         }
         JsonAttribute.discussion.discussionFrom(response.getData());

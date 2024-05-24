@@ -194,9 +194,7 @@ public class DataLabel extends DataCommonType {
             variables.put("after", cursor);
             Response response = qc.execRepoQuerySync(query, variables);
             if (response.hasError()) {
-                if (qc.hasNotFound()) {
-                    qc.clearErrors();
-                }
+                qc.clearNotFound();
                 break;
             }
             JsonObject pageLabels = findPageLabels.apply(response.getData());

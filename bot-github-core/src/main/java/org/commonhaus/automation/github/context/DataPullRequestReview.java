@@ -67,9 +67,7 @@ public class DataPullRequestReview extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (qc.hasNotFound()) {
-                    qc.clearErrors();
-                }
+                qc.clearNotFound();
                 break;
             }
             JsonObject latestReviews = JsonAttribute.latestReviews.extractObjectFrom(response.getData(), JsonAttribute.node);

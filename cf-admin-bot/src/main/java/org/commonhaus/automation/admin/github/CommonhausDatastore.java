@@ -86,7 +86,6 @@ public class CommonhausDatastore {
                 CommonhausUser response = CommonhausUser.parseFile(qc, content);
                 return AdminDataCache.COMMONHAUS_DATA.computeIfAbsent(key, k -> response);
             });
-
             if (result == null && qc.hasNotFound()) {
                 qc.clearErrors();
                 result = AdminDataCache.COMMONHAUS_DATA.computeIfAbsent(key,

@@ -49,9 +49,7 @@ public class DataCommonComment extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (qc.hasNotFound()) {
-                    qc.clearErrors();
-                }
+                qc.clearNotFound();
                 return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
@@ -102,9 +100,7 @@ public class DataCommonComment extends DataCommonObject {
                     }
                     """, variables);
             if (response.hasError()) {
-                if (qc.hasNotFound()) {
-                    qc.clearErrors();
-                }
+                qc.clearNotFound();
                 return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
