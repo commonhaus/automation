@@ -136,19 +136,29 @@ public class AdminQueryContext extends QueryContext {
             return true;
         }
         if (memberConfig.collaborators().isPresent()) {
+            Log.debugf("collaborators: %s",
+                    memberConfig.collaborators().get());
             for (String repoName : memberConfig.collaborators().get()) {
                 GHRepository repo = getRepository(repoName);
                 Set<String> names = execGitHubSync((gh, dryRun) -> repo.getCollaboratorNames());
-                if (names != null && names.contains(login)) {
+                if (hasNotFound()) {
+                    clearErrors();
+                } else if (names != null && names.contains(login)) {
                     return true;
                 }
             }
         }
         if (memberConfig.organizations().isPresent()) {
             GHUser user = execGitHubSync((gh, dryRun) -> gh.getUser(login));
+            Log.debugf("user: %s, organizations: %s",
+                    user, memberConfig.organizations().get());
             for (String orgName : memberConfig.organizations().get()) {
                 GHOrganization org = getOrganization(orgName);
-                return org.hasMember(user);
+                if (hasNotFound()) {
+                    clearErrors();
+                } else if (org != null && org.hasMember(user)) {
+                    return true;
+                }
             }
         }
         return false;
