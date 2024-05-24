@@ -34,7 +34,7 @@ public class MemberSession {
     GHMyself myself;
     GitHubUser userData;
 
-    public MemberSession(UserInfo userInfo) {
+    private MemberSession(UserInfo userInfo) {
         this.userInfo = userInfo;
         this.nodeId = userInfo.getString("node_id");
     }

@@ -35,34 +35,25 @@ public class MemberApi {
     @Inject
     CommonhausDatastore datastore;
 
-    boolean isUnknownUser() {
-        return !ctx.userIsKnown(userInfo.getString("login"));
-    }
-
     @GET
+    @KnownUser
     @Path("/me")
     @Produces("application/json")
     public Response getUserInfo() {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
 
         return memberProfile.hasConnection()
-                ? Response.ok(new Message(Message.Type.INFO, memberProfile.userData)).build()
+                ? Response.ok(new Message(Message.Type.INFO, memberProfile.getUserData())).build()
                 : Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
 
     @GET
+    @KnownUser
     @Path("/github")
     @Produces("application/json")
     public Response githubLogin() {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
-
         // entry point: cache some member details
         MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -73,13 +64,10 @@ public class MemberApi {
     }
 
     @GET
+    @KnownUser
     @Path("/login")
     @Produces("application/json")
     public Response finishLogin() {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
-
         // entry point: cache some member details
         MemberSession member = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -96,13 +84,10 @@ public class MemberApi {
     }
 
     @GET
+    @KnownUser
     @Path("/gh-emails")
     @Produces("application/json")
     public Response getEmails() {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
-
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
@@ -114,13 +99,10 @@ public class MemberApi {
     }
 
     @GET
+    @KnownUser
     @Path("/commonhaus")
     @Produces("application/json")
     public Response getCommonhausUser() {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
-
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -132,13 +114,10 @@ public class MemberApi {
     }
 
     @PUT
+    @KnownUser
     @Path("/commonhaus/attest")
     @Produces("application/json")
     public Response updateCommonhausUser(Attestation attestation) {
-        if (isUnknownUser()) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
-        }
-
         if (attestation.isValid(ctx)) {
             // cache/retrieve member details
             MemberSession memberProfile = MemberSession
