@@ -54,7 +54,7 @@ public class TeamMemberSyncTest extends ContextHelper {
 
                 });
 
-        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 3);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(3);
@@ -79,7 +79,7 @@ public class TeamMemberSyncTest extends ContextHelper {
 
                 });
 
-        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 3);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(3);
