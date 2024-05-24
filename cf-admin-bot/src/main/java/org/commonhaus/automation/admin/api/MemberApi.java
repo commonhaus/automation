@@ -1,7 +1,6 @@
 package org.commonhaus.automation.admin.api;
 
 import java.net.URI;
-import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -9,17 +8,13 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
-import org.jboss.resteasy.reactive.RestResponse;
-import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 
-import io.quarkus.logging.Log;
 import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -40,19 +35,17 @@ public class MemberApi {
     @Inject
     CommonhausDatastore datastore;
 
-    @ServerRequestFilter
-    public Optional<RestResponse<Void>> getFilter(ContainerRequestContext reqCtx) {
-        Log.infof("MemberApi: %s, %s", reqCtx.getUriInfo().getPath(), userInfo);
-        if (ctx.userIsKnown(userInfo.getString("login"))) {
-            return Optional.empty();
-        }
-        return Optional.of(RestResponse.status(Response.Status.METHOD_NOT_ALLOWED));
+    boolean isUnknownUser() {
+        return !ctx.userIsKnown(userInfo.getString("login"));
     }
 
     @GET
     @Path("/me")
     @Produces("application/json")
     public Response getUserInfo() {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -66,6 +59,10 @@ public class MemberApi {
     @Path("/github")
     @Produces("application/json")
     public Response githubLogin() {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
+
         // entry point: cache some member details
         MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -79,6 +76,10 @@ public class MemberApi {
     @Path("/login")
     @Produces("application/json")
     public Response finishLogin() {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
+
         // entry point: cache some member details
         MemberSession member = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -98,6 +99,10 @@ public class MemberApi {
     @Path("/gh-emails")
     @Produces("application/json")
     public Response getEmails() {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
+
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
@@ -112,6 +117,10 @@ public class MemberApi {
     @Path("/commonhaus")
     @Produces("application/json")
     public Response getCommonhausUser() {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
+
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
@@ -126,6 +135,10 @@ public class MemberApi {
     @Path("/commonhaus/attest")
     @Produces("application/json")
     public Response updateCommonhausUser(Attestation attestation) {
+        if (isUnknownUser()) {
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        }
+
         if (attestation.isValid(ctx)) {
             // cache/retrieve member details
             MemberSession memberProfile = MemberSession
