@@ -14,11 +14,11 @@ group_management:
           - user12
         teams:
           - commonhaus-test/cf-council
-          - commonhaus-test/admin
+          - commonhaus-test/cf-voting
       egc:
         field: login
         teams:
-          - commonhaus-test/test-quorum-default
+          - commonhaus-test/team-quorum-default
     dry_run: true
 
 ## Email addresses to notify of errors and dry-run results

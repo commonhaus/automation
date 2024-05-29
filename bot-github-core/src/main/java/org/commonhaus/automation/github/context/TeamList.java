@@ -29,6 +29,11 @@ public class TeamList {
         return this;
     }
 
+    public boolean hasLogin(String login) {
+        return members.stream()
+                .anyMatch(actor -> actor.login.equals(login));
+    }
+
     public int size() {
         return members.size();
     }

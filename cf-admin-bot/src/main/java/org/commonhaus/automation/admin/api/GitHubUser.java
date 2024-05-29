@@ -1,10 +1,16 @@
 package org.commonhaus.automation.admin.api;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.admin.github.AdminQueryContext;
+import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.github.context.JsonAttribute;
+
+import io.quarkus.logging.Log;
 
 /**
  * DTO for User data returned to the web interface
@@ -17,8 +23,7 @@ class GitHubUser {
     String name;
     String avatarUrl;
     String company;
-    String bio;
-    List<String> gh_emails;
+    List<String> roles;
 
     public GitHubUser(long id, String login, String nodeId) {
         this.id = id;
@@ -35,13 +40,29 @@ class GitHubUser {
         this.name = JsonAttribute.name.stringFrom(jsonObject);
         this.avatarUrl = JsonAttribute.avatarUrl.stringFrom(jsonObject);
         this.company = JsonAttribute.company.stringFrom(jsonObject);
-        this.bio = JsonAttribute.bio.stringFrom(jsonObject);
+    }
+
+    public GitHubUser withRoles(AppContextService ctx) {
+        List<String> r = this.roles;
+        if (r == null) {
+            AdminQueryContext qc = ctx.getAdminQueryContext();
+            r = new ArrayList<>();
+            r.add("sponsor"); // called for known users, this is the minimum role
+            for (Entry<String, String> entry : ctx.groupRole()) {
+                Log.debugf("MemberSession: %s -> %s", entry.getKey(), entry.getValue());
+                if (qc.userInTeam(this.login, entry.getKey())) {
+                    r.add(entry.getValue());
+                }
+            }
+            this.roles = r;
+        }
+        return this;
     }
 
     @Override
     public String toString() {
         return "GitHubUser [login=" + login + ", id=" + id + ", nodeId=" + nodeId + ", name=" + name + ", avatarUrl="
-                + avatarUrl + ", company=" + company + ", bio=" + bio + ", gh_emails=" + gh_emails + "]";
+                + avatarUrl + ", company=" + company + ", roles=" + roles + "]";
     }
 
     @Override

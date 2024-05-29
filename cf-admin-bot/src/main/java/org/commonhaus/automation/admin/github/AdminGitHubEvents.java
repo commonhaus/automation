@@ -5,11 +5,12 @@ import java.util.Objects;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminConfig.AttestationConfig;
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
-import io.quarkiverse.githubapp.event.Member;
+import io.quarkiverse.githubapp.event.Membership;
 import io.quarkiverse.githubapp.event.Push;
 import io.quarkus.logging.Log;
 
@@ -35,8 +36,13 @@ public class AdminGitHubEvents {
         }
     }
 
-    public void updateKnownUsers(@Member GHEventPayload.Member memberEvent, GitHub github) {
-        Log.debugf("updateKnownUsers (member): %s", memberEvent.getMember().getLogin());
-        AdminDataCache.KNOWN_USER.invalidate(memberEvent.getMember().getLogin());
+    public void updateMembership(@Membership GHEventPayload.Membership membershipEvent, GitHub github) {
+        AdminDataCache.KNOWN_USER.invalidate(membershipEvent.getMember().getLogin());
+        AdminQueryContext qc = ctx.newAdminQueryContext(
+                github,
+                membershipEvent.getRepository(),
+                membershipEvent.getInstallation().getId());
+
+        qc.updateTeamList(membershipEvent.getOrganization(), membershipEvent.getTeam());
     }
 }

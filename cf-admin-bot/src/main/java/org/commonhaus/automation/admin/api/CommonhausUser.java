@@ -1,15 +1,18 @@
 package org.commonhaus.automation.admin.api;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.commonhaus.automation.admin.github.AdminQueryContext;
-import org.commonhaus.automation.admin.github.AppContextService;
 import org.kohsuke.github.GHContent;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.smallrye.common.constraint.NotNull;
@@ -21,14 +24,25 @@ import io.smallrye.common.constraint.NotNull;
 public class CommonhausUser {
 
     public enum MemberStatus {
-        ACTIVE,
-        INACTIVE,
         COMMITTEE,
+        ACTIVE,
         PENDING,
+        INACTIVE,
         REVOKED,
-        SPONSOR,
         SUSPENDED,
-        UNKNOWN
+        SPONSOR,
+        UNKNOWN;
+
+        public static MemberStatus fromString(String role) {
+            if (role == null) {
+                return UNKNOWN;
+            }
+            try {
+                return MemberStatus.valueOf(role.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return UNKNOWN;
+            }
+        }
     }
 
     public static class Discord {
@@ -45,34 +59,59 @@ public class CommonhausUser {
         /** Additional ForwardEmail aliases. Optional and rare. */
         @JsonProperty("alt_alias")
         List<String> altAlias;
+
+        public Collection<? extends String> altAlias() {
+            return altAlias == null ? List.of() : altAlias;
+        }
+
+        public boolean validAddress(String email, String login, String defaultDomain) {
+            return email.equals(login + "@" + defaultDomain) || altAlias().contains(email);
+        }
     }
 
     public static class Services {
         @JsonProperty("forward_email")
         ForwardEmail forwardEmail;
         Discord discord;
+
+        public ForwardEmail forwardEmail() {
+            if (forwardEmail == null) {
+                forwardEmail = new ForwardEmail();
+            }
+            return forwardEmail;
+        }
+
+        public Discord discord() {
+            if (discord == null) {
+                discord = new Discord();
+            }
+            return discord;
+        }
     }
 
     public static class GoodStanding {
-        String attestationUntil;
-        String contributionUntil;
-        String duesUntil;
+        Map<String, Attestation> attestation = new HashMap<>();
+        String contribution;
+        String dues;
+
+        @JsonIgnore
+        public boolean isValid() {
+            return (attestation.isEmpty()
+                    || attestation.values().stream().allMatch(s -> s.date.matches("\\d{4}-\\d{2}-\\d{2}")))
+                    && (contribution == null || contribution.matches("\\d{4}-\\d{2}-\\d{2}"))
+                    && (dues == null || dues.matches("\\d{4}-\\d{2}-\\d{2}"));
+        }
+    }
+
+    public record AttestationPost(
+            @NotNull String id,
+            @NotNull String version) {
     }
 
     public record Attestation(
             @NotNull @JsonProperty("with_status") MemberStatus withStatus,
-            @NotNull String YMD,
-            @NotNull String id,
-            @NotNull String version,
-            @NotNull JsonNode data) {
-
-        public boolean isValid(AppContextService ctx) {
-            return withStatus != null
-                    && YMD != null
-                    && data != null
-                    && YMD.matches("\\d{4}-\\d{2}-\\d{2}")
-                    && (ctx.validAttestation(id));
-        }
+            @NotNull String date,
+            @NotNull String version) {
     }
 
     public static class Data {
@@ -83,9 +122,6 @@ public class CommonhausUser {
         GoodStanding goodUntil = new GoodStanding();
 
         Services services = new Services();
-
-        @NotNull
-        List<Attestation> attestations = new ArrayList<>();
     }
 
     @NotNull
@@ -96,14 +132,15 @@ public class CommonhausUser {
     final Data data;
 
     transient String sha = null;
+    transient boolean conflict = false;
 
-    CommonhausUser(String login, long id, Data data) {
+    private CommonhausUser(String login, long id, Data data) {
         this.login = login;
         this.id = id;
         this.data = data;
     }
 
-    CommonhausUser(String login, long id) {
+    private CommonhausUser(String login, long id) {
         this.login = login;
         this.id = id;
         this.data = new Data();
@@ -118,11 +155,7 @@ public class CommonhausUser {
     }
 
     public Services services() {
-        return data.services;
-    }
-
-    public List<Attestation> attestations() {
-        return data.attestations;
+        return data.services == null ? new Services() : data.services;
     }
 
     public boolean fetched() {
@@ -133,8 +166,44 @@ public class CommonhausUser {
         return sha;
     }
 
-    public void append(Attestation attestation) {
-        data.attestations.add(attestation);
+    public MemberStatus status() {
+        return data.status;
+    }
+
+    public GoodStanding goodUntil() {
+        return data.goodUntil;
+    }
+
+    public boolean postConflict() {
+        return conflict;
+    }
+
+    public void setConflict(boolean conflict) {
+        this.conflict = conflict;
+    }
+
+    public void appendAttestation(MemberStatus userStatus, AttestationPost post) {
+        LocalDate date = LocalDate.now().plusYears(1);
+
+        Attestation attestation = new Attestation(
+                userStatus,
+                date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                post.version());
+
+        data.goodUntil.attestation.put(post.id, attestation);
+    }
+
+    public void updateStatus(List<MemberStatus> roleStatus) {
+        for (MemberStatus newStatus : roleStatus) {
+            if (newStatus.ordinal() < data.status.ordinal()) {
+                data.status = newStatus;
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "CommonhausUser [login=" + login + ", id=" + id + ", sha=" + sha + ", conflict=" + conflict + "]";
     }
 
     public static CommonhausUser parseFile(AdminQueryContext qc, GHContent content) throws IOException {
@@ -145,9 +214,9 @@ public class CommonhausUser {
         return user;
     }
 
-    public static CommonhausUser create(String login, long id, MemberStatus status) {
+    public static CommonhausUser create(String login, long id) {
         CommonhausUser user = new CommonhausUser(login, id);
-        user.data.status = status;
+        user.data.status = MemberStatus.UNKNOWN;
         return user;
     }
 

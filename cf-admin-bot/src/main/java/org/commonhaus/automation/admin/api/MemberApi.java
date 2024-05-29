@@ -1,20 +1,31 @@
 package org.commonhaus.automation.admin.api;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
+import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
+import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
+import org.commonhaus.automation.admin.api.CommonhausUser.Services;
+import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 
+import io.quarkus.logging.Log;
 import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -36,21 +47,6 @@ public class MemberApi {
     CommonhausDatastore datastore;
 
     @GET
-    @KnownUser
-    @Path("/me")
-    @Produces("application/json")
-    public Response getUserInfo() {
-        // cache/retrieve member details
-        MemberSession memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity);
-
-        return memberProfile.hasConnection()
-                ? Response.ok(new Message(Message.Type.INFO, memberProfile.getUserData())).build()
-                : Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
-    @GET
-    @KnownUser
     @Path("/github")
     @Produces("application/json")
     public Response githubLogin() {
@@ -64,7 +60,6 @@ public class MemberApi {
     }
 
     @GET
-    @KnownUser
     @Path("/login")
     @Produces("application/json")
     public Response finishLogin() {
@@ -85,17 +80,154 @@ public class MemberApi {
 
     @GET
     @KnownUser
-    @Path("/gh-emails")
+    @Path("/me")
     @Produces("application/json")
-    public Response getEmails() {
+    public Response getUserInfo() {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
-                .withEmails();
+                .withRoles(ctx);
 
         return memberProfile.hasConnection()
-                ? Response.ok(new Message(Message.Type.EMAIL, memberProfile.userData.gh_emails)).build()
+                ? Response.ok(new MemberApiResponse(MemberApiResponse.Type.INFO, memberProfile.getUserData())).build()
                 : Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    }
+
+    @GET
+    @KnownUser
+    @Path("/aliases")
+    @Produces("application/json")
+    public Response getAliases(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+        // cache/retrieve member details
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity);
+
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            Services services = user.services();
+            ForwardEmail forwardEmail = services.forwardEmail();
+
+            List<String> addresses = new ArrayList<>();
+            addresses.add(memberProfile.login());
+            addresses.addAll(forwardEmail.altAlias());
+
+            boolean possibleMissingActive = !forwardEmail.active && ctx.validAttestation("email");
+            boolean checkAlias = forwardEmail.active || possibleMissingActive;
+            Log.debugf("Checking aliases for %s, possibleMissingActive=%s, checkAlias=%s",
+                    memberProfile.login(), possibleMissingActive, checkAlias);
+
+            Map<String, Alias> aliasMap = Map.of();
+            if (checkAlias) {
+                // Make request to forward email service to fetch aliases
+                aliasMap = ctx.getAliases(addresses, refresh);
+            }
+
+            MemberApiResponse responseEntity = new MemberApiResponse(MemberApiResponse.Type.ALIAS, aliasMap);
+
+            if (possibleMissingActive && !aliasMap.isEmpty()) {
+                // Compensate for missed setting of active flag
+                responseEntity.addAll(updateActiveFlag(memberProfile, user,
+                        "Update forward email service active flag for %s".formatted(user.id())));
+            }
+
+            return aliasMap.isEmpty()
+                    ? Response.status(Response.Status.NO_CONTENT).build()
+                    : Response.ok(responseEntity).build();
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Exception e) {
+            Log.debugf("Error getting aliases for %s: %s", memberProfile.login(), e);
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @KnownUser
+    @Path("/aliases")
+    @Produces("application/json")
+    public Response updateAliases(Map<String, Set<String>> aliases) {
+        // cache/retrieve member details
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity);
+
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            ForwardEmail forwardEmail = user.services().forwardEmail();
+
+            boolean possibleMissingActive = !forwardEmail.active && ctx.validAttestation("email");
+            boolean setAlias = forwardEmail.active || possibleMissingActive;
+
+            Map<String, Alias> aliasMap = Map.of();
+            if (setAlias) {
+                // Make request to forward email service to update aliases
+                aliasMap = ctx.setRecipients(memberProfile.name(), aliases);
+            }
+
+            MemberApiResponse responseEntity = new MemberApiResponse(MemberApiResponse.Type.ALIAS, aliasMap);
+
+            if (possibleMissingActive && !aliasMap.isEmpty()) {
+                // Save/set active flag if aliases have been created
+                responseEntity.addAll(updateActiveFlag(memberProfile, user,
+                        "Update forward email service active flag for %s".formatted(user.id())));
+            }
+
+            return aliasMap.isEmpty()
+                    ? Response.status(Response.Status.NO_CONTENT).build()
+                    : Response.ok(responseEntity).build();
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Exception e) {
+            Log.debugf("Error getting aliases for %s: %s", memberProfile.login(), e);
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @KnownUser
+    @Path("/aliases/password")
+    @Produces("application/json")
+    public Response generatePassword(AliasRequest alias) {
+        // cache/retrieve member details
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity);
+
+        try {
+            // TODO: Generate Password API is not available quite yet.. SOOOON
+            // CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            // ForwardEmail forwardEmail = user.services().forwardEmail();
+
+            // boolean possibleMissingActive = !forwardEmail.active && ctx.validAttestation("email");
+            // boolean generatePassword = (forwardEmail.active || possibleMissingActive);
+            // if (generatePassword && !forwardEmail.validAddress(alias.email(), memberProfile.login(), ctx.getDefaultDomain())) {
+            //     return Response.status(Response.Status.BAD_REQUEST).build();
+            // }
+
+            // boolean updated = generatePassword && ctx.generatePassword(alias.email());
+
+            // MemberApiResponse responseEntity = new MemberApiResponse();
+
+            // if (possibleMissingActive && updated) {
+            //     // Save/set active flag if aliases have been created
+            //     responseEntity.addAll(updateActiveFlag(memberProfile, user,
+            //             "Update forward email service active flag for %s".formatted(user.id())));
+            // }
+
+            return Response.noContent().build();
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Exception e) {
+            Log.debugf("Error generating password for %s: %s", memberProfile.login(), e);
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GET
@@ -107,36 +239,122 @@ public class MemberApi {
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
 
-        CommonhausUser user = datastore.getCommonhausUser(memberProfile.login(), memberProfile.id());
-        return user == null
-                ? Response.status(Response.Status.NOT_FOUND).build()
-                : Response.ok(new Message(Message.Type.HAUS, user.data)).build();
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            return Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
+        } catch (Exception e) {
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
-    @PUT
+    @POST
     @KnownUser
     @Path("/commonhaus/attest")
     @Produces("application/json")
-    public Response updateCommonhausUser(Attestation attestation) {
-        if (attestation.isValid(ctx)) {
-            // cache/retrieve member details
-            MemberSession memberProfile = MemberSession
-                    .getMemberProfile(ctx, userInfo, identity);
-
-            CommonhausUser user = datastore.getCommonhausUser(memberProfile.login(), memberProfile.id());
-            if (user == null) { // not found, it's ok, make a new one in this case
-                user = new CommonhausUser(memberProfile.login(), memberProfile.id());
-            }
-            user.append(attestation);
-
-            user = datastore.setCommonhausUser(user,
-                    "%s added attestation (%s|%s)"
-                            .formatted(user.id(), attestation.id(), attestation.version()));
-
-            return user != null
-                    ? Response.ok(new Message(Message.Type.HAUS, user.data)).build()
-                    : Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    public Response updateAttestations(AttestationPost post) {
+        if (!ctx.validAttestation(post.id())) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
         }
-        return Response.status(Response.Status.BAD_REQUEST).build();
+
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity)
+                .withRoles(ctx);
+
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            user.appendAttestation(user.status(), post);
+            String message = "%s added attestation (%s|%s)".formatted(user.id(), post.id(), post.version());
+            return updateCommonhausUser(memberProfile, user, message);
+        } catch (Exception e) {
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @KnownUser
+    @Path("/commonhaus/attest/all")
+    @Produces("application/json")
+    public Response updateAttestations(List<AttestationPost> postList) {
+        if (postList.stream().anyMatch(x -> !ctx.validAttestation(x.id()))) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity)
+                .withRoles(ctx);
+
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            String message = user.id() + " added attestations ";
+            for (AttestationPost p : postList) {
+                user.appendAttestation(user.status(), p);
+                message += "(" + p.id() + "|" + p.version() + ") ";
+            }
+            user = datastore.setCommonhausUser(user, memberProfile.roles(), message);
+
+            return user.postConflict()
+                    ? Response
+                            .status(Response.Status.CONFLICT)
+                            .entity(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data))
+                            .build()
+                    : Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
+        } catch (Exception e) {
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @KnownUser
+    @Path("/commonhaus/status")
+    @Produces("application/json")
+    public Response updateUserStatus() {
+        // cache/retrieve member details
+        MemberSession memberProfile = MemberSession
+                .getMemberProfile(ctx, userInfo, identity)
+                .withRoles(ctx);
+
+        // Refresh the user's status
+        try {
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            return Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
+        } catch (Exception e) {
+            if (Log.isDebugEnabled()) {
+                e.printStackTrace();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private MemberApiResponse updateActiveFlag(MemberSession memberProfile, CommonhausUser user, String message) {
+        user.services().forwardEmail().active = true;
+        user = datastore.setCommonhausUser(user, memberProfile.roles(), message);
+
+        // don't return null; will have to fix the active flag another time
+        return user.postConflict()
+                ? new MemberApiResponse()
+                : new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data);
+    }
+
+    private Response updateCommonhausUser(MemberSession memberProfile, CommonhausUser user, String message) {
+        user = datastore.setCommonhausUser(user, memberProfile.roles(), message);
+
+        return user.postConflict()
+                ? Response
+                        .status(Response.Status.CONFLICT)
+                        .entity(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data))
+                        .build()
+                : Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
+    }
+
+    public static record AliasRequest(String email) {
     }
 }

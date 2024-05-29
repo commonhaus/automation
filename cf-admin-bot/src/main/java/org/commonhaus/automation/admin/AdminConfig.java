@@ -2,6 +2,7 @@ package org.commonhaus.automation.admin;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
@@ -12,9 +13,15 @@ public interface AdminConfig {
 
     String dataStore();
 
+    String defaultAliasDomain();
+
     MemberConfig member();
 
     AttestationConfig attestations();
+
+    Map<String, String> groupRole();
+
+    Map<String, String> roleStatus();
 
     interface MemberConfig {
         URI home();
