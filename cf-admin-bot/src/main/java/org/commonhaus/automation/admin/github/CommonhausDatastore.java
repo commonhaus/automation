@@ -1,16 +1,20 @@
 package org.commonhaus.automation.admin.github;
 
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
+import org.commonhaus.automation.admin.api.MemberSession;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.HttpException;
 
 import io.quarkus.logging.Log;
 import io.quarkus.vertx.ConsumeEvent;
@@ -29,35 +33,55 @@ public class CommonhausDatastore {
 
     Executor executor = Infrastructure.getDefaultWorkerPool();
 
-    public record QueryMessage(String login, long id) {
+    interface DatastoreEvent {
+        long id();
+
+        String login();
+
+        List<String> roles();
+    }
+
+    public record QueryEvent(String login, long id, List<String> roles) implements DatastoreEvent {
     };
 
-    public record UpdateMessage(CommonhausUser user, String message) {
+    public record UpdateEvent(CommonhausUser user, String message, List<String> roles) implements DatastoreEvent {
+        @Override
+        public long id() {
+            return user.id();
+        }
+
+        @Override
+        public String login() {
+            return user.login();
+        }
     };
 
     /**
      * GET Commonhaus user data
      *
-     * @param login
-     * @param id
-     * @return
+     * @param login GitHub user login
+     * @param id GitHub user id
+     * @return A Commonhaus user object (never null)
+     * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser getCommonhausUser(String login, long id) {
-        QueryMessage query = new QueryMessage(login, id);
+    public CommonhausUser getCommonhausUser(MemberSession session) {
+        QueryEvent query = new QueryEvent(session.login(), session.id(), session.roles());
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
-        Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", id, response.body());
+        Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", session.id(), response.body());
         return response.body();
     }
 
     /**
-     * PUT Commonhaus user data
+     * Update Commonhaus user data
      *
-     * @param login
-     * @param id
-     * @return
+     * @param user Commonhaus user object
+     * @param message Commit message
+     * @param memberProfile
+     *
+     * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser setCommonhausUser(CommonhausUser user, String message) {
-        UpdateMessage update = new UpdateMessage(user, message);
+    public CommonhausUser setCommonhausUser(CommonhausUser user, List<String> roles, String message) {
+        UpdateEvent update = new UpdateEvent(user, message, roles);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, update);
         Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", user.id(), response.body());
         return response.body();
@@ -67,39 +91,30 @@ public class CommonhausDatastore {
      * Retrieve Commonhaus user data from the repository using
      * the GitHub bot's login and id.
      *
-     * @param query
-     * @return
+     * @param event Query message containing the login and id
+     * @return A Commonhaus user object (never null)
+     * @throws RuntimeException if GitHub or other API query fails
      */
     @ConsumeEvent(value = READ)
-    public Uni<CommonhausUser> fetchCommonhausUser(QueryMessage query) {
-        final String key = query.login + ":" + query.id;
+    public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
+        final String key = event.login() + ":" + event.id();
 
         CommonhausUser result = AdminDataCache.COMMONHAUS_DATA.get(key);
         AdminQueryContext qc = ctx.getAdminQueryContext();
-        if (result == null && qc != null) {
+        if (qc == null) {
+            return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
+        } else if (result == null) {
             GHRepository repo = qc.getRepository();
-            result = qc.execGitHubSync((gh, dryRun) -> {
-                GHContent content = repo.getFileContent(dataPath(query.id));
-                if (content == null) {
-                    return null;
-                }
-                CommonhausUser response = CommonhausUser.parseFile(qc, content);
-                return AdminDataCache.COMMONHAUS_DATA.computeIfAbsent(key, k -> response);
-            });
-            if (result == null && qc.hasNotFound()) {
-                qc.clearErrors();
-                result = AdminDataCache.COMMONHAUS_DATA.computeIfAbsent(key,
-                        k -> CommonhausUser.create(query.login, query.id, MemberStatus.UNKNOWN));
-            }
+            result = readCommonhausUser(qc, repo, event, key);
 
             if (qc.hasErrors()) {
-                RuntimeException e = qc.bundleExceptions();
-                Log.errorf("[%s|%s] Failed to fetch Commonhaus user data: %s", qc.getLogId(), query.id, e);
+                Throwable e = qc.bundleExceptions();
+                Log.errorf("[%s|%s] Failed to fetch Commonhaus user data: %s", qc.getLogId(), event.id(), e);
                 return Uni.createFrom().failure(e);
             }
         }
 
-        Log.debugf("[%s|%s] Fetched Commonhaus user data: %s", qc.getLogId(), query.id, result);
+        Log.debugf("[%s|%s] Fetched Commonhaus user data: %s", qc.getLogId(), event.id(), result);
         final CommonhausUser r = result;
         return Uni.createFrom().item(() -> r).emitOn(executor);
     }
@@ -108,45 +123,29 @@ public class CommonhausDatastore {
      * Update Commonhaus user data in the repository using
      * the GitHub bot's login and id.
      *
-     * @param query
-     * @return
+     * @param event Update message containing the user and commit message
+     * @return Updated Commonhaus user object (never null)
+     * @throws RuntimeException if GitHub or other API query fails
      */
     @Blocking
     @ConsumeEvent(value = WRITE)
-    public Uni<CommonhausUser> pushCommonhausUser(UpdateMessage event) {
+    public Uni<CommonhausUser> pushCommonhausUser(UpdateEvent event) {
         final CommonhausUser user = event.user();
         final String key = user.login() + ":" + user.id();
 
-        AdminQueryContext qc = ctx.getAdminQueryContext();
         CommonhausUser result = user;
-        if (qc != null) {
+        AdminQueryContext qc = ctx.getAdminQueryContext();
+        if (qc == null) {
+            return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
+        } else {
             GHRepository repo = qc.getRepository();
-            result = AdminDataCache.COMMONHAUS_DATA.compute(key, (k, v) -> {
-                // GHContentUpdateResponse response = update.commit();
-                return qc.execGitHubSync((gh, dryRun) -> {
-                    String content = qc.writeValue(user);
-                    GHContentBuilder update = repo.createContent()
-                            .message(event.message())
-                            .content(content);
-
-                    CommonhausUser oldValue = (CommonhausUser) v;
-                    if (oldValue != null) {
-                        update.sha(oldValue.sha());
-                    }
-                    GHContentUpdateResponse response = update.commit();
-                    GHContent responseContent = response.getContent();
-                    CommonhausUser newValue = qc.parseFile(responseContent, CommonhausUser.class);
-                    return newValue;
-                });
-            });
+            result = updateCommonhausUser(qc, repo, user, event, key);
 
             if (qc.hasErrors()) {
-                RuntimeException e = qc.bundleExceptions();
+                Throwable e = qc.bundleExceptions();
                 Log.errorf("[%s|%s] Failed to fetch Commonhaus user data: %s", qc.getLogId(), user.id(), e);
                 return Uni.createFrom().failure(e);
             }
-        } else {
-            result = null;
         }
 
         Log.debugf("[%s|%s] Updated Commonhaus user data: %s", qc.getLogId(), user.id(), result);
@@ -154,7 +153,73 @@ public class CommonhausDatastore {
         return Uni.createFrom().item(() -> u).emitOn(executor);
     }
 
+    private CommonhausUser updateCommonhausUser(AdminQueryContext qc, GHRepository repo,
+            CommonhausUser input, UpdateEvent event, String key) {
+
+        updateRoles(input, event.roles()); // pre-update roles, if necessary
+        return qc.execGitHubSync((gh, dryRun) -> {
+            CommonhausUser result = input;
+
+            String content = qc.writeValue(input);
+            GHContentBuilder update = repo.createContent()
+                    .path(dataPath(input.id()))
+                    .message(event.message())
+                    .content(content);
+            if (input.sha() != null) {
+                update.sha(input.sha());
+            }
+            GHContentUpdateResponse response = update.commit();
+
+            if (qc.hasConflict()) {
+                HttpException ex = qc.getConflict();
+                qc.clearConflict();
+                Log.debugf("[%s|%s] Conflict updating Commonhaus user data: %s",
+                        qc.getLogId(), input.id(), ex.getResponseMessage());
+
+                // we're here after a save conflict; re-read the data
+                result = readCommonhausUser(qc, repo, event, key);
+                result.setConflict(true);
+            } else {
+                GHContent responseContent = response.getContent();
+                result = CommonhausUser.parseFile(qc, responseContent);
+                AdminDataCache.COMMONHAUS_DATA.put(key, result);
+            }
+
+            return result;
+        });
+    }
+
+    private CommonhausUser readCommonhausUser(AdminQueryContext qc, GHRepository repo,
+            DatastoreEvent event, String key) {
+
+        CommonhausUser response = qc.execGitHubSync((gh, dryRun) -> {
+            GHContent content = repo.getFileContent(dataPath(event.id()));
+            if (content != null) {
+                return CommonhausUser.parseFile(qc, content);
+            }
+            return null;
+        });
+
+        if (qc.clearNotFound() || response == null) {
+            Log.debugf("[%s|%s] Commonhaus user data not found or could not be parsed",
+                    qc.getLogId(), event.id());
+            response = CommonhausUser.create(event.login(), event.id());
+        }
+        updateRoles(response, event.roles());
+        AdminDataCache.COMMONHAUS_DATA.put(key, response);
+        return response;
+    }
+
+    private void updateRoles(CommonhausUser user, List<String> roles) {
+        if (user.status() == MemberStatus.UNKNOWN && !roles.isEmpty()) {
+            List<MemberStatus> status = roles.stream()
+                    .map(r -> ctx.getStatusForRole(r))
+                    .toList();
+            user.updateStatus(status);
+        }
+    }
+
     private String dataPath(long id) {
-        return "data/logins/" + id + ".json";
+        return "data/users/" + id + ".yaml";
     }
 }

@@ -25,6 +25,7 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.HttpException;
 import org.kohsuke.github.ReactionContent;
 
 import io.quarkus.logging.Log;
@@ -159,7 +160,10 @@ public abstract class QueryContext {
         exceptions.clear();
     }
 
-    public RuntimeException bundleExceptions() {
+    public Throwable bundleExceptions() {
+        if (exceptions.size() == 1) {
+            return exceptions.get(0);
+        }
         return hasErrors()
                 ? new PackagedException(exceptions, errors)
                 : null;
@@ -171,10 +175,33 @@ public abstract class QueryContext {
                         && e.getOtherFields().get("type").equals("NOT_FOUND"));
     }
 
-    public void clearNotFound() {
+    public boolean clearNotFound() {
         if (hasNotFound()) {
             clearErrors();
+            return true;
         }
+        return false;
+    }
+
+    public boolean hasConflict() {
+        return exceptions.stream().anyMatch(e -> e instanceof HttpException
+                && ((HttpException) e).getResponseCode() == 409);
+    }
+
+    public HttpException getConflict() {
+        return exceptions.stream()
+                .filter(e -> e instanceof HttpException
+                        && ((HttpException) e).getResponseCode() == 409)
+                .findFirst()
+                .map(e -> (HttpException) e).orElse(null);
+    }
+
+    public boolean clearConflict() {
+        if (hasConflict()) {
+            clearErrors();
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -568,6 +595,21 @@ public abstract class QueryContext {
 
     public void updateTeamList(String fullTeamName, Set<GHUser> members) {
         TEAM_MEMBERS.put(fullTeamName, members);
+    }
+
+    public void updateTeamList(GHOrganization org, GHTeam ghTeam) {
+        // Normalize team name to include org name
+        String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
+        String teamFullName = org.getLogin() + "/" + relativeName;
+
+        Set<GHUser> members = execGitHubSync((gh, dryRun) -> {
+            return ghTeam.getMembers();
+        });
+        if (hasErrors() || members == null) {
+            TEAM_MEMBERS.invalidate(teamFullName);
+        } else {
+            TEAM_MEMBERS.put(teamFullName, members);
+        }
     }
 
     public String[] getErrorAddresses() {

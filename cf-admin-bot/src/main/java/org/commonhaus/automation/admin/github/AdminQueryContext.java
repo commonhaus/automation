@@ -7,6 +7,7 @@ import org.commonhaus.automation.admin.AdminConfig.MemberConfig;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.TeamList;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -93,7 +94,7 @@ public class AdminQueryContext extends QueryContext {
             JsonNode node = parseFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
-            logAndSendEmail("getTeamSource",
+            logAndSendEmail("readSourceFile",
                     "Unable to read file %s from repo %s".formatted(path, repo.getFullName()),
                     e);
             return null;
@@ -160,5 +161,16 @@ public class AdminQueryContext extends QueryContext {
             });
         }
         return false;
+    }
+
+    public boolean userInTeam(String login, String fullTeamName) {
+        String[] parts = fullTeamName.split("/");
+        if (parts.length != 2) {
+            Log.warnf("userInTeam: invalid team name %s", fullTeamName);
+            return false;
+        }
+        GHOrganization org = getOrganization(parts[0]);
+        TeamList teamList = getTeamList(org, fullTeamName);
+        return teamList != null && teamList.hasLogin(login);
     }
 }

@@ -1,9 +1,9 @@
 package org.commonhaus.automation.admin.api;
 
 import java.io.IOException;
-import java.util.stream.Collectors;
+import java.util.List;
 
-import org.commonhaus.automation.admin.github.AdminDataCache;
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
@@ -46,6 +46,11 @@ public class MemberSession {
         return connection;
     }
 
+    public MemberSession withRoles(AppContextService ctx) {
+        getUserData().withRoles(ctx);
+        return this;
+    }
+
     public GitHubUser getUserData() {
         GitHubUser user = userData;
         if (user == null) {
@@ -63,11 +68,7 @@ public class MemberSession {
                 myself = connection.getMyself();
                 GitHubUser data = getUserData();
                 data.name = myself.getName();
-                data.bio = myself.getBio();
                 data.company = myself.getCompany();
-                data.gh_emails = myself.getEmails2().stream()
-                        .map(email -> email.getEmail())
-                        .collect(Collectors.toList());
             } catch (IOException e) {
                 Log.errorf(e, "Unable to retrieve user information for %s", getUserData().login);
                 connection = null;
@@ -78,16 +79,6 @@ public class MemberSession {
 
     public boolean hasConnection() {
         return connection != null;
-    }
-
-    public MemberSession withEmails() {
-        GitHubUser data = getUserData();
-        if (data == null || data.gh_emails != null) {
-            // nothing to do
-            return this;
-        }
-        getMyself();
-        return this;
     }
 
     @Override
@@ -137,5 +128,14 @@ public class MemberSession {
 
     public String login() {
         return getUserData().login;
+    }
+
+    public String name() {
+        return getUserData().name;
+    }
+
+    public List<String> roles() {
+        List<String> roles = getUserData().roles;
+        return roles == null ? List.of() : roles;
     }
 }

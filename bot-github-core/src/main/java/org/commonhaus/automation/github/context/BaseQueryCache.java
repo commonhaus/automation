@@ -8,11 +8,11 @@ import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 public enum BaseQueryCache {
-    REPO_CONFIG(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
+    REPO_CONFIG(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
-    LABELS(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
+    LABELS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
-    TEAM_MEMBERS(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
+    TEAM_MEMBERS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
     BOT_LOGIN(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
 

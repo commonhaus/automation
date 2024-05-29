@@ -17,6 +17,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
 import io.quarkiverse.githubapp.event.DiscussionComment;
 import io.quarkiverse.githubapp.event.IssueComment;
+import io.quarkiverse.githubapp.event.Membership;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkiverse.githubapp.event.PullRequestReview;
 import io.quarkus.logging.Log;
@@ -192,5 +193,15 @@ public class Voting {
         } else {
             bus.send(VoteEvent.ADDRESS, new VoteEvent(qc, votingConfig, eventData));
         }
+    }
+
+    public void updateKnownUsers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @Membership GHEventPayload.Membership membershipEvent) {
+
+        EventQueryContext qc = queryHelper.newQueryContext(
+                new EventData(event, membershipEvent),
+                github, graphQLClient);
+
+        qc.updateTeamList(membershipEvent.getOrganization(), membershipEvent.getTeam());
     }
 }

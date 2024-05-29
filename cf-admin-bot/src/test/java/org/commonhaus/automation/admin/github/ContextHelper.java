@@ -13,6 +13,7 @@ import java.util.Set;
 
 import jakarta.inject.Singleton;
 
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
@@ -81,7 +82,7 @@ public class ContextHelper extends QueryContext {
 
         Set<GHUser> testQuorum = new HashSet<>();
         Set<GHUser> council = new HashSet<>();
-        Set<GHUser> admin = new HashSet<>();
+        Set<GHUser> voting = new HashSet<>();
 
         for (int i = 1; i < 15; i++) {
             String login = "user" + i;
@@ -93,14 +94,18 @@ public class ContextHelper extends QueryContext {
                 council.add(user);
             }
             if (i % 4 == 0) {
-                admin.add(user);
+                voting.add(user);
             }
             when(gh.getUser(login)).thenReturn(user);
         }
 
-        setupMockTeam("test-quorum-default", org, testQuorum);
+        GHUser user = mockGHUser(botLogin);
+        when(gh.getUser(botLogin)).thenReturn(user);
+        testQuorum.add(user);
+
+        setupMockTeam("team-quorum-default", org, testQuorum);
         setupMockTeam("cf-council", org, council);
-        setupMockTeam("admin", org, admin);
+        setupMockTeam("cf-voting", org, voting);
 
         when(mocks.installationClient(installationId).getOrganization("commonhaus-test")).thenReturn(org);
     }
@@ -141,9 +146,11 @@ public class ContextHelper extends QueryContext {
                 DiscoveryAction.ADDED, gh, installationId, repo, Optional.ofNullable(null));
 
         ctx.repositoryDiscovered(repoEvent);
-        //ctx.setConnection
         ctx.adminQueryContext = new AdminQueryContext(ctx, repo, installationId)
                 .addExisting(gh);
+
+        ctx.attestationIds.add("member");
+        ctx.attestationIds.add("coc");
 
         return gh;
     }

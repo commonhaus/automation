@@ -1,4 +1,4 @@
-package org.commonhaus.automation.admin.github;
+package org.commonhaus.automation.admin;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
@@ -16,7 +16,9 @@ public enum AdminDataCache {
 
     USER_CONNECTION(b -> b.expireAfterAccess(30, TimeUnit.MINUTES)),
 
-    KNOWN_USER(b -> b.expireAfterWrite(2, TimeUnit.DAYS));
+    KNOWN_USER(b -> b.expireAfterWrite(2, TimeUnit.DAYS)),
+
+    ALIASES(b -> b.expireAfterWrite(6, TimeUnit.HOURS));
 
     private QueryCache cache = null;
 
@@ -33,7 +35,7 @@ public enum AdminDataCache {
         return (T) cache.get(key);
     }
 
-    <T> void put(String key, T value) {
+    public <T> void put(String key, T value) {
         cache.put(key, value);
     }
 
