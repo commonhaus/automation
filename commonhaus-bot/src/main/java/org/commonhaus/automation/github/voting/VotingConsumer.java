@@ -262,10 +262,6 @@ public class VotingConsumer {
 
     private void updateBotComment(VoteEvent voteEvent, String commentBody) {
         QueryContext qc = voteEvent.getQueryContext();
-        if (qc.hasErrors()) {
-            return;
-        }
-
         BotComment comment = qc.updateBotComment(voteEvent.commentPattern(),
                 voteEvent.getItemType(), voteEvent.getId(), commentBody, voteEvent.getBody());
         if (comment != null) {
