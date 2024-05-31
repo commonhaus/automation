@@ -24,6 +24,7 @@ import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.quarkus.logging.Log;
 import io.quarkus.oidc.UserInfo;
@@ -34,6 +35,10 @@ import io.quarkus.security.identity.SecurityIdentity;
 @Authenticated
 @ApplicationScoped
 public class MemberApi {
+
+    @ConfigProperty(name = "quarkus.oidc.authentication.cookie-domain")
+    String cookieDomain;
+
     @Inject
     AppContextService ctx;
 
@@ -71,6 +76,7 @@ public class MemberApi {
         return Response.seeOther(ctx.getMemberHome())
                 .cookie(new NewCookie.Builder("id")
                         .value(member.nodeId)
+                        .domain(cookieDomain)
                         .path("/")
                         .secure(true)
                         .maxAge(30)
