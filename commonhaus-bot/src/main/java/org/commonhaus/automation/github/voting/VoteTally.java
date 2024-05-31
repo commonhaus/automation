@@ -142,18 +142,11 @@ public class VoteTally {
                             .replaceAll("\\r\\n", "\r\n> ")
                     + "\r\n\r\n---\r\n\r\n";
         } else if (isClosed) {
-            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed without explaining the outcome."
+            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed."
                     + "\r\n\r\n---\r\n\r\n";
         }
 
-        if (countedVotes > 0) {
-            markdown = String.format("\r\n%s%d of %d members of @%s have voted (%s%s).",
-                    (hasQuorum ? "✅ " : "🗳️"),
-                    groupVotes, groupSize, group,
-                    voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
-                    isPullRequest ? " or review" : "");
-            markdown += "\r\n" + summarizeResults();
-        }
+        markdown += "\r\n" + summarizeResults();
         return markdown;
     }
 
@@ -230,23 +223,36 @@ public class VoteTally {
     }
 
     String summarizeResults() {
-        if (voteType != VoteInformation.Type.manualComments) {
-            return "\r\n"
-                    + "| Reaction | Total | Team | Voting members |\r\n"
-                    + "| --- | --- | --- | --- |\r\n"
-                    + categoriesToRows()
-                    + "\r\n"
-                    + duplicatesToString()
-                    + ignoredToString();
+        boolean useComments = voteType == VoteInformation.Type.manualComments;
+        String result = "";
+
+        if (countedVotes == 0) {
+            result += "\r\nNo votes (non-bot %s) found on this item.".formatted(
+                    useComments ? "comments" : "reactions");
         } else {
-            Category c = categories.get("comment");
-            if (c == null || c.total == 0) {
-                return "\r\nNo votes (non-bot comments) found.";
+            result += String.format("\r\n%s%d of %d members of @%s have voted (%s%s).",
+                    (hasQuorum ? "✅ " : "🗳️"),
+                    groupVotes, groupSize, group,
+                    voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
+                    isPullRequest ? " or review" : "");
+
+            if (useComments) {
+                Category c = categories.get("comment");
+                result += "\r\n"
+                        + "The following members have commented:  \r\n"
+                        + actorsToString(c.team);
+            } else {
+                result += "\r\n"
+                        + "| Reaction | Total | Team | Voting members |\r\n"
+                        + "| --- | --- | --- | --- |\r\n"
+                        + categoriesToRows()
+                        + "\r\n"
+                        + duplicatesToString()
+                        + ignoredToString();
             }
-            return "\r\n"
-                    + "The following members have commented:  \r\n"
-                    + actorsToString(c.team);
         }
+
+        return result;
     }
 
     String categoriesToRows() {

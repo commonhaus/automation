@@ -155,18 +155,6 @@ public class VotingConsumer {
                 ? getFilteredComments(voteEvent)
                 : List.of();
 
-        final boolean prNoReviews = !voteEvent.isPullRequest() || voteEvent.getReviews().isEmpty();
-
-        // If we have no comments, no reactions (and no reviews if this is a pull
-        // request), no manual result comments, and item is still open, we're done.
-        if (reactions.isEmpty() && comments.isEmpty() && prNoReviews
-                && resultComments.isEmpty() && voteEvent.itemIsOpen()) {
-            Log.debugf("[%s] checkOpenVote: done (nothing to count)", voteEvent.getLogId());
-            updateBotComment(voteEvent, String.format("No votes (non-bot %s) found on this item.",
-                    voteInfo.countComments() ? "comments" : "reactions"));
-            return;
-        }
-
         // Tally the votes
         VoteTally tally = new VoteTally(voteInfo, reactions, comments, resultComments);
 
