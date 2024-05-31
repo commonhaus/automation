@@ -15,11 +15,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.smallrye.common.constraint.NotNull;
 
 /**
  * Commonhaus user: stored as json file
  */
+@RegisterForReflection
 @JsonDeserialize(builder = CommonhausUser.Builder.class)
 public class CommonhausUser {
 

@@ -20,6 +20,7 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
 import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
+import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -79,7 +80,7 @@ public class MemberApi {
                         .domain(cookieDomain)
                         .path("/")
                         .secure(true)
-                        .maxAge(30)
+                        .maxAge(60)
                         .build())
                 .build();
     }
@@ -93,6 +94,9 @@ public class MemberApi {
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
                 .withRoles(ctx);
+
+        Log.debugf("/member/me %s: hasConnection=%s, userData=%s",
+                memberProfile.login(), memberProfile.hasConnection(), memberProfile.getUserData());
 
         return memberProfile.hasConnection()
                 ? Response.ok(new MemberApiResponse(MemberApiResponse.Type.INFO, memberProfile.getUserData())).build()
@@ -271,6 +275,8 @@ public class MemberApi {
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            updateRoles(user, memberProfile.roles());
+
             user.appendAttestation(user.status(), post);
             String message = "%s added attestation (%s|%s)".formatted(user.id(), post.id(), post.version());
             return updateCommonhausUser(memberProfile, user, message);
@@ -297,6 +303,7 @@ public class MemberApi {
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            updateRoles(user, memberProfile.roles());
             String message = user.id() + " added attestations ";
             for (AttestationPost p : postList) {
                 user.appendAttestation(user.status(), p);
@@ -328,9 +335,12 @@ public class MemberApi {
                 .getMemberProfile(ctx, userInfo, identity)
                 .withRoles(ctx);
 
-        // Refresh the user's status
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            if (updateRoles(user, memberProfile.roles())) {
+                // Refresh the user's status
+                return updateCommonhausUser(memberProfile, user, "Update status");
+            }
             return Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
         } catch (Exception e) {
             if (Log.isDebugEnabled()) {
@@ -359,6 +369,17 @@ public class MemberApi {
                         .entity(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data))
                         .build()
                 : Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
+    }
+
+    boolean updateRoles(CommonhausUser user, List<String> roles) {
+        MemberStatus oldStatus = user.status();
+        if (user.status() == MemberStatus.UNKNOWN && !roles.isEmpty()) {
+            List<MemberStatus> status = roles.stream()
+                    .map(r -> ctx.getStatusForRole(r))
+                    .toList();
+            user.updateStatus(status);
+        }
+        return oldStatus != user.status();
     }
 
     public static record AliasRequest(String email) {

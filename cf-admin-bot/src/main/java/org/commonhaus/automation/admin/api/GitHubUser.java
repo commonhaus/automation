@@ -11,10 +11,12 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.github.context.JsonAttribute;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 /**
  * DTO for User data returned to the web interface
  */
+@RegisterForReflection
 class GitHubUser {
     final long id;
     final String login;
@@ -61,8 +63,7 @@ class GitHubUser {
 
     @Override
     public String toString() {
-        return "GitHubUser [login=" + login + ", id=" + id + ", nodeId=" + nodeId + ", name=" + name + ", avatarUrl="
-                + avatarUrl + ", company=" + company + ", roles=" + roles + "]";
+        return "GitHubUser [login=" + login + ", id=" + id + ", nodeId=" + nodeId + ", name=" + name + ", roles=" + roles + "]";
     }
 
     @Override

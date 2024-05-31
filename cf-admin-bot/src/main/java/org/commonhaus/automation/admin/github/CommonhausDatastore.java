@@ -8,7 +8,6 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
@@ -156,7 +155,6 @@ public class CommonhausDatastore {
     private CommonhausUser updateCommonhausUser(AdminQueryContext qc, GHRepository repo,
             CommonhausUser input, UpdateEvent event, String key) {
 
-        updateRoles(input, event.roles()); // pre-update roles, if necessary
         return qc.execGitHubSync((gh, dryRun) -> {
             CommonhausUser result = input;
 
@@ -205,18 +203,8 @@ public class CommonhausDatastore {
                     qc.getLogId(), event.id());
             response = CommonhausUser.create(event.login(), event.id());
         }
-        updateRoles(response, event.roles());
         AdminDataCache.COMMONHAUS_DATA.put(key, response);
         return response;
-    }
-
-    private void updateRoles(CommonhausUser user, List<String> roles) {
-        if (user.status() == MemberStatus.UNKNOWN && !roles.isEmpty()) {
-            List<MemberStatus> status = roles.stream()
-                    .map(r -> ctx.getStatusForRole(r))
-                    .toList();
-            user.updateStatus(status);
-        }
     }
 
     private String dataPath(long id) {

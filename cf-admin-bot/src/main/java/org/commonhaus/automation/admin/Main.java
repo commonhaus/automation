@@ -2,17 +2,9 @@ package org.commonhaus.automation.admin;
 
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.github.AppContextService;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.core.JsonGenerator.Feature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
-
-import io.quarkus.jackson.ObjectMapperCustomizer;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
@@ -49,16 +41,6 @@ public class Main {
 
         void onStop(@Observes ShutdownEvent ev) {
             Log.infof("Bot stopping. dryRun=%s", ctx.isDryRun());
-        }
-    }
-
-    @Singleton
-    static class AppObjectMapperCustomizer implements ObjectMapperCustomizer {
-        public void customize(ObjectMapper mapper) {
-            mapper.enable(Feature.IGNORE_UNKNOWN)
-                    .setSerializationInclusion(Include.NON_EMPTY)
-                    .setVisibility(VisibilityChecker.Std.defaultInstance()
-                            .with(JsonAutoDetect.Visibility.ANY));
         }
     }
 }
