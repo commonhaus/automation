@@ -40,7 +40,7 @@ public class CommonhausDatastore {
         List<String> roles();
     }
 
-    public record QueryEvent(String login, long id, List<String> roles) implements DatastoreEvent {
+    public record QueryEvent(String login, long id, List<String> roles, boolean refresh) implements DatastoreEvent {
     };
 
     public record UpdateEvent(CommonhausUser user, String message, List<String> roles) implements DatastoreEvent {
@@ -55,6 +55,10 @@ public class CommonhausDatastore {
         }
     };
 
+    public CommonhausUser getCommonhausUser(MemberSession session) {
+        return getCommonhausUser(session, false);
+    }
+
     /**
      * GET Commonhaus user data
      *
@@ -63,8 +67,8 @@ public class CommonhausDatastore {
      * @return A Commonhaus user object (never null)
      * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser getCommonhausUser(MemberSession session) {
-        QueryEvent query = new QueryEvent(session.login(), session.id(), session.roles());
+    public CommonhausUser getCommonhausUser(MemberSession session, boolean resetCache) {
+        QueryEvent query = new QueryEvent(session.login(), session.id(), session.roles(), resetCache);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
         Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", session.id(), response.body());
         return response.body();
@@ -98,7 +102,7 @@ public class CommonhausDatastore {
     public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
         final String key = event.login() + ":" + event.id();
 
-        CommonhausUser result = AdminDataCache.COMMONHAUS_DATA.get(key);
+        CommonhausUser result = event.refresh() ? null : AdminDataCache.COMMONHAUS_DATA.get(key);
         AdminQueryContext qc = ctx.getAdminQueryContext();
         if (qc == null) {
             return Uni.createFrom().failure(new IllegalStateException("No admin query context"));

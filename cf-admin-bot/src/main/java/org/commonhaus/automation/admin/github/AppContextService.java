@@ -108,6 +108,8 @@ public class AppContextService extends BaseContextService {
             AdminQueryContext qc = adminQueryContext;
 
             if (qc == null || qc.checkExpiredConnection()) {
+                Log.debugf("Creating new AdminQueryContext for installation %s with data store %s",
+                        dataStoreInstallationId, adminData.dataStore());
                 try {
                     GitHub github = getInstallationClient(dataStoreInstallationId);
                     github.getInstallation(); // authenticated installation

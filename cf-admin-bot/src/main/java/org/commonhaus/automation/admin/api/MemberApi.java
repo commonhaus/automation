@@ -329,14 +329,14 @@ public class MemberApi {
     @KnownUser
     @Path("/commonhaus/status")
     @Produces("application/json")
-    public Response updateUserStatus() {
+    public Response updateUserStatus(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
                 .withRoles(ctx);
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile, refresh);
             if (updateRoles(user, memberProfile.roles())) {
                 // Refresh the user's status
                 return updateCommonhausUser(memberProfile, user, "Update status");
