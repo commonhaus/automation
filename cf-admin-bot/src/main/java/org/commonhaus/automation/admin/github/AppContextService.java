@@ -143,20 +143,22 @@ public class AppContextService extends BaseContextService {
         String dataStore = getDataStore();
         String attestationRepo = adminData.attestations().repo();
 
+        if (repoEvent.removed()) {
+            if (Objects.equals(repoFullName, dataStore)) {
+                dataStoreInstallationId = DISABLED;
+            }
+            return;
+        }
+
         AdminQueryContext qc = newAdminQueryContext(
                 repoEvent.github(),
                 repo,
                 repoEvent.installationId());
 
-        if (Objects.equals(repoFullName, dataStore)) {
-            if (repoEvent.removed()) {
-                dataStoreInstallationId = DISABLED;
-            } else {
-                dataStoreInstallationId = repoEvent.installationId();
-            }
-            Log.debugf("Creating new AdminQueryContext for installation %s with data store %s",
+        if (adminQueryContext == null && Objects.equals(repoFullName, dataStore)) {
+            Log.debugf("Keeping AdminQueryContext for installation %s with data store %s",
                     dataStoreInstallationId, dataStore);
-
+            dataStoreInstallationId = repoEvent.installationId();
             adminQueryContext = qc;
         }
 
@@ -242,10 +244,13 @@ public class AppContextService extends BaseContextService {
     }
 
     public boolean userIsKnown(String login) {
-        return AdminDataCache.KNOWN_USER.computeIfAbsent(login, (k) -> {
-            AdminQueryContext qc = getAdminQueryContext();
-            return qc != null && qc.userIsKnown(login, adminData.member());
-        });
+        AdminQueryContext qc = getAdminQueryContext();
+        if (qc != null) {
+            return AdminDataCache.KNOWN_USER.computeIfAbsent(login, (k) -> {
+                return qc.userIsKnown(login, adminData.member());
+            });
+        }
+        return false;
     }
 
     public Map<String, Alias> getAliases(List<String> emails, boolean resetCache) {

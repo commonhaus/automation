@@ -18,6 +18,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
 import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
@@ -68,10 +69,14 @@ public class MemberApi {
     @GET
     @Path("/login")
     @Produces("application/json")
-    public Response finishLogin() {
+    public Response finishLogin(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         // entry point: cache some member details
         MemberSession member = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
+
+        if (refresh) {
+            AdminDataCache.KNOWN_USER.invalidate(member.login());
+        }
 
         // redirect to the member home page
         return Response.seeOther(ctx.getMemberHome())
