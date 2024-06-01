@@ -143,7 +143,7 @@ public class AppContextService extends BaseContextService {
         String dataStore = getDataStore();
         String attestationRepo = adminData.attestations().repo();
 
-        adminQueryContext = newAdminQueryContext(
+        AdminQueryContext qc = newAdminQueryContext(
                 repoEvent.github(),
                 repo,
                 repoEvent.installationId());
@@ -154,9 +154,14 @@ public class AppContextService extends BaseContextService {
             } else {
                 dataStoreInstallationId = repoEvent.installationId();
             }
+            Log.debugf("Creating new AdminQueryContext for installation %s with data store %s",
+                    dataStoreInstallationId, dataStore);
+
+            adminQueryContext = qc;
         }
+
         if (Objects.equals(repoFullName, attestationRepo)) {
-            updateValidAttestations(adminQueryContext);
+            updateValidAttestations(qc);
         }
     }
 
