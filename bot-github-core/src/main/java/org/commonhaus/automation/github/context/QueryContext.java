@@ -144,7 +144,11 @@ public abstract class QueryContext {
             github = ctx.getInstallationClient(getInstallationId());
             graphQLClient = null;
         }
-        return !github.isCredentialValid() || github.isAnonymous();
+        boolean result = execGitHubSync((gh, dryRun) -> {
+            return !gh.isCredentialValid() || gh.isAnonymous();
+        });
+        clearErrors();
+        return result;
     }
 
     public void addException(Exception e) {
