@@ -73,12 +73,14 @@ public class ContextHelper extends QueryContext {
         return mock;
     }
 
-    public void setupMockTeam(GitHubMockSetupContext mocks) throws IOException {
+    public GitHub setupMockTeam(GitHubMockSetupContext mocks) throws IOException {
         GHOrganization org = Mockito.mock(GHOrganization.class);
         when(org.getLogin()).thenReturn(organizationName);
+        when(org.getId()).thenReturn(organizationId);
 
         GitHub gh = mocks.installationClient(installationId);
         when(gh.getOrganization(organizationName)).thenReturn(org);
+        when(gh.isCredentialValid()).thenReturn(true);
 
         Set<GHUser> testQuorum = new HashSet<>();
         Set<GHUser> council = new HashSet<>();
@@ -107,7 +109,24 @@ public class ContextHelper extends QueryContext {
         setupMockTeam("cf-council", org, council);
         setupMockTeam("cf-voting", org, voting);
 
-        when(mocks.installationClient(installationId).getOrganization("commonhaus-test")).thenReturn(org);
+        return gh;
+    }
+
+    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx, String repoName)
+            throws IOException {
+        return setupMockRepository(mocks, gh, ctx, repoName, "R_" + repoName.hashCode());
+    }
+
+    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx, String repoName,
+            String nodeId)
+            throws IOException {
+        GHRepository repo = mocks.repository(repoName);
+        when(repo.getFullName()).thenReturn(repoName);
+        when(repo.getNodeId()).thenReturn(nodeId);
+        when(gh.getRepository(repoName)).thenReturn(repo);
+
+        ctx.refreshScopedQueryContext(gh, repo, installationId);
+        return repo;
     }
 
     protected void setupMockTeam(String name, GHOrganization org, Set<GHUser> userSet) throws IOException {
@@ -123,7 +142,7 @@ public class ContextHelper extends QueryContext {
         TEAM_MEMBERS.put(teamName, users);
     }
 
-    public GitHub setupUserGithub(AppContextService ctx, GitHubMockSetupContext mocks, String nodeId) {
+    public GitHub setupUserGithub(String nodeId) {
         GitHub gh = mock(GitHub.class);
         AdminDataCache.USER_CONNECTION.put(nodeId, gh);
         AdminDataCache.KNOWN_USER.put(botLogin, Boolean.TRUE);
@@ -135,23 +154,18 @@ public class ContextHelper extends QueryContext {
     }
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
-        GHRepository repo = mocks.repository(ctx.getDataStore());
-        when(repo.getFullName()).thenReturn(ctx.getDataStore());
-        when(repo.getNodeId()).thenReturn("R_kgDOL8tG0g");
-
         GitHub gh = mocks.installationClient(installationId);
-        when(gh.getRepository(ctx.getDataStore())).thenReturn(repo);
 
+        GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), "R_kgDOL8tG0g");
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
-                DiscoveryAction.ADDED, gh, installationId, repo, Optional.ofNullable(null));
+                DiscoveryAction.ADDED, gh, installationId, dataStoreRepo, Optional.ofNullable(null));
 
         ctx.repositoryDiscovered(repoEvent);
-        ctx.adminQueryContext = new AdminQueryContext(ctx, repo, installationId)
-                .addExisting(gh);
 
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");
 
+        setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
         return gh;
     }
 

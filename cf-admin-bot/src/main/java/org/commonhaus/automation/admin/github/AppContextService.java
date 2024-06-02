@@ -10,12 +10,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.AdminConfig;
 import org.commonhaus.automation.admin.AdminConfig.AttestationConfig;
+import org.commonhaus.automation.admin.AdminConfig.MemberConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.RepositoryConfigFile;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
@@ -23,10 +25,13 @@ import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
+import org.commonhaus.automation.github.context.TeamList;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.yaml.snakeyaml.DumperOptions;
@@ -52,12 +57,10 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 @Singleton
 public class AppContextService extends BaseContextService {
 
+    Map<String, ScopedQueryContext> scopedContexts = new ConcurrentHashMap<>();
+
     @RestClient
     ForwardEmailClient forwardEmailClient;
-
-    AdminQueryContext adminQueryContext = null;
-
-    private static final Long DISABLED = -1L;
 
     private static ObjectMapper yamlMapper;
 
@@ -68,8 +71,6 @@ public class AppContextService extends BaseContextService {
     @ConfigItem(defaultValue = "${quarkus.github-app.instance-endpoint}/graphql")
     String graphqlApiEndpoint;
 
-    long dataStoreInstallationId = DISABLED;
-
     public AppContextService(BotConfig data, AdminConfig adminData,
             GitHubClientProvider gitHubClientProvider,
             GitHubConfigFileProvider configProvider, EventBus bus) {
@@ -77,13 +78,21 @@ public class AppContextService extends BaseContextService {
         this.adminData = adminData;
     }
 
-    public AdminQueryContext newRepoAdminQueryContext(GHRepository repository, MonitoredRepo repoCfg) {
-        return new AdminQueryContext(this, repository, repoCfg);
+    public ScopedQueryContext refreshScopedQueryContext(GHRepository repository, MonitoredRepo repoCfg) {
+        ScopedQueryContext qc = new ScopedQueryContext(this, repository, repoCfg);
+        scopedContexts.put(repository.getFullName(), qc);
+        scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
+        scopedContexts.put("" + repoCfg.installationId(), qc);
+        return qc;
     }
 
-    public AdminQueryContext newAdminQueryContext(GitHub github, GHRepository repository, long installationId) {
-        return new AdminQueryContext(this, repository, installationId)
+    public ScopedQueryContext refreshScopedQueryContext(GitHub github, GHRepository repository, long installationId) {
+        ScopedQueryContext qc = new ScopedQueryContext(this, repository, installationId)
                 .addExisting(github);
+        scopedContexts.put(repository.getFullName(), qc);
+        scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
+        scopedContexts.put("" + installationId, qc);
+        return qc;
     }
 
     /**
@@ -99,34 +108,36 @@ public class AppContextService extends BaseContextService {
                         || commit.getModified().contains(path));
     }
 
-    /**
-     * Create an AdminQueryContext based on the known datastore repository
-     * and discovered installation id.
-     */
-    public AdminQueryContext getAdminQueryContext() {
-        if (adminData.dataStore() != null && dataStoreInstallationId != DISABLED) {
-            AdminQueryContext qc = adminQueryContext;
-
-            if (qc == null || qc.checkExpiredConnection()) {
-                Log.debugf("Creating new AdminQueryContext for installation %s with data store %s",
-                        dataStoreInstallationId, adminData.dataStore());
-                try {
-                    GitHub github = getInstallationClient(dataStoreInstallationId);
-                    github.getInstallation(); // authenticated installation
-
-                    GHRepository repository = github.getRepository(adminData.dataStore());
-                    qc = adminQueryContext = new AdminQueryContext(this, repository, dataStoreInstallationId)
-                            .addExisting(github);
-                } catch (IOException e) {
-                    logAndSendEmail("getAdminQueryContext",
-                            "Unable to find repository %s for installation %s".formatted(adminData.dataStore(),
-                                    dataStoreInstallationId),
-                            e, botErrorEmailAddress());
-                }
-            }
-            return qc;
+    public ScopedQueryContext getScopedQueryContext(String scope) {
+        ScopedQueryContext qc = scopedContexts.get(scope);
+        if (qc == null) {
+            qc = scopedContexts.get(toOrganizationName(scope));
         }
-        return null;
+
+        if (qc != null && qc.checkExpiredConnection()) {
+            long ghId = qc.getInstallationId();
+            String fullName = qc.getRepository().getFullName();
+
+            Log.debugf("[%s] Creating new ScopedQueryContext for %s (%s)",
+                    ghId, scope, fullName);
+
+            try {
+                GitHub github = getInstallationClient(qc.getInstallationId());
+                github.getInstallation(); // authenticated installation
+
+                GHRepository repository = github.getRepository(fullName);
+                qc = new ScopedQueryContext(this, repository, ghId).addExisting(github);
+            } catch (IOException e) {
+                logAndSendEmail("getAdminQueryContext",
+                        "Unable to find repository %s for installation %s".formatted(fullName, ghId),
+                        e, botErrorEmailAddress());
+            }
+        }
+        return qc;
+    }
+
+    public ScopedQueryContext getDatastoreContext() {
+        return getScopedQueryContext(getDataStore());
     }
 
     /**
@@ -144,30 +155,28 @@ public class AppContextService extends BaseContextService {
         String attestationRepo = adminData.attestations().repo();
 
         if (repoEvent.removed()) {
-            if (Objects.equals(repoFullName, dataStore)) {
-                dataStoreInstallationId = DISABLED;
-            }
+            scopedContexts.remove(repoFullName);
+
+            scopedContexts.values().stream().filter(qc -> qc.getInstallationId() == repoEvent.installationId())
+                    .findFirst().ifPresent(qc -> {
+                        String name = toOrganizationName(qc.getRepository().getFullName());
+                        scopedContexts.put("" + repoEvent.installationId(), qc);
+                        scopedContexts.put(name, qc);
+                    });
             return;
         }
 
-        AdminQueryContext qc = newAdminQueryContext(
+        ScopedQueryContext qc = refreshScopedQueryContext(
                 repoEvent.github(),
                 repo,
                 repoEvent.installationId());
-
-        if (adminQueryContext == null && Objects.equals(repoFullName, dataStore)) {
-            Log.debugf("Keeping AdminQueryContext for installation %s with data store %s",
-                    dataStoreInstallationId, dataStore);
-            dataStoreInstallationId = repoEvent.installationId();
-            adminQueryContext = qc;
-        }
 
         if (Objects.equals(repoFullName, attestationRepo)) {
             updateValidAttestations(qc);
         }
     }
 
-    public void updateValidAttestations(AdminQueryContext qc) {
+    public void updateValidAttestations(ScopedQueryContext qc) {
         JsonNode agreements = qc.readSourceFile(qc.getRepository(), adminData.attestations().path());
         if (agreements != null) {
             List<String> newIds = new ArrayList<>();
@@ -244,13 +253,68 @@ public class AppContextService extends BaseContextService {
     }
 
     public boolean userIsKnown(String login) {
-        AdminQueryContext qc = getAdminQueryContext();
-        if (qc != null) {
-            return AdminDataCache.KNOWN_USER.computeIfAbsent(login, (k) -> {
-                return qc.userIsKnown(login, adminData.member());
-            });
+        Boolean result = AdminDataCache.KNOWN_USER.get(login);
+        if (result != null) {
+            return result;
+        }
+
+        MemberConfig memberConfig = adminData.member();
+        GHUser ghUser = getDatastoreContext().getUser(login);
+        if (memberConfig == null || ghUser == null) {
+            // do not cache this case
+            return false;
+        }
+
+        if (memberConfig.collaborators().isPresent()) {
+            Log.debugf("collaborators: %s", memberConfig.collaborators().get());
+            for (String repoName : memberConfig.collaborators().get()) {
+                ScopedQueryContext qc = getScopedQueryContext(repoName);
+                if (qc == null) {
+                    Log.errorf("No context for %s", repoName);
+                } else {
+                    Set<String> names = qc.execGitHubSync((gh, dryRun) -> {
+                        GHRepository repo = gh.getRepository(repoName);
+                        return repo == null
+                                ? null
+                                : repo.getCollaboratorNames();
+                    });
+                    qc.clearNotFound();
+                    if (names != null && names.contains(login)) {
+                        result = Boolean.TRUE;
+                        break;
+                    }
+                }
+            }
+        }
+        if (result == null && memberConfig.organizations().isPresent()) {
+            for (String orgName : memberConfig.organizations().get()) {
+                ScopedQueryContext qc = getScopedQueryContext(orgName);
+                GHOrganization org = qc.getOrganization(orgName);
+                result = qc.execGitHubSync((gh, dryRun) -> {
+                    return org == null
+                            ? null
+                            : org.hasMember(ghUser);
+                });
+                if (result != null) {
+                    break;
+                }
+            }
+        }
+
+        if (result != null) {
+            AdminDataCache.KNOWN_USER.put(login, result);
+            return result;
         }
         return false;
+    }
+
+    public boolean userInTeam(String login, String fullTeamName) {
+        String orgName = toOrganizationName(fullTeamName);
+        ScopedQueryContext qc = getScopedQueryContext(orgName);
+
+        GHOrganization org = qc.getOrganization(orgName);
+        TeamList teamList = qc.getTeamList(org, fullTeamName);
+        return teamList != null && teamList.hasLogin(login);
     }
 
     public Map<String, Alias> getAliases(List<String> emails, boolean resetCache) {
@@ -345,5 +409,10 @@ public class AppContextService extends BaseContextService {
 
     public String getDefaultDomain() {
         return adminData.defaultAliasDomain();
+    }
+
+    public String toOrganizationName(String fullName) {
+        int pos = fullName.indexOf('/');
+        return pos < 0 ? fullName : fullName.substring(0, pos);
     }
 }

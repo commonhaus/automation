@@ -28,7 +28,7 @@ public class AdminGitHubEvents {
                 && pushEvent.getRef().endsWith("/main")
                 && ctx.commitsContain(pushEvent, cfg.path())) {
             Log.debugf("updateAttestationList (push): %s", repo.getFullName());
-            AdminQueryContext qc = ctx.newAdminQueryContext(
+            ScopedQueryContext qc = ctx.refreshScopedQueryContext(
                     github,
                     pushEvent.getRepository(),
                     pushEvent.getInstallation().getId());
@@ -38,7 +38,7 @@ public class AdminGitHubEvents {
 
     public void updateMembership(@Membership GHEventPayload.Membership membershipEvent, GitHub github) {
         AdminDataCache.KNOWN_USER.invalidate(membershipEvent.getMember().getLogin());
-        AdminQueryContext qc = ctx.newAdminQueryContext(
+        ScopedQueryContext qc = ctx.refreshScopedQueryContext(
                 github,
                 membershipEvent.getRepository(),
                 membershipEvent.getInstallation().getId());

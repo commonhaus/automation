@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHEvent;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.mailer.MockMailbox;
@@ -30,6 +32,9 @@ public class TeamMemberSyncTest extends ContextHelper {
     @Inject
     MockMailbox mailbox;
 
+    @Inject
+    AppContextService ctx;
+
     @BeforeEach
     void init() {
         mailbox.clear();
@@ -40,13 +45,18 @@ public class TeamMemberSyncTest extends ContextHelper {
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
-                    setupMockTeam(mocks);
+
+                    GitHub gh = setupMockTeam(mocks);
+                    setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
+
+                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
 
                     GHContent content = mock(GHContent.class);
                     when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
 
-                    when(mocks.repository("commonhaus/foundation").getFileContent("CONTACTS.yaml"))
+                    when(foundationRepo.getFileContent("CONTACTS.yaml"))
                             .thenReturn(content);
+
                 })
                 .when().payloadFromClasspath("/github/eventInstallationAdded.json")
                 .event(GHEvent.INSTALLATION_REPOSITORIES)
@@ -64,14 +74,16 @@ public class TeamMemberSyncTest extends ContextHelper {
     void testDiscoveryWhenInstallationCreated() throws Exception {
         given()
                 .github(mocks -> {
+                    GitHub gh = setupMockTeam(mocks);
+                    setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
+                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
+
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
-                    setupMockTeam(mocks);
 
                     GHContent content = mock(GHContent.class);
                     when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
 
-                    when(mocks.repository("commonhaus/foundation").getFileContent("CONTACTS.yaml"))
-                            .thenReturn(content);
+                    when(foundationRepo.getFileContent("CONTACTS.yaml")).thenReturn(content);
                 })
                 .when().payloadFromClasspath("/github/eventInstallationCreated.json")
                 .event(GHEvent.INSTALLATION)
@@ -89,13 +101,12 @@ public class TeamMemberSyncTest extends ContextHelper {
     void testQueryFailed() throws Exception {
         given()
                 .github(mocks -> {
+                    GitHub gh = setupMockTeam(mocks);
+                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
+
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
-                    setupMockTeam(mocks);
 
-                    GHContent content = mock(GHContent.class);
-                    when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
-
-                    when(mocks.repository("commonhaus/foundation").getFileContent("CONTACTS.yaml"))
+                    when(foundationRepo.getFileContent("CONTACTS.yaml"))
                             .thenThrow(new IOException("Test exception"));
                 })
                 .when().payloadFromClasspath("/github/eventInstallationAdded.json")

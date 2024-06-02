@@ -381,8 +381,9 @@ public class MemberApi {
         if (user.status() == MemberStatus.UNKNOWN && !roles.isEmpty()) {
             List<MemberStatus> status = roles.stream()
                     .map(r -> ctx.getStatusForRole(r))
+                    .sorted()
                     .toList();
-            user.updateStatus(status);
+            user.data.status = status.get(0);
         }
         return oldStatus != user.status();
     }

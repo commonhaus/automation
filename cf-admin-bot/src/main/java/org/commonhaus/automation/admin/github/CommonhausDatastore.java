@@ -41,7 +41,7 @@ public class CommonhausDatastore {
     }
 
     public record QueryEvent(String login, long id, List<String> roles, boolean refresh) implements DatastoreEvent {
-    };
+    }
 
     public record UpdateEvent(CommonhausUser user, String message, List<String> roles) implements DatastoreEvent {
         @Override
@@ -53,7 +53,7 @@ public class CommonhausDatastore {
         public String login() {
             return user.login();
         }
-    };
+    }
 
     public CommonhausUser getCommonhausUser(MemberSession session) {
         return getCommonhausUser(session, false);
@@ -62,8 +62,6 @@ public class CommonhausDatastore {
     /**
      * GET Commonhaus user data
      *
-     * @param login GitHub user login
-     * @param id GitHub user id
      * @return A Commonhaus user object (never null)
      * @throws RuntimeException if GitHub or other API query fails
      */
@@ -79,7 +77,6 @@ public class CommonhausDatastore {
      *
      * @param user Commonhaus user object
      * @param message Commit message
-     * @param memberProfile
      *
      * @throws RuntimeException if GitHub or other API query fails
      */
@@ -103,7 +100,7 @@ public class CommonhausDatastore {
         final String key = event.login() + ":" + event.id();
 
         CommonhausUser result = event.refresh() ? null : AdminDataCache.COMMONHAUS_DATA.get(key);
-        AdminQueryContext qc = ctx.getAdminQueryContext();
+        ScopedQueryContext qc = ctx.getDatastoreContext();
         if (qc == null) {
             return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
         } else if (result == null) {
@@ -136,8 +133,8 @@ public class CommonhausDatastore {
         final CommonhausUser user = event.user();
         final String key = user.login() + ":" + user.id();
 
-        CommonhausUser result = user;
-        AdminQueryContext qc = ctx.getAdminQueryContext();
+        CommonhausUser result;
+        ScopedQueryContext qc = ctx.getDatastoreContext();
         if (qc == null) {
             return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
         } else {
@@ -156,11 +153,11 @@ public class CommonhausDatastore {
         return Uni.createFrom().item(() -> u).emitOn(executor);
     }
 
-    private CommonhausUser updateCommonhausUser(AdminQueryContext qc, GHRepository repo,
+    private CommonhausUser updateCommonhausUser(ScopedQueryContext qc, GHRepository repo,
             CommonhausUser input, UpdateEvent event, String key) {
 
         return qc.execGitHubSync((gh, dryRun) -> {
-            CommonhausUser result = input;
+            CommonhausUser result;
 
             String content = qc.writeValue(input);
             GHContentBuilder update = repo.createContent()
@@ -191,7 +188,7 @@ public class CommonhausDatastore {
         });
     }
 
-    private CommonhausUser readCommonhausUser(AdminQueryContext qc, GHRepository repo,
+    private CommonhausUser readCommonhausUser(ScopedQueryContext qc, GHRepository repo,
             DatastoreEvent event, String key) {
 
         CommonhausUser response = qc.execGitHubSync((gh, dryRun) -> {

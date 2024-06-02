@@ -6,7 +6,6 @@ import java.util.Map.Entry;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.admin.github.AdminQueryContext;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.github.context.JsonAttribute;
 
@@ -47,12 +46,11 @@ class GitHubUser {
     public GitHubUser withRoles(AppContextService ctx) {
         List<String> r = this.roles;
         if (r == null) {
-            AdminQueryContext qc = ctx.getAdminQueryContext();
             r = new ArrayList<>();
             r.add("sponsor"); // called for known users, this is the minimum role
             for (Entry<String, String> entry : ctx.groupRole()) {
                 Log.debugf("MemberSession: %s -> %s", entry.getKey(), entry.getValue());
-                if (qc.userInTeam(this.login, entry.getKey())) {
+                if (ctx.userInTeam(this.login, entry.getKey())) {
                     r.add(entry.getValue());
                 }
             }

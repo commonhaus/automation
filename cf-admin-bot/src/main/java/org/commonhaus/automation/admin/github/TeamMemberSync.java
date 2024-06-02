@@ -35,6 +35,8 @@ import org.kohsuke.github.GitHub;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkiverse.githubapp.event.Push;
+import io.quarkus.arc.profile.IfBuildProfile;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -48,6 +50,7 @@ public class TeamMemberSync {
     @Inject
     AppContextService ctx;
 
+    @UnlessBuildProfile("test")
     public void startup(@Observes StartupEvent startup) {
         // Don't flood. Be leisurely for scheduled/cron queries
         executor.scheduleAtFixedRate(() -> {
@@ -56,6 +59,17 @@ public class TeamMemberSync {
                 task.run();
             }
         }, 0, 10, TimeUnit.SECONDS);
+    }
+
+    @IfBuildProfile("test")
+    public void testStartup(@Observes StartupEvent startup) {
+        Log.debugf("DEBUG: HERE WE ARE");
+        executor.scheduleAtFixedRate(() -> {
+            Runnable task = taskQueue.poll();
+            if (task != null) {
+                task.run();
+            }
+        }, 0, 30, TimeUnit.MILLISECONDS);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -141,7 +155,7 @@ public class TeamMemberSync {
         for (SourceConfig source : repoCfg.sourceConfig) {
             if (source.performSync()) {
                 taskQueue.add(() -> {
-                    AdminQueryContext qc = this.ctx.newRepoAdminQueryContext(repo, repoCfg)
+                    ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repo, repoCfg)
                             .addExisting(github);
                     syncTeamMembership(qc, source);
                 });
@@ -149,7 +163,7 @@ public class TeamMemberSync {
         }
     }
 
-    void syncTeamMembership(AdminQueryContext qc, SourceConfig source) {
+    void syncTeamMembership(ScopedQueryContext qc, SourceConfig source) {
         Log.debugf("syncTeamMembership: %s / %s", source.repo(), source.path());
 
         GHRepository repo = qc.getRepository(source.repo());
@@ -189,7 +203,10 @@ public class TeamMemberSync {
 
                 for (String targetTeam : sync.teams()) {
                     try {
-                        doSyncTeamMembers(qc, source, targetTeam, logins);
+                        if (!targetTeam.contains("/")) {
+                            targetTeam = repo.getFullName() + "/" + targetTeam;
+                        }
+                        doSyncTeamMembers(source, targetTeam, logins, qc.dryRunEmailAddress());
                     } catch (Throwable t) {
                         qc.logAndSendEmail("doSyncTeamMembers", "Error syncing team members", t);
                     }
@@ -200,17 +217,16 @@ public class TeamMemberSync {
         }
     }
 
-    void doSyncTeamMembers(AdminQueryContext qc, SourceConfig config,
-            String fullTeamName, List<String> sourceLogins) {
-
+    void doSyncTeamMembers(SourceConfig config, String fullTeamName, List<String> sourceLogins, String[] dryRunEmail) {
         int slash = fullTeamName.indexOf('/');
         String orgName = fullTeamName.substring(0, slash);
         String relativeName = fullTeamName.substring(slash + 1);
         boolean productionRun = !config.dryRun();
 
-        GHOrganization org = qc.getOrganization(orgName);
+        ScopedQueryContext qc = ctx.getScopedQueryContext(orgName);
+        GHOrganization org = qc == null ? null : qc.getOrganization(orgName);
         if (org == null) {
-            Log.warnf("doSyncTeamMembers: organization %s not found", orgName);
+            Log.warnf("doSyncTeamMembers: %s %s not found", qc == null ? "ScopedQueryContext for " : "Organization", orgName);
             return;
         }
 
@@ -278,7 +294,7 @@ public class TeamMemberSync {
         if (productionRun) {
             qc.updateTeamList(fullTeamName, allLogins.updated);
         } else {
-            sendDryRunEmail(qc, fullTeamName, allLogins);
+            sendDryRunEmail(fullTeamName, allLogins, dryRunEmail);
         }
     }
 
@@ -289,8 +305,7 @@ public class TeamMemberSync {
             Set<GHUser> updated) {
     }
 
-    void sendDryRunEmail(AdminQueryContext qc, String fullTeamName, Logins logins) {
-        String[] dryRunEmail = qc.dryRunEmailAddress();
+    void sendDryRunEmail(String fullTeamName, Logins logins, String[] dryRunEmail) {
         if (dryRunEmail == null || dryRunEmail.length == 0 || Objects.equals(logins.previous, logins.updated)) {
             Log.infof("[sendDryRunEmail: %s] Current members: %s; New members: %s", fullTeamName,
                     logins.previous, logins.updated);
@@ -323,7 +338,7 @@ public class TeamMemberSync {
                 """.formatted(fullTeamName, toHtmlList(logins.added), toHtmlList(logins.removed),
                 toHtmlList(logins.updated));
 
-        ctx.sendEmail(qc.getLogId(), title, txtBody, htmlBody, dryRunEmail);
+        ctx.sendEmail("sendDryRunEmail|", title, txtBody, htmlBody, dryRunEmail);
     }
 
     public String toPlainList(Set<GHUser> members) {

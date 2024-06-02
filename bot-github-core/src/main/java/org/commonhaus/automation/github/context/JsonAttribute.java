@@ -344,6 +344,15 @@ public enum JsonAttribute {
                 ? null
                 : list.stream()
                         .map(JsonObject.class::cast)
+                        .map(x -> {
+                            String fullName = x.getString("full_name");
+                            String owner = fullName.substring(0, fullName.indexOf('/'));
+                            return Json.createObjectBuilder(x)
+                                    .add("owner", Json.createObjectBuilder()
+                                            .add("name", owner)
+                                            .build())
+                                    .build();
+                        })
                         .map(x -> tryOrNull(x.toString(), GHRepository.class))
                         .toList();
     }

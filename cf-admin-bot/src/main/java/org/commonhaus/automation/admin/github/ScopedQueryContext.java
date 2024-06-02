@@ -1,17 +1,13 @@
 package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
-import java.util.Set;
 
-import org.commonhaus.automation.admin.AdminConfig.MemberConfig;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
-import org.commonhaus.automation.github.context.TeamList;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,27 +15,31 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public class AdminQueryContext extends QueryContext {
+public class ScopedQueryContext extends QueryContext {
     private final GHRepository repository;
+    private final String ownerName;
+    private final String repoFullName;
 
     private final String logId;
     private final MonitoredRepo repoConfig;
 
-    public AdminQueryContext(AppContextService contextService, GHRepository repository, long installationId) {
+    public ScopedQueryContext(AppContextService contextService, GHRepository repository, long installationId) {
         this(contextService, repository, installationId, null);
     }
 
-    public AdminQueryContext(AppContextService contextService, GHRepository repository,
+    public ScopedQueryContext(AppContextService contextService, GHRepository repository,
             MonitoredRepo repoConfig) {
         this(contextService, repository, repoConfig.installationId(), repoConfig);
     }
 
-    public AdminQueryContext(AppContextService contextService, GHRepository repository,
+    private ScopedQueryContext(AppContextService contextService, GHRepository repository,
             long installationId, MonitoredRepo repoConfig) {
         super(contextService, installationId);
         this.repository = repository;
         this.repoConfig = repoConfig;
-        this.logId = repository.getFullName() + ":admin";
+        this.repoFullName = repoConfig != null ? repoConfig.repoFullName : repository.getFullName();
+        this.logId = repoFullName + ":admin";
+        this.ownerName = contextService.toOrganizationName(repoFullName);
     }
 
     @Override
@@ -67,19 +67,19 @@ public class AdminQueryContext extends QueryContext {
         return ActionType.bot;
     }
 
-    public AdminQueryContext addExisting(GitHub github) {
+    public ScopedQueryContext addExisting(GitHub github) {
         super.addExisting(github);
         return this;
     }
 
-    public AdminQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
+    public ScopedQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
         super.addExisting(graphQLClient);
         return this;
     }
 
     @Override
     public GHOrganization getOrganization() {
-        return getOrganization(repository.getOwnerName());
+        return getOrganization(ownerName);
     }
 
     public JsonNode readSourceFile(GHRepository repo, String path) {
@@ -123,54 +123,5 @@ public class AdminQueryContext extends QueryContext {
 
     public String[] dryRunEmailAddress() {
         return repoConfig == null ? null : repoConfig.dryRunEmailAddress();
-    }
-
-    public boolean userIsKnown(String login, MemberConfig memberConfig) {
-        GHUser ghUser = getUser(login);
-        if (memberConfig == null || ghUser == null) {
-            return true;
-        }
-        if (memberConfig.collaborators().isPresent()) {
-            Log.debugf("collaborators: %s",
-                    memberConfig.collaborators().get());
-            for (String repoName : memberConfig.collaborators().get()) {
-                Set<String> names = execGitHubSync((gh, dryRun) -> {
-                    GHRepository repo = gh.getRepository(repoName);
-                    return repo == null
-                            ? null
-                            : repo.getCollaboratorNames();
-                });
-                clearNotFound();
-                if (names != null && names.contains(login)) {
-                    return true;
-                }
-            }
-        }
-        if (memberConfig.organizations().isPresent()) {
-            return execGitHubSync((gh, dryRun) -> {
-                Log.debugf("user: %s, organizations: %s",
-                        ghUser, memberConfig.organizations().get());
-                for (String orgName : memberConfig.organizations().get()) {
-                    GHOrganization org = gh.getOrganization(orgName);
-                    clearNotFound();
-                    if (org != null && org.hasMember(ghUser)) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-        }
-        return false;
-    }
-
-    public boolean userInTeam(String login, String fullTeamName) {
-        String[] parts = fullTeamName.split("/");
-        if (parts.length != 2) {
-            Log.warnf("userInTeam: invalid team name %s", fullTeamName);
-            return false;
-        }
-        GHOrganization org = getOrganization(parts[0]);
-        TeamList teamList = getTeamList(org, fullTeamName);
-        return teamList != null && teamList.hasLogin(login);
     }
 }

@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.commonhaus.automation.admin.github.AdminQueryContext;
+import org.commonhaus.automation.admin.github.ScopedQueryContext;
 import org.kohsuke.github.GHContent;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -195,20 +195,12 @@ public class CommonhausUser {
         data.goodUntil.attestation.put(post.id, attestation);
     }
 
-    public void updateStatus(List<MemberStatus> roleStatus) {
-        for (MemberStatus newStatus : roleStatus) {
-            if (newStatus.ordinal() < data.status.ordinal()) {
-                data.status = newStatus;
-            }
-        }
-    }
-
     @Override
     public String toString() {
         return "CommonhausUser [login=" + login + ", id=" + id + ", sha=" + sha + ", conflict=" + conflict + "]";
     }
 
-    public static CommonhausUser parseFile(AdminQueryContext qc, GHContent content) throws IOException {
+    public static CommonhausUser parseFile(ScopedQueryContext qc, GHContent content) throws IOException {
         CommonhausUser user = qc.parseFile(content, CommonhausUser.class);
         if (user != null) {
             user.sha = content.getSha();
