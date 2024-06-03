@@ -249,13 +249,13 @@ public class MemberApi {
     @KnownUser
     @Path("/commonhaus")
     @Produces("application/json")
-    public Response getCommonhausUser() {
+    public Response getCommonhausUser(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity);
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile, refresh);
             return Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
         } catch (Exception e) {
             if (Log.isDebugEnabled()) {
@@ -334,14 +334,14 @@ public class MemberApi {
     @KnownUser
     @Path("/commonhaus/status")
     @Produces("application/json")
-    public Response updateUserStatus(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+    public Response updateUserStatus() {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
                 .getMemberProfile(ctx, userInfo, identity)
                 .withRoles(ctx);
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(memberProfile, refresh);
+            CommonhausUser user = datastore.getCommonhausUser(memberProfile, false);
             if (updateRoles(user, memberProfile.roles())) {
                 // Refresh the user's status
                 return updateCommonhausUser(memberProfile, user, "Update status");
