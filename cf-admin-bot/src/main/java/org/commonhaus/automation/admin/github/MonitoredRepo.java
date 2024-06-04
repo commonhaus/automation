@@ -3,7 +3,9 @@ package org.commonhaus.automation.admin.github;
 import java.util.List;
 import java.util.Objects;
 
-import org.commonhaus.automation.admin.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.GroupManagement;
+import org.commonhaus.automation.admin.config.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.SourceConfig;
 
 public final class MonitoredRepo {
     final String repoFullName;

@@ -1,9 +1,10 @@
-package org.commonhaus.automation.admin;
-
-import org.commonhaus.automation.admin.github.GroupManagement;
+package org.commonhaus.automation.admin.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public record RepositoryConfigFile(
         @JsonProperty("group_management") GroupManagement groupManagement,
         @JsonProperty("email_address") EmailAddress emailAddress) {

@@ -11,7 +11,6 @@ import java.util.Map;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
 import org.kohsuke.github.GHContent;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -47,6 +46,7 @@ public class CommonhausUser {
         }
     }
 
+    @SuppressWarnings("unused")
     public static class Discord {
         String id;
         String username;
@@ -71,6 +71,7 @@ public class CommonhausUser {
         }
     }
 
+    @SuppressWarnings("unused")
     public static class Services {
         @JsonProperty("forward_email")
         ForwardEmail forwardEmail;
@@ -91,18 +92,11 @@ public class CommonhausUser {
         }
     }
 
+    @SuppressWarnings("unused")
     public static class GoodStanding {
         Map<String, Attestation> attestation = new HashMap<>();
         String contribution;
         String dues;
-
-        @JsonIgnore
-        public boolean isValid() {
-            return (attestation.isEmpty()
-                    || attestation.values().stream().allMatch(s -> s.date.matches("\\d{4}-\\d{2}-\\d{2}")))
-                    && (contribution == null || contribution.matches("\\d{4}-\\d{2}-\\d{2}"))
-                    && (dues == null || dues.matches("\\d{4}-\\d{2}-\\d{2}"));
-        }
     }
 
     public record AttestationPost(
@@ -160,10 +154,6 @@ public class CommonhausUser {
         return data.services == null ? new Services() : data.services;
     }
 
-    public boolean fetched() {
-        return sha != null;
-    }
-
     public String sha() {
         return sha;
     }
@@ -214,6 +204,7 @@ public class CommonhausUser {
         return user;
     }
 
+    @SuppressWarnings("unused")
     public static class Builder {
         private String login;
         private long id;

@@ -1,11 +1,13 @@
-package org.commonhaus.automation.admin.github;
+package org.commonhaus.automation.admin.config;
 
 import java.util.List;
 import java.util.Objects;
 
-import org.commonhaus.automation.admin.RepositoryConfigFile;
-import org.commonhaus.automation.admin.RepositoryConfigFile.RepositoryConfig;
+import org.commonhaus.automation.admin.config.RepositoryConfigFile.RepositoryConfig;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public class GroupManagement extends RepositoryConfig {
 
     public static final GroupManagement DISABLED = new GroupManagement() {

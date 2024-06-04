@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.RepositoryConfigFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContent;

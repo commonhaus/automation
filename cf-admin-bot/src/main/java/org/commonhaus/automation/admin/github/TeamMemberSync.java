@@ -21,8 +21,10 @@ import java.util.stream.Collectors;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.RepositoryConfigFile;
-import org.commonhaus.automation.admin.github.SourceConfig.SyncToTeams;
+import org.commonhaus.automation.admin.config.GroupManagement;
+import org.commonhaus.automation.admin.config.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.SourceConfig;
+import org.commonhaus.automation.admin.config.SourceConfig.SyncToTeams;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;

@@ -1,4 +1,4 @@
-package org.commonhaus.automation.admin.github;
+package org.commonhaus.automation.admin.config;
 
 import java.util.List;
 import java.util.Map;
@@ -6,6 +6,9 @@ import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public record SourceConfig(
         String path,
         String repo,
