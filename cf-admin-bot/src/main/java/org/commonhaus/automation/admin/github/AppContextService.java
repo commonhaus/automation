@@ -20,6 +20,7 @@ import org.commonhaus.automation.admin.AdminConfig.AttestationConfig;
 import org.commonhaus.automation.admin.AdminConfig.MemberConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
+import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.RepositoryConfigFile;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
@@ -78,20 +79,22 @@ public class AppContextService extends BaseContextService {
         this.adminData = adminData;
     }
 
-    public ScopedQueryContext refreshScopedQueryContext(GHRepository repository, MonitoredRepo repoCfg) {
-        ScopedQueryContext qc = new ScopedQueryContext(this, repository, repoCfg);
+    public ScopedQueryContext refreshScopedQueryContext(GHRepository repository, MonitoredRepo repoCfg, GitHub github) {
+        ScopedQueryContext qc = new ScopedQueryContext(this, repository, repoCfg).addExisting(github);
+        Log.debugf("[%s] Refresh ScopedQueryContext for monitored repository %s", repoCfg.installationId(),
+                repository.getFullName());
+        scopedContexts.put("" + repoCfg.installationId(), qc);
         scopedContexts.put(repository.getFullName(), qc);
         scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
-        scopedContexts.put("" + repoCfg.installationId(), qc);
         return qc;
     }
 
     public ScopedQueryContext refreshScopedQueryContext(GitHub github, GHRepository repository, long installationId) {
-        ScopedQueryContext qc = new ScopedQueryContext(this, repository, installationId)
-                .addExisting(github);
+        ScopedQueryContext qc = new ScopedQueryContext(this, repository, installationId).addExisting(github);
+        Log.debugf("[%s] Refresh ScopedQueryContext for %s", installationId, repository.getFullName());
+        scopedContexts.put("" + installationId, qc);
         scopedContexts.put(repository.getFullName(), qc);
         scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
-        scopedContexts.put("" + installationId, qc);
         return qc;
     }
 
@@ -151,7 +154,6 @@ public class AppContextService extends BaseContextService {
 
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
-        String dataStore = getDataStore();
         String attestationRepo = adminData.attestations().repo();
 
         if (repoEvent.removed()) {
@@ -252,14 +254,17 @@ public class AppContextService extends BaseContextService {
         return adminData.attestations();
     }
 
-    public boolean userIsKnown(String login) {
+    public boolean userIsKnown(MemberSession session) {
+        String login = session.login();
         Boolean result = AdminDataCache.KNOWN_USER.get(login);
         if (result != null) {
             return result;
         }
 
+        UserQueryContext userQc = new UserQueryContext(this, session);
+
         MemberConfig memberConfig = adminData.member();
-        GHUser ghUser = getDatastoreContext().getUser(login);
+        GHUser ghUser = userQc.getUser(login);
         if (memberConfig == null || ghUser == null) {
             // do not cache this case
             return false;
@@ -342,9 +347,11 @@ public class AppContextService extends BaseContextService {
     public boolean generatePassword(String email) {
         Alias alias = getAlias(email, false);
         // TODO: NOT YET.. SOOOON
-        // if (alias != null && alias.verified_recipients != null && alias.verified_recipients.size() > 0) {
-        //     forwardEmailClient.generatePassword(alias.domain.name, alias.id, alias.verified_recipients.iterator().next());
-        //     return true;
+        // if (alias != null && alias.verified_recipients != null &&
+        // alias.verified_recipients.size() > 0) {
+        // forwardEmailClient.generatePassword(alias.domain.name, alias.id,
+        // alias.verified_recipients.iterator().next());
+        // return true;
         // }
         return false;
     }

@@ -157,8 +157,7 @@ public class TeamMemberSync {
         for (SourceConfig source : repoCfg.sourceConfig) {
             if (source.performSync()) {
                 taskQueue.add(() -> {
-                    ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repo, repoCfg)
-                            .addExisting(github);
+                    ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repo, repoCfg, github);
                     syncTeamMembership(qc, source);
                 });
             }

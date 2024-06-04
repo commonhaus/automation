@@ -45,8 +45,8 @@ public abstract class QueryContext {
     protected final ContextService ctx;
     protected final long installationId;
 
-    GitHub github;
-    DynamicGraphQLClient graphQLClient;
+    protected GitHub github;
+    protected DynamicGraphQLClient graphQLClient;
     List<DataCommonComment> allComments;
 
     protected QueryContext(ContextService contextService, long installationId) {
@@ -98,30 +98,6 @@ public abstract class QueryContext {
     public QueryContext addExisting(DynamicGraphQLClient graphQLClient) {
         this.graphQLClient = graphQLClient;
         return this;
-    }
-
-    public GHUser getUser(String login) {
-        return execGitHubSync((gh, dryRun) -> {
-            GHUser user = gh.getUser(login);
-            clearNotFound();
-            return user;
-        });
-    }
-
-    public GHRepository getRepository(String repoName) {
-        return execGitHubSync((gh, dryRun) -> {
-            GHRepository repo = gh.getRepository(repoName);
-            clearNotFound();
-            return repo;
-        });
-    }
-
-    public GHOrganization getOrganization(String orgName) {
-        return execGitHubSync((gh, dryRun) -> {
-            GHOrganization org = gh.getOrganization(orgName);
-            clearNotFound();
-            return org;
-        });
     }
 
     /**
@@ -296,6 +272,30 @@ public abstract class QueryContext {
         variables.putIfAbsent("owner", repo.getOwnerName());
         variables.putIfAbsent("name", repo.getName());
         return execQuerySync(query, variables);
+    }
+
+    public GHUser getUser(String login) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHUser user = gh.getUser(login);
+            clearNotFound();
+            return user;
+        });
+    }
+
+    public GHRepository getRepository(String repoName) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHRepository repo = gh.getRepository(repoName);
+            clearNotFound();
+            return repo;
+        });
+    }
+
+    public GHOrganization getOrganization(String orgName) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHOrganization org = gh.getOrganization(orgName);
+            clearNotFound();
+            return org;
+        });
     }
 
     public boolean isBot(String login) {

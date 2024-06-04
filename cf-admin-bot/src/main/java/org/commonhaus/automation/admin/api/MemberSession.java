@@ -77,6 +77,10 @@ public class MemberSession {
         return myself;
     }
 
+    public GitHub connection() {
+        return connection;
+    }
+
     public boolean hasConnection() {
         return connection != null;
     }

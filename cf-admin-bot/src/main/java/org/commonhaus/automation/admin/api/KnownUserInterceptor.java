@@ -11,6 +11,7 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.admin.github.AppContextService;
 
 import io.quarkus.oidc.UserInfo;
+import io.quarkus.security.identity.SecurityIdentity;
 
 @Interceptor
 @KnownUser
@@ -22,9 +23,13 @@ public class KnownUserInterceptor implements Serializable {
     @Inject
     UserInfo userInfo;
 
+    @Inject
+    SecurityIdentity identity;
+
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
-        if (!appCtx.userIsKnown(userInfo.getString("login"))) {
+        MemberSession session = MemberSession.getMemberProfile(appCtx, userInfo, identity);
+        if (!appCtx.userIsKnown(session)) {
             return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
         }
         return ctx.proceed();
