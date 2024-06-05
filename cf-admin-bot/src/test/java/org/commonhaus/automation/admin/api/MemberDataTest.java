@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
@@ -34,6 +35,7 @@ import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -74,13 +76,11 @@ public class MemberDataTest extends ContextHelper {
         Stream.of(AdminDataCache.values()).forEach(v -> v.invalidateAll());
 
         mockContext = GitHubAppTestingContext.get();
-        setupMockTeam(mockContext.mocks);
-
-        userGithub = setupUserGithub(botNodeId);
-        when(userGithub.isCredentialValid()).thenReturn(true);
 
         botGithub = setupBotGithub(ctx, mockContext.mocks);
         when(botGithub.isCredentialValid()).thenReturn(true);
+
+        setupMockTeam(mockContext.mocks);
     }
 
     @Test
@@ -96,13 +96,13 @@ public class MemberDataTest extends ContextHelper {
 
         // Simple retrieval of UserInfo data (provided above)
         // If the user is unknown (not in a configured org or a contributor to specified repo),
-        // we should return a 405
+        // we should return a 403
         given()
                 .log().all()
                 .when().get("/me")
                 .then()
                 .log().all()
-                .statusCode(405);
+                .statusCode(403);
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
@@ -118,6 +118,10 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testUserInfoEndpoint() throws Exception {
+        // Make known user: add to sponsors-test repository
+        GHRepository repo = mockContext.mocks.repository("commonhaus-test/sponsors-test");
+        when(repo.getCollaboratorNames()).thenReturn(Set.of(botLogin));
+
         // Simple retrieval of UserInfo data (provided above)
         // Parse/population of GitHubUser object
         given()
@@ -172,6 +176,9 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testGetCommonhausUserNotFound() throws Exception {
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+
         GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
         when(dataStore.getFileContent(anyString())).thenThrow(new GHFileNotFoundException("Badness"));
 
@@ -198,6 +205,9 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testGetCommonhausUserBadnessHappens() throws Exception {
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+
         GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
         when(dataStore.getFileContent(anyString())).thenThrow(new IOException("Badness"));
 
@@ -230,6 +240,9 @@ public class MemberDataTest extends ContextHelper {
         GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
         when(dataStore.getFileContent(anyString())).thenReturn(content);
 
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+
         given()
                 .log().all()
                 .when()
@@ -237,7 +250,7 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body("HAUS.good_until.attestation.test.with_status", equalTo("UNKNOWN"));
+                .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
@@ -285,6 +298,9 @@ public class MemberDataTest extends ContextHelper {
 
         when(builder.commit()).thenReturn(response);
 
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/cf-voting", botUser);
+
         given()
                 .log().all()
                 .when()
@@ -294,7 +310,7 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body("HAUS.good_until.attestation.test.with_status", equalTo("UNKNOWN"));
+                .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
         // Verify captured input (common test output)
         final ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
@@ -305,14 +321,14 @@ public class MemberDataTest extends ContextHelper {
         verify(builder).content(contentCaptor.capture());
 
         CommonhausUser result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.status()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(result.status()).isEqualTo(MemberStatus.COMMITTEE);
 
         assertThat(result.goodUntil().attestation).hasSize(2);
         assertThat(result.goodUntil().attestation).containsKey("member");
         Attestation att = result.goodUntil().attestation.get("member");
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("draft");
-        assertThat(att.withStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(att.withStatus()).isEqualTo(MemberStatus.COMMITTEE);
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
@@ -328,6 +344,8 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testPutUnknownAttestation() throws Exception {
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
         AttestationPost attestation = new AttestationPost(
                 "unknown",
@@ -380,6 +398,9 @@ public class MemberDataTest extends ContextHelper {
 
         when(builder.commit()).thenReturn(response);
 
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+
         given()
                 .log().all()
                 .when()
@@ -389,7 +410,7 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body("HAUS.good_until.attestation.test.with_status", equalTo("UNKNOWN"));
+                .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
         // Verify captured input (common test output)
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);

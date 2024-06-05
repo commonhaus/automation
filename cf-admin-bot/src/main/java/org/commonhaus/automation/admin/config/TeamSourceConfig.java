@@ -4,16 +4,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-public record SourceConfig(
+public record TeamSourceConfig(
         String path,
         String repo,
         Map<String, SyncToTeams> sync,
-        @JsonProperty("dry_run") Boolean dryRun) {
+        @JsonAlias("dry_run") Boolean dryRun) {
 
     public boolean performSync() {
         return sync() != null
@@ -35,7 +35,7 @@ public record SourceConfig(
     public boolean equals(Object o) {
         if (this == o)
             return true;
-        if (!(o instanceof SourceConfig that))
+        if (!(o instanceof TeamSourceConfig that))
             return false;
         return path.equals(that.path) && repo.equals(that.repo);
     }
@@ -48,7 +48,7 @@ public record SourceConfig(
     public record SyncToTeams(
             String field,
             List<String> teams,
-            @JsonProperty("preserve_users") List<String> preserveUsers) {
+            @JsonAlias("preserve_users") List<String> preserveUsers) {
 
         @Override
         public List<String> teams() {

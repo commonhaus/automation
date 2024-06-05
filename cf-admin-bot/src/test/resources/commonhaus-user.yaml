@@ -2,11 +2,11 @@
 login: commonhaus-bot
 id: 156364140
 data:
-  good_until:
+  goodUntil:
     dues: 2020-01-01
     attestation:
       test: 
-        with_status: UNKNOWN
+        withStatus: UNKNOWN
         date: 2020-01-01
         version: test-only
 ---

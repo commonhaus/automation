@@ -1,6 +1,6 @@
 package org.commonhaus.automation.admin.github;
 
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -37,13 +37,13 @@ public class CommonhausDatastore {
 
         String login();
 
-        List<String> roles();
+        Set<String> roles();
     }
 
-    public record QueryEvent(String login, long id, List<String> roles, boolean refresh) implements DatastoreEvent {
+    public record QueryEvent(String login, long id, Set<String> roles, boolean refresh) implements DatastoreEvent {
     }
 
-    public record UpdateEvent(CommonhausUser user, String message, List<String> roles) implements DatastoreEvent {
+    public record UpdateEvent(CommonhausUser user, String message, Set<String> roles) implements DatastoreEvent {
         @Override
         public long id() {
             return user.id();
@@ -80,7 +80,7 @@ public class CommonhausDatastore {
      *
      * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser setCommonhausUser(CommonhausUser user, List<String> roles, String message) {
+    public CommonhausUser setCommonhausUser(CommonhausUser user, Set<String> roles, String message) {
         UpdateEvent update = new UpdateEvent(user, message, roles);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, update);
         Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", user.id(), response.body());

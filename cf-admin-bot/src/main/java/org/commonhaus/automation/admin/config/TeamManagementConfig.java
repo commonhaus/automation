@@ -1,32 +1,31 @@
 package org.commonhaus.automation.admin.config;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import org.commonhaus.automation.admin.config.RepositoryConfigFile.RepositoryConfig;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-public class GroupManagement extends RepositoryConfig {
+public class TeamManagementConfig extends RepositoryConfig {
 
-    public static final GroupManagement DISABLED = new GroupManagement() {
+    public static final TeamManagementConfig DISABLED = new TeamManagementConfig() {
         @Override
         public boolean isDisabled() {
             return true;
         }
     };
 
-    public static GroupManagement getGroupManagementConfig(RepositoryConfigFile repoConfigFile) {
+    public static TeamManagementConfig getGroupManagementConfig(AdminConfigFile repoConfigFile) {
         if (repoConfigFile == null) {
             return DISABLED;
         }
         return repoConfigFile.groupManagement();
     }
 
-    public List<SourceConfig> sources;
+    public final List<TeamSourceConfig> sources = new ArrayList<>();
 
-    GroupManagement() {
+    TeamManagementConfig() {
     }
 
     @Override
@@ -40,8 +39,8 @@ public class GroupManagement extends RepositoryConfig {
                 .formatted(sources, enabled);
     }
 
-    public List<SourceConfig> sources() {
-        return sources == null ? List.of() : sources;
+    public List<TeamSourceConfig> sources() {
+        return sources;
     }
 
     @Override
@@ -50,7 +49,7 @@ public class GroupManagement extends RepositoryConfig {
             return true;
         if (obj == null || obj.getClass() != this.getClass())
             return false;
-        var that = (GroupManagement) obj;
+        var that = (TeamManagementConfig) obj;
         return Objects.equals(this.sources, that.sources) &&
                 Objects.equals(this.enabled, that.enabled);
     }

@@ -97,8 +97,7 @@ public class MemberApi {
     public Response getUserInfo() {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity)
-                .withRoles(ctx);
+                .getMemberProfile(ctx, userInfo, identity);
 
         Log.debugf("/member/me %s: hasConnection=%s, userData=%s",
                 memberProfile.login(), memberProfile.hasConnection(), memberProfile.getUserData());
@@ -119,6 +118,10 @@ public class MemberApi {
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            if (!user.status().mayHaveEmail()) {
+                return Response.status(Response.Status.FORBIDDEN).build();
+            }
+
             Services services = user.services();
             ForwardEmail forwardEmail = services.forwardEmail();
 
@@ -170,6 +173,10 @@ public class MemberApi {
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            if (!user.status().mayHaveEmail()) {
+                return Response.status(Response.Status.FORBIDDEN).build();
+            }
+
             ForwardEmail forwardEmail = user.services().forwardEmail();
 
             boolean possibleMissingActive = !forwardEmail.active && ctx.validAttestation("email");
@@ -215,6 +222,10 @@ public class MemberApi {
         try {
             // TODO: Generate Password API is not available quite yet.. SOOOON
             // CommonhausUser user = datastore.getCommonhausUser(memberProfile);
+            // if (!user.status().mayHaveEmail()) {
+            //     return Response.status(Response.Status.FORBIDDEN).build();
+            // }
+
             // ForwardEmail forwardEmail = user.services().forwardEmail();
 
             // boolean possibleMissingActive = !forwardEmail.active && ctx.validAttestation("email");
@@ -274,17 +285,16 @@ public class MemberApi {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
-        MemberSession memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity)
-                .withRoles(ctx);
+        MemberSession memberSession = MemberSession
+                .getMemberProfile(ctx, userInfo, identity);
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(memberProfile);
-            updateRoles(user, memberProfile.roles());
+            CommonhausUser user = datastore.getCommonhausUser(memberSession);
+            updateStatus(user, memberSession.roles());
 
             user.appendAttestation(user.status(), post);
             String message = "%s added attestation (%s|%s)".formatted(user.id(), post.id(), post.version());
-            return updateCommonhausUser(memberProfile, user, message);
+            return updateCommonhausUser(memberSession, user, message);
         } catch (Exception e) {
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
@@ -303,12 +313,11 @@ public class MemberApi {
         }
 
         MemberSession memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity)
-                .withRoles(ctx);
+                .getMemberProfile(ctx, userInfo, identity);
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile);
-            updateRoles(user, memberProfile.roles());
+            updateStatus(user, memberProfile.roles());
             String message = user.id() + " added attestations ";
             for (AttestationPost p : postList) {
                 user.appendAttestation(user.status(), p);
@@ -337,12 +346,11 @@ public class MemberApi {
     public Response updateUserStatus() {
         // cache/retrieve member details
         MemberSession memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity)
-                .withRoles(ctx);
+                .getMemberProfile(ctx, userInfo, identity);
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(memberProfile, false);
-            if (updateRoles(user, memberProfile.roles())) {
+            if (updateStatus(user, memberProfile.roles())) {
                 // Refresh the user's status
                 return updateCommonhausUser(memberProfile, user, "Update status");
             }
@@ -376,7 +384,7 @@ public class MemberApi {
                 : Response.ok(new MemberApiResponse(MemberApiResponse.Type.HAUS, user.data)).build();
     }
 
-    boolean updateRoles(CommonhausUser user, List<String> roles) {
+    boolean updateStatus(CommonhausUser user, Set<String> roles) {
         MemberStatus oldStatus = user.status();
         if (user.status() == MemberStatus.UNKNOWN && !roles.isEmpty()) {
             List<MemberStatus> status = roles.stream()

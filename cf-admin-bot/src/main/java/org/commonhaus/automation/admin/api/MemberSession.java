@@ -1,7 +1,7 @@
 package org.commonhaus.automation.admin.api;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -44,11 +44,6 @@ public class MemberSession {
             connection = ctx.getConnection(nodeId, identity);
         }
         return connection;
-    }
-
-    public MemberSession withRoles(AppContextService ctx) {
-        getUserData().withRoles(ctx);
-        return this;
     }
 
     public GitHubUser getUserData() {
@@ -138,8 +133,12 @@ public class MemberSession {
         return getUserData().name;
     }
 
-    public List<String> roles() {
-        List<String> roles = getUserData().roles;
-        return roles == null ? List.of() : roles;
+    public Set<String> roles() {
+        return getUserData().roles;
+    }
+
+    public boolean userIsKnown() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'userIsKnown'");
     }
 }

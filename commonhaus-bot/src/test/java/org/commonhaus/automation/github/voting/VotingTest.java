@@ -3,7 +3,6 @@ package org.commonhaus.automation.github.voting;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -767,7 +766,6 @@ public class VotingTest extends ContextHelper {
         EventQueryContext qc = Mockito.mock(EventQueryContext.class);
         when(qc.getOrganization()).thenReturn(org);
         when(qc.getTeamList(anyString())).thenCallRealMethod();
-        when(qc.getTeamList(any(GHOrganization.class), anyString())).thenCallRealMethod();
 
         List<DataReaction> teamReactions = new ArrayList<>(51);
         Set<GHUser> teamUsers = new HashSet<>(51);

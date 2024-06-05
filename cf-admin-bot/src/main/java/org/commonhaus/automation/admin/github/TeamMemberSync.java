@@ -21,10 +21,10 @@ import java.util.stream.Collectors;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.config.GroupManagement;
-import org.commonhaus.automation.admin.config.RepositoryConfigFile;
-import org.commonhaus.automation.admin.config.SourceConfig;
-import org.commonhaus.automation.admin.config.SourceConfig.SyncToTeams;
+import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.TeamManagementConfig;
+import org.commonhaus.automation.admin.config.TeamSourceConfig;
+import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;
@@ -65,7 +65,6 @@ public class TeamMemberSync {
 
     @IfBuildProfile("test")
     public void testStartup(@Observes StartupEvent startup) {
-        Log.debugf("DEBUG: HERE WE ARE");
         executor.scheduleAtFixedRate(() -> {
             Runnable task = taskQueue.poll();
             if (task != null) {
@@ -86,8 +85,8 @@ public class TeamMemberSync {
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
 
-        Optional<RepositoryConfigFile> repoConfig = repoEvent.getRepositoryConfig();
-        GroupManagement groupManagement = GroupManagement.getGroupManagementConfig(repoConfig.orElse(null));
+        Optional<AdminConfigFile> repoConfig = repoEvent.getRepositoryConfig();
+        TeamManagementConfig groupManagement = TeamManagementConfig.getGroupManagementConfig(repoConfig.orElse(null));
 
         if (repoEvent.removed() || repoConfig.isEmpty() || groupManagement.isDisabled()) {
             monitoredRepos.entrySet().removeIf(entry -> entry.getValue().equals(repoFullName));
@@ -127,7 +126,7 @@ public class TeamMemberSync {
                 GitHub github = ctx.getInstallationClient(repoCfg.installationId());
                 GHRepository repo = github.getRepository(repoCfg.repoFullName());
 
-                RepositoryConfigFile file = ctx.getConfiguration(repo);
+                AdminConfigFile file = ctx.getConfiguration(repo);
                 repoCfg.refresh(file);
 
                 if (repoCfg.sourceConfig() == null || repoCfg.sourceConfig().isEmpty()) {
@@ -154,7 +153,7 @@ public class TeamMemberSync {
 
     void scheduleQueryRepository(MonitoredRepo repoCfg, GHRepository repo, GitHub github) {
         Log.debugf("scheduleQueryRepository: queue repository %s", repo.getFullName());
-        for (SourceConfig source : repoCfg.sourceConfig) {
+        for (TeamSourceConfig source : repoCfg.sourceConfig) {
             if (source.performSync()) {
                 taskQueue.add(() -> {
                     ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repo, repoCfg, github);
@@ -164,7 +163,7 @@ public class TeamMemberSync {
         }
     }
 
-    void syncTeamMembership(ScopedQueryContext qc, SourceConfig source) {
+    void syncTeamMembership(ScopedQueryContext qc, TeamSourceConfig source) {
         Log.debugf("syncTeamMembership: %s / %s", source.repo(), source.path());
 
         GHRepository repo = qc.getRepository(source.repo());
@@ -218,11 +217,12 @@ public class TeamMemberSync {
         }
     }
 
-    void doSyncTeamMembers(SourceConfig config, String fullTeamName, List<String> sourceLogins, String[] dryRunEmail) {
-        int slash = fullTeamName.indexOf('/');
-        String orgName = fullTeamName.substring(0, slash);
-        String relativeName = fullTeamName.substring(slash + 1);
+    void doSyncTeamMembers(TeamSourceConfig config, String fullTeamName, List<String> sourceLogins,
+            String[] dryRunEmail) {
         boolean productionRun = !config.dryRun();
+
+        String orgName = ScopedQueryContext.toOrganizationName(fullTeamName);
+        String relativeName = fullTeamName.replace(orgName + "/", "");
 
         ScopedQueryContext qc = ctx.getScopedQueryContext(orgName);
         GHOrganization org = qc == null ? null : qc.getOrganization(orgName);
@@ -232,6 +232,7 @@ public class TeamMemberSync {
         }
 
         Logins allLogins = qc.execGitHubSync((gh, dryRun) -> {
+            // fetch the team: make sure we have the latest
             GHTeam team = org.getTeamByName(relativeName);
             if (team == null) {
                 Log.warnf("doSyncTeamMembers: team %s not found in %s", relativeName, orgName);

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,17 +17,16 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.AdminConfig;
-import org.commonhaus.automation.admin.AdminConfig.AttestationConfig;
-import org.commonhaus.automation.admin.AdminConfig.MemberConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.MemberSession;
-import org.commonhaus.automation.admin.config.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.UserManagementConfig;
+import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
-import org.commonhaus.automation.github.context.TeamList;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
@@ -60,6 +60,8 @@ public class AppContextService extends BaseContextService {
 
     Map<String, ScopedQueryContext> scopedContexts = new ConcurrentHashMap<>();
 
+    UserManagementConfig userConfig = UserManagementConfig.DISABLED;
+
     @RestClient
     ForwardEmailClient forwardEmailClient;
 
@@ -85,7 +87,7 @@ public class AppContextService extends BaseContextService {
                 repository.getFullName());
         scopedContexts.put("" + repoCfg.installationId(), qc);
         scopedContexts.put(repository.getFullName(), qc);
-        scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
+        scopedContexts.put(ScopedQueryContext.toOrganizationName(repository.getFullName()), qc);
         return qc;
     }
 
@@ -94,27 +96,18 @@ public class AppContextService extends BaseContextService {
         Log.debugf("[%s] Refresh ScopedQueryContext for %s", installationId, repository.getFullName());
         scopedContexts.put("" + installationId, qc);
         scopedContexts.put(repository.getFullName(), qc);
-        scopedContexts.put(toOrganizationName(repository.getFullName()), qc);
+        scopedContexts.put(ScopedQueryContext.toOrganizationName(repository.getFullName()), qc);
         return qc;
     }
 
-    /**
-     * Event filter: check if the push event contains changes to the specified path
-     *
-     * @param pushEvent the push event
-     * @param path the path to check
-     * @return true if the push event contains changes to the path
-     */
-    public boolean commitsContain(GHEventPayload.Push pushEvent, String path) {
-        return pushEvent.getCommits().stream()
-                .anyMatch(commit -> commit.getAdded().contains(path)
-                        || commit.getModified().contains(path));
+    public ScopedQueryContext getDatastoreContext() {
+        return getScopedQueryContext(getDataStore());
     }
 
     public ScopedQueryContext getScopedQueryContext(String scope) {
         ScopedQueryContext qc = scopedContexts.get(scope);
         if (qc == null) {
-            qc = scopedContexts.get(toOrganizationName(scope));
+            qc = scopedContexts.get(ScopedQueryContext.toOrganizationName(scope));
         }
 
         if (qc != null && qc.checkExpiredConnection()) {
@@ -139,10 +132,6 @@ public class AppContextService extends BaseContextService {
         return qc;
     }
 
-    public ScopedQueryContext getDatastoreContext() {
-        return getScopedQueryContext(getDataStore());
-    }
-
     /**
      * Event handler for repository discovery.
      * If the discovered repo matches the configured data store,
@@ -154,84 +143,29 @@ public class AppContextService extends BaseContextService {
 
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
-        String attestationRepo = adminData.attestations().repo();
 
         if (repoEvent.removed()) {
             scopedContexts.remove(repoFullName);
 
             scopedContexts.values().stream().filter(qc -> qc.getInstallationId() == repoEvent.installationId())
                     .findFirst().ifPresent(qc -> {
-                        String name = toOrganizationName(qc.getRepository().getFullName());
+                        String name = ScopedQueryContext.toOrganizationName(qc.getRepository().getFullName());
                         scopedContexts.put("" + repoEvent.installationId(), qc);
                         scopedContexts.put(name, qc);
                     });
             return;
+        } else {
+            refreshScopedQueryContext(
+                    repoEvent.github(),
+                    repo,
+                    repoEvent.installationId());
         }
 
-        ScopedQueryContext qc = refreshScopedQueryContext(
-                repoEvent.github(),
-                repo,
-                repoEvent.installationId());
-
-        if (Objects.equals(repoFullName, attestationRepo)) {
-            updateValidAttestations(qc);
+        Optional<AdminConfigFile> repoConfig = repoEvent.getRepositoryConfig();
+        UserManagementConfig userConfig = UserManagementConfig.getUserManagementConfig(repoConfig.orElse(null));
+        if (userConfig != null && !userConfig.isDisabled()) {
+            this.userConfig = userConfig;
         }
-    }
-
-    public void updateValidAttestations(ScopedQueryContext qc) {
-        JsonNode agreements = qc.readSourceFile(qc.getRepository(), adminData.attestations().path());
-        if (agreements != null) {
-            List<String> newIds = new ArrayList<>();
-            JsonNode attestations = agreements.get("attestations");
-            if (attestations != null && attestations.isObject()) {
-                attestations.fields().forEachRemaining(entry -> {
-                    newIds.add(entry.getKey());
-                });
-            }
-            attestationIds.addAll(newIds);
-            attestationIds.retainAll(newIds);
-        }
-    }
-
-    public Class<RepositoryConfigFile> getConfigType() {
-        return RepositoryConfigFile.class;
-    }
-
-    public String getConfigFileName() {
-        return RepositoryConfigFile.NAME;
-    }
-
-    public String getDataStore() {
-        return adminData.dataStore();
-    }
-
-    public URI getMemberHome() {
-        return adminData.member().home();
-    }
-
-    public String getGraphQlUrl() {
-        return graphqlApiEndpoint;
-    }
-
-    public boolean validAttestation(String id) {
-        // If none are defined/found, anything goes
-        return attestationIds.isEmpty() || attestationIds.contains(id);
-    }
-
-    public static ObjectMapper yamlMapper() {
-        if (yamlMapper == null) {
-            DumperOptions options = new DumperOptions();
-            options.setDefaultScalarStyle(ScalarStyle.PLAIN);
-            options.setDefaultFlowStyle(FlowStyle.AUTO);
-            options.setPrettyFlow(true);
-
-            yamlMapper = new ObjectMapper(new YAMLFactoryBuilder(new YAMLFactory())
-                    .dumperOptions(options).build())
-                    .setSerializationInclusion(Include.NON_EMPTY)
-                    .setVisibility(VisibilityChecker.Std.defaultInstance()
-                            .with(JsonAutoDetect.Visibility.ANY));
-        }
-        return yamlMapper;
     }
 
     public GitHub getConnection(String nodeId, SecurityIdentity identity) {
@@ -250,11 +184,61 @@ public class AppContextService extends BaseContextService {
         return connect;
     }
 
+    public Class<AdminConfigFile> getConfigType() {
+        return AdminConfigFile.class;
+    }
+
+    public String getConfigFileName() {
+        return AdminConfigFile.NAME;
+    }
+
+    public String getDataStore() {
+        return adminData.dataStore();
+    }
+
+    public URI getMemberHome() {
+        return adminData.memberHome();
+    }
+
+    public String getGraphQlUrl() {
+        return graphqlApiEndpoint;
+    }
+
+    public void updateValidAttestations(ScopedQueryContext qc) {
+        if (userConfig.isDisabled()) {
+            return;
+        }
+        JsonNode agreements = qc.readSourceFile(qc.getRepository(), userConfig.attestations().path());
+        if (agreements != null) {
+            List<String> newIds = new ArrayList<>();
+            JsonNode attestations = agreements.get("attestations");
+            if (attestations != null && attestations.isObject()) {
+                attestations.fields().forEachRemaining(entry -> {
+                    newIds.add(entry.getKey());
+                });
+            }
+            attestationIds.addAll(newIds);
+            attestationIds.retainAll(newIds);
+        }
+    }
+
+    public boolean validAttestation(String id) {
+        // If none are defined/found, anything goes
+        return attestationIds.isEmpty() || attestationIds.contains(id);
+    }
+
     public AttestationConfig attestationConfig() {
-        return adminData.attestations();
+        if (userConfig.isDisabled()) {
+            return null;
+        }
+        return userConfig.attestations();
     }
 
     public boolean userIsKnown(MemberSession session) {
+        if (userConfig.isDisabled()) {
+            return false;
+        }
+
         String login = session.login();
         Boolean result = AdminDataCache.KNOWN_USER.get(login);
         if (result != null) {
@@ -262,17 +246,22 @@ public class AppContextService extends BaseContextService {
         }
 
         UserQueryContext userQc = new UserQueryContext(this, session);
+        Set<String> roles = session.roles();
 
-        MemberConfig memberConfig = adminData.member();
         GHUser ghUser = userQc.getUser(login);
-        if (memberConfig == null || ghUser == null) {
+        if (ghUser == null) {
             // do not cache this case
             return false;
         }
 
-        if (memberConfig.collaborators().isPresent()) {
-            Log.debugf("collaborators: %s", memberConfig.collaborators().get());
-            for (String repoName : memberConfig.collaborators().get()) {
+        if (!userConfig.collaboratorRoles().isEmpty()) {
+            Map<String, String> collabRoles = userConfig.collaboratorRoles();
+            Log.debugf("collaborators: %s", collabRoles);
+
+            for (Entry<String, String> entry : collabRoles.entrySet()) {
+                String repoName = entry.getKey();
+                String role = entry.getValue();
+
                 ScopedQueryContext qc = getScopedQueryContext(repoName);
                 if (qc == null) {
                     Log.errorf("No context for %s", repoName);
@@ -285,23 +274,33 @@ public class AppContextService extends BaseContextService {
                     });
                     qc.clearNotFound();
                     if (names != null && names.contains(login)) {
-                        result = Boolean.TRUE;
-                        break;
+                        result = or(result, Boolean.TRUE);
+                        roles.add(role);
                     }
                 }
             }
         }
-        if (result == null && memberConfig.organizations().isPresent()) {
-            for (String orgName : memberConfig.organizations().get()) {
+        if (!userConfig.teamRoles().isEmpty()) {
+            Map<String, String> teamRoles = userConfig.teamRoles();
+            Log.debugf("teamRoles: %s", teamRoles);
+
+            for (Entry<String, String> entry : teamRoles.entrySet()) {
+                String teamFullName = entry.getKey();
+                String role = entry.getValue();
+
+                String orgName = ScopedQueryContext.toOrganizationName(teamFullName);
+
                 ScopedQueryContext qc = getScopedQueryContext(orgName);
                 GHOrganization org = qc.getOrganization(orgName);
-                result = qc.execGitHubSync((gh, dryRun) -> {
-                    return org == null
-                            ? null
-                            : org.hasMember(ghUser);
-                });
-                if (result != null) {
-                    break;
+                if (org == null) {
+                    Log.errorf("No organization for %s", orgName);
+                    continue;
+                }
+
+                boolean isMember = or(result, qc.isTeamMember(ghUser, teamFullName));
+                if (isMember) {
+                    result = or(result, Boolean.TRUE);
+                    roles.add(role);
                 }
             }
         }
@@ -313,13 +312,8 @@ public class AppContextService extends BaseContextService {
         return false;
     }
 
-    public boolean userInTeam(String login, String fullTeamName) {
-        String orgName = toOrganizationName(fullTeamName);
-        ScopedQueryContext qc = getScopedQueryContext(orgName);
-
-        GHOrganization org = qc.getOrganization(orgName);
-        TeamList teamList = qc.getTeamList(org, fullTeamName);
-        return teamList != null && teamList.hasLogin(login);
+    Boolean or(Boolean a, Boolean b) {
+        return Boolean.TRUE.equals(a) || Boolean.TRUE.equals(b);
     }
 
     public Map<String, Alias> getAliases(List<String> emails, boolean resetCache) {
@@ -345,6 +339,9 @@ public class AppContextService extends BaseContextService {
     }
 
     public boolean generatePassword(String email) {
+        if (userConfig.isDisabled()) {
+            return false;
+        }
         Alias alias = getAlias(email, false);
         // TODO: NOT YET.. SOOOON
         // if (alias != null && alias.verified_recipients != null &&
@@ -361,8 +358,11 @@ public class AppContextService extends BaseContextService {
     }
 
     private Alias getAlias(String email, boolean resetCache) {
+        if (userConfig.emailDisabled()) {
+            return null;
+        }
         int at = email.indexOf('@');
-        String domain = at < 0 ? adminData.defaultAliasDomain() : email.substring(at + 1);
+        String domain = at < 0 ? userConfig.defaultAliasDomain() : email.substring(at + 1);
         String name = at < 0 ? email : email.substring(0, at);
 
         Alias alias = resetCache ? null : AdminDataCache.ALIASES.get(email);
@@ -376,12 +376,12 @@ public class AppContextService extends BaseContextService {
     }
 
     private Alias putAlias(String description, String email, Set<String> recipients) {
-        if (recipients == null || recipients.isEmpty()) {
+        if (userConfig.emailDisabled() || recipients == null || recipients.isEmpty()) {
             return null;
         }
         int at = email.indexOf('@');
         String name = email.substring(0, at);
-        String domain = at < 0 ? adminData.defaultAliasDomain() : email.substring(at + 1);
+        String domain = at < 0 ? userConfig.defaultAliasDomain() : email.substring(at + 1);
 
         Alias alias = getAlias(email, false);
         if (alias == null) {
@@ -405,21 +405,45 @@ public class AppContextService extends BaseContextService {
         return alias;
     }
 
-    public Iterable<Entry<String, String>> groupRole() {
-        return adminData.groupRole().entrySet();
-    }
-
     public MemberStatus getStatusForRole(String role) {
-        String status = adminData.roleStatus().get(role);
+        if (userConfig.isDisabled()) {
+            return MemberStatus.UNKNOWN;
+        }
+        String status = userConfig.roleStatus().get(role);
         return MemberStatus.fromString(status);
     }
 
-    public String getDefaultDomain() {
-        return adminData.defaultAliasDomain();
+    /**
+     * Event filter: check if the push event contains changes to the specified path
+     *
+     * @param pushEvent the push event
+     * @param path the path to check
+     * @return true if the push event contains changes to the path
+     */
+    public boolean commitsContain(GHEventPayload.Push pushEvent, String path) {
+        return pushEvent.getCommits().stream()
+                .anyMatch(commit -> commit.getAdded().contains(path)
+                        || commit.getModified().contains(path));
     }
 
-    public String toOrganizationName(String fullName) {
-        int pos = fullName.indexOf('/');
-        return pos < 0 ? fullName : fullName.substring(0, pos);
+    public static ObjectMapper yamlMapper() {
+        if (yamlMapper == null) {
+            DumperOptions options = new DumperOptions();
+            options.setDefaultScalarStyle(ScalarStyle.PLAIN);
+            options.setDefaultFlowStyle(FlowStyle.AUTO);
+            options.setPrettyFlow(true);
+
+            yamlMapper = new ObjectMapper(new YAMLFactoryBuilder(new YAMLFactory())
+                    .dumperOptions(options).build())
+                    .setSerializationInclusion(Include.NON_EMPTY)
+                    .setVisibility(VisibilityChecker.Std.defaultInstance()
+                            .with(JsonAutoDetect.Visibility.ANY));
+        }
+        return yamlMapper;
+    }
+
+    public Entry<String, String>[] teamRoles() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'teamRoles'");
     }
 }

@@ -39,7 +39,7 @@ public class ScopedQueryContext extends QueryContext {
         this.repoConfig = repoConfig;
         this.repoFullName = repoConfig != null ? repoConfig.repoFullName : repository.getFullName();
         this.logId = repoFullName + ":admin";
-        this.ownerName = contextService.toOrganizationName(repoFullName);
+        this.ownerName = toOrganizationName(repoFullName);
     }
 
     @Override
