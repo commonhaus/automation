@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.config.RepositoryConfigFile;
+import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContent;
@@ -44,7 +44,7 @@ public class TeamMemberSyncTest extends ContextHelper {
     void testDiscoveryWhenInstallationAdded() throws Exception {
         given()
                 .github(mocks -> {
-                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
 
                     GitHub gh = setupMockTeam(mocks);
                     setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
@@ -78,7 +78,7 @@ public class TeamMemberSyncTest extends ContextHelper {
                     setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
                     GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
 
-                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
 
                     GHContent content = mock(GHContent.class);
                     when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
@@ -104,7 +104,7 @@ public class TeamMemberSyncTest extends ContextHelper {
                     GitHub gh = setupMockTeam(mocks);
                     GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
 
-                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
 
                     when(foundationRepo.getFileContent("CONTACTS.yaml"))
                             .thenThrow(new IOException("Test exception"));

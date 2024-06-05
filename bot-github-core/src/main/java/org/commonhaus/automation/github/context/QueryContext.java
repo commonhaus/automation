@@ -574,31 +574,20 @@ public abstract class QueryContext {
         return null;
     }
 
-    public TeamList getTeamList(String group) {
-        return getTeamList(getOrganization(), group);
+    public boolean isTeamMember(GHUser user, String teamFullName) {
+        Set<GHUser> members = teamMembers(teamFullName);
+        return members != null && members.contains(user);
     }
 
-    public TeamList getTeamList(GHOrganization org, String teamFullName) {
-        String relativeName = teamFullName.replace(org.getLogin() + "/", "");
-
-        Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
-        if (members == null) {
-            members = execGitHubSync((gh, dryRun) -> {
-                GHTeam ghTeam = org.getTeamByName(relativeName);
-                return ghTeam == null ? Set.of() : ghTeam.getMembers();
-            });
-            if (hasErrors() || members == null) {
-                return null;
-            }
-            TEAM_MEMBERS.put(teamFullName, members);
-        }
+    public TeamList getTeamList(String teamFullName) {
+        Set<GHUser> members = teamMembers(teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
         Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
         return teamList;
     }
 
-    public void updateTeamList(String fullTeamName, Set<GHUser> members) {
-        TEAM_MEMBERS.put(fullTeamName, members);
+    public void updateTeamList(String teamFullName, Set<GHUser> members) {
+        TEAM_MEMBERS.put(teamFullName, members);
     }
 
     public void updateTeamList(GHOrganization org, GHTeam ghTeam) {
@@ -616,6 +605,25 @@ public abstract class QueryContext {
         }
     }
 
+    Set<GHUser> teamMembers(String teamFullName) {
+        String orgName = toOrganizationName(teamFullName);
+        String relativeName = teamFullName.replace(orgName + "/", "");
+
+        GHOrganization org = getOrganization(orgName);
+        Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
+        if (members == null) {
+            members = execGitHubSync((gh, dryRun) -> {
+                GHTeam ghTeam = org.getTeamByName(relativeName);
+                return ghTeam == null ? Set.of() : ghTeam.getMembers();
+            });
+            if (hasErrors() || members == null) {
+                return null;
+            }
+            TEAM_MEMBERS.put(teamFullName, members);
+        }
+        return members;
+    }
+
     public String[] getErrorAddresses() {
         return ctx.botErrorEmailAddress();
     }
@@ -626,5 +634,10 @@ public abstract class QueryContext {
 
     public void logAndSendEmail(String logId, String title, String body, Throwable t) {
         ctx.logAndSendEmail(logId, title, body, t, getErrorAddresses());
+    }
+
+    public static String toOrganizationName(String fullName) {
+        int pos = fullName.indexOf('/');
+        return pos < 0 ? fullName : fullName.substring(0, pos);
     }
 }

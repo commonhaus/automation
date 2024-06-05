@@ -29,9 +29,9 @@ public class KnownUserInterceptor implements Serializable {
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
         MemberSession session = MemberSession.getMemberProfile(appCtx, userInfo, identity);
-        if (!appCtx.userIsKnown(session)) {
-            return Response.status(Response.Status.METHOD_NOT_ALLOWED).build();
+        if (appCtx.userIsKnown(session)) {
+            return ctx.proceed();
         }
-        return ctx.proceed();
+        return Response.status(Response.Status.FORBIDDEN).build();
     }
 }

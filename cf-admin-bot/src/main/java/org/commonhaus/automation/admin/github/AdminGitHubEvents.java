@@ -4,8 +4,8 @@ import java.util.Objects;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.AdminConfig.AttestationConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -20,9 +20,13 @@ public class AdminGitHubEvents {
     AppContextService ctx;
 
     public void updateAttestationList(@Push GHEventPayload.Push pushEvent, GitHub github) {
+        AttestationConfig cfg = ctx.attestationConfig();
+        if (cfg == null) {
+            return;
+        }
+
         GHRepository repo = pushEvent.getRepository();
         String repoFullName = repo.getFullName();
-        AttestationConfig cfg = ctx.attestationConfig();
 
         if (Objects.equals(repoFullName, cfg.repo())
                 && pushEvent.getRef().endsWith("/main")

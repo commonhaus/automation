@@ -14,6 +14,7 @@ import java.util.Set;
 import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
@@ -101,10 +102,6 @@ public class ContextHelper extends QueryContext {
             when(gh.getUser(login)).thenReturn(user);
         }
 
-        GHUser user = mockGHUser(botLogin);
-        when(gh.getUser(botLogin)).thenReturn(user);
-        testQuorum.add(user);
-
         setupMockTeam("team-quorum-default", org, testQuorum);
         setupMockTeam("cf-council", org, council);
         setupMockTeam("cf-voting", org, voting);
@@ -129,24 +126,24 @@ public class ContextHelper extends QueryContext {
         return repo;
     }
 
-    protected void setupMockTeam(String name, GHOrganization org, Set<GHUser> userSet) throws IOException {
-        TEAM_MEMBERS.put("commonhaus-test/" + name, userSet);
+    protected GHTeam setupMockTeam(String name, GHOrganization org, Set<GHUser> userSet) throws IOException {
+        setupMockTeam("commonhaus-test/" + name, userSet);
 
         GHTeam team = Mockito.mock(GHTeam.class);
         when(team.getMembers()).thenReturn(userSet);
         when(team.getName()).thenReturn(name);
         when(org.getTeamByName(name)).thenReturn(team);
+
+        return team;
     }
 
-    public void setupMockTeam(String teamName, Set<GHUser> users) {
-        TEAM_MEMBERS.put(teamName, users);
+    public void setupMockTeam(String fullTeamName, Set<GHUser> users) {
+        TEAM_MEMBERS.put(fullTeamName, users);
     }
 
-    public GitHub setupUserGithub(String nodeId) {
-        GitHub gh = mock(GitHub.class);
-        AdminDataCache.USER_CONNECTION.put(nodeId, gh);
-        AdminDataCache.KNOWN_USER.put(botLogin, Boolean.TRUE);
-        return gh;
+    public void appendMockTeam(String fullTeamName, GHUser user) {
+        Set<GHUser> members = TEAM_MEMBERS.get(fullTeamName);
+        members.add(user);
     }
 
     public void setUserAsUnknown(String login) {
@@ -155,6 +152,10 @@ public class ContextHelper extends QueryContext {
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
         GitHub gh = mocks.installationClient(installationId);
+
+        GHUser bot = mockGHUser(botLogin);
+        when(gh.getUser(botLogin)).thenReturn(bot);
+        AdminDataCache.USER_CONNECTION.put(botNodeId, gh);
 
         GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), "R_kgDOL8tG0g");
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
@@ -165,7 +166,10 @@ public class ContextHelper extends QueryContext {
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");
 
-        setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
+        AdminConfigFile config = AppContextService.yamlMapper().readValue(
+                getClass().getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
+        ctx.userConfig = config.userManagement();
+
         return gh;
     }
 

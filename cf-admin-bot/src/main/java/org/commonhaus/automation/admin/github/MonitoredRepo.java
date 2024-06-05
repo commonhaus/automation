@@ -3,14 +3,14 @@ package org.commonhaus.automation.admin.github;
 import java.util.List;
 import java.util.Objects;
 
-import org.commonhaus.automation.admin.config.GroupManagement;
-import org.commonhaus.automation.admin.config.RepositoryConfigFile;
-import org.commonhaus.automation.admin.config.SourceConfig;
+import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.TeamManagementConfig;
+import org.commonhaus.automation.admin.config.TeamSourceConfig;
 
 public final class MonitoredRepo {
     final String repoFullName;
     private final long installationId;
-    List<SourceConfig> sourceConfig;
+    List<TeamSourceConfig> sourceConfig;
     private String[] dryRunEmailAddress;
     private String[] errorEmailAddress;
 
@@ -19,8 +19,8 @@ public final class MonitoredRepo {
         this.installationId = installationId;
     }
 
-    MonitoredRepo refresh(RepositoryConfigFile file) {
-        GroupManagement groupManagement = GroupManagement.getGroupManagementConfig(file);
+    MonitoredRepo refresh(AdminConfigFile file) {
+        TeamManagementConfig groupManagement = TeamManagementConfig.getGroupManagementConfig(file);
         this.sourceConfig = groupManagement.sources();
         this.dryRunEmailAddress = file.emailAddress() == null ? null : file.emailAddress().dryRun();
         this.errorEmailAddress = file.emailAddress() == null ? null : file.emailAddress().errors();
@@ -50,7 +50,7 @@ public final class MonitoredRepo {
         return repoFullName;
     }
 
-    public List<SourceConfig> sourceConfig() {
+    public List<TeamSourceConfig> sourceConfig() {
         return sourceConfig;
     }
 

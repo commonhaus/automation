@@ -11,7 +11,7 @@ import java.util.Map;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
 import org.kohsuke.github.GHContent;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -29,6 +29,7 @@ public class CommonhausUser {
         ACTIVE,
         PENDING,
         INACTIVE,
+        DENIED,
         REVOKED,
         SUSPENDED,
         SPONSOR,
@@ -43,6 +44,13 @@ public class CommonhausUser {
             } catch (IllegalArgumentException e) {
                 return UNKNOWN;
             }
+        }
+
+        public boolean mayHaveEmail() {
+            return this != PENDING
+                    && this != REVOKED
+                    && this != SPONSOR
+                    && this != SUSPENDED;
         }
     }
 
@@ -59,7 +67,7 @@ public class CommonhausUser {
         boolean active;
 
         /** Additional ForwardEmail aliases. Optional and rare. */
-        @JsonProperty("alt_alias")
+        @JsonAlias("alt_alias")
         List<String> altAlias;
 
         public Collection<? extends String> altAlias() {
@@ -73,7 +81,7 @@ public class CommonhausUser {
 
     @SuppressWarnings("unused")
     public static class Services {
-        @JsonProperty("forward_email")
+        @JsonAlias("forward_email")
         ForwardEmail forwardEmail;
         Discord discord;
 
@@ -105,7 +113,7 @@ public class CommonhausUser {
     }
 
     public record Attestation(
-            @NotNull @JsonProperty("with_status") MemberStatus withStatus,
+            @NotNull @JsonAlias("with_status") MemberStatus withStatus,
             @NotNull String date,
             @NotNull String version) {
     }
@@ -114,7 +122,7 @@ public class CommonhausUser {
         @NotNull
         MemberStatus status = MemberStatus.UNKNOWN;
 
-        @JsonProperty("good_until")
+        @JsonAlias("good_until")
         GoodStanding goodUntil = new GoodStanding();
 
         Services services = new Services();

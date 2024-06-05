@@ -3,7 +3,7 @@
 # (specify team as organization/team-name)
 # If dry_run is true, an email will be sent to the specified email 
 # address with the results of the dry run.
-group_management:
+groupManagement:
   sources:
   - path: CONTACTS.yaml
     repo: commonhaus/foundation
@@ -19,11 +19,36 @@ group_management:
         field: login
         teams:
           - commonhaus-test/team-quorum-default
-    dry_run: true
+    dryRun: true
+
+userManagement:
+  defaultAliasDomain: example.com
+
+  attestations:
+    repo: commonhaus/foundation
+    path: ATTESTATIONS.yaml
+
+  ## Map GitHub teams to roles
+  ## The default role for known/discovered users 
+  groupRole:
+    teams:
+      commonhaus-test/cf-council: cfc
+      commonhaus-test/cf-voting: egc
+      commonhaus-test/team-quorum-default: member
+    outsideCollaborators:
+      commonhaus-test/sponsors-test: sponsor
+
+  ## Initial mapping of a role to a MemberStatus
+  ## Used when the initial status is UNKNOWN
+  roleStatus:
+    cfc: COMMITTEE
+    egc: COMMITTEE
+    member: ACTIVE
+    sponsor: SPONSOR
 
 ## Email addresses to notify of errors and dry-run results
-email_address:
+emailAddress:
   errors:
     - repo-errors@example.com
-  dry_run:
+  dryRun:
     - dry-run@example.com

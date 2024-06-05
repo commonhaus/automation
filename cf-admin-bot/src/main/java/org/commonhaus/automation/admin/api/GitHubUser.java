@@ -1,15 +1,12 @@
 package org.commonhaus.automation.admin.api;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map.Entry;
+import java.util.HashSet;
+import java.util.Set;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.github.context.JsonAttribute;
 
-import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 /**
@@ -24,7 +21,7 @@ class GitHubUser {
     String name;
     String avatarUrl;
     String company;
-    List<String> roles;
+    Set<String> roles = new HashSet<>();
 
     public GitHubUser(long id, String login, String nodeId) {
         this.id = id;
@@ -41,22 +38,6 @@ class GitHubUser {
         this.name = JsonAttribute.name.stringFrom(jsonObject);
         this.avatarUrl = JsonAttribute.avatarUrl.stringFrom(jsonObject);
         this.company = JsonAttribute.company.stringFrom(jsonObject);
-    }
-
-    public GitHubUser withRoles(AppContextService ctx) {
-        List<String> r = this.roles;
-        if (r == null) {
-            r = new ArrayList<>();
-            r.add("sponsor"); // called for known users, this is the minimum role
-            for (Entry<String, String> entry : ctx.groupRole()) {
-                Log.debugf("MemberSession: %s -> %s", entry.getKey(), entry.getValue());
-                if (ctx.userInTeam(this.login, entry.getKey())) {
-                    r.add(entry.getValue());
-                }
-            }
-            this.roles = r;
-        }
-        return this;
     }
 
     @Override
