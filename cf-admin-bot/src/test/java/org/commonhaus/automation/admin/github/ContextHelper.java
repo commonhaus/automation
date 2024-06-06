@@ -7,11 +7,15 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 import jakarta.inject.Singleton;
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
@@ -35,6 +39,8 @@ import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.quarkus.jackson.ObjectMapperCustomizer;
+import io.smallrye.graphql.client.Response;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ContextHelper extends QueryContext {
 
@@ -152,6 +158,7 @@ public class ContextHelper extends QueryContext {
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
         GitHub gh = mocks.installationClient(installationId);
+        DynamicGraphQLClient dql = mocks.installationGraphQLClient(installationId);
 
         GHUser bot = mockGHUser(botLogin);
         when(gh.getUser(botLogin)).thenReturn(bot);
@@ -159,7 +166,7 @@ public class ContextHelper extends QueryContext {
 
         GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), "R_kgDOL8tG0g");
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
-                DiscoveryAction.ADDED, gh, installationId, dataStoreRepo, Optional.ofNullable(null));
+                DiscoveryAction.ADDED, gh, dql, installationId, dataStoreRepo, Optional.ofNullable(null));
 
         ctx.repositoryDiscovered(repoEvent);
 
@@ -171,6 +178,19 @@ public class ContextHelper extends QueryContext {
         ctx.userConfig = config.userManagement();
 
         return gh;
+    }
+
+    public Response mockResponse(String filename) {
+        try {
+            JsonObject jsonObject = Json.createReader(Files.newInputStream(Path.of(filename))).readObject();
+
+            Response mockResponse = Mockito.mock(Response.class);
+            when(mockResponse.getData()).thenReturn(jsonObject);
+
+            return mockResponse;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

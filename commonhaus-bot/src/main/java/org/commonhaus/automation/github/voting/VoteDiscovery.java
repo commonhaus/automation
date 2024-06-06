@@ -18,6 +18,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.RepositoryConfigFile;
 import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.ScheduledQueryContext;
+import org.commonhaus.automation.github.ScheduledQueryContext.ScheduledItemQueryContext;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.EventType;
@@ -166,7 +167,7 @@ public class VoteDiscovery {
     void scheduleQueryIssue(ScheduledQueryContext qc, EventType type, VoteConfig voteConfig, DataCommonItem item) {
         Log.infof("[%s] discoverVotes: queue %s #%s", qc.getLogId(), type, item.number);
         taskQueue.add(() -> {
-            ScheduledQueryContext itemCtx = ctx.newScheduledQueryContext(qc, type);
+            ScheduledItemQueryContext itemCtx = ctx.newScheduledItemQueryContext(qc, type);
             eventBus.send(VoteEvent.ADDRESS, new VoteEvent(itemCtx, voteConfig, item, type));
         });
     }

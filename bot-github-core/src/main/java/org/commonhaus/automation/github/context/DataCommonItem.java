@@ -57,6 +57,32 @@ public class DataCommonItem extends DataCommonObject {
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
+    public static DataCommonItem createIssue(QueryContext qc, String title, String bodyString) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("title", title);
+        variables.put("body", bodyString);
+
+        Response response = qc.execRepoQuerySync("""
+                mutation($title: String!, $body: String!) {
+                    createIssue(input: {
+                        title: $title,
+                        body: $body
+                    }) {
+                        clientMutationId
+                        issue {
+                            """ + ISSUE_FIELDS + """
+                        }
+                    }
+                }
+                """, variables);
+        if (response.hasError()) {
+            qc.clearNotFound();
+            return null;
+        }
+        JsonObject result = JsonAttribute.createIssue.jsonObjectFrom(response.getData());
+        return JsonAttribute.issue.commonItemFrom(result);
+    }
+
     public static DataCommonItem editIssueDescription(QueryContext qc,
             String nodeId, String bodyString) {
         Map<String, Object> variables = new HashMap<>();
@@ -157,5 +183,28 @@ public class DataCommonItem extends DataCommonObject {
             cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
         } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
         return allIssues;
+    }
+
+    public static DataCommonItem queryItem(QueryContext qc, String nodeId) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("id", nodeId);
+
+        Response response = qc.execQuerySync("""
+                query($id: ID!) {
+                    node(id: $id) {
+                        ... on Issue {
+                            """ + ISSUE_FIELDS + """
+                }
+                ... on PullRequest {
+                    """ + PR_FIELDS + """
+                        }
+                    }
+                }
+                """, variables);
+        if (response.hasError()) {
+            qc.clearNotFound();
+            return null;
+        }
+        return JsonAttribute.node.commonItemFrom(response.getData());
     }
 }

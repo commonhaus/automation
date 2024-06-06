@@ -72,4 +72,8 @@ public class DataCommonObject extends DataCommonType {
         this.url = other.url;
         this.body = other.body;
     }
+
+    public Date mostRecent() {
+        return updatedAt == null ? createdAt : updatedAt;
+    }
 }

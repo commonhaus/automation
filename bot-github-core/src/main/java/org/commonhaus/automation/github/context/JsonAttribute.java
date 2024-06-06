@@ -56,6 +56,7 @@ public enum JsonAttribute {
     answer,
     author,
     avatarUrl("avatar_url"),
+    bio,
     body,
     category,
     changes,
@@ -64,7 +65,9 @@ public enum JsonAttribute {
     comment,
     commentEdge,
     comments,
+    company,
     content,
+    createIssue,
     createdAt("created_at"),
     databaseId,
     discussion,
@@ -110,8 +113,6 @@ public enum JsonAttribute {
     url("html_url"),
     user,
     viewer,
-    company,
-    bio,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */

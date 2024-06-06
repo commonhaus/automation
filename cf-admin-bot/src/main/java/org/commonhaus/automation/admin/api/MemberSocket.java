@@ -20,9 +20,7 @@ import org.commonhaus.automation.admin.api.MemberApiResponse.Type;
 import org.commonhaus.automation.admin.github.AppContextService;
 
 import io.quarkus.logging.Log;
-import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.Authenticated;
-import io.quarkus.security.identity.SecurityIdentity;
 
 @Authenticated
 @ServerEndpoint(value = "/member/{id}/stream", encoders = MessageEncoder.class, decoders = MessageDecoder.class)
@@ -31,19 +29,11 @@ public class MemberSocket {
     @Inject
     AppContextService ctx;
 
-    @Inject // session scoped
-    UserInfo userInfo;
-
-    @Inject // session scoped
-    SecurityIdentity identity;
-
+    @Inject
     MemberSession memberProfile;
 
     @OnOpen
     public void onOpen(Session session) {
-        memberProfile = MemberSession
-                .getMemberProfile(ctx, userInfo, identity);
-
         if (!memberProfile.hasConnection()) {
             sendMessage(session, new MemberApiResponse(Type.ERROR, "Problem working with GitHub credentials."));
 

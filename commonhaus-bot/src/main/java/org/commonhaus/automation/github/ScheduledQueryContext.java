@@ -3,6 +3,7 @@ package org.commonhaus.automation.github;
 import java.util.List;
 
 import org.commonhaus.automation.github.context.ActionType;
+import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.EventType;
@@ -29,7 +30,7 @@ public class ScheduledQueryContext extends QueryContext {
         this.logId = "%s:scheduled.%s".formatted(repository.getFullName(), eventType);
     }
 
-    ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
+    public ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
         super(parent);
 
         this.repository = parent.repository;
@@ -86,5 +87,26 @@ public class ScheduledQueryContext extends QueryContext {
 
     public List<DataCommonItem> findIssuesWithLabel(String label) {
         return DataCommonItem.findIssuesWithLabel(this, label);
+    }
+
+    /**
+     * Item-scoped query context. Safe to cache comment lookups
+     */
+    public static class ScheduledItemQueryContext extends ScheduledQueryContext {
+        /** Cache comments for this event (issue specific) */
+        List<DataCommonComment> allComments;
+
+        public ScheduledItemQueryContext(ScheduledQueryContext parent, EventType eventType) {
+            super(parent, eventType);
+        }
+
+        public List<DataCommonComment> getCachedComments(String nodeId) {
+            return allComments;
+        }
+
+        /** Event-scoped comment lookup */
+        public void setCachedComments(String nodeId, List<DataCommonComment> comments) {
+            allComments = comments;
+        }
     }
 }

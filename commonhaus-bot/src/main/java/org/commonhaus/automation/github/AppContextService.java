@@ -6,6 +6,7 @@ import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.RepositoryConfigFile;
 import org.commonhaus.automation.config.BotConfig;
+import org.commonhaus.automation.github.ScheduledQueryContext.ScheduledItemQueryContext;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
@@ -48,8 +49,8 @@ public class AppContextService extends BaseContextService {
         return new ScheduledQueryContext(this, repository, installationId);
     }
 
-    public ScheduledQueryContext newScheduledQueryContext(ScheduledQueryContext qc, EventType eventType) {
-        return new ScheduledQueryContext(qc, eventType);
+    public ScheduledItemQueryContext newScheduledItemQueryContext(ScheduledQueryContext qc, EventType eventType) {
+        return new ScheduledItemQueryContext(qc, eventType);
     }
 
     public Class<RepositoryConfigFile> getConfigType() {

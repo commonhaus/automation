@@ -5,9 +5,12 @@ import java.util.Optional;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
+
 public record RepositoryDiscoveryEvent(
         DiscoveryAction action,
         GitHub github,
+        DynamicGraphQLClient graphQLClient,
         long installationId,
         GHRepository repository,
         Optional<?> repoConfig) {
