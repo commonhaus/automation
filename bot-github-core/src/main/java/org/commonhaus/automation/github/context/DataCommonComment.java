@@ -12,7 +12,6 @@ import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.Response;
 
 public class DataCommonComment extends DataCommonObject {
-
     protected static final String COMMENT_FIELDS = COMMON_OBJECT_FIELDS + """
             databaseId
             """;

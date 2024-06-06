@@ -7,6 +7,7 @@ import jakarta.websocket.DecodeException;
 import jakarta.websocket.Decoder;
 import jakarta.websocket.EncodeException;
 import jakarta.websocket.Encoder;
+import jakarta.ws.rs.core.Response;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -32,6 +33,7 @@ public class MemberApiResponse {
 
     enum Type {
         ALIAS,
+        APPLY,
         EMAIL,
         ERROR,
         HAUS,
@@ -43,21 +45,53 @@ public class MemberApiResponse {
     @JsonIgnore
     private Map<Type, Object> data = new HashMap<>();
 
-    @JsonAnyGetter
-    public Map<Type, Object> getData() {
-        return data;
-    }
-
-    @JsonAnySetter
-    public void setData(Type key, Object value) {
-        data.put(key, value);
-    }
+    @JsonIgnore
+    Response.Status status = Response.Status.OK;
 
     public MemberApiResponse() {
     }
 
     public MemberApiResponse(Type key, Object payload) {
         setData(key, payload);
+    }
+
+    @JsonAnyGetter
+    public Map<Type, Object> getData() {
+        return data;
+    }
+
+    @JsonAnySetter
+    public MemberApiResponse setData(Type key, Object value) {
+        data.put(key, value);
+        return this;
+    }
+
+    public MemberApiResponse addAll(MemberApiResponse data2) {
+        for (Map.Entry<Type, Object> entry : data2.getData().entrySet()) {
+            data.put(entry.getKey(), entry.getValue());
+        }
+        return this;
+    }
+
+    public <T> T value(Type key, Class<T> clazz) {
+        return clazz.cast(data.get(key));
+    }
+
+    public Response.Status status() {
+        return status;
+    }
+
+    public MemberApiResponse responseStatus(Response.Status status) {
+        this.status = status;
+        return this;
+    }
+
+    public Response finish() {
+        return this.status() == Response.Status.OK
+                ? Response.ok(this).build()
+                : Response.status(this.status())
+                        .entity(this)
+                        .build();
     }
 
     public static class MessageEncoder implements Encoder.Text<MemberApiResponse> {
@@ -84,12 +118,6 @@ public class MemberApiResponse {
         @Override
         public boolean willDecode(String msg) {
             return true;
-        }
-    }
-
-    public void addAll(MemberApiResponse data2) {
-        for (Map.Entry<Type, Object> entry : data2.getData().entrySet()) {
-            data.put(entry.getKey(), entry.getValue());
         }
     }
 }

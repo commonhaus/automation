@@ -13,7 +13,8 @@ import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.identity.SecurityIdentity;
 
 public class MemberSession {
-    static MemberSession getMemberProfile(AppContextService ctx, UserInfo userInfo, SecurityIdentity identity) {
+
+    static MemberSession getMemberSession(AppContextService ctx, UserInfo userInfo, SecurityIdentity identity) {
         // Lookup based on userInfo, replace with cached session data if present
         final MemberSession lookup = new MemberSession(userInfo);
 
@@ -27,12 +28,12 @@ public class MemberSession {
         return memberProfile;
     }
 
-    final String nodeId;
-    final UserInfo userInfo;
+    private final String nodeId;
+    private final UserInfo userInfo;
 
-    GitHub connection;
-    GHMyself myself;
-    GitHubUser userData;
+    private GitHub connection;
+    private GHMyself myself;
+    private GitHubUser userData;
 
     private MemberSession(UserInfo userInfo) {
         this.userInfo = userInfo;
@@ -135,10 +136,5 @@ public class MemberSession {
 
     public Set<String> roles() {
         return getUserData().roles;
-    }
-
-    public boolean userIsKnown() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'userIsKnown'");
     }
 }

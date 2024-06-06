@@ -47,7 +47,6 @@ public abstract class QueryContext {
 
     protected GitHub github;
     protected DynamicGraphQLClient graphQLClient;
-    List<DataCommonComment> allComments;
 
     protected QueryContext(ContextService contextService, long installationId) {
         this.ctx = contextService;
@@ -332,13 +331,24 @@ public abstract class QueryContext {
         return false;
     }
 
+    /** Item-scoped comment lookup; doesn't always apply */
+    public List<DataCommonComment> getCachedComments(String nodeId) {
+        return null;
+    }
+
+    /** Item-scoped comment lookup; doesn't always apply */
+    public void setCachedComments(String nodeId, List<DataCommonComment> comments) {
+        // No-op
+    }
+
     public List<DataCommonComment> getComments(String nodeId, Predicate<DataCommonComment> filter) {
-        List<DataCommonComment> comments = allComments;
+        List<DataCommonComment> comments = getCachedComments(nodeId);
         if (comments == null) {
             if (hasErrors()) {
                 return List.of();
             }
-            comments = allComments = DataCommonComment.queryComments(this, nodeId);
+            comments = DataCommonComment.queryComments(this, nodeId);
+            setCachedComments(nodeId, comments);
         }
         return comments.stream().filter(c -> filter.test(c)).toList();
     }
@@ -417,25 +427,60 @@ public abstract class QueryContext {
         return botComment;
     }
 
-    public void updateItemDescription(EventType eventType, String nodeId, String bodyString) {
+    public DataCommonItem getItem(EventType eventType, String nodeId) {
+        if (hasErrors()) {
+            Log.debugf("[%s] getItem skipping due to errors", getLogId());
+            return null;
+        }
+        return switch (eventType) {
+            case discussion ->
+                DataDiscussion.queryDiscussion(this, nodeId);
+            case issue, pull_request ->
+                DataCommonItem.queryItem(this, nodeId);
+            default -> {
+                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                yield null;
+            }
+        };
+    }
+
+    public DataCommonItem createItem(EventType eventType, String title, String description) {
+        if (hasErrors()) {
+            Log.debugf("[%s] getItem skipping due to errors", getLogId());
+            return null;
+        }
+        return switch (eventType) {
+            case issue ->
+                DataCommonItem.createIssue(this, title, description);
+            default -> {
+                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                yield null;
+            }
+        };
+    }
+
+    public DataCommonItem updateItemDescription(EventType eventType, String nodeId, String bodyString) {
         if (isDryRun()) {
             Log.debugf("[%s] updateItemDescription would set body to: %s", getLogId(), bodyString);
-            return;
+            return null;
         }
         if (hasErrors()) {
             Log.debugf("[%s] updateItemDescription skipping due to errors", getLogId());
-            return;
+            return null;
         }
 
-        switch (eventType) {
+        return switch (eventType) {
             case discussion, discussion_comment ->
                 DataDiscussion.editDiscussion(this, nodeId, bodyString);
             case issue, issue_comment ->
                 DataCommonItem.editIssueDescription(this, nodeId, bodyString);
             case pull_request, pull_request_review ->
                 DataCommonItem.editPullRequestDescription(this, nodeId, bodyString);
-            default -> logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
-        }
+            default -> {
+                logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
+                yield null;
+            }
+        };
     }
 
     public List<DataPullRequestReview> queryReviews(String nodeId) {

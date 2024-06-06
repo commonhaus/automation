@@ -3,6 +3,7 @@ package org.commonhaus.automation.admin.github;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +19,9 @@ import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.AdminConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.ApplicationData;
+import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
+import org.commonhaus.automation.admin.api.ApplicationData.Feedback;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
@@ -27,6 +31,9 @@ import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
+import org.commonhaus.automation.github.context.DataCommonComment;
+import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
@@ -51,28 +58,24 @@ import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkiverse.githubapp.GitHubConfigFileProvider;
 import io.quarkus.logging.Log;
 import io.quarkus.oidc.AccessTokenCredential;
-import io.quarkus.runtime.annotations.ConfigItem;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 @Singleton
 public class AppContextService extends BaseContextService {
 
+    @RestClient
+    ForwardEmailClient forwardEmailClient;
+
     Map<String, ScopedQueryContext> scopedContexts = new ConcurrentHashMap<>();
 
     UserManagementConfig userConfig = UserManagementConfig.DISABLED;
-
-    @RestClient
-    ForwardEmailClient forwardEmailClient;
 
     private static ObjectMapper yamlMapper;
 
     final AdminConfig adminData;
 
     final Set<String> attestationIds = new HashSet<>();
-
-    @ConfigItem(defaultValue = "${quarkus.github-app.instance-endpoint}/graphql")
-    String graphqlApiEndpoint;
 
     public AppContextService(BotConfig data, AdminConfig adminData,
             GitHubClientProvider gitHubClientProvider,
@@ -158,7 +161,8 @@ public class AppContextService extends BaseContextService {
             refreshScopedQueryContext(
                     repoEvent.github(),
                     repo,
-                    repoEvent.installationId());
+                    repoEvent.installationId())
+                    .addExisting(repoEvent.graphQLClient());
         }
 
         Optional<AdminConfigFile> repoConfig = repoEvent.getRepositoryConfig();
@@ -200,10 +204,6 @@ public class AppContextService extends BaseContextService {
         return adminData.memberHome();
     }
 
-    public String getGraphQlUrl() {
-        return graphqlApiEndpoint;
-    }
-
     public void updateValidAttestations(ScopedQueryContext qc) {
         if (userConfig.isDisabled()) {
             return;
@@ -213,9 +213,7 @@ public class AppContextService extends BaseContextService {
             List<String> newIds = new ArrayList<>();
             JsonNode attestations = agreements.get("attestations");
             if (attestations != null && attestations.isObject()) {
-                attestations.fields().forEachRemaining(entry -> {
-                    newIds.add(entry.getKey());
-                });
+                attestations.fields().forEachRemaining(entry -> newIds.add(entry.getKey()));
             }
             attestationIds.addAll(newIds);
             attestationIds.retainAll(newIds);
@@ -380,7 +378,7 @@ public class AppContextService extends BaseContextService {
             return null;
         }
         int at = email.indexOf('@');
-        String name = email.substring(0, at);
+        String name = at < 0 ? email : email.substring(0, at);
         String domain = at < 0 ? userConfig.defaultAliasDomain() : email.substring(at + 1);
 
         Alias alias = getAlias(email, false);
@@ -442,8 +440,54 @@ public class AppContextService extends BaseContextService {
         return yamlMapper;
     }
 
-    public Entry<String, String>[] teamRoles() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'teamRoles'");
+    public ApplicationData getOpenApplication(MemberSession session, String applicationId) {
+        if (applicationId == null) {
+            return null;
+        }
+        ScopedQueryContext qc = getDatastoreContext();
+        DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
+        ApplicationData application = new ApplicationData(session, issue);
+        if (application.isOwner()) {
+            Feedback feedback = getFeedback(qc, applicationId, issue.mostRecent());
+            if (feedback != null) {
+                application.setFeedback(feedback);
+            }
+        }
+        return application;
+    }
+
+    public ApplicationData updateApplication(MemberSession session, String applicationId,
+            ApplicationPost applicationPost) {
+        if (applicationPost == null) {
+            return null;
+        }
+        if (applicationId != null) {
+            ApplicationData existing = getOpenApplication(session, applicationId);
+            if (existing == null || existing.notOwner()) {
+                return existing;
+            }
+        }
+
+        ScopedQueryContext qc = getDatastoreContext();
+        String description = ApplicationData.updateDescription(applicationPost);
+
+        DataCommonItem item = applicationId == null
+                ? qc.createItem(EventType.issue,
+                        ApplicationData.createTitle(session),
+                        description)
+                : qc.updateItemDescription(EventType.issue, applicationId, description);
+
+        return item == null
+                ? null
+                : new ApplicationData(session, item);
+    }
+
+    Feedback getFeedback(ScopedQueryContext qc, String nodeId, Date mostRecent) {
+        List<DataCommonComment> comments = qc.getComments(nodeId,
+                x -> ApplicationData.isUserFeedback(x.body) && ApplicationData.isNewer(x, mostRecent));
+
+        return (comments == null || comments.isEmpty())
+                ? null
+                : new Feedback(comments.get(0));
     }
 }

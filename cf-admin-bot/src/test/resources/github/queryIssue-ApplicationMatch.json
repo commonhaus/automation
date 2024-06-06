@@ -1,0 +1,18 @@
+{
+  "node": {
+    "id": "I_kwDOL8tG0s6LSQkK",
+    "author": {
+      "login": "commonhaus-bot",
+      "url": "https://api.github.com/users/commonhaus-bot",
+      "avatar_url": "https://avatars.githubusercontent.com/u/156364140?v=4"
+    },
+    "body": "",
+    "createdAt": "2024-06-05T20:56:05Z",
+    "updatedAt": "2024-06-05T20:56:05Z",
+    "url": "https://github.com/commonhaus-test/ops-test/issues/1",
+    "number": 1,
+    "title": "Membership application: Any Name (commonhaus-bot)",
+    "closed": false,
+    "closedAt": null
+  }
+}

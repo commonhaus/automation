@@ -10,9 +10,6 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.github.AppContextService;
 
-import io.quarkus.oidc.UserInfo;
-import io.quarkus.security.identity.SecurityIdentity;
-
 @Interceptor
 @KnownUser
 public class KnownUserInterceptor implements Serializable {
@@ -21,14 +18,10 @@ public class KnownUserInterceptor implements Serializable {
     AppContextService appCtx;
 
     @Inject
-    UserInfo userInfo;
-
-    @Inject
-    SecurityIdentity identity;
+    MemberSession session;
 
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
-        MemberSession session = MemberSession.getMemberProfile(appCtx, userInfo, identity);
         if (appCtx.userIsKnown(session)) {
             return ctx.proceed();
         }

@@ -6,6 +6,7 @@ import java.util.List;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.context.ActionType;
+import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
@@ -22,12 +23,18 @@ import org.kohsuke.github.GHRepository;
  * queries.
  * <p>
  * It is not thread-safe.
+ *
+ * This context is Event-scoped, and is focused on changes to a specific item
+ * (issue, pull request, etc.).
  */
 public class EventQueryContext extends QueryContext {
     /**
      * Event data used to construct this query context
      */
     private final EventData event;
+
+    /** Cache comments for this event (issue specific) */
+    List<DataCommonComment> allComments;
 
     /** Package private. Constructed by QueryHelper */
     EventQueryContext(AppContextService helper, EventData event) {
@@ -91,5 +98,14 @@ public class EventQueryContext extends QueryContext {
 
     public Collection<DataLabel> removeLabels(List<String> labels) {
         return removeLabels(event.getNodeId(), labels);
+    }
+
+    public List<DataCommonComment> getCachedComments(String nodeId) {
+        return allComments;
+    }
+
+    /** Event-scoped comment lookup */
+    public void setCachedComments(String nodeId, List<DataCommonComment> comments) {
+        allComments = comments;
     }
 }

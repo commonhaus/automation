@@ -1,8 +1,6 @@
 package org.commonhaus.automation.admin.api;
 
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -64,7 +62,7 @@ public class CommonhausUser {
 
     public static class ForwardEmail {
         /** Is an alias active for this user */
-        boolean active;
+        boolean configured;
 
         /** Additional ForwardEmail aliases. Optional and rare. */
         @JsonAlias("alt_alias")
@@ -126,6 +124,8 @@ public class CommonhausUser {
         GoodStanding goodUntil = new GoodStanding();
 
         Services services = new Services();
+
+        String applicationId;
     }
 
     @NotNull
@@ -180,17 +180,6 @@ public class CommonhausUser {
 
     public void setConflict(boolean conflict) {
         this.conflict = conflict;
-    }
-
-    public void appendAttestation(MemberStatus userStatus, AttestationPost post) {
-        LocalDate date = LocalDate.now().plusYears(1);
-
-        Attestation attestation = new Attestation(
-                userStatus,
-                date.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                post.version());
-
-        data.goodUntil.attestation.put(post.id, attestation);
     }
 
     @Override

@@ -81,10 +81,30 @@ public class DataDiscussion extends DataCommonItem {
         return allDiscussions;
     }
 
+    static DataDiscussion queryDiscussion(QueryContext qc, String nodeId) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("id", nodeId);
+
+        Response response = qc.execQuerySync("""
+                query($id: ID!) {
+                    node(id: $id) {
+                        ... on Discussion {
+                            """ + DISCUSSION_FIELDS + """
+                        }
+                    }
+                }
+                """, variables);
+        if (response.hasError()) {
+            qc.clearNotFound();
+            return null;
+        }
+        return new DataDiscussion(JsonAttribute.node.jsonObjectFrom(response.getData()));
+    }
+
     /**
      * package private. See QueryHelper / QueryContext
      */
-    static void editDiscussion(QueryContext qc, String nodeId,
+    static DataDiscussion editDiscussion(QueryContext qc, String nodeId,
             String modifiedText) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
@@ -103,8 +123,8 @@ public class DataDiscussion extends DataCommonItem {
                 variables);
         if (response.hasError()) {
             qc.clearNotFound();
-            return;
+            return null;
         }
-        JsonAttribute.discussion.discussionFrom(response.getData());
+        return JsonAttribute.discussion.discussionFrom(response.getData());
     }
 }
