@@ -27,7 +27,7 @@ egc:
   - project: jreleaser
     login: user5
   - project: morphia
-    login: user6
+    login: user12
   - project: openrewrite
     login: user7
   - project: jackson

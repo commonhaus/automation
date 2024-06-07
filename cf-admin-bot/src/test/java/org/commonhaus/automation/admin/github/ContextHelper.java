@@ -102,11 +102,15 @@ public class ContextHelper extends QueryContext {
             if (i % 3 == 0) {
                 council.add(user);
             }
-            if (i % 4 == 0) {
+            if (i % 6 == 0) {
                 voting.add(user);
             }
             when(gh.getUser(login)).thenReturn(user);
         }
+
+        System.out.println("testQuorum " + testQuorum.stream().map(GHUser::getLogin).toList());
+        System.out.println("council " + council.stream().map(GHUser::getLogin).toList());
+        System.out.println("voting " + voting.stream().map(GHUser::getLogin).toList());
 
         setupMockTeam("team-quorum-default", org, testQuorum);
         setupMockTeam("cf-council", org, council);
