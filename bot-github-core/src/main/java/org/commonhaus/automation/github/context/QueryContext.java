@@ -297,6 +297,14 @@ public abstract class QueryContext {
         });
     }
 
+    public GHTeam getTeam(GHOrganization org, String relativeName) {
+        return execGitHubSync((gh, dryRun) -> {
+            GHTeam team = org.getTeamByName(relativeName);
+            clearNotFound();
+            return team;
+        });
+    }
+
     public boolean isBot(String login) {
         String botLogin = BOT_LOGIN.computeIfAbsent("" + getInstallationId(), k -> {
             Response response = execQuerySync("""
@@ -650,9 +658,9 @@ public abstract class QueryContext {
         }
     }
 
-    Set<GHUser> teamMembers(String teamFullName) {
+    public Set<GHUser> teamMembers(String teamFullName) {
         String orgName = toOrganizationName(teamFullName);
-        String relativeName = teamFullName.replace(orgName + "/", "");
+        String relativeName = toRelativeName(orgName, teamFullName);
 
         GHOrganization org = getOrganization(orgName);
         Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
@@ -684,5 +692,13 @@ public abstract class QueryContext {
     public static String toOrganizationName(String fullName) {
         int pos = fullName.indexOf('/');
         return pos < 0 ? fullName : fullName.substring(0, pos);
+    }
+
+    public static String toRelativeName(String orgName, String fullName) {
+        return fullName.replace(orgName + "/", "");
+    }
+
+    public static String toFullName(String orgName, String relativeName) {
+        return orgName + "/" + relativeName;
     }
 }

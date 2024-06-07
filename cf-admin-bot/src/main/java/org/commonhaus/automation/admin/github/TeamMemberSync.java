@@ -1,7 +1,7 @@
 package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -26,6 +26,7 @@ import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
+import org.commonhaus.automation.github.context.DataTeam;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;
@@ -191,7 +192,8 @@ public class TeamMemberSync {
             if (sourceTeamData != null && sourceTeamData.isArray()) {
                 Log.debugf("syncTeamMembership: field %s from %s to %s", field, groupName, sync.teams());
 
-                List<String> logins = new ArrayList<>();
+                Set<String> logins = new HashSet<>();
+                logins.addAll(sync.preserveUsers(defaults));
                 for (JsonNode member : sourceTeamData) {
                     JsonNode node = member.get(field);
                     String login = node == null || !node.isTextual() ? null : node.asText();
@@ -208,7 +210,7 @@ public class TeamMemberSync {
                         if (!targetTeam.contains("/")) {
                             targetTeam = repo.getFullName() + "/" + targetTeam;
                         }
-                        doSyncTeamMembers(source, targetTeam, logins, sync.preserveUsers(defaults), qc.dryRunEmailAddress());
+                        doSyncTeamMembers(source, targetTeam, logins, qc.dryRunEmailAddress());
                     } catch (Throwable t) {
                         qc.logAndSendEmail("doSyncTeamMembers", "Error syncing team members", t);
                     }
@@ -219,12 +221,11 @@ public class TeamMemberSync {
         }
     }
 
-    void doSyncTeamMembers(TeamSourceConfig config, String fullTeamName, List<String> sourceLogins,
-            List<String> preserveUsers, String[] dryRunEmail) {
+    void doSyncTeamMembers(TeamSourceConfig config, String fullTeamName, Set<String> sourceLogins, String[] dryRunEmail) {
         boolean productionRun = !config.dryRun();
 
         String orgName = ScopedQueryContext.toOrganizationName(fullTeamName);
-        String relativeName = fullTeamName.replace(orgName + "/", "");
+        String relativeName = ScopedQueryContext.toRelativeName(orgName, fullTeamName);
 
         ScopedQueryContext qc = ctx.getScopedQueryContext(orgName);
         GHOrganization org = qc == null ? null : qc.getOrganization(orgName);
@@ -233,82 +234,67 @@ public class TeamMemberSync {
             return;
         }
 
-        Logins allLogins = qc.execGitHubSync((gh, dryRun) -> {
-            // fetch the team: make sure we have the latest
-            GHTeam team = org.getTeamByName(relativeName);
-            if (team == null) {
-                Log.warnf("doSyncTeamMembers: team %s not found in %s", relativeName, orgName);
-                return null;
+        GHTeam team = qc.getTeam(org, relativeName);
+        if (team == null) {
+            Log.warnf("doSyncTeamMembers: team %s not found in %s", relativeName, orgName);
+            return;
+        }
+
+        // Use GraphQL to get the _immediate_ team members (exclude child teams)
+        List<String> currentLogins = DataTeam.queryImmediateTeamMemberLogin(qc, orgName, relativeName);
+
+        Set<String> toAdd = new HashSet<>(sourceLogins);
+        Set<String> toRemove = new HashSet<>();
+
+        currentLogins.forEach(user -> {
+            if (sourceLogins.contains(user)) {
+                toAdd.remove(user); // already in team
+            } else {
+                Log.infof("doSyncTeamMembers: remove %s from %s", user, fullTeamName);
+                toRemove.add(user);
             }
-            Set<GHUser> original = team.getMembers();
-            Set<GHUser> finalLogins = new HashSet<>();
-            Set<GHUser> added = new HashSet<>();
-            Set<GHUser> removed = new HashSet<>();
+        });
 
-            Set<String> toAdd = new HashSet<>(sourceLogins);
-            toAdd.addAll(preserveUsers);
-
-            original.forEach(user -> {
-                if (sourceLogins.contains(user.getLogin())) {
-                    toAdd.remove(user.getLogin()); // already in team
-                    finalLogins.add(user);
-                } else if (!preserveUsers.contains(user.getLogin())) {
-                    Log.infof("doSyncTeamMembers: removing %s from %s", user.getLogin(), relativeName);
-                    removed.add(user);
-                    if (productionRun) {
-                        try {
-                            team.remove(user);
-                        } catch (IOException e) {
-                            qc.logAndSendEmail("doSyncTeamMembers",
-                                    "failed to remove %s to %s".formatted(user.getLogin(), fullTeamName), e);
-                        }
-                    }
+        if (productionRun) {
+            // Membership events will update the team cache; do nothing with the cache here.
+            qc.execGitHubSync((gh, dryRun) -> {
+                if (dryRun) {
+                    return null;
                 }
-            });
-
-            if (!toAdd.isEmpty()) {
-                Log.infof("doSyncTeamMembers: adding %s to %s", toAdd, fullTeamName);
                 for (String login : toAdd) {
                     try {
                         GHUser user = gh.getUser(login);
-                        if (user == null) {
-                            Log.warnf("doSyncTeamMembers: user %s not found", login);
-                            continue;
-                        }
-                        added.add(user);
-                        finalLogins.add(user);
-
-                        if (productionRun) {
-                            try {
-                                team.add(user);
-                            } catch (IOException e) {
-                                qc.logAndSendEmail("doSyncTeamMembers",
-                                        "failed to add %s to %s".formatted(user.getLogin(), fullTeamName), e);
-                            }
-                        }
-                    } catch (Exception e) {
-                        qc.logAndSendEmail("doSyncTeamMembers",
-                                "failed to add %s to %s".formatted(login, relativeName), e);
+                        team.add(user);
+                    } catch (IOException e) {
+                        Log.warnf("doSyncTeamMembers: failed to add %s to %s", login, fullTeamName);
                     }
                 }
-            }
-            return new Logins(original, added, removed, finalLogins);
-        });
+                for (String login : toRemove) {
+                    try {
+                        GHUser user = gh.getUser(login);
+                        team.remove(user);
+                    } catch (IOException e) {
+                        Log.warnf("doSyncTeamMembers: failed to remove %s from %s", login, fullTeamName);
+                    }
+                }
+                return null;
+            });
 
-        Log.infof("doSyncTeamMembers: %s has %d members", fullTeamName, allLogins.updated.size());
-
-        if (productionRun) {
-            qc.updateTeamList(fullTeamName, allLogins.updated);
         } else {
+            Set<String> finalLogins = new HashSet<>(currentLogins);
+            finalLogins.addAll(toAdd);
+            finalLogins.removeAll(toRemove);
+
+            Logins allLogins = new Logins(currentLogins, toAdd, toRemove, finalLogins);
             sendDryRunEmail(fullTeamName, allLogins, dryRunEmail);
         }
     }
 
     record Logins(
-            Set<GHUser> previous,
-            Set<GHUser> added,
-            Set<GHUser> removed,
-            Set<GHUser> updated) {
+            Collection<String> previous,
+            Collection<String> added,
+            Collection<String> removed,
+            Collection<String> updated) {
     }
 
     void sendDryRunEmail(String fullTeamName, Logins logins, String[] dryRunEmail) {
@@ -347,21 +333,21 @@ public class TeamMemberSync {
         ctx.sendEmail("sendDryRunEmail|", title, txtBody, htmlBody, dryRunEmail);
     }
 
-    public String toPlainList(Set<GHUser> members) {
+    public String toPlainList(Collection<String> members) {
         if (members == null || members.isEmpty()) {
             return "none";
         }
         return members.stream()
-                .map(x -> "- %s (%s)".formatted(x.getLogin(), x.getHtmlUrl()))
+                .map(x -> "- %s".formatted(x))
                 .collect(Collectors.joining("\n"));
     }
 
-    public String toHtmlList(Set<GHUser> members) {
+    public String toHtmlList(Collection<String> members) {
         if (members == null || members.isEmpty()) {
             return "none";
         }
         return "<ul>\n" + members.stream()
-                .map(x -> "<li><a href=\"%s\">%s</a></li>".formatted(x.getHtmlUrl(), x.getLogin()))
+                .map(x -> "<li>%s</li>".formatted(x))
                 .collect(Collectors.joining("\n"))
                 + "\n</ul>";
     }

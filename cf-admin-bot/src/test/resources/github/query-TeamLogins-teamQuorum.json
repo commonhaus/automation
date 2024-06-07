@@ -1,0 +1,35 @@
+{
+  "organization": {
+    "team": {
+      "members": {
+        "nodes": [
+          {
+            "login": "user8"
+          },
+          {
+            "login": "user2"
+          },
+          {
+            "login": "user6"
+          },
+          {
+            "login": "user4"
+          },
+          {
+            "login": "user14"
+          },
+          {
+            "login": "user10"
+          },
+          {
+            "login": "user12"
+          }
+        ],
+        "pageInfo": {
+          "endCursor": "Y3Vyc29yOnYyOpHOAAxXCQ==",
+          "hasNextPage": false
+        }
+      }
+    }
+  }
+}

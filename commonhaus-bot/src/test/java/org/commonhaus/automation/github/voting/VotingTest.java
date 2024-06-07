@@ -766,6 +766,7 @@ public class VotingTest extends ContextHelper {
         EventQueryContext qc = Mockito.mock(EventQueryContext.class);
         when(qc.getOrganization()).thenReturn(org);
         when(qc.getTeamList(anyString())).thenCallRealMethod();
+        when(qc.teamMembers(anyString())).thenCallRealMethod();
 
         List<DataReaction> teamReactions = new ArrayList<>(51);
         Set<GHUser> teamUsers = new HashSet<>(51);
