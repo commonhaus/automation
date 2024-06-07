@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import jakarta.inject.Inject;
 
@@ -22,6 +23,7 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
+import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -67,7 +69,39 @@ public class TeamMemberSyncTest extends ContextHelper {
         await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 3);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(3);
+        List<Mail> mailList = mailbox.getMailsSentTo("dry-run@example.com");
+        assertThat(mailList).hasSize(3);
+
+        for (Mail m : mailList) {
+            String subject = m.getSubject();
+            String body = m.getText();
+            String finalGroup = body.replaceAll("(?s).*?(Final:.*)", "$1");
+            System.out.println("final group: " + finalGroup);
+
+            // see test CONTACTS.yaml for group members
+            // see cf-admin.yml for sync parameters
+            if (subject.contains("commonhaus-test/cf-council") || subject.contains("commonhaus-test/cf-voting")) {
+                // cf-council and cf-voting should be the same
+                assertTeamLogins(finalGroup,
+                        List.of("user1 ()", "user2 ()", "user3 ()", "user9 ()"));
+            }
+            if (subject.contains("commonhaus-test/team-quorum-default")) {
+                // team quorum has different membership + other preserved value
+                assertTeamLogins(finalGroup,
+                        List.of("user4 ()", "user5 ()", "user6 ()", "user7 ()", "user8 ()", "user9 ()", "user12 ()"));
+            }
+        }
+    }
+
+    void assertTeamLogins(String text, List<String> logins) {
+        for (int i = 1; i < 15; i++) {
+            String login = "user" + i + " ()";
+            if (logins.contains(login)) {
+                assertThat(text).contains(login);
+            } else {
+                assertThat(text).doesNotContain(login);
+            }
+        }
     }
 
     @Test

@@ -29,6 +29,7 @@ import io.quarkus.security.Authenticated;
 @Authenticated
 @ApplicationScoped
 public class MemberAliasesResource {
+    final static String ID = "email";
     @Inject
     AppContextService ctx;
 
@@ -47,14 +48,14 @@ public class MemberAliasesResource {
             if (!user.status().mayHaveEmail()) {
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
-            if (!ctx.validAttestation("email")) {
+            if (!ctx.validAttestation(ID)) {
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
 
             Services services = user.services();
             ForwardEmail forwardEmail = services.forwardEmail();
 
-            boolean possibleMissingActive = !forwardEmail.configured && ctx.validAttestation("email");
+            boolean possibleMissingActive = !forwardEmail.configured && ctx.validAttestation(ID);
             boolean checkAlias = forwardEmail.configured || possibleMissingActive;
 
             Map<String, Alias> aliasMap = Map.of();
@@ -94,7 +95,7 @@ public class MemberAliasesResource {
             if (!user.status().mayHaveEmail()) {
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
-            if (!ctx.validAttestation("email")) {
+            if (!ctx.validAttestation(ID)) {
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
 
@@ -151,7 +152,7 @@ public class MemberAliasesResource {
             // ForwardEmail forwardEmail = user.services().forwardEmail();
 
             // boolean possibleMissingActive = !forwardEmail.active &&
-            // ctx.validAttestation("email");
+            // ctx.validAttestation(ID);
             // boolean generatePassword = (forwardEmail.active || possibleMissingActive);
             // if (generatePassword && !forwardEmail.validAddress(alias.email(),
             // memberSession.login(), ctx.getDefaultDomain())) {

@@ -12,6 +12,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public record TeamSourceConfig(
         String path,
         String repo,
+        Defaults defaults,
         Map<String, SyncToTeams> sync,
         @JsonAlias("dry_run") Boolean dryRun) {
 
@@ -45,6 +46,26 @@ public record TeamSourceConfig(
         return Objects.hash(path, repo);
     }
 
+    public record Defaults(
+            String field,
+            @JsonAlias("preserve_users") List<String> preserveUsers) {
+        @Override
+        public String field() {
+            return field == null ? "login" : field;
+        }
+
+        @Override
+        public List<String> preserveUsers() {
+            return preserveUsers == null ? List.of() : preserveUsers;
+        }
+
+        @Override
+        public String toString() {
+            return "SyncToTeams{field='%s', preserveUsers=%s}"
+                    .formatted(field, preserveUsers);
+        }
+    }
+
     public record SyncToTeams(
             String field,
             List<String> teams,
@@ -60,15 +81,23 @@ public record TeamSourceConfig(
             return preserveUsers == null ? List.of() : preserveUsers;
         }
 
+        public List<String> preserveUsers(Defaults defaults) {
+            return preserveUsers == null ? defaults.preserveUsers() : preserveUsers;
+        }
+
         @Override
         public String field() {
             return field == null ? "login" : field;
         }
 
+        public String field(Defaults defaults) {
+            return field == null ? defaults.field() : field;
+        }
+
         @Override
         public String toString() {
-            return "SyncToTeams{field='%s', teams=%s}"
-                    .formatted(field, teams);
+            return "SyncToTeams{field='%s', preserveUsers=%s, teams=%s}"
+                    .formatted(field, preserveUsers, teams);
         }
     }
 }

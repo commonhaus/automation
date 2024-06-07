@@ -24,6 +24,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig;
+import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.kohsuke.github.GHEventPayload;
@@ -179,11 +180,12 @@ public class TeamMemberSync {
             return;
         }
 
+        Defaults defaults = source.defaults();
         // sync team membership
         for (Map.Entry<String, SyncToTeams> entry : source.sync().entrySet()) {
             String groupName = entry.getKey();
             SyncToTeams sync = entry.getValue();
-            String field = sync.field();
+            String field = sync.field(defaults);
 
             JsonNode sourceTeamData = data.get(groupName);
             if (sourceTeamData != null && sourceTeamData.isArray()) {
@@ -206,7 +208,7 @@ public class TeamMemberSync {
                         if (!targetTeam.contains("/")) {
                             targetTeam = repo.getFullName() + "/" + targetTeam;
                         }
-                        doSyncTeamMembers(source, targetTeam, logins, qc.dryRunEmailAddress());
+                        doSyncTeamMembers(source, targetTeam, logins, sync.preserveUsers(defaults), qc.dryRunEmailAddress());
                     } catch (Throwable t) {
                         qc.logAndSendEmail("doSyncTeamMembers", "Error syncing team members", t);
                     }
@@ -218,7 +220,7 @@ public class TeamMemberSync {
     }
 
     void doSyncTeamMembers(TeamSourceConfig config, String fullTeamName, List<String> sourceLogins,
-            String[] dryRunEmail) {
+            List<String> preserveUsers, String[] dryRunEmail) {
         boolean productionRun = !config.dryRun();
 
         String orgName = ScopedQueryContext.toOrganizationName(fullTeamName);
@@ -244,11 +246,13 @@ public class TeamMemberSync {
             Set<GHUser> removed = new HashSet<>();
 
             Set<String> toAdd = new HashSet<>(sourceLogins);
+            toAdd.addAll(preserveUsers);
+
             original.forEach(user -> {
                 if (sourceLogins.contains(user.getLogin())) {
                     toAdd.remove(user.getLogin()); // already in team
                     finalLogins.add(user);
-                } else {
+                } else if (!preserveUsers.contains(user.getLogin())) {
                     Log.infof("doSyncTeamMembers: removing %s from %s", user.getLogin(), relativeName);
                     removed.add(user);
                     if (productionRun) {

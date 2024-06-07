@@ -7,16 +7,18 @@ groupManagement:
   sources:
   - path: CONTACTS.yaml
     repo: commonhaus/foundation
+    defaults:
+      field: login
+      preserveUsers:
+        - user6
     sync:
       cf-council:
-        field: login
-        preserve_users:
-          - user12
+        preserveUsers:
+          - user9
         teams:
           - commonhaus-test/cf-council
           - commonhaus-test/cf-voting
       egc:
-        field: login
         teams:
           - commonhaus-test/team-quorum-default
     dryRun: true
