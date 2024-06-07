@@ -3,9 +3,12 @@ package org.commonhaus.automation.admin.config;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public class UserManagementConfig extends RepositoryConfig {
 
     public static final UserManagementConfig DISABLED = new UserManagementConfig() {

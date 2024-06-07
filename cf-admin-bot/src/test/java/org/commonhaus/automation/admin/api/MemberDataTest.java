@@ -57,7 +57,7 @@ import io.smallrye.graphql.client.Response;
 
 @QuarkusTest
 @GitHubAppTest
-@TestHTTPEndpoint(MemberApi.class)
+@TestHTTPEndpoint(MemberResource.class)
 public class MemberDataTest extends ContextHelper {
 
     @Inject
@@ -415,6 +415,9 @@ public class MemberDataTest extends ContextHelper {
 
         mockExistingCommonhausData();
 
+        // update to remove applicationId
+        GHContentBuilder builder = mockUpdateCommonhausData();
+
         given()
                 .log().all()
                 .when()
@@ -422,6 +425,12 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(404);
+
+        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(builder).content(contentCaptor.capture());
+
+        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        assertThat(result.data.applicationId).isNull();
     }
 
     @Test
@@ -438,6 +447,9 @@ public class MemberDataTest extends ContextHelper {
 
         mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
 
+        // update to remove applicationId
+        GHContentBuilder builder = mockUpdateCommonhausData();
+
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationBadTitle.json");
         when(mockContext.mocks.installationGraphQLClient(installationId)
                 .executeSync(contains("query($id: ID!) {"), anyMap()))
@@ -450,6 +462,12 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(403);
+
+        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(builder).content(contentCaptor.capture());
+
+        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        assertThat(result.data.applicationId).isNull();
     }
 
     @Test
@@ -483,7 +501,7 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body("APPLY.feedback.content", equalTo("Feedback"));
+                .body("APPLY.feedback.htmlContent", equalTo("<p>Feedback</p>\n"));
     }
 
     void mockExistingCommonhausData() throws IOException {

@@ -10,6 +10,8 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.github.AppContextService;
 
+import io.quarkus.logging.Log;
+
 @Interceptor
 @KnownUser
 public class KnownUserInterceptor implements Serializable {
@@ -22,7 +24,9 @@ public class KnownUserInterceptor implements Serializable {
 
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
-        if (appCtx.userIsKnown(session)) {
+        if (session.userIsKnown(appCtx)) {
+            Log.debugf("[%s] Known User %s, %s", session.nodeId(), session.login(), session.roles());
+
             return ctx.proceed();
         }
         return Response.status(Response.Status.FORBIDDEN).build();

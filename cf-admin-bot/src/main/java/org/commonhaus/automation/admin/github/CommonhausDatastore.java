@@ -15,6 +15,9 @@ import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.HttpException;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.quarkus.logging.Log;
 import io.quarkus.vertx.ConsumeEvent;
 import io.smallrye.common.annotation.Blocking;
@@ -29,6 +32,9 @@ public class CommonhausDatastore {
 
     @Inject
     AppContextService ctx;
+
+    @Inject
+    ObjectMapper mapper;
 
     Executor executor = Infrastructure.getDefaultWorkerPool();
 
@@ -99,7 +105,10 @@ public class CommonhausDatastore {
     public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
         final String key = event.login() + ":" + event.id();
 
-        CommonhausUser result = event.refresh() ? null : AdminDataCache.COMMONHAUS_DATA.get(key);
+        CommonhausUser result = event.refresh()
+                ? null
+                : deepCopy(AdminDataCache.COMMONHAUS_DATA.get(key));
+
         ScopedQueryContext qc = ctx.getDatastoreContext();
         if (qc == null) {
             return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
@@ -164,6 +173,7 @@ public class CommonhausDatastore {
                     .path(dataPath(input.id()))
                     .message(event.message())
                     .content(content);
+
             if (input.sha() != null) {
                 update.sha(input.sha());
             }
@@ -177,11 +187,12 @@ public class CommonhausDatastore {
 
                 // we're here after a save conflict; re-read the data
                 result = readCommonhausUser(qc, repo, event, key);
+                AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(result));
                 result.setConflict(true);
             } else {
                 GHContent responseContent = response.getContent();
                 result = CommonhausUser.parseFile(qc, responseContent);
-                AdminDataCache.COMMONHAUS_DATA.put(key, result);
+                AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(result));
             }
 
             return result;
@@ -204,8 +215,22 @@ public class CommonhausDatastore {
                     qc.getLogId(), event.id());
             response = CommonhausUser.create(event.login(), event.id());
         }
-        AdminDataCache.COMMONHAUS_DATA.put(key, response);
         return response;
+    }
+
+    private CommonhausUser deepCopy(CommonhausUser user) {
+        if (user == null) {
+            return null;
+        }
+        // create a disconnected copy of the essential data.
+        try {
+            String json = mapper.writeValueAsString(user);
+            CommonhausUser copy = mapper.readValue(json, CommonhausUser.class);
+            copy.sha(user.sha());
+        } catch (JsonProcessingException e) {
+            ctx.logAndSendEmail("CommonhausDatastore.deepCopy", "Unable to copy Commonbaus user", e, null);
+        }
+        return user;
     }
 
     private String dataPath(long id) {

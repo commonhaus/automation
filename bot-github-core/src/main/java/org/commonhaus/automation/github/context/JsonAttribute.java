@@ -113,6 +113,7 @@ public enum JsonAttribute {
     url("html_url"),
     user,
     viewer,
+    lastEditedAt,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */

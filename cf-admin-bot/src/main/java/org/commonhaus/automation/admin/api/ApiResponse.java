@@ -19,7 +19,7 @@ import io.quarkus.arc.Arc;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-public class MemberApiResponse {
+public class ApiResponse {
 
     static ObjectMapper mapper;
 
@@ -48,10 +48,10 @@ public class MemberApiResponse {
     @JsonIgnore
     Response.Status status = Response.Status.OK;
 
-    public MemberApiResponse() {
+    public ApiResponse() {
     }
 
-    public MemberApiResponse(Type key, Object payload) {
+    public ApiResponse(Type key, Object payload) {
         setData(key, payload);
     }
 
@@ -61,12 +61,12 @@ public class MemberApiResponse {
     }
 
     @JsonAnySetter
-    public MemberApiResponse setData(Type key, Object value) {
+    public ApiResponse setData(Type key, Object value) {
         data.put(key, value);
         return this;
     }
 
-    public MemberApiResponse addAll(MemberApiResponse data2) {
+    public ApiResponse addAll(ApiResponse data2) {
         for (Map.Entry<Type, Object> entry : data2.getData().entrySet()) {
             data.put(entry.getKey(), entry.getValue());
         }
@@ -81,7 +81,7 @@ public class MemberApiResponse {
         return status;
     }
 
-    public MemberApiResponse responseStatus(Response.Status status) {
+    public ApiResponse responseStatus(Response.Status status) {
         this.status = status;
         return this;
     }
@@ -94,9 +94,9 @@ public class MemberApiResponse {
                         .build();
     }
 
-    public static class MessageEncoder implements Encoder.Text<MemberApiResponse> {
+    public static class MessageEncoder implements Encoder.Text<ApiResponse> {
         @Override
-        public String encode(MemberApiResponse object) throws EncodeException {
+        public String encode(ApiResponse object) throws EncodeException {
             try {
                 return getMapper().writeValueAsString(object);
             } catch (JsonProcessingException e) {
@@ -105,11 +105,11 @@ public class MemberApiResponse {
         }
     }
 
-    public static class MessageDecoder implements Decoder.Text<MemberApiResponse> {
+    public static class MessageDecoder implements Decoder.Text<ApiResponse> {
         @Override
-        public MemberApiResponse decode(String s) throws DecodeException {
+        public ApiResponse decode(String s) throws DecodeException {
             try {
-                return getMapper().readValue(s, MemberApiResponse.class);
+                return getMapper().readValue(s, ApiResponse.class);
             } catch (JsonProcessingException e) {
                 throw new DecodeException(s, e.toString());
             }

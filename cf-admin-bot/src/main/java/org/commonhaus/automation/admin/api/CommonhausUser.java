@@ -5,7 +5,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import jakarta.ws.rs.core.Response;
+
+import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
 import org.kohsuke.github.GHContent;
 
@@ -62,6 +66,7 @@ public class CommonhausUser {
 
     public static class ForwardEmail {
         /** Is an alias active for this user */
+        @JsonAlias("active")
         boolean configured;
 
         /** Additional ForwardEmail aliases. Optional and rare. */
@@ -170,6 +175,10 @@ public class CommonhausUser {
         return data.status;
     }
 
+    public void sha(String sha) {
+        this.sha = sha;
+    }
+
     public GoodStanding goodUntil() {
         return data.goodUntil;
     }
@@ -180,6 +189,23 @@ public class CommonhausUser {
 
     public void setConflict(boolean conflict) {
         this.conflict = conflict;
+    }
+
+    boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
+        MemberStatus oldStatus = data.status;
+        if (data.status == MemberStatus.UNKNOWN && !roles.isEmpty()) {
+            List<MemberStatus> status = roles.stream()
+                    .map(r -> ctx.getStatusForRole(r))
+                    .sorted()
+                    .toList();
+            data.status = status.get(0);
+        }
+        return oldStatus != data.status;
+    }
+
+    public ApiResponse toResponse() {
+        return new ApiResponse(ApiResponse.Type.HAUS, data)
+                .responseStatus(postConflict() ? Response.Status.CONFLICT : Response.Status.OK);
     }
 
     @Override

@@ -14,9 +14,9 @@ import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
 import jakarta.websocket.server.ServerEndpoint;
 
-import org.commonhaus.automation.admin.api.MemberApiResponse.MessageDecoder;
-import org.commonhaus.automation.admin.api.MemberApiResponse.MessageEncoder;
-import org.commonhaus.automation.admin.api.MemberApiResponse.Type;
+import org.commonhaus.automation.admin.api.ApiResponse.MessageDecoder;
+import org.commonhaus.automation.admin.api.ApiResponse.MessageEncoder;
+import org.commonhaus.automation.admin.api.ApiResponse.Type;
 import org.commonhaus.automation.admin.github.AppContextService;
 
 import io.quarkus.logging.Log;
@@ -35,7 +35,7 @@ public class MemberSocket {
     @OnOpen
     public void onOpen(Session session) {
         if (!memberProfile.hasConnection()) {
-            sendMessage(session, new MemberApiResponse(Type.ERROR, "Problem working with GitHub credentials."));
+            sendMessage(session, new ApiResponse(Type.ERROR, "Problem working with GitHub credentials."));
 
             tryToClose(session,
                     new CloseReason(CloseCodes.UNEXPECTED_CONDITION, "No GitHub connection"));
@@ -65,7 +65,7 @@ public class MemberSocket {
                         "Client error"));
     }
 
-    public boolean sendMessage(Session session, MemberApiResponse message) {
+    public boolean sendMessage(Session session, ApiResponse message) {
         if (session.isOpen()) {
             try {
                 session.getBasicRemote().sendObject(message);
