@@ -7,9 +7,7 @@ import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventPayload;
 import org.commonhaus.automation.mail.MailEvent;
-import org.commonmark.node.Node;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.html.HtmlRenderer;
+import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;
 
@@ -25,9 +23,6 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 
 @JsonDeserialize(as = EmailAction.class)
 public class EmailAction extends Action {
-    static final Parser parser = Parser.builder().build();
-    static final HtmlRenderer renderer = HtmlRenderer.builder().build();
-
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance pullRequestEvent(String title, String htmlBody,
@@ -112,16 +107,8 @@ public class EmailAction extends Action {
     }
 
     private String toHtmlBody(EventData eventData, String body) {
-        if (body == null) {
-            return "<p></p>";
-        }
-        try {
-            // Do not include HTML comments in the rendered email body
-            Node document = parser.parse(body.replaceAll("<!--.*?-->", body));
-            return renderer.render(document);
-        } catch (Exception e) {
-            Log.errorf(e, "[%s] EmailAction.toHtmlBody: Failed to render body as HTML", eventData.getLogId());
-            return body;
-        }
+        return body == null
+                ? "<p></p>"
+                : MarkdownConverter.toHtml(body.replaceAll("<!--.*?-->", ""));
     }
 }

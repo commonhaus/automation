@@ -44,6 +44,8 @@ public class DataCommonObject extends DataCommonType {
     public final String url;
     public final Date createdAt;
     public final Date updatedAt;
+    public final Date lastEditedAt;
+
     // allow modification for dry run
     public String body;
 
@@ -59,6 +61,7 @@ public class DataCommonObject extends DataCommonType {
         }
         this.createdAt = JsonAttribute.createdAt.dateFrom(object);
         this.updatedAt = JsonAttribute.updatedAt.dateFrom(object);
+        this.lastEditedAt = JsonAttribute.lastEditedAt.dateFrom(object);
 
         this.url = JsonAttribute.url.stringFrom(object);
         this.body = JsonAttribute.body.stringFrom(object);
@@ -69,11 +72,12 @@ public class DataCommonObject extends DataCommonType {
         this.author = other.author;
         this.createdAt = other.createdAt;
         this.updatedAt = other.updatedAt;
+        this.lastEditedAt = other.lastEditedAt;
         this.url = other.url;
         this.body = other.body;
     }
 
     public Date mostRecent() {
-        return updatedAt == null ? createdAt : updatedAt;
+        return lastEditedAt == null ? createdAt : lastEditedAt;
     }
 }

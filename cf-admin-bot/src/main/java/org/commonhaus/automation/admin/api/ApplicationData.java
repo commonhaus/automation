@@ -5,7 +5,11 @@ import java.util.regex.Pattern;
 
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.markdown.MarkdownConverter;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -41,7 +45,7 @@ public class ApplicationData {
     private String extract(Pattern pattern, String body) {
         var matcher = pattern.matcher(body);
         if (matcher.find()) {
-            return matcher.group(2);
+            return matcher.group(2).trim();
         }
         return "";
     }
@@ -50,10 +54,7 @@ public class ApplicationData {
         this.feedback = feedback;
     }
 
-    public boolean notOwner() {
-        return issueId == null;
-    }
-
+    @JsonIgnore
     public boolean isOwner() {
         return issueId != null;
     }
@@ -68,16 +69,18 @@ public class ApplicationData {
     }
 
     public static class Feedback {
-        final String content;
+        final String htmlContent;
         final String date;
 
-        public Feedback(String content, String date) {
-            this.content = content;
+        public Feedback(String htmlContent, String date) {
+            this.htmlContent = htmlContent;
             this.date = date;
         }
 
         public Feedback(DataCommonComment dataCommonComment) {
-            content = dataCommonComment.body.replaceAll("::response::", "").trim();
+            String content = dataCommonComment.body.replaceAll("::response::", "").trim();
+
+            this.htmlContent = MarkdownConverter.toHtml(content);
             date = dataCommonComment.mostRecent().toString();
         }
     }
@@ -106,6 +109,7 @@ public class ApplicationData {
     }
 
     public static boolean isNewer(DataCommonComment x, Date issueMostRecent) {
+        Log.debugf("isNewer: %s %s", x.mostRecent(), issueMostRecent);
         return x.mostRecent().after(issueMostRecent);
     }
 }

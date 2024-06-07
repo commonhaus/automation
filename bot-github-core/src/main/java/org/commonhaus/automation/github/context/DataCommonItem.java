@@ -61,12 +61,14 @@ public class DataCommonItem extends DataCommonObject {
         Map<String, Object> variables = new HashMap<>();
         variables.put("title", title);
         variables.put("body", bodyString);
+        variables.put("repositoryId", qc.getRepository().getNodeId());
 
-        Response response = qc.execRepoQuerySync("""
-                mutation($title: String!, $body: String!) {
+        Response response = qc.execQuerySync("""
+                mutation($title: String!, $body: String!, $repositoryId: ID!) {
                     createIssue(input: {
                         title: $title,
-                        body: $body
+                        body: $body,
+                        repositoryId: $repositoryId
                     }) {
                         clientMutationId
                         issue {

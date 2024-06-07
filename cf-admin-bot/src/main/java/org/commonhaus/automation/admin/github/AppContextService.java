@@ -34,6 +34,7 @@ import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.EventType;
+import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
@@ -135,6 +136,10 @@ public class AppContextService extends BaseContextService {
         return qc;
     }
 
+    public UserQueryContext newUserQueryContext(MemberSession memberSession) {
+        return new UserQueryContext(this, memberSession);
+    }
+
     /**
      * Event handler for repository discovery.
      * If the discovered repo matches the configured data store,
@@ -232,21 +237,17 @@ public class AppContextService extends BaseContextService {
         return userConfig.attestations();
     }
 
-    public boolean userIsKnown(MemberSession session) {
+    public boolean userIsKnown(QueryContext initQc, String login, Set<String> roles) {
         if (userConfig.isDisabled()) {
             return false;
         }
 
-        String login = session.login();
         Boolean result = AdminDataCache.KNOWN_USER.get(login);
         if (result != null) {
             return result;
         }
 
-        UserQueryContext userQc = new UserQueryContext(this, session);
-        Set<String> roles = session.roles();
-
-        GHUser ghUser = userQc.getUser(login);
+        GHUser ghUser = initQc.getUser(login);
         if (ghUser == null) {
             // do not cache this case
             return false;
@@ -302,12 +303,11 @@ public class AppContextService extends BaseContextService {
                 }
             }
         }
-
-        if (result != null) {
-            AdminDataCache.KNOWN_USER.put(login, result);
-            return result;
+        if (result == null) {
+            return false;
         }
-        return false;
+        AdminDataCache.KNOWN_USER.put(login, result);
+        return result;
     }
 
     Boolean or(Boolean a, Boolean b) {
@@ -463,7 +463,7 @@ public class AppContextService extends BaseContextService {
         }
         if (applicationId != null) {
             ApplicationData existing = getOpenApplication(session, applicationId);
-            if (existing == null || existing.notOwner()) {
+            if (existing == null || !existing.isOwner()) {
                 return existing;
             }
         }

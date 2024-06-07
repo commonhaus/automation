@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
+import org.commonhaus.automation.admin.github.UserQueryContext;
 import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
 
@@ -38,6 +39,11 @@ public class MemberSession {
     private MemberSession(UserInfo userInfo) {
         this.userInfo = userInfo;
         this.nodeId = userInfo.getString("node_id");
+    }
+
+    public boolean userIsKnown(AppContextService ctx) {
+        UserQueryContext userQc = ctx.newUserQueryContext(this);
+        return ctx.userIsKnown(userQc, login(), roles());
     }
 
     public GitHub connect(AppContextService ctx, SecurityIdentity identity) {
