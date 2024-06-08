@@ -150,8 +150,13 @@ public abstract class QueryContext {
 
     public boolean hasNotFound() {
         return exceptions.stream().anyMatch(e -> e instanceof GHFileNotFoundException)
-                || errors.stream().anyMatch(e -> e.getOtherFields().containsKey("type")
-                        && e.getOtherFields().get("type").equals("NOT_FOUND"));
+                || errors.stream().anyMatch(e -> hasFieldError(e, "NOT_FOUND"));
+    }
+
+    private boolean hasFieldError(GraphQLError e, String message) {
+        var others = e.getOtherFields();
+        var type = others == null ? null : others.get("type");
+        return message.equals(type);
     }
 
     public boolean clearNotFound() {
