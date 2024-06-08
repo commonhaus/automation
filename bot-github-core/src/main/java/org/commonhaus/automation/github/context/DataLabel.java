@@ -144,7 +144,7 @@ public class DataLabel extends DataCommonType {
                     addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
                         clientMutationId
                         labelable {
-                            """ + LABEL_FIELDS + """
+                """ + PAGINATED_LABELS + """
                         }
                     }
                 }""";
@@ -176,7 +176,7 @@ public class DataLabel extends DataCommonType {
                     removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
                         clientMutationId
                         labelable {
-                            """ + PAGINATED_LABELS + """
+                """ + PAGINATED_LABELS + """
                         }
                     }
                 }""";
@@ -206,7 +206,7 @@ public class DataLabel extends DataCommonType {
                     createLabel(input: { name: $name, repositoryId: $repositoryId, color: $color }) {
                         clientMutationId
                         label {
-                            """ + PAGINATED_LABELS + """
+                            """ + LABEL_FIELDS + """
                         }
                     }
                 }""";
