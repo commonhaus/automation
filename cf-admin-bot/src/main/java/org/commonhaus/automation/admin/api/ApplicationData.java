@@ -3,6 +3,7 @@ package org.commonhaus.automation.admin.api;
 import java.util.Date;
 import java.util.regex.Pattern;
 
+import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.markdown.MarkdownConverter;
@@ -19,8 +20,8 @@ public class ApplicationData {
     static final Pattern NOTES = Pattern.compile("([\\s\\S]*?<!--NOTES::-->)([\\s\\S]*?)(<!--::NOTES-->[\\s\\S]*?)",
             Pattern.CASE_INSENSITIVE);
 
-    transient String issueId;
     transient String title;
+    transient MembershipApplication application;
 
     String created;
     String updated;
@@ -33,10 +34,11 @@ public class ApplicationData {
         if (title == null || !ownerEquals(session.login())) {
             return;
         }
-        this.issueId = issue.id;
+        application = MembershipApplication.fromDataCommonType(issue);
         this.created = issue.createdAt.toString();
-        if (issue.updatedAt != null && !issue.updatedAt.equals(issue.createdAt)) {
-            this.updated = issue.updatedAt.toString();
+
+        if (issue.lastEditedAt != null && !issue.lastEditedAt.equals(issue.createdAt)) {
+            this.updated = issue.lastEditedAt.toString();
         }
         this.contributions = extract(CONTRIBUTIONS, issue.body);
         this.additionalNotes = extract(NOTES, issue.body);
@@ -56,7 +58,7 @@ public class ApplicationData {
 
     @JsonIgnore
     public boolean isOwner() {
-        return issueId != null;
+        return application != null;
     }
 
     public boolean ownerEquals(String login) {
@@ -85,7 +87,7 @@ public class ApplicationData {
         }
     }
 
-    public static String updateDescription(ApplicationPost applicationPost) {
+    public static String issueContent(ApplicationPost applicationPost) {
         return """
                 ## Contribution Details
                 <!--CONTRIBUTION::-->

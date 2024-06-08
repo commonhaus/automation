@@ -452,14 +452,14 @@ public abstract class QueryContext {
         };
     }
 
-    public DataCommonItem createItem(EventType eventType, String title, String description) {
+    public DataCommonItem createItem(EventType eventType, String title, String description, Collection<DataLabel> labels) {
         if (hasErrors()) {
             Log.debugf("[%s] getItem skipping due to errors", getLogId());
             return null;
         }
         return switch (eventType) {
             case issue ->
-                DataCommonItem.createIssue(this, title, description);
+                DataCommonItem.createIssue(this, title, description, labels);
             default -> {
                 logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
                 yield null;
@@ -625,6 +625,10 @@ public abstract class QueryContext {
             return currentLabels;
         }
         return null;
+    }
+
+    public DataLabel createLabel(String labelName, String color) {
+        return DataLabel.createLabel(this, this.getRepositoryId(), labelName, color);
     }
 
     public boolean isTeamMember(GHUser user, String teamFullName) {

@@ -10,6 +10,8 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.api.ApiResponse.Type;
 import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
+import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
+import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 
@@ -35,21 +37,32 @@ public class MemberApplicationResource {
     public Response getApplication() {
         try {
             CommonhausUser user = datastore.getCommonhausUser(session, false);
-            ApplicationData applicationData = ctx.getOpenApplication(session, user.data.applicationId);
+            MembershipApplication application = user.application();
+            if (application == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            ApplicationData applicationData = ctx.getOpenApplication(session, application.nodeId());
             if (applicationData == null) {
-                user.data.applicationId = null;
-                user = datastore.setCommonhausUser(user, session.roles(), "Removed membership application (not found)");
+                user.application = null;
+                user = datastore.setCommonhausUser(user, session.roles(),
+                        "Remove membership application (not found)", false);
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             if (!applicationData.isOwner()) {
-                user.data.applicationId = null;
-                user = datastore.setCommonhausUser(user, session.roles(), "Removed membership application (not owner)");
-                return Response.status(Response.Status.FORBIDDEN).build();
+                user.application = null;
+                user = datastore.setCommonhausUser(user, session.roles(),
+                        "Remove membership application (not owner)", false);
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            if (user.status().updateToPending()) {
+                // compensate for missing status
+                user.status(MemberStatus.PENDING);
+                user = datastore.setCommonhausUser(user, session.roles(), "Set status to PENDING", true);
             }
             return user.toResponse()
                     .setData(Type.APPLY, applicationData)
                     .finish();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
             }
@@ -61,30 +74,29 @@ public class MemberApplicationResource {
     @KnownUser
     @Produces("application/json")
     public Response setApplication(ApplicationPost applicationPost) {
-
         try {
             CommonhausUser user = datastore.getCommonhausUser(session, false);
-            ApplicationData applicationData = ctx.updateApplication(session, user.data.applicationId, applicationPost);
+            ApplicationData applicationData = ctx.updateApplication(session, user, applicationPost);
             if (applicationData == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-            if (!applicationData.isOwner()) {
-                return Response.status(Response.Status.FORBIDDEN).build();
+                return Response.status(Response.Status.BAD_REQUEST).build();
             }
 
-            user.data.applicationId = applicationData.issueId;
-            user = datastore.setCommonhausUser(user, session.roles(), "Created membership application");
+            user.application = applicationData.application;
+            if (user.status().updateToPending()) {
+                user.status(MemberStatus.PENDING);
+            }
+            user = datastore.setCommonhausUser(user, session.roles(), "Created membership application", false);
 
             if (user.postConflict()) { // on conflict, user is reset with value from repo
                 // retry once.
-                user.data.applicationId = applicationData.issueId;
-                user = datastore.setCommonhausUser(user, session.roles(), "Created membership application");
+                user.application = applicationData.application;
+                user = datastore.setCommonhausUser(user, session.roles(), "Created membership application", false);
             }
 
             return user.toResponse()
                     .setData(Type.APPLY, applicationData)
                     .finish();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
             }

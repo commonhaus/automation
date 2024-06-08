@@ -7,8 +7,10 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
+import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventType;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
@@ -18,6 +20,7 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Issue;
 import io.quarkiverse.githubapp.event.IssueComment;
+import io.quarkiverse.githubapp.event.Label;
 import io.quarkiverse.githubapp.event.Membership;
 import io.quarkiverse.githubapp.event.Push;
 import io.quarkus.logging.Log;
@@ -101,5 +104,34 @@ public class AdminGitHubEvents {
 
         Log.debugf("[%s] updateApplications: %s", qc.getLogId(),
                 issue.getNumber(), comments);
+    }
+
+    /**
+     * Called when there is event.
+     *
+     * @param event GitHubEvent (raw payload)
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL client
+     * @param labelPayload GitHub API parsed payload
+     */
+    void onRepositoryLabelChange(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @Label GHEventPayload.Label labelPayload) {
+        String repoFullName = labelPayload.getRepository().getFullName();
+        if (!repoFullName.equals(ctx.getDataStore())) {
+            return;
+        }
+
+        ScopedQueryContext qc = ctx.refreshScopedQueryContext(
+                github,
+                labelPayload.getRepository(),
+                labelPayload.getInstallation().getId())
+                .addExisting(graphQLClient);
+
+        DataLabel label = new DataLabel(labelPayload.getLabel());
+        String cacheId = labelPayload.getRepository().getNodeId();
+        ActionType actionType = ActionType.fromString(event.getAction());
+
+        Log.debugf("[%s] LabelChanges: repository %s changed label %s", qc.getLogId(), cacheId, label);
+        qc.modifyLabels(cacheId, label, actionType);
     }
 }

@@ -49,7 +49,8 @@ public class CommonhausDatastore {
     public record QueryEvent(String login, long id, Set<String> roles, boolean refresh) implements DatastoreEvent {
     }
 
-    public record UpdateEvent(CommonhausUser user, String message, Set<String> roles) implements DatastoreEvent {
+    public record UpdateEvent(CommonhausUser user, String message, Set<String> roles,
+            boolean history) implements DatastoreEvent {
         @Override
         public long id() {
             return user.id();
@@ -86,8 +87,8 @@ public class CommonhausDatastore {
      *
      * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser setCommonhausUser(CommonhausUser user, Set<String> roles, String message) {
-        UpdateEvent update = new UpdateEvent(user, message, roles);
+    public CommonhausUser setCommonhausUser(CommonhausUser user, Set<String> roles, String message, boolean history) {
+        UpdateEvent update = new UpdateEvent(user, message, roles, history);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, update);
         Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", user.id(), response.body());
         return response.body();
@@ -168,10 +169,14 @@ public class CommonhausDatastore {
         return qc.execGitHubSync((gh, dryRun) -> {
             CommonhausUser result;
 
+            if (event.history()) {
+                input.addHistory(event.message());
+            }
+
             String content = qc.writeValue(input);
             GHContentBuilder update = repo.createContent()
                     .path(dataPath(input.id()))
-                    .message(event.message())
+                    .message("[%s] %s".formatted(input.id(), event.message()))
                     .content(content);
 
             if (input.sha() != null) {

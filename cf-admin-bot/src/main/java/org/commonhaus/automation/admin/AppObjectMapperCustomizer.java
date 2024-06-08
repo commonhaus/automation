@@ -4,9 +4,9 @@ import jakarta.inject.Singleton;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.core.JsonGenerator.Feature;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 
 import io.quarkus.arc.Unremovable;
 import io.quarkus.jackson.ObjectMapperCustomizer;
@@ -17,9 +17,8 @@ import io.quarkus.logging.Log;
 class AppObjectMapperCustomizer implements ObjectMapperCustomizer {
     public void customize(ObjectMapper mapper) {
         Log.debug("Customizing ObjectMapper");
-        mapper.enable(Feature.IGNORE_UNKNOWN)
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(Include.NON_EMPTY)
-                .setVisibility(VisibilityChecker.Std.defaultInstance()
-                        .with(JsonAutoDetect.Visibility.ANY));
+                .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
     }
 }

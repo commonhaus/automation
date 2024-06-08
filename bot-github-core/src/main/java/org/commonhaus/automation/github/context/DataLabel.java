@@ -129,6 +129,9 @@ public class DataLabel extends DataCommonType {
     /** package private. See QueryHelper / QueryContext */
     static Set<DataLabel> addLabels(QueryContext qc, String labeledId,
             Collection<DataLabel> newLabels) {
+        if (qc.isDryRun()) {
+            return new HashSet<>(newLabels);
+        }
         Log.debugf("[%s] addLabels for labelable %s with %s", qc.getLogId(), labeledId, newLabels);
         String[] labelIds = newLabels.stream().map(l -> l.id).toArray(String[]::new);
 
@@ -141,7 +144,7 @@ public class DataLabel extends DataCommonType {
                     addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
                         clientMutationId
                         labelable {
-                            """ + PAGINATED_LABELS + """
+                            """ + LABEL_FIELDS + """
                         }
                     }
                 }""";
@@ -158,6 +161,9 @@ public class DataLabel extends DataCommonType {
     /** package private. See QueryHelper / QueryContext */
     static Set<DataLabel> removeLabels(QueryContext qc, String labeledId,
             Collection<DataLabel> oldLabels) {
+        if (qc.isDryRun()) {
+            return Set.of();
+        }
         Log.debugf("[%s] removeLabels for labelable %s with %s", qc.getLogId(), labeledId, oldLabels);
         String[] labelIds = oldLabels.stream().map(l -> l.id).toArray(String[]::new);
 
@@ -182,6 +188,35 @@ public class DataLabel extends DataCommonType {
 
         Log.infof("[%s] modifyLabels for labelable %s; result=%s", qc.getLogId(), labeledId, labels);
         return labels;
+    }
+
+    static DataLabel createLabel(QueryContext qc, String repoId, String name, String color) {
+        if (qc.isDryRun()) {
+            return new Builder().name(name).id(name).build();
+        }
+        Log.debugf("[%s] createLabel %s", qc.getLogId(), name);
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("name", name);
+        variables.put("repositoryId", repoId);
+        variables.put("color", color);
+
+        String query = """
+                mutation CreateLabel($name: String!, $repositoryId: ID!, $color: String!) {
+                    createLabel(input: { name: $name, repositoryId: $repositoryId, color: $color }) {
+                        clientMutationId
+                        label {
+                            """ + PAGINATED_LABELS + """
+                        }
+                    }
+                }""";
+        Response response = qc.execRepoQuerySync(query, variables);
+        if (response.hasError()) {
+            qc.clearNotFound();
+            return null;
+        }
+        JsonObject result = JsonAttribute.createLabel.jsonObjectFrom(response.getData());
+        return JsonAttribute.label.labelFrom(result);
     }
 
     static void paginateLabels(QueryContext qc, String query,

@@ -16,6 +16,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkus.arc.Arc;
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -87,6 +88,7 @@ public class ApiResponse {
     }
 
     public Response finish() {
+        Log.debugf("ApiResponse.finish: %s", this.status());
         return this.status() == Response.Status.OK
                 ? Response.ok(this).build()
                 : Response.status(this.status())

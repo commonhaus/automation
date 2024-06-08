@@ -114,6 +114,7 @@ public enum JsonAttribute {
     user,
     viewer,
     lastEditedAt,
+    createLabel,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */

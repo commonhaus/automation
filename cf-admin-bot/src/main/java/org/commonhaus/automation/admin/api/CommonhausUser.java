@@ -1,6 +1,10 @@
 package org.commonhaus.automation.admin.api;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -11,6 +15,7 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.commonhaus.automation.github.context.DataCommonItem;
 import org.kohsuke.github.GHContent;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
@@ -53,6 +58,17 @@ public class CommonhausUser {
                     && this != REVOKED
                     && this != SPONSOR
                     && this != SUSPENDED;
+        }
+
+        public boolean updateToPending() {
+            return this == UNKNOWN
+                    || this == SPONSOR
+                    || this == INACTIVE;
+        }
+
+        public boolean updateToActive() {
+            return this == UNKNOWN
+                    || this == PENDING;
         }
     }
 
@@ -129,8 +145,15 @@ public class CommonhausUser {
         GoodStanding goodUntil = new GoodStanding();
 
         Services services = new Services();
+    }
 
-        String applicationId;
+    public record MembershipApplication(
+            @NotNull String nodeId,
+            @NotNull String htmlUrl) {
+
+        static MembershipApplication fromDataCommonType(DataCommonItem data) {
+            return new MembershipApplication(data.id, data.url);
+        }
     }
 
     @NotNull
@@ -139,20 +162,27 @@ public class CommonhausUser {
     final long id;
     @NotNull
     final Data data;
+    @NotNull
+    final List<String> history;
+
+    MembershipApplication application;
 
     transient String sha = null;
     transient boolean conflict = false;
 
-    private CommonhausUser(String login, long id, Data data) {
-        this.login = login;
-        this.id = id;
-        this.data = data;
+    private CommonhausUser(Builder builder) {
+        this.login = builder.login;
+        this.id = builder.id;
+        this.data = builder.data == null ? new Data() : builder.data;
+        this.history = builder.history == null ? new ArrayList<>() : builder.history;
+        this.application = builder.application;
     }
 
     private CommonhausUser(String login, long id) {
         this.login = login;
         this.id = id;
         this.data = new Data();
+        this.history = new ArrayList<>();
     }
 
     public String login() {
@@ -164,7 +194,10 @@ public class CommonhausUser {
     }
 
     public Services services() {
-        return data.services == null ? new Services() : data.services;
+        if (data.services == null) {
+            data.services = new Services();
+        }
+        return data.services;
     }
 
     public String sha() {
@@ -175,11 +208,18 @@ public class CommonhausUser {
         return data.status;
     }
 
+    public void status(MemberStatus status) {
+        data.status = status;
+    }
+
     public void sha(String sha) {
         this.sha = sha;
     }
 
     public GoodStanding goodUntil() {
+        if (data.goodUntil == null) {
+            data.goodUntil = new GoodStanding();
+        }
         return data.goodUntil;
     }
 
@@ -189,6 +229,19 @@ public class CommonhausUser {
 
     public void setConflict(boolean conflict) {
         this.conflict = conflict;
+    }
+
+    public MembershipApplication application() {
+        return application;
+    }
+
+    public void application(MembershipApplication application) {
+        this.application = application;
+    }
+
+    public void addHistory(String message) {
+        String when = DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+        history.add("%s %s".formatted(when, message));
     }
 
     boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
@@ -232,6 +285,9 @@ public class CommonhausUser {
         private String login;
         private long id;
         private Data data;
+        public MembershipApplication application;
+
+        private List<String> history;
 
         public Builder withLogin(String login) {
             this.login = login;
@@ -248,8 +304,18 @@ public class CommonhausUser {
             return this;
         }
 
+        public Builder withHistory(List<String> history) {
+            this.history = history;
+            return this;
+        }
+
+        public Builder withApplication(MembershipApplication application) {
+            this.application = application;
+            return this;
+        }
+
         public CommonhausUser build() {
-            return new CommonhausUser(login, id, data);
+            return new CommonhausUser(this);
         }
     }
 }

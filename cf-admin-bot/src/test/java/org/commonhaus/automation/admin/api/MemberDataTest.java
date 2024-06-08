@@ -415,9 +415,6 @@ public class MemberDataTest extends ContextHelper {
 
         mockExistingCommonhausData();
 
-        // update to remove applicationId
-        GHContentBuilder builder = mockUpdateCommonhausData();
-
         given()
                 .log().all()
                 .when()
@@ -425,12 +422,6 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(404);
-
-        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
-        verify(builder).content(contentCaptor.capture());
-
-        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.data.applicationId).isNull();
     }
 
     @Test
@@ -461,13 +452,13 @@ public class MemberDataTest extends ContextHelper {
                 .get("/apply")
                 .then()
                 .log().all()
-                .statusCode(403);
+                .statusCode(404);
 
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
         var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.data.applicationId).isNull();
+        assertThat(result.application).isNull();
     }
 
     @Test
@@ -494,6 +485,9 @@ public class MemberDataTest extends ContextHelper {
                 .executeSync(contains("comments(first: 50"), anyMap()))
                 .thenReturn(queryComments);
 
+        // update to fix member status
+        GHContentBuilder builder = mockUpdateCommonhausData();
+
         given()
                 .log().all()
                 .when()
@@ -502,6 +496,13 @@ public class MemberDataTest extends ContextHelper {
                 .log().all()
                 .statusCode(200)
                 .body("APPLY.feedback.htmlContent", equalTo("<p>Feedback</p>\n"));
+
+        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(builder).content(contentCaptor.capture());
+
+        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        assertThat(result.application).isNotNull();
+        assertThat(result.data.status).isEqualTo(MemberStatus.PENDING);
     }
 
     void mockExistingCommonhausData() throws IOException {

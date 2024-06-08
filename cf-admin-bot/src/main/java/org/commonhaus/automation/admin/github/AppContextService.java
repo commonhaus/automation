@@ -3,6 +3,7 @@ package org.commonhaus.automation.admin.github;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,7 +23,9 @@ import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
 import org.commonhaus.automation.admin.api.ApplicationData.Feedback;
+import org.commonhaus.automation.admin.api.CommonhausUser;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
+import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
@@ -33,6 +36,7 @@ import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -49,9 +53,10 @@ import org.yaml.snakeyaml.DumperOptions.ScalarStyle;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactoryBuilder;
 
@@ -433,9 +438,10 @@ public class AppContextService extends BaseContextService {
 
             yamlMapper = new ObjectMapper(new YAMLFactoryBuilder(new YAMLFactory())
                     .dumperOptions(options).build())
+                    .findAndRegisterModules()
+                    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .setSerializationInclusion(Include.NON_EMPTY)
-                    .setVisibility(VisibilityChecker.Std.defaultInstance()
-                            .with(JsonAutoDetect.Visibility.ANY));
+                    .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
         }
         return yamlMapper;
     }
@@ -446,6 +452,7 @@ public class AppContextService extends BaseContextService {
         }
         ScopedQueryContext qc = getDatastoreContext();
         DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
+
         ApplicationData application = new ApplicationData(session, issue);
         if (application.isOwner()) {
             Feedback feedback = getFeedback(qc, applicationId, issue.mostRecent());
@@ -456,26 +463,41 @@ public class AppContextService extends BaseContextService {
         return application;
     }
 
-    public ApplicationData updateApplication(MemberSession session, String applicationId,
-            ApplicationPost applicationPost) {
+    public ApplicationData updateApplication(MemberSession session, CommonhausUser user,
+            ApplicationPost applicationPost) throws Throwable {
         if (applicationPost == null) {
             return null;
         }
-        if (applicationId != null) {
-            ApplicationData existing = getOpenApplication(session, applicationId);
-            if (existing == null || !existing.isOwner()) {
-                return existing;
+
+        MembershipApplication application = user.application();
+        if (application != null) {
+            ApplicationData existing = getOpenApplication(session, application.nodeId());
+            if (existing != null && !existing.isOwner()) {
+                application = null;
             }
         }
 
         ScopedQueryContext qc = getDatastoreContext();
-        String description = ApplicationData.updateDescription(applicationPost);
+        String content = ApplicationData.issueContent(applicationPost);
+        Collection<DataLabel> labels = qc.findLabels(List.of("new-member"));
+        if (labels.isEmpty()) {
+            // TODO: config for labels / repo discovery
+            DataLabel newLabel = qc.createLabel("new-member", "#78A658");
+            if (newLabel != null) {
+                labels = List.of(newLabel);
+            }
+        }
 
-        DataCommonItem item = applicationId == null
+        DataCommonItem item = application == null
                 ? qc.createItem(EventType.issue,
                         ApplicationData.createTitle(session),
-                        description)
-                : qc.updateItemDescription(EventType.issue, applicationId, description);
+                        content,
+                        labels)
+                : qc.updateItemDescription(EventType.issue, application.nodeId(), content);
+
+        if (qc.hasErrors()) {
+            throw qc.bundleExceptions();
+        }
 
         return item == null
                 ? null

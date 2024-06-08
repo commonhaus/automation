@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.context;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -57,18 +58,22 @@ public class DataCommonItem extends DataCommonObject {
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
-    public static DataCommonItem createIssue(QueryContext qc, String title, String bodyString) {
+    public static DataCommonItem createIssue(QueryContext qc, String title, String body, Collection<DataLabel> labels) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("title", title);
-        variables.put("body", bodyString);
+        variables.put("body", body);
         variables.put("repositoryId", qc.getRepository().getNodeId());
+        if (labels != null && !labels.isEmpty()) {
+            variables.put("labelIds", labels.stream().map(x -> x.id).toList());
+        }
 
         Response response = qc.execQuerySync("""
-                mutation($title: String!, $body: String!, $repositoryId: ID!) {
+                mutation($title: String!, $body: String!, $repositoryId: ID!, $labelIds: [ID!]) {
                     createIssue(input: {
+                        repositoryId: $repositoryId,
                         title: $title,
                         body: $body,
-                        repositoryId: $repositoryId
+                        labelIds: $labelIds
                     }) {
                         clientMutationId
                         issue {

@@ -49,11 +49,11 @@ public class MemberAttestationResource {
 
             Attestation newAttestation = createAttestation(user.status(), post);
             user.goodUntil().attestation.put(post.id(), newAttestation);
-            String message = "%s added attestation (%s|%s)".formatted(user.id(), post.id(), post.version());
+            String message = "Sign attestation (%s|%s)".formatted(post.id(), post.version());
 
-            user = datastore.setCommonhausUser(user, session.roles(), message);
+            user = datastore.setCommonhausUser(user, session.roles(), message, true);
             return user.toResponse().finish();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
             }
@@ -76,15 +76,15 @@ public class MemberAttestationResource {
 
             Map<String, Attestation> newAttestations = new HashMap<>();
 
-            StringBuilder message = new StringBuilder(user.id() + " added attestations ");
+            StringBuilder message = new StringBuilder("Sign attestations ");
             for (AttestationPost p : postList) {
                 newAttestations.put(p.id(), createAttestation(user.status(), p));
                 message.append("(%s|%s) ".formatted(p.id(), p.version()));
             }
             user.goodUntil().attestation.putAll(newAttestations);
-            user = datastore.setCommonhausUser(user, session.roles(), message.toString());
+            user = datastore.setCommonhausUser(user, session.roles(), message.toString(), true);
             return user.toResponse().finish();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
             }

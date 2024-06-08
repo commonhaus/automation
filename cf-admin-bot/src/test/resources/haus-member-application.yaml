@@ -1,6 +1,7 @@
 ---
 login: commonhaus-bot
 id: 156364140
-data:
-  applicationId: 123456
+application:
+  nodeId: "alpha8943Nonsense"
+  htmlUrl: "https://stuff.whatever"
 ---

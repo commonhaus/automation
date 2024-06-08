@@ -68,7 +68,7 @@ public class MemberAliasesResource {
                 if (!forwardEmail.configured && !aliasMap.isEmpty()) {
                     forwardEmail.configured = true;
                     user = datastore.setCommonhausUser(user, session.roles(),
-                            "Fix forward email service active flag");
+                            "Fix forward email service active flag", false);
                 }
             }
             return user.toResponse()
@@ -76,7 +76,7 @@ public class MemberAliasesResource {
                     .finish();
         } catch (WebApplicationException e) {
             return e.getResponse();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.debugf("Error getting aliases for %s: %s", session.login(), e);
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
@@ -113,14 +113,14 @@ public class MemberAliasesResource {
             if (!forwardEmail.configured && !aliasMap.isEmpty()) {
                 forwardEmail.configured = true;
                 user = datastore.setCommonhausUser(user, session.roles(),
-                        "Fix forward email service active flag");
+                        "Fix forward email service active flag", false);
             }
             return user.toResponse()
                     .setData(ApiResponse.Type.ALIAS, aliasMap)
                     .finish();
         } catch (WebApplicationException e) {
             return e.getResponse();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.debugf("Error getting aliases for %s: %s", session.login(), e);
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();
@@ -172,7 +172,7 @@ public class MemberAliasesResource {
             return Response.noContent().build();
         } catch (WebApplicationException e) {
             return e.getResponse();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.debugf("Error generating password for %s: %s", session.login(), e);
             if (Log.isDebugEnabled()) {
                 e.printStackTrace();

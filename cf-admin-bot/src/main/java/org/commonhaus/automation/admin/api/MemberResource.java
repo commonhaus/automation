@@ -107,7 +107,8 @@ public class MemberResource {
             CommonhausUser user = datastore.getCommonhausUser(session, false);
             if (user.updateMemberStatus(ctx, session.roles())) {
                 // Refresh the user's status
-                user = datastore.setCommonhausUser(user, session.roles(), "Update membership status");
+                user = datastore.setCommonhausUser(user, session.roles(),
+                        "Update roles: %s".formatted(session.roles()), true);
             }
             return user.toResponse().finish();
         } catch (Exception e) {
