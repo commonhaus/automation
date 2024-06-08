@@ -1,15 +1,12 @@
 package org.commonhaus.automation.admin.api;
 
-import java.io.IOException;
 import java.util.Set;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.UserQueryContext;
-import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
 
-import io.quarkus.logging.Log;
 import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.identity.SecurityIdentity;
 
@@ -33,7 +30,6 @@ public class MemberSession {
     private final UserInfo userInfo;
 
     private GitHub connection;
-    private GHMyself myself;
     private GitHubUser userData;
 
     private MemberSession(UserInfo userInfo) {
@@ -59,24 +55,6 @@ public class MemberSession {
             userData = user = new GitHubUser(info().getJsonObject());
         }
         return user;
-    }
-
-    public GHMyself getMyself() {
-        if (connection == null) {
-            return null;
-        }
-        if (myself == null) {
-            try {
-                myself = connection.getMyself();
-                GitHubUser data = getUserData();
-                data.name = myself.getName();
-                data.company = myself.getCompany();
-            } catch (IOException e) {
-                Log.errorf(e, "Unable to retrieve user information for %s", getUserData().login);
-                connection = null;
-            }
-        }
-        return myself;
     }
 
     public GitHub connection() {
@@ -142,5 +120,9 @@ public class MemberSession {
 
     public Set<String> roles() {
         return getUserData().roles;
+    }
+
+    public String url() {
+        return getUserData().url;
     }
 }

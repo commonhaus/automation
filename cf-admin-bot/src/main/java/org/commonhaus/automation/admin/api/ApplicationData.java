@@ -87,17 +87,22 @@ public class ApplicationData {
         }
     }
 
-    public static String issueContent(ApplicationPost applicationPost) {
+    public static String issueContent(MemberSession session, ApplicationPost applicationPost) {
         return """
+                [%s](%s)
+
                 ## Contribution Details
                 <!--CONTRIBUTION::-->
                 %s
                 <!--::CONTRIBUTION-->
+
                 ## Additional Notes
                 <!--NOTES::-->
                 %s
                 <!--::NOTES-->
                 """.formatted(
+                session.login(),
+                session.url(),
                 applicationPost.contributions(),
                 applicationPost.additionalNotes());
     }

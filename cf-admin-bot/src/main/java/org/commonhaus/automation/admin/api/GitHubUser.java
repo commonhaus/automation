@@ -20,7 +20,7 @@ class GitHubUser {
 
     String name;
     String avatarUrl;
-    String company;
+    String url;
     Set<String> roles = new HashSet<>();
 
     public GitHubUser(long id, String login, String nodeId) {
@@ -37,7 +37,7 @@ class GitHubUser {
         // optional: may not be present
         this.name = JsonAttribute.name.stringFrom(jsonObject);
         this.avatarUrl = JsonAttribute.avatarUrl.stringFrom(jsonObject);
-        this.company = JsonAttribute.company.stringFrom(jsonObject);
+        this.url = JsonAttribute.url.stringFrom(jsonObject);
     }
 
     @Override

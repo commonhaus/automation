@@ -478,7 +478,7 @@ public class AppContextService extends BaseContextService {
         }
 
         ScopedQueryContext qc = getDatastoreContext();
-        String content = ApplicationData.issueContent(applicationPost);
+        String content = ApplicationData.issueContent(session, applicationPost);
         Collection<DataLabel> labels = qc.findLabels(List.of("new-member"));
         if (labels.isEmpty()) {
             // TODO: config for labels / repo discovery
