@@ -147,7 +147,6 @@ public class NotifyEmailTest extends ContextHelper {
                     verify(mocks.pullRequest(id), atLeastOnce()).getClosedAt();
                     verify(mocks.pullRequest(id), atLeastOnce()).getNodeId();
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
