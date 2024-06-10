@@ -176,7 +176,7 @@ public class CommonhausDatastore {
             String content = qc.writeValue(input);
             GHContentBuilder update = repo.createContent()
                     .path(dataPath(input.id()))
-                    .message("[%s] %s".formatted(input.id(), event.message()))
+                    .message("🤖 [%s] %s".formatted(input.id(), event.message()))
                     .content(content);
 
             if (input.sha() != null) {
