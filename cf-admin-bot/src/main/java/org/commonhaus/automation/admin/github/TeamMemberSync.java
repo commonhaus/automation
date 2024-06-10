@@ -286,6 +286,10 @@ public class TeamMemberSync {
             finalLogins.addAll(toAdd);
             finalLogins.removeAll(toRemove);
 
+            if (toAdd.isEmpty() && toRemove.isEmpty()) {
+                // no action required
+                return;
+            }
             Logins allLogins = new Logins(currentLogins, toAdd, toRemove, finalLogins);
             sendDryRunEmail(fullTeamName, allLogins, dryRunEmail);
         }
