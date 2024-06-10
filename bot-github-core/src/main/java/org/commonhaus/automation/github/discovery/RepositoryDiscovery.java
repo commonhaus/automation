@@ -159,9 +159,17 @@ public class RepositoryDiscovery {
     }
 
     Optional<?> fetchConfigFile(GHRepository ghRepository) {
-        return configProvider.fetchConfigFile(ghRepository,
-                ctx.getConfigFileName(),
-                Source.DEFAULT,
-                ctx.getConfigType());
+        try {
+            return configProvider.fetchConfigFile(ghRepository,
+                    ctx.getConfigFileName(),
+                    Source.DEFAULT,
+                    ctx.getConfigType());
+        } catch (Throwable t) {
+            if (Log.isDebugEnabled()) {
+                t.printStackTrace();
+            }
+            return Optional.empty();
+        }
+
     }
 }

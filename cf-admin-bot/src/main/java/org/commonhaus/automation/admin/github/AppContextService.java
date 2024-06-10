@@ -42,7 +42,6 @@ import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -182,7 +181,7 @@ public class AppContextService extends BaseContextService {
         }
     }
 
-    public GitHub getConnection(String nodeId, SecurityIdentity identity) {
+    public GitHub getUserConnection(String nodeId, SecurityIdentity identity) {
         GitHub connect = AdminDataCache.USER_CONNECTION.get(nodeId);
 
         if (connect == null || !connect.isCredentialValid()) {
@@ -258,6 +257,7 @@ public class AppContextService extends BaseContextService {
             return false;
         }
 
+        result = Boolean.FALSE;
         if (!userConfig.collaboratorRoles().isEmpty()) {
             Map<String, String> collabRoles = userConfig.collaboratorRoles();
             Log.debugf("collaborators: %s", collabRoles);
@@ -270,16 +270,9 @@ public class AppContextService extends BaseContextService {
                 if (qc == null) {
                     Log.errorf("No context for %s", repoName);
                 } else {
-                    Set<String> names = qc.execGitHubSync((gh, dryRun) -> {
-                        GHRepository repo = gh.getRepository(repoName);
-                        return repo == null
-                                ? null
-                                : repo.getCollaboratorNames();
-                    });
-                    qc.clearNotFound();
-                    if (names != null && names.contains(login)) {
-                        result = or(result, Boolean.TRUE);
+                    if (qc.isCollaborator(ghUser, repoName)) {
                         roles.add(role);
+                        result = or(result, Boolean.TRUE);
                     }
                 }
             }
@@ -293,23 +286,15 @@ public class AppContextService extends BaseContextService {
                 String role = entry.getValue();
 
                 String orgName = ScopedQueryContext.toOrganizationName(teamFullName);
-
                 ScopedQueryContext qc = getScopedQueryContext(orgName);
-                GHOrganization org = qc.getOrganization(orgName);
-                if (org == null) {
-                    Log.errorf("No organization for %s", orgName);
-                    continue;
-                }
 
-                boolean isMember = or(result, qc.isTeamMember(ghUser, teamFullName));
-                if (isMember) {
-                    result = or(result, Boolean.TRUE);
+                if (qc == null) {
+                    Log.errorf("No context for %s", orgName);
+                } else if (qc.isTeamMember(ghUser, teamFullName)) {
                     roles.add(role);
+                    result = or(result, Boolean.TRUE);
                 }
             }
-        }
-        if (result == null) {
-            return false;
         }
         AdminDataCache.KNOWN_USER.put(login, result);
         return result;

@@ -104,6 +104,7 @@ public class TeamMemberSync {
 
     public void updateTeamMembers(@Push GHEventPayload.Push pushEvent, GitHub github) {
         GHRepository repo = pushEvent.getRepository();
+        Log.debugf("pushEvent: %s", repo.getFullName());
         for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
             MonitoredRepo repoCfg = entry.getKey();
             if (repoCfg.repoFullName().equals(repo.getFullName())

@@ -44,7 +44,7 @@ public class MemberSession {
 
     public GitHub connect(AppContextService ctx, SecurityIdentity identity) {
         if (connection == null) {
-            connection = ctx.getConnection(nodeId, identity);
+            connection = ctx.getUserConnection(nodeId, identity);
         }
         return connection;
     }

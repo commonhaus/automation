@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.context;
 
 import static org.commonhaus.automation.github.context.BaseQueryCache.BOT_LOGIN;
+import static org.commonhaus.automation.github.context.BaseQueryCache.COLLABORATORS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
 import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
@@ -638,7 +639,14 @@ public abstract class QueryContext {
 
     public boolean isTeamMember(GHUser user, String teamFullName) {
         Set<GHUser> members = teamMembers(teamFullName);
+        Log.debugf("%s members: %s", teamFullName, members.stream().map(GHUser::getLogin).toList());
         return members != null && members.contains(user);
+    }
+
+    public boolean isCollaborator(GHUser user, String repoName) {
+        Set<String> collaborators = collaborators(repoName);
+        Log.debugf("%s members: %s", repoName, collaborators);
+        return collaborators != null && collaborators.contains(user.getLogin());
     }
 
     public TeamList getTeamList(String teamFullName) {
@@ -679,11 +687,30 @@ public abstract class QueryContext {
                 return ghTeam == null ? Set.of() : ghTeam.getMembers();
             });
             if (hasErrors() || members == null) {
+                clearNotFound();
                 return null;
             }
             TEAM_MEMBERS.put(teamFullName, members);
         }
         return members;
+    }
+
+    public Set<String> collaborators(String repoFullName) {
+        Set<String> collaborators = COLLABORATORS.get(repoFullName);
+        if (collaborators == null) {
+            collaborators = execGitHubSync((gh, dryRun) -> {
+                GHRepository repo = gh.getRepository(repoFullName);
+                return repo == null
+                        ? null
+                        : repo.getCollaboratorNames();
+            });
+            if (hasErrors() || collaborators == null) {
+                clearNotFound();
+                return null;
+            }
+            COLLABORATORS.put(repoFullName, collaborators);
+        }
+        return collaborators;
     }
 
     public String[] getErrorAddresses() {

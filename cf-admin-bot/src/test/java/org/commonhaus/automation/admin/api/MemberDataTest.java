@@ -120,6 +120,8 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testUserInfoEndpoint() throws Exception {
+
+        addCollaborator("commonhaus-test/sponsors-test", botLogin);
         // Make known user: add to sponsors-test repository
         GHRepository repo = mockContext.mocks.repository("commonhaus-test/sponsors-test");
         when(repo.getCollaboratorNames()).thenReturn(Set.of(botLogin));

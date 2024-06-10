@@ -20,6 +20,7 @@ import jakarta.json.JsonObject;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.ActionType;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
@@ -158,6 +159,10 @@ public class ContextHelper extends QueryContext {
 
     public void setUserAsUnknown(String login) {
         AdminDataCache.KNOWN_USER.put(login, Boolean.FALSE);
+    }
+
+    public void addCollaborator(String repoName, String login) {
+        BaseQueryCache.COLLABORATORS.put(repoName, Set.of(login));
     }
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {

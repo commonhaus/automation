@@ -13,6 +13,7 @@ public enum BaseQueryCache {
     LABELS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
     TEAM_MEMBERS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
+    COLLABORATORS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
     BOT_LOGIN(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
 

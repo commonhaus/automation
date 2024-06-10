@@ -1,13 +1,13 @@
-package org.commonhaus.automation.admin;
+package org.commonhaus.automation.admin.dev;
 
-import io.quarkus.arc.profile.UnlessBuildProfile;
+import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.qute.Engine;
 import io.quarkus.vertx.web.Route;
 import io.quarkus.vertx.web.Route.HttpMethod;
 import io.quarkus.vertx.web.RoutingExchange;
 import io.vertx.ext.web.RoutingContext;
 
-@UnlessBuildProfile("prod")
+@IfBuildProfile("dev")
 public class TestRoutes {
     final String memberHome;
 
