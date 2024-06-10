@@ -104,7 +104,7 @@ public class CommonhausDatastore {
      */
     @ConsumeEvent(value = READ)
     public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
-        final String key = event.login() + ":" + event.id();
+        final String key = getKey(event);
 
         CommonhausUser result = event.refresh()
                 ? null
@@ -141,7 +141,7 @@ public class CommonhausDatastore {
     @ConsumeEvent(value = WRITE)
     public Uni<CommonhausUser> pushCommonhausUser(UpdateEvent event) {
         final CommonhausUser user = event.user();
-        final String key = user.login() + ":" + user.id();
+        final String key = getKey(user);
 
         CommonhausUser result;
         ScopedQueryContext qc = ctx.getDatastoreContext();
@@ -240,5 +240,17 @@ public class CommonhausDatastore {
 
     private String dataPath(long id) {
         return "data/users/" + id + ".yaml";
+    }
+
+    public static String getKey(QueryEvent event) {
+        return event.login() + ":" + event.id();
+    }
+
+    public static String getKey(CommonhausUser user) {
+        return user.login() + ":" + user.id();
+    }
+
+    public static String getKey(MemberSession session) {
+        return session.login() + ":" + session.nodeId();
     }
 }

@@ -73,6 +73,7 @@ public class MemberResource {
     public Response getUserInfo(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         if (refresh) {
             AdminDataCache.KNOWN_USER.invalidate(session.login());
+            AdminDataCache.COMMONHAUS_DATA.invalidate(CommonhausDatastore.getKey(session));
             session.userIsKnown(ctx);
         }
 
