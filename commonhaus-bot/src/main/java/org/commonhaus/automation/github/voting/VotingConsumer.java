@@ -122,7 +122,7 @@ public class VotingConsumer {
                 }
                 // re-queue the message
                 Log.infof("[%s] voting.consumeManualResult: re-queue event", qc.getLogId());
-                bus.send(VoteEvent.MANUAL_ADDRESS, msg);
+                bus.send(VoteEvent.MANUAL_ADDRESS, voteEvent);
             }
         } catch (Throwable e) {
             Log.errorf(e, "[%s] voting.checkVotes: unexpected error", voteEvent.getLogId());
