@@ -169,14 +169,14 @@ public abstract class QueryContext {
     }
 
     public boolean hasConflict() {
-        return exceptions.stream().anyMatch(e -> e instanceof HttpException
-                && ((HttpException) e).getResponseCode() == 409);
+        return getConflict() != null;
     }
 
     public HttpException getConflict() {
         return exceptions.stream()
-                .filter(e -> e instanceof HttpException
-                        && ((HttpException) e).getResponseCode() == 409)
+                .filter(e -> e instanceof HttpException)
+                .map(e -> (HttpException) e)
+                .filter(e -> e.getResponseCode() == 409 || e.getMessage().contains("409"))
                 .findFirst()
                 .map(e -> (HttpException) e).orElse(null);
     }
