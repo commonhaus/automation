@@ -18,7 +18,9 @@ public enum AdminDataCache {
 
     KNOWN_USER(b -> b.expireAfterWrite(2, TimeUnit.DAYS)),
 
-    ALIASES(b -> b.expireAfterWrite(6, TimeUnit.HOURS));
+    ALIASES(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
+
+    APPLICATION_CHECK(b -> b.expireAfterWrite(1, TimeUnit.HOURS));
 
     private QueryCache cache = null;
 
