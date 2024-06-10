@@ -19,6 +19,7 @@ public class ApplicationData {
             "([\\s\\S]*?<!--CONTRIBUTION::-->)([\\s\\S]*?)(<!--::CONTRIBUTION-->[\\s\\S]*?)", Pattern.CASE_INSENSITIVE);
     static final Pattern NOTES = Pattern.compile("([\\s\\S]*?<!--NOTES::-->)([\\s\\S]*?)(<!--::NOTES-->[\\s\\S]*?)",
             Pattern.CASE_INSENSITIVE);
+    static final Pattern STRIP_COMMENTS = Pattern.compile("<!--:?:?(CONTRIBUTION|NOTES):?:?-->", Pattern.CASE_INSENSITIVE);
 
     transient String title;
     transient MembershipApplication application;
@@ -103,8 +104,8 @@ public class ApplicationData {
                 """.formatted(
                 session.login(),
                 session.url(),
-                applicationPost.contributions(),
-                applicationPost.additionalNotes());
+                STRIP_COMMENTS.matcher(applicationPost.contributions()).replaceAll(" "),
+                STRIP_COMMENTS.matcher(applicationPost.additionalNotes()).replaceAll(" "));
     }
 
     public static String createTitle(MemberSession session) {
