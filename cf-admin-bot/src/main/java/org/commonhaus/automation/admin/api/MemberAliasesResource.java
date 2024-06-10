@@ -22,7 +22,6 @@ import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 
-import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
 
 @Path("/member/aliases")
@@ -45,6 +44,9 @@ public class MemberAliasesResource {
     public Response getAliases(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
+            if (user == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
             if (!user.status().mayHaveEmail()) {
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
@@ -77,10 +79,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            Log.debugf("Error getting aliases for %s: %s", session.login(), e);
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            ctx.logAndSendEmail("getAliases", "Unable to fetch user aliases for " + session.login(), e, null);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -89,9 +88,11 @@ public class MemberAliasesResource {
     @KnownUser
     @Produces("application/json")
     public Response updateAliases(Map<String, Set<String>> aliases) {
-
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
+            if (user == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
             if (!user.status().mayHaveEmail()) {
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
@@ -121,10 +122,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            Log.debugf("Error getting aliases for %s: %s", session.login(), e);
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            ctx.logAndSendEmail("updateAliases", "Unable to update user aliases for " + session.login(), e, null);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -173,10 +171,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            Log.debugf("Error generating password for %s: %s", session.login(), e);
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            ctx.logAndSendEmail("generatePassword", "Unable to generate SMTP password for " + alias.email(), e, null);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
