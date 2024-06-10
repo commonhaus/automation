@@ -42,7 +42,7 @@ class MailConsumer {
                                 mailEvent.logId,
                                 List.of(mailEvent.addresses),
                                 mailEvent.subject),
-                        failure -> Log.errorf(failure, "%s EmailAction.apply: Failed to send email to %s",
+                        failure -> Log.errorf(failure, "[%s] EmailAction.apply: Failed to send email to %s",
                                 mailEvent.logId,
                                 List.of(mailEvent.addresses),
                                 mailEvent.subject));
