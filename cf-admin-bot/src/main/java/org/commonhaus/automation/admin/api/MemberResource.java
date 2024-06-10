@@ -77,9 +77,12 @@ public class MemberResource {
             session.userIsKnown(ctx);
         }
 
-        return session.hasConnection()
-                ? Response.ok(new ApiResponse(ApiResponse.Type.INFO, session.getUserData())).build()
-                : Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        if (session.hasConnection()) {
+            return Response.ok(new ApiResponse(ApiResponse.Type.INFO, session.getUserData())).build();
+        } else {
+            Log.errorf("getUserInfo: Unable to establish connection to GH for %s", session.login());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GET
@@ -89,12 +92,13 @@ public class MemberResource {
     public Response getCommonhausUser(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, refresh);
+            CommonhausUser user = datastore.getCommonhausUser(session, refresh, true);
+            if (user == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
             return user.toResponse().finish();
         } catch (Exception e) {
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            Log.errorf(e, "getCommonhausUser: Unable to get user data for %s: %s", session.login(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -105,7 +109,7 @@ public class MemberResource {
     @Produces("application/json")
     public Response updateUserStatus() {
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, false);
+            CommonhausUser user = datastore.getCommonhausUser(session, false, false);
             if (user.updateMemberStatus(ctx, session.roles())) {
                 // Refresh the user's status
                 user = datastore.setCommonhausUser(user, session.roles(),
@@ -113,9 +117,7 @@ public class MemberResource {
             }
             return user.toResponse().finish();
         } catch (Exception e) {
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            Log.errorf(e, "updateUserStatus: Unable to update status for %s: %s", session.login(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

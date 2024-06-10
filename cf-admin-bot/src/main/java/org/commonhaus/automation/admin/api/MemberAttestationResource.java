@@ -39,12 +39,12 @@ public class MemberAttestationResource {
     @POST
     @KnownUser
     @Produces("application/json")
-    public Response updateAttestations(AttestationPost post) {
+    public Response updateAttestation(AttestationPost post) {
         if (!ctx.validAttestation(post.id())) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session);
+            CommonhausUser user = datastore.getCommonhausUser(session, false, true);
             user.updateMemberStatus(ctx, session.roles());
 
             Attestation newAttestation = createAttestation(user.status(), post);
@@ -54,9 +54,7 @@ public class MemberAttestationResource {
             user = datastore.setCommonhausUser(user, session.roles(), message, true);
             return user.toResponse().finish();
         } catch (Throwable e) {
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            Log.errorf(e, "updateAttestation: Unable to update attestation for %s: %s", session.login(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -71,7 +69,7 @@ public class MemberAttestationResource {
         }
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session);
+            CommonhausUser user = datastore.getCommonhausUser(session, false, true);
             user.updateMemberStatus(ctx, session.roles());
 
             Map<String, Attestation> newAttestations = new HashMap<>();
@@ -85,9 +83,7 @@ public class MemberAttestationResource {
             user = datastore.setCommonhausUser(user, session.roles(), message.toString(), true);
             return user.toResponse().finish();
         } catch (Throwable e) {
-            if (Log.isDebugEnabled()) {
-                e.printStackTrace();
-            }
+            Log.errorf(e, "updateAttestations: Unable to update attestations for %s: %s", session.login(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
