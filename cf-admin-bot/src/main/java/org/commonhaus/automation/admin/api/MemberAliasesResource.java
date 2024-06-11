@@ -23,6 +23,7 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 
+import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
 
 @Path("/member/aliases")
@@ -49,9 +50,11 @@ public class MemberAliasesResource {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             if (!user.status().mayHaveEmail()) {
+                Log.infof("getAliases|%s User is not eligible for email", user.login());
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
             if (!ctx.validAttestation(ID)) {
+                Log.errorf("getAliases|%s %s is an invalid attestation id", user.login(), ID);
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
 
