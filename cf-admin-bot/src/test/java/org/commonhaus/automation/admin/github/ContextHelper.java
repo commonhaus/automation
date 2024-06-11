@@ -1,6 +1,7 @@
 package org.commonhaus.automation.admin.github;
 
 import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -27,6 +29,9 @@ import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.kohsuke.github.GHContent;
+import org.kohsuke.github.GHContentBuilder;
+import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
@@ -122,13 +127,9 @@ public class ContextHelper extends QueryContext {
             when(gh.getUser(login)).thenReturn(user);
         }
 
-        System.out.println("testQuorum " + testQuorum.stream().map(GHUser::getLogin).toList());
-        System.out.println("council " + council.stream().map(GHUser::getLogin).toList());
-        System.out.println("voting " + voting.stream().map(GHUser::getLogin).toList());
-
-        setupMockTeam("team-quorum-default", org, testQuorum);
-        setupMockTeam("cf-council", org, council);
-        setupMockTeam("cf-voting", org, voting);
+        setupMockTeam(mocks, "team-quorum-default", org, testQuorum);
+        setupMockTeam(mocks, "cf-council", org, council);
+        setupMockTeam(mocks, "cf-voting", org, voting);
 
         return gh;
     }
@@ -152,10 +153,11 @@ public class ContextHelper extends QueryContext {
         return repo;
     }
 
-    protected GHTeam setupMockTeam(String name, GHOrganization org, Set<GHUser> userSet) throws IOException {
+    protected GHTeam setupMockTeam(GitHubMockSetupContext mocks, String name, GHOrganization org, Set<GHUser> userSet)
+            throws IOException {
         setupMockTeam("commonhaus-test/" + name, userSet);
 
-        GHTeam team = Mockito.mock(GHTeam.class);
+        GHTeam team = mocks.team(name.hashCode());
         when(team.getMembers()).thenReturn(userSet);
         when(team.getName()).thenReturn(name);
         when(org.getTeamByName(name)).thenReturn(team);
@@ -192,7 +194,7 @@ public class ContextHelper extends QueryContext {
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
                 DiscoveryAction.ADDED, gh, dql, installationId, dataStoreRepo, Optional.ofNullable(null));
 
-        BaseQueryCache.LABELS.computeIfAbsent(datastoreRepoId, (k) -> new HashSet<>()).addAll(APP_LABELS);
+        setLabels(datastoreRepoId, APP_LABELS);
         ctx.repositoryDiscovered(repoEvent);
 
         ctx.attestationIds.add("member");
@@ -216,6 +218,59 @@ public class ContextHelper extends QueryContext {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void mockExistingCommonhausData(GitHub botGithub, AppContextService ctx) throws IOException {
+        mockExistingCommonhausData(botGithub, ctx, "src/test/resources/commonhaus-user.yaml");
+    }
+
+    public void mockExistingCommonhausData(GitHub botGithub, AppContextService ctx, String filename) throws IOException {
+        GHContent content = mock(GHContent.class);
+        when(content.read()).thenReturn(Files.newInputStream(Path.of(filename)));
+        when(content.getSha()).thenReturn("1234567890abcdef");
+
+        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
+        when(dataStore.getFileContent(anyString())).thenReturn(content);
+    }
+
+    public GHContentBuilder mockUpdateCommonhausData(GitHub botGithub, AppContextService ctx) throws IOException {
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        return mockUpdateCommonhausData(builder, botGithub, ctx, "src/test/resources/commonhaus-user.yaml");
+    }
+
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, GitHub botGithub, AppContextService ctx)
+            throws IOException {
+        return mockUpdateCommonhausData(builder, botGithub, ctx, "src/test/resources/commonhaus-user.yaml");
+    }
+
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, GitHub botGithub, AppContextService ctx, String filename) throws IOException {
+        when(builder.content(anyString())).thenReturn(builder);
+        when(builder.message(anyString())).thenReturn(builder);
+        when(builder.path(anyString())).thenReturn(builder);
+        when(builder.sha(anyString())).thenReturn(builder);
+
+        GHContent responseContent = mock(GHContent.class);
+        when(responseContent.read())
+                .thenReturn(Files.newInputStream(Path.of(filename)));
+        when(responseContent.getSha()).thenReturn("1234567890adefgh");
+
+        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
+        when(dataStore.createContent()).thenReturn(builder);
+
+        GHContentUpdateResponse response = Mockito.mock(GHContentUpdateResponse.class);
+        when(response.getContent()).thenReturn(responseContent);
+
+        when(builder.commit()).thenReturn(response);
+
+        return builder;
+    }
+
+    public void setLabels(String id, DataLabel... labels) {
+        BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(List.of(labels));
+    }
+
+    public void setLabels(String id, Set<DataLabel> labels) {
+        BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
     }
 
     @Override

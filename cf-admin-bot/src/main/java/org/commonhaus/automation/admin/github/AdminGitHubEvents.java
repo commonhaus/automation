@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.api.MemberApplicationProcess;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.github.context.ActionType;
@@ -86,13 +87,18 @@ public class AdminGitHubEvents {
      * @param graphQLClient
      * @param issueCommentEvent
      */
-    public void updateApplication(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+    public void applicationIssueLabelAdded(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Issue.Labeled GHEventPayload.Issue issueEvent) {
+
         String repoFullName = issueEvent.getRepository().getFullName();
         ActionType actionType = ActionType.fromString(event.getAction());
+        JsonObject payload = JsonAttribute.unpack(event.getPayload());
+        DataCommonItem issue = JsonAttribute.issue.commonItemFrom(payload);
+        DataLabel label = JsonAttribute.label.labelFrom(payload);
 
         // ignore if it isn't an issue in the datastore repository
-        if (!repoFullName.equals(ctx.getDataStore())) {
+        if (!repoFullName.equals(ctx.getDataStore())
+                || !ApplicationData.isMemberApplicationEvent(issue, label)) {
             return;
         }
 
@@ -102,15 +108,11 @@ public class AdminGitHubEvents {
                 issueEvent.getInstallation().getId())
                 .addExisting(graphQLClient);
 
-        JsonObject payload = JsonAttribute.unpack(event.getPayload());
-        DataCommonItem issue = JsonAttribute.issue.commonItemFrom(payload);
-        DataLabel label = JsonAttribute.label.labelFrom(payload);
-
         Log.debugf("[%s] updateApplication #%s - %s", qc.getLogId(),
                 issue.number, actionType);
 
         try {
-            applicationProcess.handleApplicationEvent(qc, issueEvent.getIssue(), issue, label);
+            applicationProcess.handleApplicationLabelAdded(qc, issueEvent.getIssue(), issue, label);
         } catch (Exception e) {
             ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
         } finally {

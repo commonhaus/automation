@@ -76,7 +76,7 @@ public class VotingTest extends ContextHelper {
     @AfterEach
     protected void noErrorMail() throws Exception {
         await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
-                .atMost(5, TimeUnit.SECONDS);
+                .atMost(3, TimeUnit.SECONDS);
     }
 
     @Test

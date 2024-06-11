@@ -10,13 +10,10 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -34,15 +31,12 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
-import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -240,7 +234,7 @@ public class MemberDataTest extends ContextHelper {
     })
     void testGetCommonhausUser() throws Exception {
 
-        mockExistingCommonhausData();
+        mockExistingCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
@@ -276,9 +270,9 @@ public class MemberDataTest extends ContextHelper {
                 "draft");
         String attestJson = mapper.writeValueAsString(attestation);
 
-        mockExistingCommonhausData(); // pre-existing data
+        mockExistingCommonhausData(botGithub, ctx); // pre-existing data
 
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/cf-voting", botUser);
@@ -363,7 +357,7 @@ public class MemberDataTest extends ContextHelper {
                 new AttestationPost("coc", "2.0"));
         String attestJson = mapper.writeValueAsString(attestations);
 
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
@@ -417,7 +411,7 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
-        mockExistingCommonhausData();
+        mockExistingCommonhausData(botGithub, ctx);
 
         given()
                 .log().all()
@@ -440,10 +434,10 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
-        mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
+        mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
         // update to remove applicationId
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationBadTitle.json");
         when(mockContext.mocks.installationGraphQLClient(installationId)
@@ -477,7 +471,7 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
-        mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
+        mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationMatch.json");
         when(mockContext.mocks.installationGraphQLClient(installationId)
@@ -490,7 +484,7 @@ public class MemberDataTest extends ContextHelper {
                 .thenReturn(queryComments);
 
         // update to fix member status
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         given()
                 .log().all()
@@ -521,7 +515,7 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
-        mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
+        mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationMatch.json");
         when(mockContext.mocks.installationGraphQLClient(installationId)
@@ -539,7 +533,7 @@ public class MemberDataTest extends ContextHelper {
         String applyJson = mapper.writeValueAsString(application);
 
         // update to fix member status
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         given()
                 .log().all()
@@ -565,45 +559,4 @@ public class MemberDataTest extends ContextHelper {
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
     }
-
-    void mockExistingCommonhausData() throws IOException {
-        mockExistingCommonhausData("src/test/resources/commonhaus-user.yaml");
-    }
-
-    void mockExistingCommonhausData(String filename) throws IOException {
-        GHContent content = mock(GHContent.class);
-        when(content.read()).thenReturn(Files.newInputStream(Path.of(filename)));
-        when(content.getSha()).thenReturn("1234567890abcdef");
-
-        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
-        when(dataStore.getFileContent(anyString())).thenReturn(content);
-    }
-
-    GHContentBuilder mockUpdateCommonhausData() throws IOException {
-        return mockUpdateCommonhausData("src/test/resources/commonhaus-user.yaml");
-    }
-
-    GHContentBuilder mockUpdateCommonhausData(String filename) throws IOException {
-        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
-        when(builder.content(anyString())).thenReturn(builder);
-        when(builder.message(anyString())).thenReturn(builder);
-        when(builder.path(anyString())).thenReturn(builder);
-        when(builder.sha(anyString())).thenReturn(builder);
-
-        GHContent responseContent = mock(GHContent.class);
-        when(responseContent.read())
-                .thenReturn(Files.newInputStream(Path.of(filename)));
-        when(responseContent.getSha()).thenReturn("1234567890adefgh");
-
-        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
-        when(dataStore.createContent()).thenReturn(builder);
-
-        GHContentUpdateResponse response = Mockito.mock(GHContentUpdateResponse.class);
-        when(response.getContent()).thenReturn(responseContent);
-
-        when(builder.commit()).thenReturn(response);
-
-        return builder;
-    }
-
 }

@@ -128,6 +128,7 @@ public class ApplicationData {
 
     public static boolean isMemberApplicationEvent(DataCommonItem issue, DataLabel label) {
         return issue.title.startsWith("Membership application:")
+                && !issue.closed
                 && (ACCEPTED.equals(label.name) || DECLINED.equals(label.name));
     }
 

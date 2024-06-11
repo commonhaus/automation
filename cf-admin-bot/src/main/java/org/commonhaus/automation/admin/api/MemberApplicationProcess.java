@@ -31,11 +31,16 @@ public class MemberApplicationProcess {
     @Inject
     CommonhausDatastore datastore;
 
-    public void handleApplicationEvent(ScopedQueryContext qc, GHIssue issue, DataCommonItem item, DataLabel label) {
-        if (!ApplicationData.isMemberApplicationEvent(item, label)) {
-            return;
-        }
-
+    /**
+     * Handle an application event (issue label change) for a membership application.
+     * Not triggered by the user, but by the system when a label is added or removed from an issue.
+     *
+     * @param qc QueryContext for the repository containing the issue
+     * @param issue The issue that was updated
+     * @param item The issue as Json-derived data
+     * @param label The label that was added
+     */
+    public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item, DataLabel label) {
         String login = ApplicationData.getLogin(item);
         GHUser applicant = qc.getUser(login);
         CommonhausUser user = datastore.getCommonhausUser(login, applicant.getId(), false, false);
@@ -75,6 +80,7 @@ public class MemberApplicationProcess {
                         if (u.status().updateFromPending()) {
                             u.status(MemberStatus.DECLINED);
                         }
+                        u.isMember = false;
                     },
                     "Membership application declined",
                     true,
@@ -86,6 +92,15 @@ public class MemberApplicationProcess {
         }
     }
 
+    /**
+     * User action called when a user submits or updates their membership application
+     *
+     * @param session User session
+     * @param qc Datastore QueryContext (for making changes to the application issue)
+     * @param applicationData Current application data
+     * @param applicationPost Application data from the user
+     * @return updated ApplicationData object or null on error (see QueryContext for errors)
+     */
     public ApplicationData userUpdateApplicationIssue(
             MemberSession session,
             ScopedQueryContext qc,

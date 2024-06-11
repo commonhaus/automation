@@ -1,0 +1,19 @@
+{
+  "removeLabelsFromLabelable": {
+    "clientMutationId": null,
+    "labelable": {
+      "labels": {
+        "nodes": [
+          {
+            "id": "LA_kwDOL8tG0s8AAAABpSSN4Q",
+            "name": "application/accepted"
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "MQ"
+        }
+      }
+    }
+  }
+}
