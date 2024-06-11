@@ -30,15 +30,16 @@ import io.smallrye.common.constraint.NotNull;
 @RegisterForReflection
 @JsonDeserialize(builder = CommonhausUser.Builder.class)
 public class CommonhausUser {
+    public static final String MEMBER_ROLE = "member";
 
     public enum MemberStatus {
+        REVOKED,
+        SUSPENDED,
+        DECLINED,
         COMMITTEE,
         ACTIVE,
         PENDING,
         INACTIVE,
-        DECLINED,
-        REVOKED,
-        SUSPENDED,
         SPONSOR,
         UNKNOWN;
 
@@ -54,10 +55,9 @@ public class CommonhausUser {
         }
 
         public boolean mayHaveEmail() {
-            return this != PENDING
-                    && this != REVOKED
-                    && this != SPONSOR
-                    && this != SUSPENDED;
+            return this == COMMITTEE
+                    || this == ACTIVE
+                    || this == INACTIVE;
         }
 
         public boolean updateToPending() {
@@ -165,6 +165,7 @@ public class CommonhausUser {
     @NotNull
     final List<String> history;
 
+    Boolean isMember;
     MembershipApplication application;
 
     transient String sha = null;
@@ -176,6 +177,7 @@ public class CommonhausUser {
         this.data = builder.data == null ? new Data() : builder.data;
         this.history = builder.history == null ? new ArrayList<>() : builder.history;
         this.application = builder.application;
+        this.isMember = builder.isMember;
     }
 
     private CommonhausUser(String login, long id) {
@@ -183,6 +185,7 @@ public class CommonhausUser {
         this.id = id;
         this.data = new Data();
         this.history = new ArrayList<>();
+        this.isMember = null;
     }
 
     public String login() {
@@ -285,8 +288,9 @@ public class CommonhausUser {
         private String login;
         private long id;
         private Data data;
-        public MembershipApplication application;
+        private Boolean isMember;
 
+        public MembershipApplication application;
         private List<String> history;
 
         public Builder withLogin(String login) {
@@ -311,6 +315,11 @@ public class CommonhausUser {
 
         public Builder withApplication(MembershipApplication application) {
             this.application = application;
+            return this;
+        }
+
+        public Builder withIsMember(Boolean isMember) {
+            this.isMember = isMember;
             return this;
         }
 

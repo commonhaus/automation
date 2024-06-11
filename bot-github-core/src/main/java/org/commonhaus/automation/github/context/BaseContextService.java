@@ -91,10 +91,12 @@ public abstract class BaseContextService implements ContextService {
     }
 
     public <F> F getConfiguration(GHRepository repo) {
+        return getConfiguration(repo, false);
+    }
+
+    public <F> F getConfiguration(GHRepository repo, boolean refresh) {
         Optional<F> repoConfig = REPO_CONFIG.get(repo.getNodeId());
-        if (repoConfig == null) {
-            // unless we haven't had an event for a repo in a long while, this should more
-            // or less never happen
+        if (repoConfig == null || refresh) {
             String configFileName = getConfigFileName();
             @SuppressWarnings("unchecked")
             Class<F> configType = (Class<F>) getConfigType();

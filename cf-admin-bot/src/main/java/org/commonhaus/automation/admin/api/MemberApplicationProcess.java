@@ -59,6 +59,7 @@ public class MemberApplicationProcess {
                         if (u.status().updateFromPending()) {
                             u.status(MemberStatus.ACTIVE);
                         }
+                        u.isMember = true;
                         u.application = null;
                     },
                     "Membership application accepted",

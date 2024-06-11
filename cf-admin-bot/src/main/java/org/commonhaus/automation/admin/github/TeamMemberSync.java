@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
@@ -38,14 +39,18 @@ import org.kohsuke.github.GitHub;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Push;
 import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
+@ApplicationScoped
 public class TeamMemberSync {
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -99,18 +104,29 @@ public class TeamMemberSync {
         monitoredRepos.put(cfg, repoFullName);
 
         Log.debugf("repositoryDiscovered: %s", repo.getFullName());
-        scheduleQueryRepository(cfg, repo, repoEvent.github());
+
+        if (LaunchMode.current() != LaunchMode.NORMAL) {
+            // Scan immediately in dev & test
+            scheduleQueryRepository(cfg, repo, repoEvent.github());
+        }
     }
 
-    public void updateTeamMembers(@Push GHEventPayload.Push pushEvent, GitHub github) {
+    public void updateTeamMembers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @Push GHEventPayload.Push pushEvent) {
         GHRepository repo = pushEvent.getRepository();
-        Log.debugf("pushEvent: %s", repo.getFullName());
+        Log.debugf("updateTeamMembers (push): %s", repo.getFullName());
+
         for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
             MonitoredRepo repoCfg = entry.getKey();
             if (repoCfg.repoFullName().equals(repo.getFullName())
                     && pushEvent.getRef().endsWith("/main")
                     && repoCfg.sourceConfig().stream().anyMatch(s -> ctx.commitsContain(pushEvent, s.path()))) {
-                Log.debugf("updateTeamMembers (push): %s", repo.getFullName());
+                Log.debugf("updateTeamMembers (push): Re-read configuration: %s", repo.getFullName());
+
+                AdminConfigFile file = ctx.getConfiguration(repo, true);
+                repoCfg.refresh(file);
+
+                // schedule a query for the repository to refresh the team membership to new config
                 scheduleQueryRepository(repoCfg, repo, github);
             }
         }
