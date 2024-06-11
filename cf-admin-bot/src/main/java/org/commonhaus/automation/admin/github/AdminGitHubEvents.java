@@ -3,6 +3,7 @@ package org.commonhaus.automation.admin.github;
 import java.util.List;
 import java.util.Objects;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
@@ -29,6 +30,7 @@ import io.quarkiverse.githubapp.event.Push;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
+@ApplicationScoped
 public class AdminGitHubEvents {
 
     @Inject
