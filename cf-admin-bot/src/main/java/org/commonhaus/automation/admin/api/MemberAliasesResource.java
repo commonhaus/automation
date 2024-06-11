@@ -21,6 +21,7 @@ import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
+import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 
 import io.quarkus.security.Authenticated;
 
@@ -68,9 +69,7 @@ public class MemberAliasesResource {
                 aliasMap = ctx.getAliases(emailAddresses, refresh);
 
                 if (!forwardEmail.configured && !aliasMap.isEmpty()) {
-                    forwardEmail.configured = true;
-                    user = datastore.setCommonhausUser(user, session.roles(),
-                            "Fix forward email service active flag", false);
+                    user = updatedConfiguredFlag(user);
                 }
             }
             return user.toResponse()
@@ -112,9 +111,7 @@ public class MemberAliasesResource {
             // Update alias mappings
             Map<String, Alias> aliasMap = ctx.setRecipients(session.name(), aliases);
             if (!forwardEmail.configured && !aliasMap.isEmpty()) {
-                forwardEmail.configured = true;
-                user = datastore.setCommonhausUser(user, session.roles(),
-                        "Fix forward email service active flag", false);
+                user = updatedConfiguredFlag(user);
             }
             return user.toResponse()
                     .setData(ApiResponse.Type.ALIAS, aliasMap)
@@ -125,6 +122,18 @@ public class MemberAliasesResource {
             ctx.logAndSendEmail("updateAliases", "Unable to update user aliases for " + session.login(), e, null);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    CommonhausUser updatedConfiguredFlag(CommonhausUser user) {
+        // eventual consistency. No big deal if this
+        CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
+                (c, u) -> {
+                    u.services().forwardEmail().configured = true;
+                },
+                "Fix forward email service active flag",
+                false,
+                false));
+        return result == null ? user : result;
     }
 
     List<String> getEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {

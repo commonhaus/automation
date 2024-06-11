@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -19,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContent;
@@ -46,6 +48,7 @@ public class TeamMemberSyncTest extends ContextHelper {
     @BeforeEach
     void init() {
         mailbox.clear();
+        BaseQueryCache.LABELS.computeIfAbsent(datastoreRepoId, (k) -> new HashSet<>()).addAll(APP_LABELS);
     }
 
     @Test

@@ -21,6 +21,7 @@ import jakarta.json.JsonObject;
 
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIOException;
+import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
@@ -497,6 +498,22 @@ public abstract class QueryContext {
         };
     }
 
+    public boolean closeIssue(GHIssue issue) {
+        if (isDryRun()) {
+            Log.debugf("[%s] closeIssue would close issue %s", getLogId(), issue.getNumber());
+            return true;
+        }
+        execGitHubSync((gh, dryRun) -> {
+            issue.close();
+            return null;
+        });
+        if (hasErrors()) {
+            clearNotFound();
+            return false;
+        }
+        return true;
+    }
+
     public List<DataPullRequestReview> queryReviews(String nodeId) {
         if (hasErrors()) {
             return List.of();
@@ -711,6 +728,27 @@ public abstract class QueryContext {
             COLLABORATORS.put(repoFullName, collaborators);
         }
         return collaborators;
+    }
+
+    public void addTeamMember(GHUser user, String teamFullName) {
+        if (isDryRun()) {
+            Log.debugf("[%s] addTeamMember would add %s to %s", getLogId(), user.getLogin(), teamFullName);
+            return;
+        }
+        // this will trigger membership change events, which will come back around to update
+        // the cache.
+        String orgName = toOrganizationName(teamFullName);
+        String relativeName = toRelativeName(orgName, teamFullName);
+        GHOrganization org = getOrganization(orgName);
+        execGitHubSync((gh, dryRun) -> {
+            GHTeam ghTeam = org.getTeamByName(relativeName);
+            ghTeam.add(user);
+            return null;
+        });
+        if (hasErrors()) {
+            clearNotFound();
+        }
+        TEAM_MEMBERS.invalidate(teamFullName);
     }
 
     public String[] getErrorAddresses() {

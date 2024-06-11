@@ -1,8 +1,8 @@
 package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
-import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -44,17 +44,29 @@ public class CommonhausDatastore {
 
         String login();
 
-        Set<String> roles();
-
         boolean create();
     }
 
-    public record QueryEvent(String login, long id, Set<String> roles, boolean refresh,
+    public record QueryEvent(String login, long id, boolean refresh,
             boolean create) implements DatastoreEvent {
     }
 
-    public record UpdateEvent(CommonhausUser user, String message, Set<String> roles,
-            boolean history) implements DatastoreEvent {
+    /**
+     * Update Commonhaus user data
+     *
+     * @param user Commonhaus user object
+     * @param updateUser Function to apply changes to the user. This function will not have access to the MemberSession.
+     * @param message Commit message
+     * @param history Whether to add the message to the user's history
+     * @param retry Whether to retry the update if there is a conflict
+     */
+    public record UpdateEvent(
+            CommonhausUser user,
+            BiConsumer<AppContextService, CommonhausUser> updateUser,
+            String message,
+            boolean history,
+            boolean retry) implements DatastoreEvent {
+
         @Override
         public long id() {
             return user.id();
@@ -69,6 +81,14 @@ public class CommonhausDatastore {
         public boolean create() {
             return true;
         }
+
+        public void applyChanges(AppContextService ctx, CommonhausUser user) {
+            updateUser.accept(ctx, user);
+        }
+
+        static UpdateEvent retryEvent(UpdateEvent initial, CommonhausUser revisedUser) {
+            return new UpdateEvent(revisedUser, initial.updateUser(), initial.message(), initial.history(), false);
+        }
     }
 
     public CommonhausUser getCommonhausUser(MemberSession session) {
@@ -82,9 +102,19 @@ public class CommonhausDatastore {
      * @throws RuntimeException if GitHub or other API query fails
      */
     public CommonhausUser getCommonhausUser(MemberSession session, boolean resetCache, boolean create) {
-        QueryEvent query = new QueryEvent(session.login(), session.id(), session.roles(), resetCache, create);
+        return getCommonhausUser(session.login(), session.id(), resetCache, create);
+    }
+
+    /**
+     * GET Commonhaus user data
+     *
+     * @return A Commonhaus user object (never null)
+     * @throws RuntimeException if GitHub or other API query fails
+     */
+    public CommonhausUser getCommonhausUser(String login, long id, boolean resetCache, boolean create) {
+        QueryEvent query = new QueryEvent(login, id, resetCache, create);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
-        Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", session.id(), response.body());
+        Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", login, response.body());
         return response.body();
     }
 
@@ -96,10 +126,9 @@ public class CommonhausDatastore {
      *
      * @throws RuntimeException if GitHub or other API query fails
      */
-    public CommonhausUser setCommonhausUser(CommonhausUser user, Set<String> roles, String message, boolean history) {
-        UpdateEvent update = new UpdateEvent(user, message, roles, history);
-        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, update);
-        Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", user.id(), response.body());
+    public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {
+        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, updateEvent);
+        Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", updateEvent.login(), response.body());
         return response.body();
     }
 
@@ -157,7 +186,6 @@ public class CommonhausDatastore {
     @ConsumeEvent(value = WRITE)
     public Uni<CommonhausUser> pushCommonhausUser(UpdateEvent event) {
         final CommonhausUser user = event.user();
-        final String key = getKey(user);
 
         CommonhausUser result = null;
         ScopedQueryContext qc = ctx.getDatastoreContext();
@@ -166,8 +194,7 @@ public class CommonhausDatastore {
             ctx.logAndSendEmail("pushCommonhausUser", "Unable to get datastore query context", e, null);
             return Uni.createFrom().failure(e);
         } else if (!qc.hasErrors()) {
-            GHRepository repo = qc.getRepository();
-            result = updateCommonhausUser(qc, repo, user, event, key);
+            result = updateCommonhausUser(qc, event);
         }
 
         if (qc.hasErrors()) {
@@ -182,54 +209,62 @@ public class CommonhausDatastore {
         return Uni.createFrom().item(() -> u).emitOn(executor);
     }
 
-    private CommonhausUser updateCommonhausUser(ScopedQueryContext qc, GHRepository repo,
-            CommonhausUser input, UpdateEvent event, String key) {
+    private CommonhausUser updateCommonhausUser(ScopedQueryContext qc, UpdateEvent event) {
+        GHRepository repo = qc.getRepository();
+        CommonhausUser user = deepCopy(event.user()); // leave original alone
+        String key = getKey(user);
 
-        CommonhausUser result;
-
+        // Callback: Apply changes to the user
+        event.applyChanges(ctx, user);
         if (event.history()) {
-            input.addHistory(event.message());
+            user.addHistory(event.message());
         }
 
-        String content = writeUser(qc, input);
-        if (content == null) {
-            // If it can't be serialized, bail.
-            return input;
+        if (qc.isDryRun()) {
+            return user;
         }
+
+        String content = writeUser(qc, user);
+        if (content == null) {
+            // If it can't be serialized, bail and return the original
+            return event.user();
+        }
+
         GHContentBuilder update = repo.createContent()
-                .path(dataPath(input.id()))
-                .message("🤖 [%s] %s".formatted(input.id(), event.message()))
+                .path(dataPath(user.id()))
+                .message("🤖 [%s] %s".formatted(user.id(), event.message()))
                 .content(content);
 
-        if (input.sha() != null) {
-            update.sha(input.sha());
+        if (user.sha() != null) {
+            update.sha(user.sha());
         }
 
-        GHContentUpdateResponse response = qc.execGitHubSync((gh3, dryRun3) -> {
-            if (dryRun3) {
-                return null;
-            }
-            return update.commit();
-        });
-
+        GHContentUpdateResponse response = qc.execGitHubSync((gh3, dryRun3) -> update.commit());
         HttpException ex = qc.getConflict();
         if (ex != null) {
             qc.clearConflict();
-            Log.debugf("[%s|%s] Conflict updating Commonhaus user data: %s",
-                    qc.getLogId(), input.id(), ex.getResponseMessage());
+            Log.debugf("[%s|%s] Conflict updating Commonhaus user data", qc.getLogId(), user.login());
 
             // we're here after a save conflict; re-read the data
-            result = readCommonhausUser(qc, repo, event, key);
-            if (result != null) {
-                // recovered from conflict w/o further IOException
-                // Otherwise, query context will still contain errors, see caller
-                result.setConflict(true);
+            user = readCommonhausUser(qc, repo, event, key);
+            if (user != null) {
+                if (event.retry()) {
+                    // retry the update
+                    return updateCommonhausUser(qc, UpdateEvent.retryEvent(event, user));
+                } else {
+                    // allow caller to handle unresolved conflict
+                    user.setConflict(true);
+                }
             }
-        } else {
+        } else if (!qc.hasErrors()) {
             GHContent responseContent = response.getContent();
-            result = parseUser(qc, input, responseContent);
+            user = parseUser(qc, responseContent);
+            if (user != null) {
+                AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(user));
+            }
         }
-        return result;
+        // Caller should be check for query context errors
+        return user;
     }
 
     /** Get user data: will return null on IOException (including not found) */
@@ -272,14 +307,12 @@ public class CommonhausDatastore {
         return user;
     }
 
-    private CommonhausUser parseUser(ScopedQueryContext qc, CommonhausUser user, GHContent responseContent) {
+    private CommonhausUser parseUser(ScopedQueryContext qc, GHContent responseContent) {
         try {
             return CommonhausUser.parseFile(qc, responseContent);
         } catch (IOException e) {
-            // unlikely, but safer to keep what we had
-            // send an email to the admin because this shouldn't happen.
-            ctx.logAndSendEmail("CommonhausDatastore.parseUser", "Unable to deserialize Commonhaus user", e, null);
-            return user;
+            qc.addException(e);
+            return null;
         }
     }
 
@@ -287,9 +320,7 @@ public class CommonhausDatastore {
         try {
             return qc.writeValue(input);
         } catch (IOException e) {
-            // unlikely, but allow us to fail fast without exceptions everyplace
-            // send an email to the admin because this shouldn't happen.
-            ctx.logAndSendEmail("CommonhausDatastore.writeUser", "Unable to serialize Commonhaus user", e, null);
+            qc.addException(e);
             return null;
         }
     }

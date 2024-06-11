@@ -1,6 +1,7 @@
 package org.commonhaus.automation.admin.api;
 
 import java.net.URI;
+import java.util.Set;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -16,6 +17,7 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
+import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.quarkus.logging.Log;
@@ -73,7 +75,6 @@ public class MemberResource {
     public Response getUserInfo(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         if (refresh) {
             AdminDataCache.KNOWN_USER.invalidate(session.login());
-            AdminDataCache.COMMONHAUS_DATA.invalidate(CommonhausDatastore.getKey(session));
             session.userIsKnown(ctx);
         }
 
@@ -90,6 +91,9 @@ public class MemberResource {
     @Path("/commonhaus")
     @Produces("application/json")
     public Response getCommonhausUser(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+        if (refresh) {
+            AdminDataCache.COMMONHAUS_DATA.invalidate(CommonhausDatastore.getKey(session));
+        }
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(session, refresh, true);
@@ -110,10 +114,15 @@ public class MemberResource {
     public Response updateUserStatus() {
         try {
             CommonhausUser user = datastore.getCommonhausUser(session, false, false);
-            if (user.updateMemberStatus(ctx, session.roles())) {
+            final Set<String> roles = session.roles();
+            if (user.updateMemberStatus(ctx, roles)) {
                 // Refresh the user's status
-                user = datastore.setCommonhausUser(user, session.roles(),
-                        "Update roles: %s".formatted(session.roles()), true);
+                user = datastore.setCommonhausUser(new UpdateEvent(
+                        user,
+                        (c, u) -> u.updateMemberStatus(c, roles),
+                        "Update member status",
+                        false,
+                        false));
             }
             return user.toResponse().finish();
         } catch (Exception e) {

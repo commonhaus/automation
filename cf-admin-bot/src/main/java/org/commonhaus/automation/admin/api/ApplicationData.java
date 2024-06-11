@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.markdown.MarkdownConverter;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -15,6 +16,10 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
 public class ApplicationData {
+    public static final String NEW = "application/new";
+    public static final String ACCEPTED = "application/accepted";
+    public static final String DECLINED = "application/declined";
+
     static final Pattern CONTRIBUTIONS = Pattern.compile(
             "([\\s\\S]*?<!--CONTRIBUTION::-->)([\\s\\S]*?)(<!--::CONTRIBUTION-->[\\s\\S]*?)", Pattern.CASE_INSENSITIVE);
     static final Pattern NOTES = Pattern.compile("([\\s\\S]*?<!--NOTES::-->)([\\s\\S]*?)(<!--::NOTES-->[\\s\\S]*?)",
@@ -30,9 +35,9 @@ public class ApplicationData {
     String additionalNotes;
     Feedback feedback;
 
-    public ApplicationData(MemberSession session, DataCommonItem issue) {
+    public ApplicationData(String login, DataCommonItem issue) {
         this.title = issue == null ? null : issue.title;
-        if (title == null || !ownerEquals(session.login())) {
+        if (title == null || !ownerEquals(login)) {
             return;
         }
         application = MembershipApplication.fromDataCommonType(issue);
@@ -58,7 +63,7 @@ public class ApplicationData {
     }
 
     @JsonIgnore
-    public boolean isOwner() {
+    public boolean isValid() {
         return application != null;
     }
 
@@ -84,13 +89,18 @@ public class ApplicationData {
             String content = dataCommonComment.body.replaceAll("::response::", "").trim();
 
             this.htmlContent = MarkdownConverter.toHtml(content);
-            date = dataCommonComment.mostRecent().toString();
+            date = dataCommonComment.mostRecentEdit().toString();
         }
     }
 
     public static String issueContent(MemberSession session, ApplicationPost applicationPost) {
         return """
                 [%s](%s)
+
+                > [!TIP]
+                > - Include "::response::" in your comment to send feedback to the applicant.
+                > - Add the 'application/accepted' label to accept the application.
+                > - Add the 'application/declined' label to decline or reject the application.
 
                 ## Contribution Details
                 <!--CONTRIBUTION::-->
@@ -112,12 +122,25 @@ public class ApplicationData {
         return "Membership application: %s (%s)".formatted(session.name(), session.login());
     }
 
+    public static String getLogin(DataCommonItem issue) {
+        return issue.title.replaceAll("Membership application: .*? \\((.*)\\)", "$1");
+    }
+
+    public static boolean isMemberApplicationEvent(DataCommonItem issue, DataLabel label) {
+        return issue.title.startsWith("Membership application:")
+                && (ACCEPTED.equals(label.name) || DECLINED.equals(label.name));
+    }
+
     public static boolean isUserFeedback(String body) {
         return body.contains("::response::");
     }
 
+    public static boolean isAccepted(DataLabel label) {
+        return ACCEPTED.equals(label.name);
+    }
+
     public static boolean isNewer(DataCommonComment x, Date issueMostRecent) {
-        Log.debugf("isNewer: %s %s", x.mostRecent(), issueMostRecent);
-        return x.mostRecent().after(issueMostRecent);
+        Log.debugf("isNewer: %s %s", x.mostRecentEdit(), issueMostRecent);
+        return x.mostRecentEdit().after(issueMostRecent);
     }
 }

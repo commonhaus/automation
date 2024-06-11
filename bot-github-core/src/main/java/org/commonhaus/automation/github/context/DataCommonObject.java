@@ -77,7 +77,7 @@ public class DataCommonObject extends DataCommonType {
         this.body = other.body;
     }
 
-    public Date mostRecent() {
+    public Date mostRecentEdit() {
         return lastEditedAt == null ? createdAt : lastEditedAt;
     }
 }

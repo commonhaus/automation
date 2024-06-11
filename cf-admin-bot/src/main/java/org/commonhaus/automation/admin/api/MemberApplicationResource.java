@@ -1,5 +1,7 @@
 package org.commonhaus.automation.admin.api;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,10 +19,14 @@ import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
+import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
+import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.commonhaus.automation.github.context.DataCommonItem;
+import org.commonhaus.automation.github.context.DataLabel;
+import org.commonhaus.automation.github.context.EventType;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
-import io.smallrye.common.annotation.Blocking;
 
 @Path("/member/apply")
 @Authenticated
@@ -35,6 +41,9 @@ public class MemberApplicationResource {
     @Inject
     MemberSession session;
 
+    @Inject
+    MemberApplicationProcess memberApplicationProcess;
+
     @GET
     @KnownUser
     @Produces("application/json")
@@ -44,24 +53,16 @@ public class MemberApplicationResource {
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
+
             MembershipApplication application = user.application();
             ApplicationData applicationData = application == null
                     ? null
-                    : ctx.getOpenApplication(session, application.nodeId());
+                    : memberApplicationProcess.findUserApplication(session, application.nodeId());
 
-            if (applicationData == null || !applicationData.isOwner()) {
-                if (application != null) {
-                    user.application = null;
-                    String state = applicationData == null ? "not found" : "not owner";
-                    updateStatus(user, "Remove membership application (" + state + ")", false);
-                }
+            if (application == null && applicationData == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
-            }
-
-            if (user.status().updateToPending()) {
-                // compensate for missing status
-                user.status(MemberStatus.PENDING);
-                user = updateStatus(user, "Set status to PENDING", true);
+            } else if (applicationData == null || !applicationData.isValid() || user.status().updateToPending()) {
+                return doUserApplicationUpdate(user, applicationData, null); // WRITE
             }
             return user.toResponse()
                     .setData(Type.APPLY, applicationData)
@@ -76,63 +77,124 @@ public class MemberApplicationResource {
     @KnownUser
     @Produces("application/json")
     public Response setApplication(ApplicationPost applicationPost) {
-        AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
-                (k) -> new AtomicBoolean(false));
-
-        // There are a few separate updates here (dealing with the issue AND (separately) with the user record).
-        // We'll enforce one at a time coming from the UI for this one.
-        return checkRunning.compareAndSet(false, true)
-                ? doApplicationUpdate(applicationPost, checkRunning)
-                : Response.status(Response.Status.TOO_MANY_REQUESTS).build();
-    }
-
-    @Blocking
-    private CommonhausUser updateStatus(CommonhausUser user, String message, boolean history) {
-        AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
-                (k) -> new AtomicBoolean(false));
-        boolean iAmWriter = checkRunning.compareAndSet(false, true);
-        if (iAmWriter) {
-            try {
-                return datastore.setCommonhausUser(user, session.roles(), message, history);
-            } finally {
-                checkRunning.set(false);
-            }
-        }
-        return user;
-    }
-
-    @Blocking
-    private Response doApplicationUpdate(ApplicationPost applicationPost, AtomicBoolean checkRunning) {
         try {
+            if (applicationPost == null) {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
             CommonhausUser user = datastore.getCommonhausUser(session, false, false);
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
-            ApplicationData applicationData = ctx.updateApplication(session, user, applicationPost);
-            if (applicationData == null) {
-                return Response.status(Response.Status.BAD_REQUEST).build();
-            }
+            MembershipApplication application = user.application();
+            ApplicationData applicationData = application == null
+                    ? null
+                    : memberApplicationProcess.findUserApplication(session, application.nodeId());
 
-            user.application = applicationData.application;
-            if (user.status().updateToPending()) {
-                user.status(MemberStatus.PENDING);
+            if (applicationData != null && !applicationData.isValid()) {
+                applicationData = null;
             }
-            user = datastore.setCommonhausUser(user, session.roles(), "Created membership application", false);
-
-            if (user.postConflict()) { // on conflict, user is reset with value from repo
-                // retry once.
-                user.application = applicationData.application;
-                user = datastore.setCommonhausUser(user, session.roles(), "Created membership application", false);
-            }
-
-            return user.toResponse()
-                    .setData(Type.APPLY, applicationData)
-                    .finish();
+            return doUserApplicationUpdate(user, applicationData, applicationPost); // WRITE
         } catch (Throwable e) {
-            Log.errorf(e, "doApplicationUpdate: Unable to update user application for %s: %s", session.login(), e);
+            Log.errorf(e, "getApplication: Unable to retrieve application for %s: %s", session.login(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        } finally {
-            checkRunning.set(false);
         }
     }
+
+    private Response doUserApplicationUpdate(CommonhausUser user, ApplicationData applicationData,
+            ApplicationPost post) {
+        AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
+                (k) -> new AtomicBoolean(false));
+
+        if (checkRunning.compareAndSet(false, true)) {
+            try {
+                ScopedQueryContext qc = ctx.getDatastoreContext();
+
+                boolean notFound = applicationData == null && post == null;
+                boolean notOwner = applicationData != null && !applicationData.isValid();
+
+                if (notFound || notOwner) {
+                    // RESET/REMOVE APPLICATION FROM USER (missing or bad, no replacement)
+                    String state = notFound ? "not found" : "not owner";
+                    user = datastore.setCommonhausUser(new UpdateEvent(user,
+                            (c, u) -> {
+                                u.application = null;
+                            },
+                            "Remove membership application (" + state + ")",
+                            false,
+                            true));
+
+                    return Response.status(Response.Status.NOT_FOUND).build();
+                } else if (post == null) {
+                    // UPDATING MISMATCHED STATUS
+                    if (user.status().updateToPending()) {
+                        user = datastore.setCommonhausUser(new UpdateEvent(user,
+                                (c, u) -> {
+                                    if (u.status().updateToPending()) {
+                                        u.status(MemberStatus.PENDING);
+                                    }
+                                },
+                                "Set status to PENDING",
+                                false,
+                                true));
+                    }
+                    return user.toResponse()
+                            .setData(Type.APPLY, applicationData)
+                            .finish();
+                }
+
+                // UPDATE APPLICATION ISSUE
+                ApplicationData updated = userUpdateApplicationIssue(qc, applicationData, post);
+
+                if (qc.hasErrors()) {
+                    Throwable e = qc.bundleExceptions();
+                    qc.clearErrors();
+                    ctx.logAndSendEmail(qc.getLogId(), "Failed to update MembershipApplication issue", e, null);
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+                }
+                if (updated == null) {
+                    return Response.status(Response.Status.BAD_REQUEST).build();
+                }
+                final MembershipApplication application = updated.application;
+                user = datastore.setCommonhausUser(new UpdateEvent(user,
+                        (c, u) -> {
+                            u.application = application;
+                            if (u.status().updateToPending()) {
+                                u.status(MemberStatus.PENDING);
+                            }
+                        },
+                        "Updated membership application",
+                        false,
+                        true));
+
+                return user.toResponse()
+                        .setData(Type.APPLY, updated)
+                        .finish();
+            } finally {
+                checkRunning.set(false);
+            }
+        } else {
+            return Response.status(Response.Status.TOO_MANY_REQUESTS).build();
+        }
+    }
+
+    public ApplicationData userUpdateApplicationIssue(ScopedQueryContext qc,
+            ApplicationData applicationData,
+            ApplicationPost applicationPost) {
+
+        String content = ApplicationData.issueContent(session, applicationPost);
+        Collection<DataLabel> labels = qc.findLabels(List.of(ApplicationData.NEW));
+        MembershipApplication application = applicationData == null ? null : applicationData.application;
+
+        DataCommonItem item = application == null
+                ? qc.createItem(EventType.issue,
+                        ApplicationData.createTitle(session),
+                        content,
+                        labels)
+                : qc.updateItemDescription(EventType.issue, application.nodeId(), content);
+
+        return item == null
+                ? null
+                : new ApplicationData(session.login(), item);
+    }
+
 }

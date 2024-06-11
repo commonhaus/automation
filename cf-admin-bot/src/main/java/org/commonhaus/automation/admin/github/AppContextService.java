@@ -3,8 +3,6 @@ package org.commonhaus.automation.admin.github;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,12 +18,7 @@ import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.admin.AdminConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.ApplicationData;
-import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
-import org.commonhaus.automation.admin.api.ApplicationData.Feedback;
-import org.commonhaus.automation.admin.api.CommonhausUser;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
-import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
@@ -34,10 +27,6 @@ import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
-import org.commonhaus.automation.github.context.DataCommonComment;
-import org.commonhaus.automation.github.context.DataCommonItem;
-import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -401,6 +390,17 @@ public class AppContextService extends BaseContextService {
         return MemberStatus.fromString(status);
     }
 
+    public String getTeamForRole(String role) {
+        if (userConfig.isDisabled()) {
+            return null;
+        }
+        return userConfig.teamRoles().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(role))
+                .map(Entry::getKey)
+                .findFirst()
+                .orElse(null);
+    }
+
     /**
      * Event filter: check if the push event contains changes to the specified path
      *
@@ -429,72 +429,5 @@ public class AppContextService extends BaseContextService {
                     .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
         }
         return yamlMapper;
-    }
-
-    public ApplicationData getOpenApplication(MemberSession session, String applicationId) {
-        if (applicationId == null) {
-            return null;
-        }
-        ScopedQueryContext qc = getDatastoreContext();
-        DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
-
-        ApplicationData application = new ApplicationData(session, issue);
-        if (application.isOwner()) {
-            Feedback feedback = getFeedback(qc, applicationId, issue.mostRecent());
-            if (feedback != null) {
-                application.setFeedback(feedback);
-            }
-        }
-        return application;
-    }
-
-    public ApplicationData updateApplication(MemberSession session, CommonhausUser user,
-            ApplicationPost applicationPost) throws Throwable {
-        if (applicationPost == null) {
-            return null;
-        }
-
-        MembershipApplication application = user.application();
-        if (application != null) {
-            ApplicationData existing = getOpenApplication(session, application.nodeId());
-            if (existing != null && !existing.isOwner()) {
-                application = null;
-            }
-        }
-
-        ScopedQueryContext qc = getDatastoreContext();
-        String content = ApplicationData.issueContent(session, applicationPost);
-        Collection<DataLabel> labels = qc.findLabels(List.of("new-member"));
-        if (labels.isEmpty()) {
-            // TODO: config for labels / repo discovery
-            DataLabel newLabel = qc.createLabel("new-member", "#78A658");
-            if (newLabel != null) {
-                labels = List.of(newLabel);
-            }
-        }
-
-        DataCommonItem item = application == null
-                ? qc.createItem(EventType.issue,
-                        ApplicationData.createTitle(session),
-                        content,
-                        labels)
-                : qc.updateItemDescription(EventType.issue, application.nodeId(), content);
-
-        if (qc.hasErrors()) {
-            throw qc.bundleExceptions();
-        }
-
-        return item == null
-                ? null
-                : new ApplicationData(session, item);
-    }
-
-    Feedback getFeedback(ScopedQueryContext qc, String nodeId, Date mostRecent) {
-        List<DataCommonComment> comments = qc.getComments(nodeId,
-                x -> ApplicationData.isUserFeedback(x.body) && ApplicationData.isNewer(x, mostRecent));
-
-        return (comments == null || comments.isEmpty())
-                ? null
-                : new Feedback(comments.get(0));
     }
 }

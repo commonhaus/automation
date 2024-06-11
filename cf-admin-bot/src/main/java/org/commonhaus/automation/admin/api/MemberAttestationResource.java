@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -18,6 +19,7 @@ import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
+import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -44,14 +46,22 @@ public class MemberAttestationResource {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
         try {
+            final Set<String> roles = session.roles();
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
-            user.updateMemberStatus(ctx, session.roles());
+            user.updateMemberStatus(ctx, roles);
 
             Attestation newAttestation = createAttestation(user.status(), post);
-            user.goodUntil().attestation.put(post.id(), newAttestation);
             String message = "Sign attestation (%s|%s)".formatted(post.id(), post.version());
 
-            user = datastore.setCommonhausUser(user, session.roles(), message, true);
+            user = datastore.setCommonhausUser(new UpdateEvent(user,
+                    (c, u) -> {
+                        u.updateMemberStatus(c, roles);
+                        u.goodUntil().attestation.put(post.id(), newAttestation);
+                    },
+                    message,
+                    true,
+                    true));
+
             return user.toResponse().finish();
         } catch (Throwable e) {
             Log.errorf(e, "updateAttestation: Unable to update attestation for %s: %s", session.login(), e);
@@ -69,8 +79,9 @@ public class MemberAttestationResource {
         }
 
         try {
+            final Set<String> roles = session.roles();
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
-            user.updateMemberStatus(ctx, session.roles());
+            user.updateMemberStatus(ctx, roles);
 
             Map<String, Attestation> newAttestations = new HashMap<>();
 
@@ -79,8 +90,16 @@ public class MemberAttestationResource {
                 newAttestations.put(p.id(), createAttestation(user.status(), p));
                 message.append("(%s|%s) ".formatted(p.id(), p.version()));
             }
-            user.goodUntil().attestation.putAll(newAttestations);
-            user = datastore.setCommonhausUser(user, session.roles(), message.toString(), true);
+
+            user = datastore.setCommonhausUser(new UpdateEvent(user,
+                    (c, u) -> {
+                        u.updateMemberStatus(c, roles);
+                        u.goodUntil().attestation.putAll(newAttestations);
+                    },
+                    message.toString(),
+                    true,
+                    true));
+
             return user.toResponse().finish();
         } catch (Throwable e) {
             Log.errorf(e, "updateAttestations: Unable to update attestations for %s: %s", session.login(), e);

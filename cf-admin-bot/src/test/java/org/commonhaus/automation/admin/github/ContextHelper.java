@@ -18,9 +18,11 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.BaseQueryCache;
+import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
@@ -52,6 +54,17 @@ public class ContextHelper extends QueryContext {
     public static final long botId = 156364140;
     public static final String botLogin = "commonhaus-bot";
     public static final String botNodeId = "U_kgDOCVHtbA";
+
+    public static final String datastoreRepoId = "R_kgDOL8tG0g";
+
+    public static final DataLabel APP_NEW = new DataLabel.Builder()
+            .name(ApplicationData.NEW).build();
+    public static final DataLabel APP_ACCEPTED = new DataLabel.Builder()
+            .name(ApplicationData.ACCEPTED).build();
+    public static final DataLabel APP_DECLINED = new DataLabel.Builder()
+            .id("LA_kwDOKRPTI88AAAABhGp_7g")
+            .name(ApplicationData.DECLINED).build();
+    public static final Set<DataLabel> APP_LABELS = Set.of(APP_NEW, APP_ACCEPTED, APP_DECLINED);
 
     @Singleton
     static class AppObjectMapperCustomizer implements ObjectMapperCustomizer {
@@ -120,12 +133,14 @@ public class ContextHelper extends QueryContext {
         return gh;
     }
 
-    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx, String repoName)
+    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx,
+            String repoName)
             throws IOException {
         return setupMockRepository(mocks, gh, ctx, repoName, "R_" + repoName.hashCode());
     }
 
-    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx, String repoName,
+    protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx,
+            String repoName,
             String nodeId)
             throws IOException {
         GHRepository repo = mocks.repository(repoName);
@@ -173,10 +188,11 @@ public class ContextHelper extends QueryContext {
         when(gh.getUser(botLogin)).thenReturn(bot);
         AdminDataCache.USER_CONNECTION.put(botNodeId, gh);
 
-        GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), "R_kgDOL8tG0g");
+        GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), datastoreRepoId);
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
                 DiscoveryAction.ADDED, gh, dql, installationId, dataStoreRepo, Optional.ofNullable(null));
 
+        BaseQueryCache.LABELS.computeIfAbsent(datastoreRepoId, (k) -> new HashSet<>()).addAll(APP_LABELS);
         ctx.repositoryDiscovered(repoEvent);
 
         ctx.attestationIds.add("member");

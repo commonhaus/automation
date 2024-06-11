@@ -36,7 +36,7 @@ public class CommonhausUser {
         ACTIVE,
         PENDING,
         INACTIVE,
-        DENIED,
+        DECLINED,
         REVOKED,
         SUSPENDED,
         SPONSOR,
@@ -66,7 +66,7 @@ public class CommonhausUser {
                     || this == INACTIVE;
         }
 
-        public boolean updateToActive() {
+        public boolean updateFromPending() {
             return this == UNKNOWN
                     || this == PENDING;
         }
