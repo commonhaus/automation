@@ -1,13 +1,16 @@
 package org.commonhaus.automation.admin.api;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
 import org.commonhaus.automation.admin.api.ApplicationData.Feedback;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
+import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -82,11 +85,33 @@ public class MemberApplicationProcess {
         }
     }
 
-    ApplicationData findUserApplication(MemberSession session, String applicationId) {
+    public ApplicationData userUpdateApplicationIssue(
+            MemberSession session,
+            ScopedQueryContext qc,
+            ApplicationData applicationData,
+            ApplicationPost applicationPost) {
+
+        String content = ApplicationData.issueContent(session, applicationPost);
+        Collection<DataLabel> labels = qc.findLabels(List.of(ApplicationData.NEW));
+        MembershipApplication application = applicationData == null ? null : applicationData.application;
+
+        DataCommonItem item = application == null
+                ? qc.createItem(EventType.issue,
+                        ApplicationData.createTitle(session),
+                        content,
+                        labels)
+                : qc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
+
+        return item == null
+                ? null
+                : new ApplicationData(session.login(), item);
+    }
+
+    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments) {
         ScopedQueryContext qc = ctx.getDatastoreContext();
         DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
         ApplicationData application = new ApplicationData(session.login(), issue);
-        if (application.isValid()) {
+        if (application.isValid() && withComments) {
             Feedback feedback = getFeedback(qc, applicationId, issue.mostRecentEdit());
             if (feedback != null) {
                 application.setFeedback(feedback);

@@ -16,7 +16,7 @@ import io.smallrye.graphql.client.Response;
 @TemplateData
 public class DataCommonItem extends DataCommonObject {
 
-    static final String ISSUE_FIELDS = COMMON_OBJECT_FIELDS + """
+    public static final String ISSUE_FIELDS = COMMON_OBJECT_FIELDS + """
             number
             title
             body
@@ -24,16 +24,16 @@ public class DataCommonItem extends DataCommonObject {
             closedAt
             """;
 
-    static final String PR_FIELDS = ISSUE_FIELDS + """
+    public static final String PR_FIELDS = ISSUE_FIELDS + """
             reviewDecision
             """;
 
-    static final String ISSUE_FIELDS_MIN = COMMON_OBJECT_MIN + """
+    public static final String ISSUE_FIELDS_MIN = COMMON_OBJECT_MIN + """
             number
             title
             """;
 
-    static final String PR_FIELDS_MIN = ISSUE_FIELDS_MIN + """
+    public static final String PR_FIELDS_MIN = ISSUE_FIELDS_MIN + """
             reviewDecision
             """;
 
@@ -91,7 +91,10 @@ public class DataCommonItem extends DataCommonObject {
     }
 
     public static DataCommonItem editIssueDescription(QueryContext qc,
-            String nodeId, String bodyString) {
+            String nodeId, String bodyString, String issueFields) {
+
+        issueFields = issueFields == null ? ISSUE_FIELDS_MIN : issueFields;
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
@@ -104,7 +107,7 @@ public class DataCommonItem extends DataCommonObject {
                     }) {
                         clientMutationId
                         issue {
-                            """ + ISSUE_FIELDS_MIN + """
+                            """ + issueFields + """
                         }
                     }
                 }
@@ -114,11 +117,14 @@ public class DataCommonItem extends DataCommonObject {
             return null;
         }
         JsonObject result = JsonAttribute.updateIssue.jsonObjectFrom(response.getData());
-        return JsonAttribute.pullRequest.commonItemFrom(result);
+        return JsonAttribute.issue.commonItemFrom(result);
     }
 
     public static DataCommonItem editPullRequestDescription(QueryContext qc,
-            String nodeId, String bodyString) {
+            String nodeId, String bodyString, String prFields) {
+
+        prFields = prFields == null ? PR_FIELDS_MIN : prFields;
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", bodyString);
@@ -131,7 +137,7 @@ public class DataCommonItem extends DataCommonObject {
                     }) {
                         clientMutationId
                         pullRequest {
-                            """ + PR_FIELDS_MIN + """
+                            """ + prFields + """
                         }
                     }
                 }

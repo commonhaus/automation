@@ -105,7 +105,10 @@ public class DataDiscussion extends DataCommonItem {
      * package private. See QueryHelper / QueryContext
      */
     static DataDiscussion editDiscussion(QueryContext qc, String nodeId,
-            String modifiedText) {
+            String modifiedText, String fields) {
+
+        fields = fields == null ? DISCUSSION_FIELDS : fields;
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
         variables.put("body", modifiedText);

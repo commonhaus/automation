@@ -1,7 +1,5 @@
 package org.commonhaus.automation.admin.api;
 
-import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,9 +19,6 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
-import org.commonhaus.automation.github.context.DataCommonItem;
-import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.EventType;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -57,7 +52,7 @@ public class MemberApplicationResource {
             MembershipApplication application = user.application();
             ApplicationData applicationData = application == null
                     ? null
-                    : memberApplicationProcess.findUserApplication(session, application.nodeId());
+                    : memberApplicationProcess.findUserApplication(session, application.nodeId(), true);
 
             if (application == null && applicationData == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
@@ -79,6 +74,7 @@ public class MemberApplicationResource {
     public Response setApplication(ApplicationPost applicationPost) {
         try {
             if (applicationPost == null) {
+                Log.errorf("setApplication|%s: No application data", session.login());
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
             CommonhausUser user = datastore.getCommonhausUser(session, false, false);
@@ -88,7 +84,7 @@ public class MemberApplicationResource {
             MembershipApplication application = user.application();
             ApplicationData applicationData = application == null
                     ? null
-                    : memberApplicationProcess.findUserApplication(session, application.nodeId());
+                    : memberApplicationProcess.findUserApplication(session, application.nodeId(), false);
 
             if (applicationData != null && !applicationData.isValid()) {
                 applicationData = null;
@@ -143,7 +139,8 @@ public class MemberApplicationResource {
                 }
 
                 // UPDATE APPLICATION ISSUE
-                ApplicationData updated = userUpdateApplicationIssue(qc, applicationData, post);
+                ApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc, applicationData,
+                        post);
 
                 if (qc.hasErrors()) {
                     Throwable e = qc.bundleExceptions();
@@ -152,6 +149,7 @@ public class MemberApplicationResource {
                     return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
                 }
                 if (updated == null) {
+                    Log.errorf("doUserApplicationUpdate|%s: Updated data was not returned", session.login());
                     return Response.status(Response.Status.BAD_REQUEST).build();
                 }
                 final MembershipApplication application = updated.application;
@@ -175,26 +173,6 @@ public class MemberApplicationResource {
         } else {
             return Response.status(Response.Status.TOO_MANY_REQUESTS).build();
         }
-    }
-
-    public ApplicationData userUpdateApplicationIssue(ScopedQueryContext qc,
-            ApplicationData applicationData,
-            ApplicationPost applicationPost) {
-
-        String content = ApplicationData.issueContent(session, applicationPost);
-        Collection<DataLabel> labels = qc.findLabels(List.of(ApplicationData.NEW));
-        MembershipApplication application = applicationData == null ? null : applicationData.application;
-
-        DataCommonItem item = application == null
-                ? qc.createItem(EventType.issue,
-                        ApplicationData.createTitle(session),
-                        content,
-                        labels)
-                : qc.updateItemDescription(EventType.issue, application.nodeId(), content);
-
-        return item == null
-                ? null
-                : new ApplicationData(session.login(), item);
     }
 
 }

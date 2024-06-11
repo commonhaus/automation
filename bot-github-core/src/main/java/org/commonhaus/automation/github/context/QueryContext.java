@@ -475,6 +475,10 @@ public abstract class QueryContext {
     }
 
     public DataCommonItem updateItemDescription(EventType eventType, String nodeId, String bodyString) {
+        return updateItemDescription(eventType, nodeId, bodyString, null);
+    }
+
+    public DataCommonItem updateItemDescription(EventType eventType, String nodeId, String bodyString, String fields) {
         if (isDryRun()) {
             Log.debugf("[%s] updateItemDescription would set body to: %s", getLogId(), bodyString);
             return null;
@@ -486,11 +490,11 @@ public abstract class QueryContext {
 
         return switch (eventType) {
             case discussion, discussion_comment ->
-                DataDiscussion.editDiscussion(this, nodeId, bodyString);
+                DataDiscussion.editDiscussion(this, nodeId, bodyString, fields);
             case issue, issue_comment ->
-                DataCommonItem.editIssueDescription(this, nodeId, bodyString);
+                DataCommonItem.editIssueDescription(this, nodeId, bodyString, fields);
             case pull_request, pull_request_review ->
-                DataCommonItem.editPullRequestDescription(this, nodeId, bodyString);
+                DataCommonItem.editPullRequestDescription(this, nodeId, bodyString, fields);
             default -> {
                 logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
                 yield null;

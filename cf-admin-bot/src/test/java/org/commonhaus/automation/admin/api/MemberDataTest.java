@@ -6,6 +6,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -25,6 +26,7 @@ import java.util.stream.Stream;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
 import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
 import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
@@ -505,6 +507,63 @@ public class MemberDataTest extends ContextHelper {
         var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING);
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testSubmitApplication() throws Exception {
+        GHUser botUser = botGithub.getUser(botLogin);
+        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+
+        mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
+
+        Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationMatch.json");
+        when(mockContext.mocks.installationGraphQLClient(installationId)
+                .executeSync(contains("query($id: ID!) {"), anyMap()))
+                .thenReturn(queryIssue);
+
+        Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
+        when(mockContext.mocks.installationGraphQLClient(installationId)
+                .executeSync(contains("updateIssue(input: {"), anyMap()))
+                .thenReturn(updateIssue);
+
+        ApplicationPost application = new ApplicationPost(
+                "unknown",
+                "draft");
+        String applyJson = mapper.writeValueAsString(application);
+
+        // update to fix member status
+        GHContentBuilder builder = mockUpdateCommonhausData();
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(applyJson)
+                .post("/apply")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN")) // mock response
+                .body("APPLY.created", notNullValue()) // from mutableUpdateIssue.json
+                .body("APPLY.updated", notNullValue()) // from mutableUpdateIssue.json
+                .body("APPLY.contributions", equalTo("testContrib")) // from mutableUpdateIssue.json
+                .body("APPLY.additionalNotes", equalTo("testNotes")); // from mutableUpdateIssue.json
+
+        // Look at data passed to mutable operation to update user data
+        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(builder).content(contentCaptor.capture());
+
+        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+
+        assertThat(result.application).isNotNull();
+        assertThat(result.data.status).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
     }
 
     void mockExistingCommonhausData() throws IOException {
