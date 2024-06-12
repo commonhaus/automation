@@ -64,14 +64,6 @@ public class VotingConsumer {
         QueryContext qc = voteEvent.getQueryContext();
         VoteConfig votingConfig = voteEvent.getVotingConfig();
 
-        // Each query context does have a reference to the original event and to the
-        // potentially short-lived GitHub connection.
-        // Will reauthenticate if necessary/possible
-        if (qc.checkExpiredConnection()) {
-            Log.infof("[%s] voting.checkVotes: GitHub connection expired and can't be renewed", qc.getLogId());
-            return;
-        }
-
         AtomicBoolean checkRunning = VOTE_CHECK.computeIfAbsent(voteEvent.getId(), (k) -> new AtomicBoolean(false));
         boolean iAmVoteCounter = checkRunning.compareAndSet(false, true);
 
@@ -98,16 +90,10 @@ public class VotingConsumer {
     @Blocking
     public void consumeManualResult(Message<ManualVoteEvent> msg) {
         ManualVoteEvent voteEvent = msg.body();
-        QueryContext qc = voteEvent.getQueryContext();
         VoteConfig votingConfig = voteEvent.getVotingConfig();
 
-        // Each query context does have a reference to the original event and to the
-        // potentially short-lived GitHub connection.
-        // Will reauthenticate if necessary/possible
-        if (qc.checkExpiredConnection()) {
-            Log.infof("[%s] voting.consumeManualResult: GitHub connection expired and can't be renewed", qc.getLogId());
-            return;
-        }
+        QueryContext qc = voteEvent.getQueryContext();
+        qc.refreshConnection(); // reauthenticate if necessary
 
         AtomicBoolean checkRunning = VOTE_CHECK.computeIfAbsent(voteEvent.getId(), (k) -> new AtomicBoolean(false));
         boolean iAmVoteCounter = checkRunning.compareAndSet(false, true);

@@ -20,6 +20,10 @@ public interface ContextService {
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
 
+    void updateConnection(long installationId, GitHub gh);
+
+    void updateConnection(long installationId, DynamicGraphQLClient gql);
+
     void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 
     void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses);

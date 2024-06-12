@@ -128,16 +128,9 @@ public class QueryContext {
         return installationId;
     }
 
-    public boolean checkExpiredConnection() {
-        if (github == null) {
-            github = ctx.getInstallationClient(getInstallationId());
-            graphQLClient = null;
-        }
-        boolean result = execGitHubSync((gh, dryRun) -> {
-            return !gh.isCredentialValid() || gh.isAnonymous();
-        });
-        clearErrors();
-        return result;
+    public void refreshConnection() {
+        github = ctx.getInstallationClient(getInstallationId());
+        graphQLClient = null;
     }
 
     public void addException(Exception e) {

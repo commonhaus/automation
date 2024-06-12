@@ -22,14 +22,14 @@ public class MemberSession {
         });
 
         // Create/renew GitHub connection
-        memberProfile.connect(ctx, identity);
+        memberProfile.connection = ctx.getUserConnection(memberProfile.nodeId(), identity);
         return memberProfile;
     }
 
     private final String nodeId;
     private final UserInfo userInfo;
 
-    private GitHub connection;
+    private transient GitHub connection;
     private GitHubUser userData;
 
     private MemberSession(UserInfo userInfo) {
@@ -40,13 +40,6 @@ public class MemberSession {
     public boolean userIsKnown(AppContextService ctx) {
         UserQueryContext userQc = ctx.newUserQueryContext(this);
         return ctx.userIsKnown(userQc, login(), roles());
-    }
-
-    public GitHub connect(AppContextService ctx, SecurityIdentity identity) {
-        if (connection == null) {
-            connection = ctx.getUserConnection(nodeId, identity);
-        }
-        return connection;
     }
 
     public GitHubUser getUserData() {

@@ -69,11 +69,36 @@ public abstract class BaseContextService implements ContextService {
     }
 
     public GitHub getInstallationClient(long installationId) {
-        return gitHubClientProvider.getInstallationClient(installationId);
+        GitHub gh = BaseQueryCache.CONNECTION.get("gh-" + installationId);
+        if (gh != null && gh.isCredentialValid()) {
+            return gh;
+        }
+        // there is no way to test the graphql client's credentials for validity.
+        // if the GH credentials are invalid, invalidate the GraphQL client, too
+        BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
+
+        gh = gitHubClientProvider.getInstallationClient(installationId);
+        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
+        return gh;
     }
 
     public DynamicGraphQLClient getInstallationGraphQLClient(long installationId) {
-        return gitHubClientProvider.getInstallationGraphQLClient(installationId);
+        DynamicGraphQLClient graphQLClient = BaseQueryCache.CONNECTION.get("graphQL-" + installationId);
+        if (graphQLClient != null) {
+            return graphQLClient;
+        }
+
+        graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
+        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
+        return graphQLClient;
+    }
+
+    public void updateConnection(long installationId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
+    }
+
+    public void updateConnection(long installationId, DynamicGraphQLClient gh) {
+        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, gh);
     }
 
     protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
