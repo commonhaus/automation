@@ -12,7 +12,6 @@ public enum BaseQueryCache {
     CONNECTION(b -> b.expireAfterWrite(30, TimeUnit.MINUTES)),
 
     LABELS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
-
     TEAM_MEMBERS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
     COLLABORATORS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 

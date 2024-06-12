@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.commonhaus.automation.admin.github.InstallationAccess;
+import org.commonhaus.automation.github.context.QueryContext;
+
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -57,5 +60,29 @@ public class TeamManagementConfig extends RepositoryConfig {
     @Override
     public int hashCode() {
         return Objects.hash(sources, enabled);
+    }
+
+    /**
+     * Link the installation to repositories and organizations that
+     * used by this configuration. It requires read access to the
+     * source file, and write access to orgs containing target teams.
+     *
+     * @param access the installation access object
+     */
+    public void setAccess(InstallationAccess access) {
+        sources.forEach(source -> {
+            // we should have (at least) read access to the source repo
+            access.addRead(source.repo());
+            if (source.performSync()) {
+                // If we have enough information to perform a sync,
+                // we should have write access for all of the target teams
+                // (which includes the organization, based on bot permissions)
+                source.sync().values().forEach(sync -> {
+                    sync.teams().forEach(team -> {
+                        access.addWrite(QueryContext.toOrganizationName(team));
+                    });
+                });
+            }
+        });
     }
 }

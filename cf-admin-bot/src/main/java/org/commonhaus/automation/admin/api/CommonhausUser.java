@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -22,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
-import io.smallrye.common.constraint.NotNull;
 
 /**
  * Commonhaus user: stored as json file
@@ -127,18 +127,18 @@ public class CommonhausUser {
     }
 
     public record AttestationPost(
-            @NotNull String id,
-            @NotNull String version) {
+            @Nonnull String id,
+            @Nonnull String version) {
     }
 
     public record Attestation(
-            @NotNull @JsonAlias("with_status") MemberStatus withStatus,
-            @NotNull String date,
-            @NotNull String version) {
+            @Nonnull @JsonAlias("with_status") MemberStatus withStatus,
+            @Nonnull String date,
+            @Nonnull String version) {
     }
 
     public static class Data {
-        @NotNull
+        @Nonnull
         MemberStatus status = MemberStatus.UNKNOWN;
 
         @JsonAlias("good_until")
@@ -148,21 +148,21 @@ public class CommonhausUser {
     }
 
     public record MembershipApplication(
-            @NotNull String nodeId,
-            @NotNull String htmlUrl) {
+            @Nonnull String nodeId,
+            @Nonnull String htmlUrl) {
 
         static MembershipApplication fromDataCommonType(DataCommonItem data) {
             return new MembershipApplication(data.id, data.url);
         }
     }
 
-    @NotNull
+    @Nonnull
     final String login;
-    @NotNull
+    @Nonnull
     final long id;
-    @NotNull
+    @Nonnull
     final Data data;
-    @NotNull
+    @Nonnull
     final List<String> history;
 
     Boolean isMember;
