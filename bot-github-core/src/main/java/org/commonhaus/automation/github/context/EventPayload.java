@@ -54,20 +54,52 @@ public class EventPayload {
     public static class DiscussionCommentPayload extends DiscussionPayload {
         public final DataDiscussionComment comment;
 
-        // Only present for edits
-        public final String fromBody;
-
         public DiscussionCommentPayload(ActionType action, JsonObject jsonData) {
             super(action, jsonData);
             this.comment = JsonAttribute.comment.discussionCommentFrom(jsonData);
+        }
+    }
 
+    @TemplateData
+    public static class CommonItemPayload extends EventPayload {
+        public final DataCommonItem issue;
+        public final DataCommonItem pullRequest;
+
+        public final DataLabel label;
+
+        public final String fromBody;
+        public final String fromTitle;
+
+        public CommonItemPayload(ActionType action, JsonObject jsonData) {
+            super(action);
+
+            this.issue = JsonAttribute.issue.commonItemFrom(jsonData);
+            this.pullRequest = JsonAttribute.pullRequest.commonItemFrom(jsonData);
+
+            // labeled / unlabeled
+            this.label = JsonAttribute.label.labelFrom(jsonData);
+
+            // edited
             JsonObject changes = JsonAttribute.changes.jsonObjectFrom(jsonData);
             if (changes == null) {
                 this.fromBody = null;
+                this.fromTitle = null;
             } else {
                 this.fromBody = JsonAttribute.from.stringFrom(
                         JsonAttribute.body.jsonObjectFrom(changes));
+                this.fromTitle = JsonAttribute.from.stringFrom(
+                        JsonAttribute.title.jsonObjectFrom(changes));
             }
+        }
+    }
+
+    @TemplateData
+    public static class CommonItemCommentPayload extends CommonItemPayload {
+        public final DataCommonComment comment;
+
+        public CommonItemCommentPayload(ActionType action, JsonObject jsonData) {
+            super(action, jsonData);
+            this.comment = JsonAttribute.comment.commonCommentFrom(jsonData);
         }
     }
 }

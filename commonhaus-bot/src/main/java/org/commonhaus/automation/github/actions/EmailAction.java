@@ -3,13 +3,12 @@ package org.commonhaus.automation.github.actions;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventQueryContext;
+import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventPayload;
 import org.commonhaus.automation.mail.MailEvent;
 import org.commonhaus.automation.markdown.MarkdownConverter;
-import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHPullRequest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,11 +24,8 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 public class EmailAction extends Action {
     @CheckedTemplate
     static class Templates {
-        public static native MailTemplateInstance pullRequestEvent(String title, String htmlBody,
-                GHPullRequest pullRequest, String status);
-
-        public static native MailTemplateInstance discussionEvent(String title, String htmlBody,
-                DataDiscussion discussion, String repoSlug, String status);
+        public static native MailTemplateInstance itemEvent(String title, String htmlBody,
+                DataCommonItem item, String repoSlug, String status);
     }
 
     @JsonProperty
@@ -61,15 +57,19 @@ public class EmailAction extends Action {
         MailTemplateInstance mailTemplateInstance;
         try {
             mailTemplateInstance = switch (qc.getEventType()) {
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = eventData.getGHEventPayload();
+                case issue, pull_request -> {
+                    EventPayload.CommonItemPayload payload = eventData.getEventPayload();
+                    DataCommonItem item = payload.issue == null
+                            ? payload.pullRequest
+                            : payload.issue;
 
                     title = String.format("PR #%s %s",
-                            payload.getNumber(), payload.getPullRequest().getTitle());
+                            item.number, item.title);
 
-                    yield Templates.pullRequestEvent(title,
-                            toHtmlBody(eventData, payload.getPullRequest().getBody()),
-                            payload.getPullRequest(),
+                    yield Templates.itemEvent(title,
+                            toHtmlBody(eventData, item.body),
+                            item,
+                            eventData.getRepository().getFullName(),
                             status);
                 }
                 case discussion -> {
@@ -79,7 +79,7 @@ public class EmailAction extends Action {
                     title = String.format("#%s %s",
                             discussion.number, discussion.title);
 
-                    yield Templates.discussionEvent(title,
+                    yield Templates.itemEvent(title,
                             toHtmlBody(eventData, discussion.body),
                             discussion,
                             eventData.getRepository().getFullName(),
