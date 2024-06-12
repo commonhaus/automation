@@ -16,11 +16,15 @@ public record RepositoryDiscoveryEvent(
         Optional<?> repoConfig) {
 
     public boolean added() {
-        return action == DiscoveryAction.ADDED;
+        return action.added();
     }
 
     public boolean removed() {
-        return action == DiscoveryAction.REMOVED;
+        return action.removed();
+    }
+
+    public boolean installation() {
+        return action.installation();
     }
 
     @SuppressWarnings("unchecked")

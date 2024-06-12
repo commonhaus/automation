@@ -106,14 +106,14 @@ public class RepositoryDiscovery {
             case "created", "unsuspend" -> {
                 for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.ADDED, github, graphQLClient, installationId,
+                            DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
                             repo, fetchConfigFile(repo)));
                 }
             }
             case "deleted", "suspend" -> {
                 for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.REMOVED, github, graphQLClient, installationId,
+                            DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
                             repo, null));
                 }
             }
