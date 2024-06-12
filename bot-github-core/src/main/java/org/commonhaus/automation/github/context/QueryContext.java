@@ -348,7 +348,7 @@ public class QueryContext {
                             }
                         }
                     """, new HashMap<>());
-            if (response.hasError()) {
+            if (hasErrors() || response == null) {
                 return "unknown";
             }
             JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
@@ -712,16 +712,8 @@ public class QueryContext {
         // Normalize team name to include org name
         String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
         String teamFullName = org.getLogin() + "/" + relativeName;
-        TEAM_MEMBERS.put("ghTeam-" + teamFullName, ghTeam);
-
-        Set<GHUser> members = execGitHubSync((gh, dryRun) -> {
-            return ghTeam.getMembers();
-        });
-        if (hasErrors() || members == null) {
-            TEAM_MEMBERS.invalidate(teamFullName);
-        } else {
-            TEAM_MEMBERS.put(teamFullName, members);
-        }
+        TEAM_MEMBERS.invalidate("ghTeam-" + teamFullName);
+        TEAM_MEMBERS.invalidate(teamFullName);
     }
 
     public Set<GHUser> teamMembers(String teamFullName) {

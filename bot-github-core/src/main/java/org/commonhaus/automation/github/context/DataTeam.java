@@ -39,7 +39,7 @@ public class DataTeam {
                         }
                     }
                     """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors() || response == null) {
                 break;
             }
 

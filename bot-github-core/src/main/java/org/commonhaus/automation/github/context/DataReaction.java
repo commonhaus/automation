@@ -156,7 +156,7 @@ public class DataReaction {
                             }
                         }
                     """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors()) {
                 qc.clearNotFound();
                 break;
             }

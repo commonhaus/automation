@@ -51,7 +51,7 @@ public class DataDiscussionComment extends DataCommonComment {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
@@ -79,7 +79,7 @@ public class DataDiscussionComment extends DataCommonComment {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }

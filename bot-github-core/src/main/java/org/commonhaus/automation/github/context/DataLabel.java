@@ -211,7 +211,7 @@ public class DataLabel extends DataCommonType {
                     }
                 }""";
         Response response = qc.execRepoQuerySync(query, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors()) {
             qc.clearNotFound();
             return null;
         }
@@ -228,7 +228,7 @@ public class DataLabel extends DataCommonType {
         do {
             variables.put("after", cursor);
             Response response = qc.execRepoQuerySync(query, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors()) {
                 qc.clearNotFound();
                 break;
             }

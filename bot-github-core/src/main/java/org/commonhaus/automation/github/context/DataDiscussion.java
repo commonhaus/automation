@@ -64,7 +64,7 @@ public class DataDiscussion extends DataCommonItem {
                         }
                     }
                         """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors()) {
                 break;
             }
 
@@ -94,7 +94,7 @@ public class DataDiscussion extends DataCommonItem {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
@@ -124,7 +124,7 @@ public class DataDiscussion extends DataCommonItem {
                 }
                 """,
                 variables);
-        if (response.hasError()) {
+        if (qc.hasErrors()) {
             qc.clearNotFound();
             return null;
         }
