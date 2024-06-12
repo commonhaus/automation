@@ -22,10 +22,8 @@ import jakarta.json.JsonObject;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
-import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -271,35 +269,5 @@ public class ContextHelper extends QueryContext {
 
     public void setLabels(String id, Set<DataLabel> labels) {
         BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
-    }
-
-    @Override
-    public String getLogId() {
-        throw new UnsupportedOperationException("Unimplemented method 'getLogId'");
-    }
-
-    @Override
-    public String getRepositoryId() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepositoryId'");
-    }
-
-    @Override
-    public GHRepository getRepository() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepository'");
-    }
-
-    @Override
-    public GHOrganization getOrganization() {
-        throw new UnsupportedOperationException("Unimplemented method 'getOrganization'");
-    }
-
-    @Override
-    public EventType getEventType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getEventType'");
-    }
-
-    @Override
-    public ActionType getActionType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getActionType'");
     }
 }

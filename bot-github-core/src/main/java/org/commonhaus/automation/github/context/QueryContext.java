@@ -35,7 +35,7 @@ import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public abstract class QueryContext {
+public class QueryContext {
     @FunctionalInterface
     public interface GitHubParameterApiCall<R> {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
@@ -50,30 +50,42 @@ public abstract class QueryContext {
     protected GitHub github;
     protected DynamicGraphQLClient graphQLClient;
 
-    protected QueryContext(ContextService contextService, long installationId) {
+    public QueryContext(ContextService contextService, long installationId) {
         this.ctx = contextService;
         this.installationId = installationId;
     }
 
-    protected QueryContext(QueryContext other) {
+    public QueryContext(QueryContext other) {
         this.ctx = other.ctx;
         this.installationId = other.installationId;
     }
 
-    public abstract String getLogId();
+    public String getLogId() {
+        return "[" + installationId + "]";
+    }
 
-    public abstract String getRepositoryId();
+    public String getRepositoryId() {
+        throw new UnsupportedOperationException("Unimplemented method 'getRepositoryId'");
+    }
 
-    public abstract GHRepository getRepository();
+    public GHRepository getRepository() {
+        throw new UnsupportedOperationException("Unimplemented method 'getRepository'");
+    }
 
-    public abstract GHOrganization getOrganization();
+    public GHOrganization getOrganization() {
+        throw new UnsupportedOperationException("Unimplemented method 'getOrganization'");
+    }
 
-    public abstract EventType getEventType();
+    public EventType getEventType() {
+        throw new UnsupportedOperationException("Unimplemented method 'getEventType'");
+    }
 
-    public abstract ActionType getActionType();
+    public ActionType getActionType() {
+        throw new UnsupportedOperationException("Unimplemented method 'getActionType'");
+    }
 
     public JsonObject getJsonData() {
-        return null;
+        throw new UnsupportedOperationException("Unimplemented method 'getJsonData'");
     }
 
     public boolean isDryRun() {

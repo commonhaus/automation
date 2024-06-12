@@ -23,18 +23,14 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.github.AppContextService;
-import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHPullRequestFileDetail;
-import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.PagedIterable;
 import org.kohsuke.github.PagedIterator;
@@ -237,35 +233,5 @@ public class ContextHelper extends QueryContext {
             return iteratorMock;
         });
         return iterableMock;
-    }
-
-    @Override
-    public String getLogId() {
-        throw new UnsupportedOperationException("Unimplemented method 'getLogId'");
-    }
-
-    @Override
-    public String getRepositoryId() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepositoryId'");
-    }
-
-    @Override
-    public GHRepository getRepository() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepository'");
-    }
-
-    @Override
-    public GHOrganization getOrganization() {
-        throw new UnsupportedOperationException("Unimplemented method 'getOrganization'");
-    }
-
-    @Override
-    public EventType getEventType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getEventType'");
-    }
-
-    @Override
-    public ActionType getActionType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getActionType'");
     }
 }
