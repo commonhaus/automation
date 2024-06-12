@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.annotation.Nonnull;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
@@ -21,6 +22,7 @@ import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.admin.forwardemail.Alias;
@@ -29,9 +31,11 @@ import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -59,10 +63,16 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 @Singleton
 public class AppContextService extends BaseContextService {
 
+    // This all feels ridiculous. But we need to find the right installation
+    // for the access we need across multiple installations to construct
+    // query contexts with the necessary permissions to modify team membership
+    // or manage membership-related issues/user records.
+    final Map<Long, InstallationAccess> installationAccess = new ConcurrentHashMap<>();
+    final Map<String, Long> writeToInstallId = new ConcurrentHashMap<>();
+    final Map<String, Long> readToInstallId = new ConcurrentHashMap<>();
+
     @RestClient
     ForwardEmailClient forwardEmailClient;
-
-    Map<String, ScopedQueryContext> scopedContexts = new ConcurrentHashMap<>();
 
     UserManagementConfig userConfig = UserManagementConfig.DISABLED;
 
@@ -79,23 +89,17 @@ public class AppContextService extends BaseContextService {
         this.adminData = adminData;
     }
 
-    public ScopedQueryContext refreshScopedQueryContext(GHRepository repository, MonitoredRepo repoCfg, GitHub github) {
-        ScopedQueryContext qc = new ScopedQueryContext(this, repository, repoCfg).addExisting(github);
-        Log.debugf("[%s] Refresh ScopedQueryContext for monitored repository %s", repoCfg.installationId(),
-                repository.getFullName());
-        scopedContexts.put("" + repoCfg.installationId(), qc);
-        scopedContexts.put(repository.getFullName(), qc);
-        scopedContexts.put(ScopedQueryContext.toOrganizationName(repository.getFullName()), qc);
-        return qc;
+    public ScopedQueryContext refreshScopedQueryContext(@Nonnull MonitoredRepo repoCfg, GHRepository repository) {
+        return new ScopedQueryContext(this, repoCfg.installationId(), repository)
+                .addExisting(repoCfg);
     }
 
-    public ScopedQueryContext refreshScopedQueryContext(GitHub github, GHRepository repository, long installationId) {
-        ScopedQueryContext qc = new ScopedQueryContext(this, repository, installationId).addExisting(github);
-        Log.debugf("[%s] Refresh ScopedQueryContext for %s", installationId, repository.getFullName());
-        scopedContexts.put("" + installationId, qc);
-        scopedContexts.put(repository.getFullName(), qc);
-        scopedContexts.put(ScopedQueryContext.toOrganizationName(repository.getFullName()), qc);
-        return qc;
+    public ScopedQueryContext refreshScopedQueryContext(long installationId, GHRepository repository) {
+        return new ScopedQueryContext(this, installationId, repository);
+    }
+
+    public ScopedQueryContext refreshScopedQueryContext(long installationId, GHOrganization org, GHRepository repository) {
+        return new ScopedQueryContext(this, installationId, org, repository);
     }
 
     public ScopedQueryContext getDatastoreContext() {
@@ -103,34 +107,24 @@ public class AppContextService extends BaseContextService {
     }
 
     public ScopedQueryContext getScopedQueryContext(String scope) {
-        ScopedQueryContext qc = scopedContexts.get(scope);
-        if (qc == null) {
-            qc = scopedContexts.get(ScopedQueryContext.toOrganizationName(scope));
-        }
+        String orgName = QueryContext.toOrganizationName(scope);
 
-        if (qc == null) {
-            logAndSendEmail("getScopedQueryContext",
-                    "Unable to find context for scope " + scope,
-                    null, botErrorEmailAddress());
+        // try for write access first: full scope, then just the org
+        Long installationId = writeToInstallId.getOrDefault(scope,
+                writeToInstallId.get(orgName));
+        if (installationId == null) {
+            // if we didn't find that, look for read access: full scope, then just the org
+            installationId = readToInstallId.getOrDefault(scope,
+                    readToInstallId.get(orgName));
+        }
+        if (installationId == null) {
+            Log.errorf("No installation found for %s", scope);
             return null;
         }
-
-        qc.refreshConnection(); // reauthenticate if necessary
-        // long ghId = qc.getInstallationId();
-        // String fullName = qc.getRepository().getFullName();
-
-        // Log.debugf("[%s] Creating new ScopedQueryContext for %s (%s)",
-        //         ghId, scope, fullName);
-
-        // try {
-        //     GitHub github = getInstallationClient(qc.getInstallationId());
-        //     github.getInstallation(); // authenticated installation
-
-        //     GHRepository repository = github.getRepository(fullName);
-        //     qc = new ScopedQueryContext(this, repository, ghId).addExisting(github);
-        // } catch (IOException e) {
-        // }
-        return qc;
+        InstallationAccess access = installationAccess.get(installationId);
+        return access.containsRepo(scope)
+                ? new ScopedQueryContext(this, installationId, orgName, scope)
+                : new ScopedQueryContext(this, installationId, orgName, null);
     }
 
     public UserQueryContext newUserQueryContext(MemberSession memberSession) {
@@ -146,31 +140,57 @@ public class AppContextService extends BaseContextService {
     protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
         super.repositoryDiscovered(repoEvent);
 
-        GHRepository repo = repoEvent.repository();
-        String repoFullName = repo.getFullName();
-
-        if (repoEvent.removed()) {
-            scopedContexts.remove(repoFullName);
-
-            scopedContexts.values().stream().filter(qc -> qc.getInstallationId() == repoEvent.installationId())
-                    .findFirst().ifPresent(qc -> {
-                        String name = ScopedQueryContext.toOrganizationName(qc.getRepository().getFullName());
-                        scopedContexts.put("" + repoEvent.installationId(), qc);
-                        scopedContexts.put(name, qc);
-                    });
-            return;
-        } else {
-            refreshScopedQueryContext(
-                    repoEvent.github(),
-                    repo,
-                    repoEvent.installationId())
-                    .addExisting(repoEvent.graphQLClient());
-        }
-
+        DiscoveryAction action = repoEvent.action();
+        long installationId = repoEvent.installationId();
+        String repoFullName = repoEvent.repository().getFullName();
+        String orgName = ScopedQueryContext.toOrganizationName(repoFullName);
         Optional<AdminConfigFile> repoConfig = repoEvent.getRepositoryConfig();
-        UserManagementConfig userConfig = UserManagementConfig.getUserManagementConfig(repoConfig.orElse(null));
-        if (userConfig != null && !userConfig.isDisabled()) {
-            this.userConfig = userConfig;
+
+        if (action.added()) {
+            InstallationAccess access = installationAccess.computeIfAbsent(installationId,
+                    InstallationAccess::new);
+            access.write.add(repoFullName);
+            access.write.add(orgName);
+
+            UserManagementConfig userConfig = UserManagementConfig.getUserManagementConfig(repoConfig.orElse(null));
+            if (userConfig != null && !userConfig.isDisabled()) {
+                this.userConfig = userConfig;
+            }
+            TeamManagementConfig teamConfig = TeamManagementConfig.getGroupManagementConfig(repoConfig.orElse(null));
+            if (teamConfig != null && !teamConfig.isDisabled()) {
+                teamConfig.setAccess(access);
+            }
+
+            // update indexes
+            access.write.forEach(s -> writeToInstallId.put(s, access.installationId));
+            access.read.forEach(s -> readToInstallId.put(s, access.installationId));
+        } else if (action.removed()) {
+            if (repoFullName.equals(getDataStore())) {
+                userConfig = UserManagementConfig.DISABLED;
+            }
+
+            InstallationAccess access = installationAccess.get(installationId);
+            if (action.installation()) {
+                // Installation is removed, forget all access
+                access = installationAccess.remove(installationId);
+                if (access != null) {
+                    // repair or replace values first
+                    installationAccess.values().forEach(remaining -> {
+                        remaining.write.forEach(s -> writeToInstallId.put(s, remaining.installationId));
+                        remaining.read.forEach(s -> readToInstallId.put(s, remaining.installationId));
+                    });
+
+                    // now clean up anything that still points to the installation being removed
+                    writeToInstallId.values().removeIf(x -> x == installationId);
+                    readToInstallId.values().removeIf(x -> x == installationId);
+                }
+            } else {
+                // Just one repo. Remove write access, and read access if private
+                access.write.remove(repoFullName);
+                if (repoEvent.repository().isPrivate()) {
+                    access.read.remove(repoFullName);
+                }
+            }
         }
     }
 

@@ -61,7 +61,7 @@ public class QueryContext {
     }
 
     public String getLogId() {
-        return "[" + installationId + "]";
+        return "" + installationId;
     }
 
     public String getRepositoryId() {
@@ -301,6 +301,12 @@ public class QueryContext {
         });
     }
 
+    /**
+     * GitHub caches org lookups
+     *
+     * @param orgName
+     * @return
+     */
     public GHOrganization getOrganization(String orgName) {
         return execGitHubSync((gh, dryRun) -> {
             GHOrganization org = gh.getOrganization(orgName);
@@ -309,12 +315,28 @@ public class QueryContext {
         });
     }
 
+    /**
+     * This is an indirect lookup: list of teams is fetched first,
+     * then the team is found by name.
+     *
+     * @param org GHOrganization
+     * @param relativeName name relative to organization
+     * @return GHTeam or null if not found
+     */
     public GHTeam getTeam(GHOrganization org, String relativeName) {
-        return execGitHubSync((gh, dryRun) -> {
-            GHTeam team = org.getTeamByName(relativeName);
-            clearNotFound();
-            return team;
-        });
+        String fullName = toFullName(org.getLogin(), relativeName);
+        GHTeam team = TEAM_MEMBERS.get("ghTeam-" + fullName);
+        if (team == null) {
+            team = execGitHubSync((gh, dryRun) -> {
+                GHTeam result = org.getTeamByName(relativeName);
+                clearNotFound();
+                return result;
+            });
+            if (team != null) {
+                TEAM_MEMBERS.put("ghTeam-" + fullName, team);
+            }
+        }
+        return team;
     }
 
     public boolean isBot(String login) {
@@ -690,6 +712,7 @@ public class QueryContext {
         // Normalize team name to include org name
         String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
         String teamFullName = org.getLogin() + "/" + relativeName;
+        TEAM_MEMBERS.put("ghTeam-" + teamFullName, ghTeam);
 
         Set<GHUser> members = execGitHubSync((gh, dryRun) -> {
             return ghTeam.getMembers();

@@ -147,7 +147,7 @@ public class ContextHelper extends QueryContext {
         when(repo.getNodeId()).thenReturn(nodeId);
         when(gh.getRepository(repoName)).thenReturn(repo);
 
-        ctx.refreshScopedQueryContext(gh, repo, installationId);
+        ctx.refreshScopedQueryContext(installationId, repo);
         return repo;
     }
 

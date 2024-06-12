@@ -2,6 +2,8 @@ package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
 
+import jakarta.annotation.Nonnull;
+
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
@@ -16,44 +18,66 @@ import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ScopedQueryContext extends QueryContext {
-    private final GHRepository repository;
-    private final String ownerName;
-    private final String repoFullName;
+    private String ownerName;
+    private String repoFullName;
 
-    private final String logId;
-    private final MonitoredRepo repoConfig;
+    private GHRepository repository;
+    private MonitoredRepo repoConfig;
 
-    public ScopedQueryContext(AppContextService contextService, GHRepository repository, long installationId) {
-        this(contextService, repository, installationId, null);
-    }
-
-    public ScopedQueryContext(AppContextService contextService, GHRepository repository,
-            MonitoredRepo repoConfig) {
-        this(contextService, repository, repoConfig.installationId(), repoConfig);
-    }
-
-    private ScopedQueryContext(AppContextService contextService, GHRepository repository,
-            long installationId, MonitoredRepo repoConfig) {
+    /**
+     * In this path, repository could be null (org-level event)
+     *
+     * @param contextService
+     * @param installationId
+     * @param orgName
+     * @param repoFullName
+     */
+    public ScopedQueryContext(@Nonnull AppContextService contextService, @Nonnull long installationId, @Nonnull String orgName,
+            String repoFullName) {
         super(contextService, installationId);
-        this.repository = repository;
-        this.repoConfig = repoConfig;
-        this.repoFullName = repoConfig != null ? repoConfig.repoFullName : repository.getFullName();
-        this.logId = repoFullName + ":admin";
-        this.ownerName = toOrganizationName(repoFullName);
+        this.ownerName = orgName;
+        this.repoFullName = repoFullName;
     }
 
-    @Override
-    public String getLogId() {
-        return logId;
+    public ScopedQueryContext(@Nonnull AppContextService contextService, @Nonnull long installationId,
+            @Nonnull GHRepository repo) {
+        super(contextService, installationId);
+        this.repoFullName = repo.getFullName();
+        this.ownerName = QueryContext.toOrganizationName(repoFullName);
+        this.repository = repo;
+    }
+
+    /**
+     * In this path, repository could be null (org-level event)
+     *
+     * @param contextService
+     * @param installationId
+     * @param org GHOrganization
+     * @param repo GHRepository
+     */
+    public ScopedQueryContext(@Nonnull AppContextService contextService, @Nonnull long installationId,
+            @Nonnull GHOrganization org, GHRepository repo) {
+        super(contextService, installationId);
+        this.ownerName = org.getLogin();
+        this.repository = repo;
+    }
+
+    public ScopedQueryContext addExisting(MonitoredRepo repoCfg) {
+        this.repoConfig = repoCfg;
+        return this;
     }
 
     @Override
     public String getRepositoryId() {
-        return repository.getNodeId();
+        GHRepository repo = getRepository();
+        return repo == null ? null : getRepository().getNodeId();
     }
 
     @Override
     public GHRepository getRepository() {
+        if (repository == null && repoFullName != null) {
+            repository = getRepository(repoFullName);
+        }
         return repository;
     }
 

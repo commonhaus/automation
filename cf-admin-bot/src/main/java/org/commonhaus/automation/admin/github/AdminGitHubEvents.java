@@ -49,33 +49,41 @@ public class AdminGitHubEvents {
 
         GHRepository repo = pushEvent.getRepository();
         String repoFullName = repo.getFullName();
+        long installationId = pushEvent.getInstallation().getId();
 
         if (Objects.equals(repoFullName, cfg.repo())
                 && pushEvent.getRef().endsWith("/main")
                 && ctx.commitsContain(pushEvent, cfg.path())) {
-            Log.debugf("updateAttestationList (push): %s", repo.getFullName());
-            ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                    github,
-                    pushEvent.getRepository(),
-                    pushEvent.getInstallation().getId())
-                    .addExisting(graphQLClient);
+            Log.debugf("updateAttestationList (push): %s", repoFullName);
+
+            ScopedQueryContext qc = ctx.refreshScopedQueryContext(installationId, repo);
+            if (qc == null) {
+                ctx.logAndSendEmail("" + installationId,
+                        "updateAttestationList: Unable to get query context for " + repoFullName, null, null);
+                return;
+            }
+            qc.addExisting(github).addExisting(graphQLClient);
             ctx.updateValidAttestations(qc);
         }
     }
 
     public void updateMembership(GitHub github, DynamicGraphQLClient graphQLClient,
             @Membership GHEventPayload.Membership membershipEvent) {
+
         AdminDataCache.KNOWN_USER.invalidate(membershipEvent.getMember().getLogin());
         GHRepository repo = membershipEvent.getRepository();
         GHOrganization org = membershipEvent.getOrganization();
 
-        ScopedQueryContext qc = ctx.getScopedQueryContext(
-                repo == null ? org.getLogin() : repo.getFullName());
+        long installationId = membershipEvent.getInstallation().getId();
+        String scope = repo == null ? org.getLogin() : repo.getFullName();
+
+        ScopedQueryContext qc = ctx.refreshScopedQueryContext(installationId, org, repo);
         if (qc == null) {
+            ctx.logAndSendEmail("" + installationId,
+                    "updateMembership: Unable to get query context for " + scope, null, null);
             return;
         }
         qc.addExisting(github).addExisting(graphQLClient);
-
         qc.updateTeamList(membershipEvent.getOrganization(), membershipEvent.getTeam());
     }
 
@@ -103,10 +111,10 @@ public class AdminGitHubEvents {
         }
 
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                github,
-                issueEvent.getRepository(),
-                issueEvent.getInstallation().getId())
-                .addExisting(graphQLClient);
+                issueEvent.getInstallation().getId(),
+                issueEvent.getRepository())
+                .addExisting(graphQLClient)
+                .addExisting(github);
 
         Log.debugf("[%s] updateApplication #%s - %s", qc.getLogId(),
                 issue.number, actionType);
@@ -135,9 +143,9 @@ public class AdminGitHubEvents {
             return;
         }
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                github,
-                issueCommentEvent.getRepository(),
-                issueCommentEvent.getInstallation().getId())
+                issueCommentEvent.getInstallation().getId(),
+                issueCommentEvent.getRepository())
+                .addExisting(github)
                 .addExisting(graphQLClient);
 
         GHIssue issue = issueCommentEvent.getIssue();
@@ -164,9 +172,9 @@ public class AdminGitHubEvents {
         }
 
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                github,
-                labelPayload.getRepository(),
-                labelPayload.getInstallation().getId())
+                labelPayload.getInstallation().getId(),
+                labelPayload.getRepository())
+                .addExisting(github)
                 .addExisting(graphQLClient);
 
         DataLabel label = new DataLabel(labelPayload.getLabel());
