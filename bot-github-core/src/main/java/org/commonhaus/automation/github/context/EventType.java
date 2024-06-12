@@ -2,6 +2,8 @@ package org.commonhaus.automation.github.context;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.github.context.EventPayload.CommonItemCommentPayload;
+import org.commonhaus.automation.github.context.EventPayload.CommonItemPayload;
 import org.commonhaus.automation.github.context.EventPayload.DiscussionCommentPayload;
 import org.commonhaus.automation.github.context.EventPayload.DiscussionPayload;
 
@@ -33,6 +35,8 @@ public enum EventType {
         return switch (this) {
             case discussion -> new DiscussionPayload(action, jsonData);
             case discussion_comment -> new DiscussionCommentPayload(action, jsonData);
+            case issue, pull_request -> new CommonItemPayload(action, jsonData);
+            case issue_comment -> new CommonItemCommentPayload(action, jsonData);
             default -> {
                 Log.errorf("EventType.getDataFrom: unsupported event type %s", this);
                 yield null;
