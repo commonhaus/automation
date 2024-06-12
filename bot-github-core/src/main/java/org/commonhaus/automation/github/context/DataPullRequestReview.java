@@ -66,7 +66,7 @@ public class DataPullRequestReview extends DataCommonObject {
                         }
                     }
                     """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors()) {
                 qc.clearNotFound();
                 break;
             }

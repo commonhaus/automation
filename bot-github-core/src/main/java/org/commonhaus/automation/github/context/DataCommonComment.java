@@ -47,7 +47,7 @@ public class DataCommonComment extends DataCommonObject {
                         }
                     }
                     """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors() || response == null) {
                 qc.clearNotFound();
                 return null;
             }
@@ -98,7 +98,7 @@ public class DataCommonComment extends DataCommonObject {
                         }
                     }
                     """, variables);
-            if (response.hasError()) {
+            if (qc.hasErrors() || response == null) {
                 qc.clearNotFound();
                 return null;
             }

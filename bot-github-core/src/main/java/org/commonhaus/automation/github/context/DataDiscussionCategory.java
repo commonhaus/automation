@@ -60,7 +60,7 @@ public class DataDiscussionCategory {
                     }
                 """);
         Log.debugf("[%s] discussion categories: %s", qc.getLogId(), response.getData());
-        if (response.hasError()) {
+        if (qc.hasErrors()) {
             return List.of();
         }
 

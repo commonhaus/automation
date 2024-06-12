@@ -82,7 +82,7 @@ public class DataCommonItem extends DataCommonObject {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
@@ -112,7 +112,7 @@ public class DataCommonItem extends DataCommonObject {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
@@ -142,7 +142,7 @@ public class DataCommonItem extends DataCommonObject {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
@@ -181,7 +181,7 @@ public class DataCommonItem extends DataCommonObject {
                     }
                         """, variables);
 
-            if (response.hasError()) {
+            if (qc.hasErrors()) {
                 break;
             }
 
@@ -214,7 +214,7 @@ public class DataCommonItem extends DataCommonObject {
                     }
                 }
                 """, variables);
-        if (response.hasError()) {
+        if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
         }
