@@ -5,8 +5,8 @@ import org.commonhaus.automation.github.voting.VoteConfig;
 
 public class RepositoryConfigFile {
     public static final String NAME = "cf-automation.yml";
-    public final NoticeConfig notice = new NoticeConfig();
-    public final VoteConfig voting = new VoteConfig();
+    public NoticeConfig notice;
+    public VoteConfig voting;
 
     public static class RepositoryConfig {
         protected Boolean enabled;

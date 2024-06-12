@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 
 public class VoteConfig extends RepositoryConfig {
     public static VoteConfig getVotingConfig(RepositoryConfigFile repoConfigFile) {
-        if (repoConfigFile == null) {
+        if (repoConfigFile == null || repoConfigFile.voting == null) {
             return DISABLED;
         }
         return repoConfigFile.voting;
