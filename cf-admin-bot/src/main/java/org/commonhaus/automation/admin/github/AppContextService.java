@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.annotation.Nonnull;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
+import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.AdminConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
@@ -201,18 +202,14 @@ public class AppContextService extends BaseContextService {
      * @param nodeId User Node ID
      * @param identity Security Identity
      * @return GitHub connection or null
+     * @throws IOException
      */
-    public GitHub getUserConnection(String nodeId, SecurityIdentity identity) {
+    public GitHub getUserConnection(String nodeId, SecurityIdentity identity) throws IOException {
         GitHub connect = BaseQueryCache.CONNECTION.get("user-" + nodeId);
         if (connect == null || !connect.isCredentialValid()) {
-            try {
-                AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
-                connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
-                BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
-            } catch (IOException e) {
-                Log.errorf(e, "%s failed to create session", nodeId);
-                connect = null;
-            }
+            AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
+            connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
+            BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
         }
         return connect;
     }
@@ -447,6 +444,22 @@ public class AppContextService extends BaseContextService {
         return pushEvent.getCommits().stream()
                 .anyMatch(commit -> commit.getAdded().contains(path)
                         || commit.getModified().contains(path));
+    }
+
+    public Response toResponse(String logId, String message, Throwable t) {
+        if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
+            return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
+        }
+        Log.errorf(t, "[%s] %s; %s", logId, message, t);
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    }
+
+    public Response toResponseWithEmail(String logId, String message, Throwable t) {
+        if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
+            return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
+        }
+        logAndSendEmail(logId, message, t, null);
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
 
     public static ObjectMapper yamlMapper() {

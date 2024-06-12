@@ -65,8 +65,7 @@ public class MemberAttestationResource {
 
             return user.toResponse().finish();
         } catch (Throwable e) {
-            Log.errorf(e, "updateAttestation: Unable to update attestation for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponse("updateAttestation", "Unable to update attestation for " + session.login(), e);
         }
     }
 
@@ -105,8 +104,7 @@ public class MemberAttestationResource {
 
             return user.toResponse().finish();
         } catch (Throwable e) {
-            Log.errorf(e, "updateAttestations: Unable to update attestations for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponse("updateAttestations", "Unable to update attestations for " + session.login(), e);
         }
     }
 

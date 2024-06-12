@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -248,7 +247,7 @@ public class QueryContext {
                         null);
                 errors.addAll(response.getErrors());
             }
-        } catch (ExecutionException | InterruptedException | RuntimeException e) {
+        } catch (Throwable e) {
             logAndSendEmail(getLogId(), "Error executing GraphQL query", e);
             exceptions.add(e);
         }

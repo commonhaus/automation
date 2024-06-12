@@ -123,9 +123,12 @@ public class MemberApplicationProcess {
                 : new ApplicationData(session.login(), item);
     }
 
-    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments) {
+    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments) throws Throwable {
         ScopedQueryContext qc = ctx.getDatastoreContext();
         DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
+        if (qc.hasErrors()) {
+            throw qc.bundleExceptions();
+        }
         ApplicationData application = new ApplicationData(session.login(), issue);
         if (application.isValid() && withComments) {
             Feedback feedback = getFeedback(qc, applicationId, issue.mostRecentEdit());

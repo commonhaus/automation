@@ -1,5 +1,6 @@
 package org.commonhaus.automation.admin.api;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.commonhaus.automation.admin.AdminDataCache;
@@ -22,7 +23,11 @@ public class MemberSession {
         });
 
         // Create/renew GitHub connection
-        memberProfile.connection = ctx.getUserConnection(memberProfile.nodeId(), identity);
+        try {
+            memberProfile.connection = ctx.getUserConnection(memberProfile.nodeId(), identity);
+        } catch (IOException e) {
+            memberProfile.connectionError = e;
+        }
         return memberProfile;
     }
 
@@ -30,6 +35,7 @@ public class MemberSession {
     private final UserInfo userInfo;
 
     private transient GitHub connection;
+    private transient IOException connectionError;
     private GitHubUser userData;
 
     private MemberSession(UserInfo userInfo) {
@@ -48,14 +54,6 @@ public class MemberSession {
             userData = user = new GitHubUser(info().getJsonObject());
         }
         return user;
-    }
-
-    public GitHub connection() {
-        return connection;
-    }
-
-    public boolean hasConnection() {
-        return connection != null;
     }
 
     @Override
@@ -117,5 +115,21 @@ public class MemberSession {
 
     public String url() {
         return getUserData().url;
+    }
+
+    public void applicationStatus(boolean b) {
+        this.getUserData().hasApplication = b;
+    }
+
+    public GitHub connection() {
+        return connection;
+    }
+
+    public boolean hasConnection() {
+        return connection != null;
+    }
+
+    public Throwable connectionError() {
+        return connectionError;
     }
 }

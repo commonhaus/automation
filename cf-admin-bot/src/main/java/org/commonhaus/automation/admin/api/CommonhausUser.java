@@ -38,8 +38,8 @@ public class CommonhausUser {
         DECLINED,
         COMMITTEE,
         ACTIVE,
-        PENDING,
         INACTIVE,
+        PENDING,
         SPONSOR,
         UNKNOWN;
 
@@ -326,5 +326,9 @@ public class CommonhausUser {
         public CommonhausUser build() {
             return new CommonhausUser(this);
         }
+    }
+
+    public void updateApplicationStatus(MemberSession session) {
+        session.applicationStatus(this.application != null);
     }
 }

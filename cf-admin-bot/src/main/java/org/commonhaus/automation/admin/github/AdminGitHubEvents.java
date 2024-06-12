@@ -41,21 +41,20 @@ public class AdminGitHubEvents {
     MemberApplicationProcess applicationProcess;
 
     public void updateAttestationList(GitHub github, DynamicGraphQLClient graphQLClient,
-            @Push GHEventPayload.Push pushEvent) {
+            @Push GHEventPayload.Push eventPayload) {
+        long installationId = eventPayload.getInstallation().getId();
+        GHRepository repo = eventPayload.getRepository();
+        String repoFullName = repo.getFullName();
+
+        Log.debugf("[%s] updateAttestationList (push): %s", installationId, repoFullName);
         AttestationConfig cfg = ctx.attestationConfig();
         if (cfg == null) {
             return;
         }
 
-        GHRepository repo = pushEvent.getRepository();
-        String repoFullName = repo.getFullName();
-        long installationId = pushEvent.getInstallation().getId();
-
         if (Objects.equals(repoFullName, cfg.repo())
-                && pushEvent.getRef().endsWith("/main")
-                && ctx.commitsContain(pushEvent, cfg.path())) {
-            Log.debugf("updateAttestationList (push): %s", repoFullName);
-
+                && eventPayload.getRef().endsWith("/main")
+                && ctx.commitsContain(eventPayload, cfg.path())) {
             ScopedQueryContext qc = ctx.refreshScopedQueryContext(installationId, repo);
             if (qc == null) {
                 ctx.logAndSendEmail("" + installationId,
@@ -68,13 +67,15 @@ public class AdminGitHubEvents {
     }
 
     public void updateMembership(GitHub github, DynamicGraphQLClient graphQLClient,
-            @Membership GHEventPayload.Membership membershipEvent) {
+            @Membership GHEventPayload.Membership eventPayload) {
+        long installationId = eventPayload.getInstallation().getId();
+        Log.debugf("[%s] updateMembership: %s",
+                installationId, eventPayload.getOrganization().getLogin());
 
-        AdminDataCache.KNOWN_USER.invalidate(membershipEvent.getMember().getLogin());
-        GHRepository repo = membershipEvent.getRepository();
-        GHOrganization org = membershipEvent.getOrganization();
+        AdminDataCache.KNOWN_USER.invalidate(eventPayload.getMember().getLogin());
+        GHRepository repo = eventPayload.getRepository();
+        GHOrganization org = eventPayload.getOrganization();
 
-        long installationId = membershipEvent.getInstallation().getId();
         String scope = repo == null ? org.getLogin() : repo.getFullName();
 
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(installationId, org, repo);
@@ -84,7 +85,7 @@ public class AdminGitHubEvents {
             return;
         }
         qc.addExisting(github).addExisting(graphQLClient);
-        qc.updateTeamList(membershipEvent.getOrganization(), membershipEvent.getTeam());
+        qc.updateTeamList(eventPayload.getOrganization(), eventPayload.getTeam());
     }
 
     /**
@@ -93,16 +94,19 @@ public class AdminGitHubEvents {
      * @param event
      * @param github
      * @param graphQLClient
-     * @param issueCommentEvent
+     * @param eventPayload
      */
     public void applicationIssueLabelAdded(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @Issue.Labeled GHEventPayload.Issue issueEvent) {
+            @Issue.Labeled GHEventPayload.Issue eventPayload) {
+        long installationId = eventPayload.getInstallation().getId();
+        String repoFullName = eventPayload.getRepository().getFullName();
+        Log.debugf("[%s] applicationIssueLabelAdded: %s",
+                installationId, repoFullName);
 
-        String repoFullName = issueEvent.getRepository().getFullName();
         ActionType actionType = ActionType.fromString(event.getAction());
-        JsonObject payload = JsonAttribute.unpack(event.getPayload());
-        DataCommonItem issue = JsonAttribute.issue.commonItemFrom(payload);
-        DataLabel label = JsonAttribute.label.labelFrom(payload);
+        JsonObject data = JsonAttribute.unpack(event.getPayload());
+        DataCommonItem issue = JsonAttribute.issue.commonItemFrom(data);
+        DataLabel label = JsonAttribute.label.labelFrom(data);
 
         // ignore if it isn't an issue in the datastore repository
         if (!repoFullName.equals(ctx.getDataStore())
@@ -111,16 +115,16 @@ public class AdminGitHubEvents {
         }
 
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                issueEvent.getInstallation().getId(),
-                issueEvent.getRepository())
+                installationId,
+                eventPayload.getRepository())
                 .addExisting(graphQLClient)
                 .addExisting(github);
 
-        Log.debugf("[%s] updateApplication #%s - %s", qc.getLogId(),
+        Log.debugf("[%s] applicationIssueLabelAdded #%s - %s", qc.getLogId(),
                 issue.number, actionType);
 
         try {
-            applicationProcess.handleApplicationLabelAdded(qc, issueEvent.getIssue(), issue, label);
+            applicationProcess.handleApplicationLabelAdded(qc, eventPayload.getIssue(), issue, label);
         } catch (Exception e) {
             ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
         } finally {
@@ -134,21 +138,24 @@ public class AdminGitHubEvents {
      * @param event
      * @param github
      * @param graphQLClient
-     * @param issueCommentEvent
+     * @param eventPayload
      */
     public void updateApplicationComments(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @IssueComment GHEventPayload.IssueComment issueCommentEvent) {
-        String repoFullName = issueCommentEvent.getRepository().getFullName();
+            @IssueComment GHEventPayload.IssueComment eventPayload) {
+        long installationId = eventPayload.getInstallation().getId();
+        String repoFullName = eventPayload.getRepository().getFullName();
+        Log.debugf("[%s] updateApplicationComments: %s",
+                installationId, repoFullName);
         if (!repoFullName.equals(ctx.getDataStore())) {
             return;
         }
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                issueCommentEvent.getInstallation().getId(),
-                issueCommentEvent.getRepository())
+                eventPayload.getInstallation().getId(),
+                eventPayload.getRepository())
                 .addExisting(github)
                 .addExisting(graphQLClient);
 
-        GHIssue issue = issueCommentEvent.getIssue();
+        GHIssue issue = eventPayload.getIssue();
         String nodeId = issue.getNodeId();
         List<DataCommonComment> comments = qc.getComments(nodeId, x -> true);
 
@@ -157,28 +164,32 @@ public class AdminGitHubEvents {
     }
 
     /**
-     * Called when there is a label change (added or removed from the repository) event.
+     * Called when there is a label change (added or removed from the repository)
+     * event.
      *
      * @param event GitHubEvent (raw payload)
      * @param github GitHub API (connection instance)
      * @param graphQLClient GraphQL client
-     * @param labelPayload GitHub API parsed payload
+     * @param eventPayload GitHub API parsed payload
      */
     void onRepositoryLabelChange(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
-            @Label GHEventPayload.Label labelPayload) {
-        String repoFullName = labelPayload.getRepository().getFullName();
+            @Label GHEventPayload.Label eventPayload) {
+        long installationId = eventPayload.getInstallation().getId();
+        String repoFullName = eventPayload.getRepository().getFullName();
+        Log.debugf("[%s] onRepositoryLabelChange: %s",
+                installationId, repoFullName);
         if (!repoFullName.equals(ctx.getDataStore())) {
             return;
         }
 
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                labelPayload.getInstallation().getId(),
-                labelPayload.getRepository())
+                eventPayload.getInstallation().getId(),
+                eventPayload.getRepository())
                 .addExisting(github)
                 .addExisting(graphQLClient);
 
-        DataLabel label = new DataLabel(labelPayload.getLabel());
-        String cacheId = labelPayload.getRepository().getNodeId();
+        DataLabel label = new DataLabel(eventPayload.getLabel());
+        String cacheId = eventPayload.getRepository().getNodeId();
         ActionType actionType = ActionType.fromString(event.getAction());
 
         Log.debugf("[%s] LabelChanges: repository %s changed label %s", qc.getLogId(), cacheId, label);
