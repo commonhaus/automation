@@ -182,11 +182,13 @@ public class ContextHelper extends QueryContext {
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
         GitHub gh = mocks.installationClient(installationId);
+        ctx.updateConnection(installationId, gh);
         DynamicGraphQLClient dql = mocks.installationGraphQLClient(installationId);
+        ctx.updateConnection(installationId, dql);
 
         GHUser bot = mockGHUser(botLogin);
         when(gh.getUser(botLogin)).thenReturn(bot);
-        AdminDataCache.USER_CONNECTION.put(botNodeId, gh);
+        ctx.updateUserConnection(botNodeId, gh);
 
         GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), datastoreRepoId);
         RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(

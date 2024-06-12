@@ -27,6 +27,7 @@ import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -107,25 +108,28 @@ public class AppContextService extends BaseContextService {
             qc = scopedContexts.get(ScopedQueryContext.toOrganizationName(scope));
         }
 
-        if (qc != null && qc.checkExpiredConnection()) {
-            long ghId = qc.getInstallationId();
-            String fullName = qc.getRepository().getFullName();
-
-            Log.debugf("[%s] Creating new ScopedQueryContext for %s (%s)",
-                    ghId, scope, fullName);
-
-            try {
-                GitHub github = getInstallationClient(qc.getInstallationId());
-                github.getInstallation(); // authenticated installation
-
-                GHRepository repository = github.getRepository(fullName);
-                qc = new ScopedQueryContext(this, repository, ghId).addExisting(github);
-            } catch (IOException e) {
-                logAndSendEmail("getAdminQueryContext",
-                        "Unable to find repository %s for installation %s".formatted(fullName, ghId),
-                        e, botErrorEmailAddress());
-            }
+        if (qc == null) {
+            logAndSendEmail("getScopedQueryContext",
+                    "Unable to find context for scope " + scope,
+                    null, botErrorEmailAddress());
+            return null;
         }
+
+        qc.refreshConnection(); // reauthenticate if necessary
+        // long ghId = qc.getInstallationId();
+        // String fullName = qc.getRepository().getFullName();
+
+        // Log.debugf("[%s] Creating new ScopedQueryContext for %s (%s)",
+        //         ghId, scope, fullName);
+
+        // try {
+        //     GitHub github = getInstallationClient(qc.getInstallationId());
+        //     github.getInstallation(); // authenticated installation
+
+        //     GHRepository repository = github.getRepository(fullName);
+        //     qc = new ScopedQueryContext(this, repository, ghId).addExisting(github);
+        // } catch (IOException e) {
+        // }
         return qc;
     }
 
@@ -170,20 +174,31 @@ public class AppContextService extends BaseContextService {
         }
     }
 
+    /**
+     * Create or renew a GitHub connection for a user.
+     * May return null if connection can not be established
+     *
+     * @param nodeId User Node ID
+     * @param identity Security Identity
+     * @return GitHub connection or null
+     */
     public GitHub getUserConnection(String nodeId, SecurityIdentity identity) {
-        GitHub connect = AdminDataCache.USER_CONNECTION.get(nodeId);
-
+        GitHub connect = BaseQueryCache.CONNECTION.get("user-" + nodeId);
         if (connect == null || !connect.isCredentialValid()) {
             try {
                 AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
                 connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
-                AdminDataCache.USER_CONNECTION.put(nodeId, connect);
+                BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
             } catch (IOException e) {
                 Log.errorf(e, "%s failed to create session", nodeId);
                 connect = null;
             }
         }
         return connect;
+    }
+
+    public void updateUserConnection(String nodeId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
     }
 
     public Class<AdminConfigFile> getConfigType() {

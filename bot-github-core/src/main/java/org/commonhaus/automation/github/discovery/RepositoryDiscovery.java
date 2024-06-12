@@ -88,6 +88,13 @@ public class RepositoryDiscovery {
         }
     }
 
+    void onEvent(@RawEvent GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient) {
+        ctx = ctxInstance.get();
+        Log.debugf("[%s] Refresh connections", event.getInstallationId());
+        ctx.updateConnection(event.getInstallationId(), github);
+        ctx.updateConnection(event.getInstallationId(), graphQLClient);
+    }
+
     /**
      * Respond to installation changes
      */

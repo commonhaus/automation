@@ -1,11 +1,7 @@
 package org.commonhaus.automation.admin.github;
 
 import org.commonhaus.automation.admin.api.MemberSession;
-import org.commonhaus.automation.github.context.ActionType;
-import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
-import org.kohsuke.github.GHOrganization;
-import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
@@ -46,27 +42,7 @@ public class UserQueryContext extends QueryContext {
     }
 
     @Override
-    public String getRepositoryId() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepositoryId'");
-    }
-
-    @Override
-    public GHRepository getRepository() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRepository'");
-    }
-
-    @Override
-    public GHOrganization getOrganization() {
-        throw new UnsupportedOperationException("Unimplemented method 'getOrganization'");
-    }
-
-    @Override
-    public EventType getEventType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getEventType'");
-    }
-
-    @Override
-    public ActionType getActionType() {
-        throw new UnsupportedOperationException("Unimplemented method 'getActionType'");
+    public void refreshConnection() {
+        // NO-OP. No installation Id, can't renew this way
     }
 }

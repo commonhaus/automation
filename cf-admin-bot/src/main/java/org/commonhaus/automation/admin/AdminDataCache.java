@@ -14,8 +14,6 @@ public enum AdminDataCache {
 
     COMMONHAUS_DATA(b -> b.expireAfterAccess(1, TimeUnit.HOURS)),
 
-    USER_CONNECTION(b -> b.expireAfterAccess(30, TimeUnit.MINUTES)),
-
     KNOWN_USER(b -> b.expireAfterWrite(2, TimeUnit.DAYS)),
 
     ALIASES(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),

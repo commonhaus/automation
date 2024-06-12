@@ -9,6 +9,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 
 public enum BaseQueryCache {
     REPO_CONFIG(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
+    CONNECTION(b -> b.expireAfterWrite(30, TimeUnit.MINUTES)),
 
     LABELS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
