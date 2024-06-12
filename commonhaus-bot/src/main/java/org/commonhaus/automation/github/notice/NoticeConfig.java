@@ -19,7 +19,7 @@ public class NoticeConfig extends RepositoryConfig {
     };
 
     public static NoticeConfig getNoticeConfig(RepositoryConfigFile repoConfigFile) {
-        if (repoConfigFile == null) {
+        if (repoConfigFile == null || repoConfigFile.notice == null) {
             return DISABLED;
         }
         return repoConfigFile.notice;
