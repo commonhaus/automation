@@ -81,8 +81,8 @@ public class MemberResource {
         if (session.hasConnection()) {
             return Response.ok(new ApiResponse(ApiResponse.Type.INFO, session.getUserData())).build();
         } else {
-            Log.errorf("getUserInfo: Unable to establish connection to GH for %s", session.login());
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("getUserInfo", "Unable to establish connection to GH for " + session.login(),
+                    session.connectionError());
         }
     }
 
@@ -100,10 +100,12 @@ public class MemberResource {
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
-            return user.toResponse().finish();
+            user.updateApplicationStatus(session);
+            return user.toResponse()
+                    .setData(ApiResponse.Type.INFO, session.getUserData())
+                    .finish();
         } catch (Exception e) {
-            Log.errorf(e, "getCommonhausUser: Unable to get user data for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponse("getCommonhausUser", "Unable to get user data for " + session.login(), e);
         }
     }
 
@@ -124,10 +126,12 @@ public class MemberResource {
                         false,
                         false));
             }
-            return user.toResponse().finish();
+            user.updateApplicationStatus(session);
+            return user.toResponse()
+                    .setData(ApiResponse.Type.INFO, session.getUserData())
+                    .finish();
         } catch (Exception e) {
-            Log.errorf(e, "updateUserStatus: Unable to update status for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponse("updateUserStatus", "Unable to update status for " + session.login(), e);
         }
     }
 }

@@ -204,7 +204,7 @@ public class CommonhausDatastore {
             return Uni.createFrom().failure(e);
         }
 
-        Log.debugf("[%s|%s] Updated Commonhaus user data: %s", qc.getLogId(), user.id(), result);
+        Log.debugf("[%s|%s] Updated Commonhaus user data: %s", qc.getLogId(), user.login(), result);
         final CommonhausUser u = result;
         return Uni.createFrom().item(() -> u).emitOn(executor);
     }

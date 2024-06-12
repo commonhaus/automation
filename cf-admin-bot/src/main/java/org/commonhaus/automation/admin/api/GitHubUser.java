@@ -22,6 +22,7 @@ class GitHubUser {
     String avatarUrl;
     String url;
     Set<String> roles = new HashSet<>();
+    boolean hasApplication = false;
 
     public GitHubUser(long id, String login, String nodeId) {
         this.id = id;

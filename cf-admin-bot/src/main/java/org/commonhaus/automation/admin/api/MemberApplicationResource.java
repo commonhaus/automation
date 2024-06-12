@@ -63,8 +63,8 @@ public class MemberApplicationResource {
                     .setData(Type.APPLY, applicationData)
                     .finish();
         } catch (Throwable e) {
-            Log.errorf(e, "getApplication: Unable to retrieve application for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("getApplication",
+                    "getApplication: Unable to retrieve application for " + session.login(), e);
         }
     }
 
@@ -91,8 +91,7 @@ public class MemberApplicationResource {
             }
             return doUserApplicationUpdate(user, applicationData, applicationPost); // WRITE
         } catch (Throwable e) {
-            Log.errorf(e, "getApplication: Unable to retrieve application for %s: %s", session.login(), e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("setApplication", "Unable to retrieve application for " + session.login(), e);
         }
     }
 
@@ -145,8 +144,8 @@ public class MemberApplicationResource {
                 if (qc.hasErrors()) {
                     Throwable e = qc.bundleExceptions();
                     qc.clearErrors();
-                    ctx.logAndSendEmail(qc.getLogId(), "Failed to update MembershipApplication issue", e, null);
-                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+                    return ctx.toResponseWithEmail(qc.getLogId(),
+                            "doUserApplicationUpdate: Failed to update MembershipApplication issue", e);
                 }
                 if (updated == null) {
                     Log.errorf("doUserApplicationUpdate|%s: Updated data was not returned", session.login());

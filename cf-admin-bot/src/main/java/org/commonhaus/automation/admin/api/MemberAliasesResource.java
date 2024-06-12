@@ -81,8 +81,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            ctx.logAndSendEmail("getAliases", "Unable to fetch user aliases for " + session.login(), e, null);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("getAliases", "Unable to fetch user aliases for " + session.login(), e);
         }
     }
 
@@ -122,8 +121,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            ctx.logAndSendEmail("updateAliases", "Unable to update user aliases for " + session.login(), e, null);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("updateAliases", "Unable to update user aliases for " + session.login(), e);
         }
     }
 
@@ -183,8 +181,7 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            ctx.logAndSendEmail("generatePassword", "Unable to generate SMTP password for " + alias.email(), e, null);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return ctx.toResponseWithEmail("generatePassword", "Unable to generate SMTP password for " + alias.email(), e);
         }
     }
 
