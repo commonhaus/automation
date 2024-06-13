@@ -21,6 +21,7 @@ import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventType;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHUser;
+import org.kohsuke.github.ReactionContent;
 
 @ApplicationScoped
 public class MemberApplicationProcess {
@@ -32,19 +33,25 @@ public class MemberApplicationProcess {
     CommonhausDatastore datastore;
 
     /**
-     * Handle an application event (issue label change) for a membership application.
-     * Not triggered by the user, but by the system when a label is added or removed from an issue.
+     * Handle an application event (issue label change) for a membership
+     * application.
      *
      * @param qc QueryContext for the repository containing the issue
      * @param issue The issue that was updated
      * @param item The issue as Json-derived data
      * @param label The label that was added
      */
-    public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item, DataLabel label) {
+    public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item,
+            DataLabel label) {
         String login = ApplicationData.getLogin(item);
         GHUser applicant = qc.getUser(login);
         CommonhausUser user = datastore.getCommonhausUser(login, applicant.getId(), false, false);
         if (user == null) {
+            // should not happen, but in case something gets misaligned...
+            ctx.logAndSendEmail(qc.getLogId(), "Invalid application data",
+                    "Label added to an application for an unknown user (%s)".formatted(login),
+                    null, null);
+            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             return;
         }
 
@@ -55,6 +62,7 @@ public class MemberApplicationProcess {
                     "Unable to find valid application data for login %s and issue %s (%s)"
                             .formatted(login, item.id, item.title),
                     null, null);
+            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             return;
         }
 
@@ -86,20 +94,27 @@ public class MemberApplicationProcess {
                     true,
                     true));
         }
-        if (!qc.hasErrors()) {
+
+        if (qc.hasErrors()) {
+            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
+        } else {
+            qc.removeBotReaction(item.id, ReactionContent.CONFUSED);
             qc.closeIssue(issue);
             qc.removeLabels(item.id, List.of(ApplicationData.NEW));
         }
     }
 
     /**
-     * User action called when a user submits or updates their membership application
+     * User action called when a user submits or updates their membership
+     * application
      *
      * @param session User session
-     * @param qc Datastore QueryContext (for making changes to the application issue)
+     * @param qc Datastore QueryContext (for making changes to the
+     *        application issue)
      * @param applicationData Current application data
      * @param applicationPost Application data from the user
-     * @return updated ApplicationData object or null on error (see QueryContext for errors)
+     * @return updated ApplicationData object or null on error (see QueryContext for
+     *         errors)
      */
     public ApplicationData userUpdateApplicationIssue(
             MemberSession session,
@@ -118,12 +133,17 @@ public class MemberApplicationProcess {
                         labels)
                 : qc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
 
+        if (qc.hasErrors() && item != null) {
+            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
+        }
+
         return item == null
                 ? null
                 : new ApplicationData(session.login(), item);
     }
 
-    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments) throws Throwable {
+    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments)
+            throws Throwable {
         ScopedQueryContext qc = ctx.getDatastoreContext();
         DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
         if (qc.hasErrors()) {
