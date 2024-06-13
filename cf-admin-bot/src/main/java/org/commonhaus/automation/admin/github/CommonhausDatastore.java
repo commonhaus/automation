@@ -114,7 +114,6 @@ public class CommonhausDatastore {
     public CommonhausUser getCommonhausUser(String login, long id, boolean resetCache, boolean create) {
         QueryEvent query = new QueryEvent(login, id, resetCache, create);
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
-        Log.debugf("[getCommonhausUser|%s] Get Commonhaus user data: %s", login, response.body());
         return response.body();
     }
 
@@ -128,7 +127,6 @@ public class CommonhausDatastore {
      */
     public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, updateEvent);
-        Log.debugf("[setCommonhausUser|%s] Update Commonhaus user data: %s", updateEvent.login(), response.body());
         return response.body();
     }
 
