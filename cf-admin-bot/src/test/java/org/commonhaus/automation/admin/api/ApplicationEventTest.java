@@ -1,6 +1,8 @@
 package org.commonhaus.automation.admin.api;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
@@ -121,6 +123,9 @@ public class ApplicationEventTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                 });
 
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -184,6 +189,10 @@ public class ApplicationEventTest extends ContextHelper {
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                 });
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
 
     }
 

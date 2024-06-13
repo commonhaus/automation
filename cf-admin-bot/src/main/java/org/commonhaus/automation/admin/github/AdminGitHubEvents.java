@@ -1,6 +1,5 @@
 package org.commonhaus.automation.admin.github;
 
-import java.util.List;
 import java.util.Objects;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +15,6 @@ import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -147,21 +145,30 @@ public class AdminGitHubEvents {
         String repoFullName = eventPayload.getRepository().getFullName();
         Log.debugf("[%s] updateApplicationComments: %s",
                 installationId, repoFullName);
-        if (!repoFullName.equals(ctx.getDataStore())) {
+
+        JsonObject data = JsonAttribute.unpack(event.getPayload());
+        DataCommonItem issue = JsonAttribute.issue.commonItemFrom(data);
+
+        // ignore if it isn't an issue in the datastore repository
+        if (!repoFullName.equals(ctx.getDataStore())
+                || !ApplicationData.isMemberApplicationEvent(issue, null)) {
             return;
         }
+
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
                 eventPayload.getInstallation().getId(),
                 eventPayload.getRepository())
                 .addExisting(github)
                 .addExisting(graphQLClient);
 
-        GHIssue issue = eventPayload.getIssue();
-        String nodeId = issue.getNodeId();
-        List<DataCommonComment> comments = qc.getComments(nodeId, x -> true);
-
-        Log.debugf("[%s] updateApplicationComments: %s", qc.getLogId(),
-                issue.getNumber(), comments);
+        DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(data);
+        try {
+            applicationProcess.handleApplicationComment(qc, issue, comment);
+        } catch (Exception e) {
+            ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
+        } finally {
+            qc.clearErrors();
+        }
     }
 
     /**
@@ -179,6 +186,7 @@ public class AdminGitHubEvents {
         String repoFullName = eventPayload.getRepository().getFullName();
         Log.debugf("[%s] onRepositoryLabelChange: %s",
                 installationId, repoFullName);
+
         if (!repoFullName.equals(ctx.getDataStore())) {
             return;
         }

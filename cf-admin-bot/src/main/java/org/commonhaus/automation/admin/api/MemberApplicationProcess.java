@@ -19,9 +19,12 @@ import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventType;
+import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.ReactionContent;
+
+import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class MemberApplicationProcess {
@@ -31,6 +34,41 @@ public class MemberApplicationProcess {
 
     @Inject
     CommonhausDatastore datastore;
+
+    /**
+     * Handle an application comment event
+     *
+     * @param qc
+     * @param issue
+     * @param item
+     */
+    public void handleApplicationComment(ScopedQueryContext qc, DataCommonItem issue, DataCommonComment comment) {
+        if (ApplicationData.isUserFeedback(comment.body)) {
+            Log.debugf("[%s] updateApplicationComments: #%s - user feedback", qc.getLogId(), issue.number);
+            String notificationEmail = ApplicationData.getNotificationEmail(issue);
+            if (notificationEmail != null) {
+                String body = """
+                        Your membership application has been updated. Please review the feedback and make any necessary updates.
+
+                        ---
+
+                        %s
+
+                        ---
+
+                        If you have any questions or need further clarification, please find us on Discord or send an email to hello@commonhaus.org.
+
+                        """
+                        .formatted(comment.body.replaceAll("::response::", "").trim());
+                String htmlBody = MarkdownConverter.toHtml(body);
+                ctx.sendEmail(qc.getLogId(),
+                        "Commonhaus Foundation Membership Application",
+                        body, htmlBody, new String[] { notificationEmail });
+            }
+        } else {
+            Log.debugf("[%s] updateApplicationComments: #%s - not user feedback", qc.getLogId(), issue.number);
+        }
+    }
 
     /**
      * Handle an application event (issue label change) for a membership
@@ -66,6 +104,7 @@ public class MemberApplicationProcess {
             return;
         }
 
+        String notificationEmail = ApplicationData.getNotificationEmail(item);
         if (ApplicationData.isAccepted(label)) {
             datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
@@ -81,6 +120,26 @@ public class MemberApplicationProcess {
             String teamFullName = ctx.getTeamForRole("member");
             if (teamFullName != null && !qc.hasErrors()) {
                 qc.addTeamMember(applicant, teamFullName);
+
+                if (notificationEmail != null) {
+                    String body = """
+                            🎉 Congratulations! 🎉
+
+                            Your membership application has been accepted.
+                            You are now a member of the Commonhaus Foundation.
+
+                            Please visit the Members-only section of the website for next steps:
+                            https://www.commonhaus.org/member/
+
+                            If you have any questions, please find us on Discord or send an email to hello@commonhaus.org.
+
+                            🥰 🚀
+                            """;
+                    String htmlBody = MarkdownConverter.toHtml(body);
+                    ctx.sendEmail(qc.getLogId(),
+                            "Welcome to the Commonhaus Foundation!",
+                            body, htmlBody, new String[] { notificationEmail });
+                }
             }
         } else {
             datastore.setCommonhausUser(new UpdateEvent(user,
@@ -93,6 +152,24 @@ public class MemberApplicationProcess {
                     "Membership application declined",
                     true,
                     true));
+
+            if (!qc.hasErrors() && notificationEmail != null) {
+                String body = """
+                        🙏 Thank you for your interest in the Commonhaus Foundation. 🙏
+
+                        We regret to inform you that your membership application has not been accepted at this time.
+
+                        If you have any questions or need further clarification, please find us on Discord or send an email to hello@commonhaus.org.
+
+                        We appreciate your understanding and interest in our community.
+
+                        🌱 🚀
+                        """;
+                String htmlBody = MarkdownConverter.toHtml(body);
+                ctx.sendEmail(qc.getLogId(),
+                        "Commonhaus Foundation Membership Application",
+                        body, htmlBody, new String[] { notificationEmail });
+            }
         }
 
         if (qc.hasErrors()) {
@@ -120,9 +197,10 @@ public class MemberApplicationProcess {
             MemberSession session,
             ScopedQueryContext qc,
             ApplicationData applicationData,
-            ApplicationPost applicationPost) {
+            ApplicationPost applicationPost,
+            String notificationEmail) {
 
-        String content = ApplicationData.issueContent(session, applicationPost);
+        String content = ApplicationData.issueContent(session, applicationPost, notificationEmail);
         Collection<DataLabel> labels = qc.findLabels(List.of(ApplicationData.NEW));
         MembershipApplication application = applicationData == null ? null : applicationData.application;
 

@@ -1,5 +1,6 @@
 package org.commonhaus.automation.admin.api;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +20,7 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
 import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.kohsuke.github.GHMyself;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -57,7 +59,8 @@ public class MemberApplicationResource {
             if (application == null && applicationData == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             } else if (applicationData == null || !applicationData.isValid() || user.status().updateToPending()) {
-                return doUserApplicationUpdate(user, applicationData, null); // WRITE
+                return doUserApplicationUpdate(user, applicationData, null,
+                        getNotificationEmail(session)); // WRITE
             }
             return user.toResponse()
                     .setData(Type.APPLY, applicationData)
@@ -81,6 +84,7 @@ public class MemberApplicationResource {
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
+
             MembershipApplication application = user.application();
             ApplicationData applicationData = application == null
                     ? null
@@ -89,14 +93,28 @@ public class MemberApplicationResource {
             if (applicationData != null && !applicationData.isValid()) {
                 applicationData = null;
             }
-            return doUserApplicationUpdate(user, applicationData, applicationPost); // WRITE
+            return doUserApplicationUpdate(user, applicationData, applicationPost,
+                    getNotificationEmail(session)); // WRITE
         } catch (Throwable e) {
             return ctx.toResponseWithEmail("setApplication", "Unable to retrieve application for " + session.login(), e);
         }
     }
 
+    private String getNotificationEmail(MemberSession session) {
+        try {
+            GHMyself myself = session.connection().getMyself();
+            return myself.getEmails2().stream()
+                    .filter(x -> x.isPrimary())
+                    .map(x -> x.getEmail())
+                    .findFirst().orElse(null);
+        } catch (IOException e) {
+            Log.errorf(e, "getNotificationEmail: Failed to get primary email for %s", session.login());
+        }
+        return null;
+    }
+
     private Response doUserApplicationUpdate(CommonhausUser user, ApplicationData applicationData,
-            ApplicationPost post) {
+            ApplicationPost post, String notificationEmail) {
         AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
                 (k) -> new AtomicBoolean(false));
 
@@ -138,8 +156,8 @@ public class MemberApplicationResource {
                 }
 
                 // UPDATE APPLICATION ISSUE
-                ApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc, applicationData,
-                        post);
+                ApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc,
+                        applicationData, post, notificationEmail);
 
                 if (qc.hasErrors()) {
                     Throwable e = qc.bundleExceptions();

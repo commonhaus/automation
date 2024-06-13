@@ -55,7 +55,7 @@
     "closed_at": null,
     "author_association": "NONE",
     "active_lock_reason": null,
-    "body": "[ebullient](https://github.com/ebullient)\n\n> [!TIP]\n> - Include \"::response::\" in your comment to send feedback to the applicant.\n> - Add the 'application/accepted' label to accept the application.\n> - Add the 'application/declined' label to decline or reject the application.\n\n## Contribution Details\n<!--CONTRIBUTION::-->\nTry again. I think the old one was lost.\n<!--::CONTRIBUTION-->\n\n## Additional Notes\n<!--NOTES::-->\nStatus: PENDING\r\nRoles: cfc, egc, sponsor\n<!--::NOTES-->\n",
+    "body": "[ebullient](https://github.com/ebullient)\n\n> [!TIP]\n> - Include \"::response::\" in your comment to send feedback to the applicant.\n> - Add the 'application/accepted' label to accept the application.\n> - Add the 'application/declined' label to decline or reject the application.\n\n## Contribution Details\n<!--CONTRIBUTION::-->\nTry again. I think the old one was lost.\n<!--::CONTRIBUTION-->\n\n## Additional Notes\n<!--NOTES::-->\nStatus: PENDING\r\nRoles: cfc, egc, sponsor\n<!--::NOTES--><!-- notify::test@example.com -->\n",
     "reactions": {
       "url": "https://api.github.com/repos/commonhaus-test/ops-test/issues/6/reactions",
       "total_count": 0,

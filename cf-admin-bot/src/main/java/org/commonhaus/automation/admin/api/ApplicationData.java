@@ -24,6 +24,7 @@ public class ApplicationData {
             "([\\s\\S]*?<!--CONTRIBUTION::-->)([\\s\\S]*?)(<!--::CONTRIBUTION-->[\\s\\S]*?)", Pattern.CASE_INSENSITIVE);
     static final Pattern NOTES = Pattern.compile("([\\s\\S]*?<!--NOTES::-->)([\\s\\S]*?)(<!--::NOTES-->[\\s\\S]*?)",
             Pattern.CASE_INSENSITIVE);
+    static final Pattern NOTIFICATION = Pattern.compile("<!-- notify::(\\S+?) -->");
     static final Pattern STRIP_COMMENTS = Pattern.compile("<!--:?:?(CONTRIBUTION|NOTES):?:?-->", Pattern.CASE_INSENSITIVE);
 
     transient String title;
@@ -93,7 +94,7 @@ public class ApplicationData {
         }
     }
 
-    public static String issueContent(MemberSession session, ApplicationPost applicationPost) {
+    public static String issueContent(MemberSession session, ApplicationPost applicationPost, String notificationEmail) {
         return """
                 [%s](%s)
 
@@ -111,11 +112,13 @@ public class ApplicationData {
                 <!--NOTES::-->
                 %s
                 <!--::NOTES-->
+                <!-- notify::%s -->
                 """.formatted(
                 session.login(),
                 session.url(),
                 STRIP_COMMENTS.matcher(applicationPost.contributions()).replaceAll(" "),
-                STRIP_COMMENTS.matcher(applicationPost.additionalNotes()).replaceAll(" "));
+                STRIP_COMMENTS.matcher(applicationPost.additionalNotes()).replaceAll(" "),
+                notificationEmail);
     }
 
     public static String createTitle(MemberSession session) {
@@ -129,7 +132,12 @@ public class ApplicationData {
     public static boolean isMemberApplicationEvent(DataCommonItem issue, DataLabel label) {
         return issue.title.startsWith("Membership application:")
                 && !issue.closed
-                && (ACCEPTED.equals(label.name) || DECLINED.equals(label.name));
+                && (label == null || ACCEPTED.equals(label.name) || DECLINED.equals(label.name));
+    }
+
+    public static String getNotificationEmail(DataCommonItem issue) {
+        var matcher = NOTIFICATION.matcher(issue.body);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     public static boolean isUserFeedback(String body) {

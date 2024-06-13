@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,7 +33,9 @@ import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContentBuilder;
+import org.kohsuke.github.GHEmail;
 import org.kohsuke.github.GHFileNotFoundException;
+import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -337,6 +340,10 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(400);
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -419,6 +426,10 @@ public class MemberDataTest extends ContextHelper {
                 .then()
                 .log().all()
                 .statusCode(404);
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -430,7 +441,16 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testGetInvalidApplication() throws Exception {
+        GHEmail email = mock(GHEmail.class);
+        when(email.isPrimary()).thenReturn(true);
+        when(email.getEmail()).thenReturn("test@example.com");
+
+        GHMyself myself = mock(GHMyself.class);
+        when(myself.getEmails2()).thenReturn(List.of(email));
+
         GHUser botUser = botGithub.getUser(botLogin);
+        when(botGithub.getMyself()).thenReturn(myself);
+
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
@@ -456,6 +476,10 @@ public class MemberDataTest extends ContextHelper {
 
         var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application).isNull();
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -467,7 +491,16 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testGetApplicationWithFeedback() throws Exception {
+        GHEmail email = mock(GHEmail.class);
+        when(email.isPrimary()).thenReturn(true);
+        when(email.getEmail()).thenReturn("test@example.com");
+
+        GHMyself myself = mock(GHMyself.class);
+        when(myself.getEmails2()).thenReturn(List.of(email));
+
         GHUser botUser = botGithub.getUser(botLogin);
+        when(botGithub.getMyself()).thenReturn(myself);
+
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
@@ -500,6 +533,10 @@ public class MemberDataTest extends ContextHelper {
         var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING);
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -511,7 +548,16 @@ public class MemberDataTest extends ContextHelper {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testSubmitApplication() throws Exception {
+        GHEmail email = mock(GHEmail.class);
+        when(email.isPrimary()).thenReturn(true);
+        when(email.getEmail()).thenReturn("test@example.com");
+
+        GHMyself myself = mock(GHMyself.class);
+        when(myself.getEmails2()).thenReturn(List.of(email));
+
         GHUser botUser = botGithub.getUser(botLogin);
+        when(botGithub.getMyself()).thenReturn(myself);
+
         appendMockTeam(organizationName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
@@ -557,5 +603,9 @@ public class MemberDataTest extends ContextHelper {
 
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 }
