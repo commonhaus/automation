@@ -262,6 +262,14 @@ public class AppContextService extends BaseContextService {
         return userConfig.attestations();
     }
 
+    public void forgetKnown(GHUser user) {
+        AdminDataCache.KNOWN_USER.invalidate(user.getLogin());
+    }
+
+    public void forgetKnown(MemberSession session) {
+        AdminDataCache.KNOWN_USER.invalidate(session.login());
+    }
+
     public boolean userIsKnown(QueryContext initQc, String login, Set<String> roles) {
         if (userConfig.isDisabled()) {
             return false;

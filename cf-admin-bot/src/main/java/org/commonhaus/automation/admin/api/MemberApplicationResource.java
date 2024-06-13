@@ -44,7 +44,7 @@ public class MemberApplicationResource {
     @Produces("application/json")
     public Response getApplication() {
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, false, false);
+            CommonhausUser user = datastore.getCommonhausUser(session);
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
@@ -77,7 +77,7 @@ public class MemberApplicationResource {
                 Log.errorf("setApplication|%s: No application data", session.login());
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
-            CommonhausUser user = datastore.getCommonhausUser(session, false, false);
+            CommonhausUser user = datastore.getCommonhausUser(session);
             if (user == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }

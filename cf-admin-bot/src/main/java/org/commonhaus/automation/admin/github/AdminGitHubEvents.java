@@ -7,7 +7,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.api.MemberApplicationProcess;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
@@ -72,7 +71,9 @@ public class AdminGitHubEvents {
         Log.debugf("[%s] updateMembership: %s",
                 installationId, eventPayload.getOrganization().getLogin());
 
-        AdminDataCache.KNOWN_USER.invalidate(eventPayload.getMember().getLogin());
+        // membership changed. Forget the user + roles
+        ctx.forgetKnown(eventPayload.getMember());
+
         GHRepository repo = eventPayload.getRepository();
         GHOrganization org = eventPayload.getOrganization();
 

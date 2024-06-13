@@ -155,15 +155,20 @@ public class CommonhausDatastore {
             GHRepository repo = qc.getRepository();
             result = readCommonhausUser(qc, repo, event, key);
         }
-
-        if (qc.clearNotFound() && event.create()) {
-            // create a new user
+        if (result == null && qc.clearNotFound() && event.create()) {
+            // create a new user if not found and no errors
             result = CommonhausUser.create(event.login(), event.id());
         }
+
+        // any other kind of error (including parse errors) will be logged and returned
         if (qc.hasErrors()) {
             Throwable e = qc.bundleExceptions();
             qc.clearErrors();
             Log.errorf(e, "[%s|%s] Unable to fetch user data for %s", qc.getLogId(), event.login(), e);
+            return Uni.createFrom().failure(e);
+        } else if (result == null && event.create()) {
+            Exception e = new IllegalStateException("No result for user after fetch with create");
+            ctx.logAndSendEmail(qc.getLogId(), "Failed to update Commonhaus user", e, null);
             return Uni.createFrom().failure(e);
         }
 

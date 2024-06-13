@@ -14,7 +14,6 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -72,12 +71,7 @@ public class MemberResource {
     @KnownUser
     @Path("/me")
     @Produces("application/json")
-    public Response getUserInfo(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
-        if (refresh) {
-            AdminDataCache.KNOWN_USER.invalidate(session.login());
-            session.userIsKnown(ctx);
-        }
-
+    public Response getUserInfo() {
         if (session.hasConnection()) {
             return Response.ok(new ApiResponse(ApiResponse.Type.INFO, session.getUserData())).build();
         } else {
@@ -90,15 +84,12 @@ public class MemberResource {
     @KnownUser
     @Path("/commonhaus")
     @Produces("application/json")
-    public Response getCommonhausUser(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
-        if (refresh) {
-            AdminDataCache.COMMONHAUS_DATA.invalidate(CommonhausDatastore.getKey(session));
-        }
-
+    public Response getCommonhausUser() {
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, refresh, true);
+            CommonhausUser user = datastore.getCommonhausUser(session, false, true);
             if (user == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
+                // This should not happen after a fetch with create=true
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             }
             user.updateApplicationStatus(session);
             return user.toResponse()
@@ -113,11 +104,20 @@ public class MemberResource {
     @KnownUser
     @Path("/commonhaus/status")
     @Produces("application/json")
-    public Response updateUserStatus() {
+    public Response updateUserStatus(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+        if (refresh) {
+            // reset all the things.
+            session.forgetUser(ctx);
+
+            // re-fetch the user
+            session.userIsKnown(ctx);
+            Log.debugf("[%s] REFRESH /member/commonhaus/status %s", session.login(), session.roles());
+        }
+
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, false, false);
+            CommonhausUser user = datastore.getCommonhausUser(session, refresh, false);
             final Set<String> roles = session.roles();
-            if (user.updateMemberStatus(ctx, roles)) {
+            if (user.statusUpdateRequired(ctx, roles)) {
                 // Refresh the user's status
                 user = datastore.setCommonhausUser(new UpdateEvent(
                         user,

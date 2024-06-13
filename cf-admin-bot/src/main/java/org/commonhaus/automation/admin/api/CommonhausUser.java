@@ -70,6 +70,12 @@ public class CommonhausUser {
             return this == UNKNOWN
                     || this == PENDING;
         }
+
+        public boolean couldBeActiveMember() {
+            return this != MemberStatus.REVOKED
+                    && this != MemberStatus.SUSPENDED
+                    && this != MemberStatus.DECLINED;
+        }
     }
 
     @SuppressWarnings("unused")
@@ -247,16 +253,46 @@ public class CommonhausUser {
         history.add("%s %s".formatted(when, message));
     }
 
-    boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
-        MemberStatus oldStatus = data.status;
-        if (data.status == MemberStatus.UNKNOWN && !roles.isEmpty()) {
+    public boolean isMember() {
+        return data.status.couldBeActiveMember()
+                && (isMember != null && isMember);
+    }
+
+    MemberStatus updateStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
+        MemberStatus newStatus = oldStatus;
+        if (isMember() && !roles.contains(MEMBER_ROLE)) {
+            // inconsistency: user is a member but does not have the member role
+            // this could be a missed automation step
+            ctx.logAndSendEmail("status",
+                    "%s is a member but does not have the member role (missing group?)".formatted(login()),
+                    null, null);
+            roles.add(MEMBER_ROLE);
+        }
+        if (newStatus == MemberStatus.UNKNOWN && !roles.isEmpty()) {
             List<MemberStatus> status = roles.stream()
                     .map(r -> ctx.getStatusForRole(r))
                     .sorted()
                     .toList();
-            data.status = status.get(0);
+            newStatus = status.get(0);
         }
+        return newStatus;
+    }
+
+    // read-only: test for change in status value
+    public boolean statusUpdateRequired(AppContextService ctx, Set<String> roles) {
+        MemberStatus newStatus = updateStatus(ctx, roles, data.status);
+        return data.status != newStatus;
+    }
+
+    // update user status
+    boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
+        MemberStatus oldStatus = data.status;
+        data.status = updateStatus(ctx, roles, data.status);
         return oldStatus != data.status;
+    }
+
+    public void updateApplicationStatus(MemberSession session) {
+        session.applicationStatus(this.application != null);
     }
 
     public ApiResponse toResponse() {
@@ -326,9 +362,5 @@ public class CommonhausUser {
         public CommonhausUser build() {
             return new CommonhausUser(this);
         }
-    }
-
-    public void updateApplicationStatus(MemberSession session) {
-        session.applicationStatus(this.application != null);
     }
 }

@@ -49,6 +49,7 @@ public class MemberAttestationResource {
         try {
             final Set<String> roles = session.roles();
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
+            // update status first so correct values are used for attestation
             user.updateMemberStatus(ctx, roles);
 
             Attestation newAttestation = createAttestation(user.status(), post);
@@ -83,6 +84,7 @@ public class MemberAttestationResource {
         try {
             final Set<String> roles = session.roles();
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
+            // update status first so correct values are used for attestation
             user.updateMemberStatus(ctx, roles);
 
             Map<String, Attestation> newAttestations = new HashMap<>();

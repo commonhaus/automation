@@ -43,6 +43,10 @@ public class MemberSession {
         this.nodeId = userInfo.getString("node_id");
     }
 
+    public void forgetUser(AppContextService ctx) {
+        ctx.forgetKnown(this);
+    }
+
     public boolean userIsKnown(AppContextService ctx) {
         UserQueryContext userQc = ctx.newUserQueryContext(this);
         return ctx.userIsKnown(userQc, login(), roles());
