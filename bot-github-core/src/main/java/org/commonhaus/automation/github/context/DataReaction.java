@@ -191,7 +191,12 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
+
         qc.clearNotFound();
+        if (qc.hasErrors()) {
+            Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
+            qc.clearErrors();
+        }
     }
 
     /** package private. See QueryHelper / QueryContext */
@@ -218,6 +223,11 @@ public class DataReaction {
                         clientMutationId
                     }
                 }""", variables);
+
         qc.clearNotFound();
+        if (qc.hasErrors()) {
+            Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
+            qc.clearErrors();
+        }
     }
 }
