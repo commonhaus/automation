@@ -123,9 +123,9 @@ public class AdminGitHubEvents {
                 issue.number, actionType);
 
         try {
-            qc.getLabels(qc.getRepositoryId());
+            qc.getLabels(qc.getRepositoryId()); // pre-fetch
             applicationProcess.handleApplicationLabelAdded(qc, eventPayload.getIssue(), issue, label);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
         } finally {
             qc.clearErrors();

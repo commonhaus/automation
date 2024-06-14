@@ -78,41 +78,34 @@ public class MemberApplicationProcess {
      * @param issue The issue that was updated
      * @param item The issue as Json-derived data
      * @param label The label that was added
+     * @throws Throwable
      */
     public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item,
-            DataLabel label) {
+            DataLabel label) throws Throwable {
         String login = ApplicationData.getLogin(item);
         GHUser applicant = qc.getUser(login);
 
         String teamFullName = ctx.getTeamForRole(CommonhausUser.MEMBER_ROLE);
         if (teamFullName == null) {
             // should not happen, but in case something gets misaligned...
-            ctx.logAndSendEmail(qc.getLogId(), "Missing configuration",
-                    "Unable to find team for " + CommonhausUser.MEMBER_ROLE,
-                    null, null);
             qc.addBotReaction(item.id, ReactionContent.CONFUSED);
-            return;
+            throw new IllegalStateException("No team found for role " + CommonhausUser.MEMBER_ROLE);
         }
 
         CommonhausUser user = datastore.getCommonhausUser(login, applicant.getId(), false, false);
         if (user == null) {
             // should not happen, but in case something gets misaligned...
-            ctx.logAndSendEmail(qc.getLogId(), "Invalid application data",
-                    "Label added to an application for an unknown user (%s)".formatted(login),
-                    null, null);
             qc.addBotReaction(item.id, ReactionContent.CONFUSED);
-            return;
+            throw new IllegalStateException("Label added to an application for an unknown user " + login);
         }
 
         ApplicationData applicationData = new ApplicationData(login, item);
         // We haven't approved/declined this member yet: we need a valid application
         if (user.isMember == null && !applicationData.isValid()) {
-            ctx.logAndSendEmail(qc.getLogId(), "Invalid application data",
-                    "Unable to find valid application data for login %s and issue %s (%s)"
-                            .formatted(login, item.id, item.title),
-                    null, null);
             qc.addBotReaction(item.id, ReactionContent.CONFUSED);
-            return;
+            throw new IllegalStateException(
+                    "Unable to find valid application data for login %s and issue %s (%s)"
+                            .formatted(login, item.id, item.title));
         }
 
         String notificationEmail = ApplicationData.getNotificationEmail(item);
@@ -130,7 +123,7 @@ public class MemberApplicationProcess {
                         true,
                         true));
             }
-            // (re-)try adding the user to the team
+            // (re-)try adding the user to the team if the above went ok.
             if (!qc.hasErrors()
                     && ctx.addTeamMember(applicant, teamFullName)
                     && notificationEmail != null) {
@@ -186,11 +179,12 @@ public class MemberApplicationProcess {
 
         if (qc.hasErrors()) {
             qc.addBotReaction(item.id, ReactionContent.CONFUSED);
-        } else {
-            qc.removeBotReaction(item.id, ReactionContent.CONFUSED);
-            qc.closeIssue(issue);
-            qc.removeLabels(item.id, List.of(ApplicationData.NEW));
+            throw qc.bundleExceptions();
         }
+
+        qc.removeBotReaction(item.id, ReactionContent.CONFUSED);
+        qc.closeIssue(issue);
+        qc.removeLabels(item.id, List.of(ApplicationData.NEW));
     }
 
     /**

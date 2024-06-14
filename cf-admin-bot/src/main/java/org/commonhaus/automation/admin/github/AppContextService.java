@@ -454,6 +454,29 @@ public class AppContextService extends BaseContextService {
                         || commit.getModified().contains(path));
     }
 
+    /**
+     * Add a member to a team using the correct query context
+     *
+     * @param applicant
+     * @param teamFullName
+     * @return
+     */
+    public boolean addTeamMember(GHUser applicant, String teamFullName) {
+        Log.debugf("addTeamMember: %s to %s", applicant.getLogin(), teamFullName);
+
+        // Use team-scoped query context for team member modifications
+        ScopedQueryContext qc = getScopedQueryContext(teamFullName);
+        qc.addTeamMember(applicant, teamFullName);
+        if (qc.hasErrors()) {
+            Throwable e = qc.bundleExceptions();
+            qc.clearErrors();
+            logAndSendEmail(qc.getLogId(), "Failed to add team member",
+                    "Failed to add %s to team %s".formatted(applicant.getLogin(), teamFullName), e, null);
+            return false;
+        }
+        return true;
+    }
+
     public Response toResponse(String logId, String message, Throwable t) {
         if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
             return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
@@ -485,19 +508,5 @@ public class AppContextService extends BaseContextService {
                     .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
         }
         return yamlMapper;
-    }
-
-    public boolean addTeamMember(GHUser applicant, String teamFullName) {
-        // Use team-scoped query context for team member modifications
-        ScopedQueryContext qc = getScopedQueryContext(teamFullName);
-        qc.addTeamMember(applicant, teamFullName);
-        if (qc.hasErrors()) {
-            Throwable e = qc.bundleExceptions();
-            qc.clearErrors();
-            logAndSendEmail(qc.getLogId(), "Failed to add team member",
-                    "Failed to add %s to team %s".formatted(applicant.getLogin(), teamFullName), e, null);
-            return false;
-        }
-        return true;
     }
 }
