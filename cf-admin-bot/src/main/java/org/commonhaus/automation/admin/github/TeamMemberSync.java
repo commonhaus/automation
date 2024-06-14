@@ -44,7 +44,6 @@ import io.quarkiverse.githubapp.event.Push;
 import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
@@ -105,10 +104,8 @@ public class TeamMemberSync {
 
         Log.debugf("repositoryDiscovered: %s", repo.getFullName());
 
-        if (LaunchMode.current() != LaunchMode.NORMAL) {
-            // Scan immediately in dev & test
-            scheduleQueryRepository(cfg, repo, repoEvent.github());
-        }
+        // Scan immediately in dev & test
+        scheduleQueryRepository(cfg, repo, repoEvent.github());
     }
 
     public void updateTeamMembers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
@@ -267,7 +264,6 @@ public class TeamMemberSync {
             if (sourceLogins.contains(user)) {
                 toAdd.remove(user); // already in team
             } else {
-                Log.infof("doSyncTeamMembers: remove %s from %s", user, fullTeamName);
                 toRemove.add(user);
             }
         });
@@ -282,6 +278,7 @@ public class TeamMemberSync {
                     try {
                         GHUser user = gh.getUser(login);
                         team.add(user);
+                        Log.infof("doSyncTeamMembers: add %s to %s", user, fullTeamName);
                     } catch (IOException e) {
                         Log.warnf("doSyncTeamMembers: failed to add %s to %s", login, fullTeamName);
                     }
@@ -290,13 +287,13 @@ public class TeamMemberSync {
                     try {
                         GHUser user = gh.getUser(login);
                         team.remove(user);
+                        Log.infof("doSyncTeamMembers: remove %s from %s", user, fullTeamName);
                     } catch (IOException e) {
                         Log.warnf("doSyncTeamMembers: failed to remove %s from %s", login, fullTeamName);
                     }
                 }
                 return null;
             });
-
         } else {
             Set<String> finalLogins = new HashSet<>(currentLogins);
             finalLogins.addAll(toAdd);
