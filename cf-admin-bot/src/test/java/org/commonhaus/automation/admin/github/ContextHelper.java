@@ -243,7 +243,8 @@ public class ContextHelper extends QueryContext {
         return mockUpdateCommonhausData(builder, botGithub, ctx, "src/test/resources/commonhaus-user.yaml");
     }
 
-    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, GitHub botGithub, AppContextService ctx, String filename) throws IOException {
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, GitHub botGithub, AppContextService ctx,
+            String filename) throws IOException {
         when(builder.content(anyString())).thenReturn(builder);
         when(builder.message(anyString())).thenReturn(builder);
         when(builder.path(anyString())).thenReturn(builder);

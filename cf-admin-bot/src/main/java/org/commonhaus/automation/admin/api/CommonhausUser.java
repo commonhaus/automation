@@ -172,6 +172,7 @@ public class CommonhausUser {
     final List<String> history;
 
     Boolean isMember;
+    String statusChange;
     MembershipApplication application;
 
     transient String sha = null;
@@ -184,6 +185,7 @@ public class CommonhausUser {
         this.history = builder.history == null ? new ArrayList<>() : builder.history;
         this.application = builder.application;
         this.isMember = builder.isMember;
+        this.statusChange = builder.statusChange;
     }
 
     private CommonhausUser(String login, long id) {
@@ -192,6 +194,7 @@ public class CommonhausUser {
         this.data = new Data();
         this.history = new ArrayList<>();
         this.isMember = null;
+        this.statusChange = null;
     }
 
     public String login() {
@@ -219,6 +222,7 @@ public class CommonhausUser {
 
     public void status(MemberStatus status) {
         data.status = status;
+        statusChange = now();
     }
 
     public void sha(String sha) {
@@ -249,8 +253,7 @@ public class CommonhausUser {
     }
 
     public void addHistory(String message) {
-        String when = DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.SECONDS));
-        history.add("%s %s".formatted(when, message));
+        history.add("%s %s".formatted(now(), message));
     }
 
     public boolean isMember() {
@@ -258,7 +261,7 @@ public class CommonhausUser {
                 && (isMember != null && isMember);
     }
 
-    MemberStatus updateStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
+    MemberStatus refreshStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
         MemberStatus newStatus = oldStatus;
         if (isMember() && !roles.contains(MEMBER_ROLE)) {
             // inconsistency: user is a member but does not have the member role
@@ -280,15 +283,19 @@ public class CommonhausUser {
 
     // read-only: test for change in status value
     public boolean statusUpdateRequired(AppContextService ctx, Set<String> roles) {
-        MemberStatus newStatus = updateStatus(ctx, roles, data.status);
+        MemberStatus newStatus = refreshStatus(ctx, roles, data.status);
         return data.status != newStatus;
     }
 
     // update user status
     boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
         MemberStatus oldStatus = data.status;
-        data.status = updateStatus(ctx, roles, data.status);
-        return oldStatus != data.status;
+        data.status = refreshStatus(ctx, roles, data.status);
+        if (oldStatus != data.status) {
+            statusChange = now();
+            return true;
+        }
+        return false;
     }
 
     public void updateApplicationStatus(MemberSession session) {
@@ -303,6 +310,10 @@ public class CommonhausUser {
     @Override
     public String toString() {
         return "CommonhausUser [login=" + login + ", id=" + id + ", sha=" + sha + ", conflict=" + conflict + "]";
+    }
+
+    private String now() {
+        return DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.MINUTES));
     }
 
     public static CommonhausUser parseFile(ScopedQueryContext qc, GHContent content) throws IOException {
@@ -325,8 +336,9 @@ public class CommonhausUser {
         private long id;
         private Data data;
         private Boolean isMember;
+        private String statusChange;
 
-        public MembershipApplication application;
+        private MembershipApplication application;
         private List<String> history;
 
         public Builder withLogin(String login) {
@@ -356,6 +368,11 @@ public class CommonhausUser {
 
         public Builder withIsMember(Boolean isMember) {
             this.isMember = isMember;
+            return this;
+        }
+
+        public Builder withStatusChange(String statusChange) {
+            this.statusChange = statusChange;
             return this;
         }
 

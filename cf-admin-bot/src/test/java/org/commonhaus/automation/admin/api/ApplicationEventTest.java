@@ -170,7 +170,7 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(builder).content(contentCaptor.capture());
                     var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
-                    assertThat(result.application).isNotNull();
+                    assertThat(result.application).isNull();
                     assertThat(result.isMember).isFalse();
                     assertThat(result.data.status).isEqualTo(MemberStatus.DECLINED); // changed from UNKNOWN -> PENDING
 

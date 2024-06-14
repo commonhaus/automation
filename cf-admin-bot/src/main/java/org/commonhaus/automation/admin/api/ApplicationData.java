@@ -148,6 +148,10 @@ public class ApplicationData {
         return ACCEPTED.equals(label.name);
     }
 
+    public static boolean isDeclined(DataLabel label) {
+        return DECLINED.equals(label.name);
+    }
+
     public static boolean isNewer(DataCommonComment x, Date issueMostRecent) {
         Log.debugf("isNewer: %s %s", x.mostRecentEdit(), issueMostRecent);
         return x.mostRecentEdit().after(issueMostRecent);

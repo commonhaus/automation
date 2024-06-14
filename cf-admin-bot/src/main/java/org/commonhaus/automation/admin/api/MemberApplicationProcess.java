@@ -83,6 +83,17 @@ public class MemberApplicationProcess {
             DataLabel label) {
         String login = ApplicationData.getLogin(item);
         GHUser applicant = qc.getUser(login);
+
+        String teamFullName = ctx.getTeamForRole(CommonhausUser.MEMBER_ROLE);
+        if (teamFullName == null) {
+            // should not happen, but in case something gets misaligned...
+            ctx.logAndSendEmail(qc.getLogId(), "Missing configuration",
+                    "Unable to find team for " + CommonhausUser.MEMBER_ROLE,
+                    null, null);
+            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
+            return;
+        }
+
         CommonhausUser user = datastore.getCommonhausUser(login, applicant.getId(), false, false);
         if (user == null) {
             // should not happen, but in case something gets misaligned...
@@ -94,8 +105,8 @@ public class MemberApplicationProcess {
         }
 
         ApplicationData applicationData = new ApplicationData(login, item);
-        if (!applicationData.isValid()) {
-            // TODO: do we fix bad data from this side? (hasn't happened yet.. )
+        // We haven't approved/declined this member yet: we need a valid application
+        if (user.isMember == null && !applicationData.isValid()) {
             ctx.logAndSendEmail(qc.getLogId(), "Invalid application data",
                     "Unable to find valid application data for login %s and issue %s (%s)"
                             .formatted(login, item.id, item.title),
@@ -106,46 +117,47 @@ public class MemberApplicationProcess {
 
         String notificationEmail = ApplicationData.getNotificationEmail(item);
         if (ApplicationData.isAccepted(label)) {
-            datastore.setCommonhausUser(new UpdateEvent(user,
-                    (c, u) -> {
-                        if (u.status().updateFromPending()) {
-                            u.status(MemberStatus.ACTIVE);
-                        }
-                        u.isMember = true;
-                        u.application = null;
-                    },
-                    "Membership application accepted",
-                    true,
-                    true));
-            String teamFullName = ctx.getTeamForRole("member");
-            if (teamFullName != null && !qc.hasErrors()) {
-                qc.addTeamMember(applicant, teamFullName);
-
-                if (notificationEmail != null) {
-                    String body = """
-                            🎉 Congratulations! 🎉
-
-                            Your membership application has been accepted.
-                            You are now a member of the Commonhaus Foundation.
-
-                            Please visit the Members-only section of the website for next steps:
-                            https://www.commonhaus.org/member/
-
-                            If you have any questions, please find us on Discord or send an email to hello@commonhaus.org.
-
-                            🥰 🚀
-                            """;
-                    String htmlBody = MarkdownConverter.toHtml(body);
-                    ctx.sendEmail(qc.getLogId(),
-                            "Welcome to the Commonhaus Foundation!",
-                            body, htmlBody, new String[] { notificationEmail });
-                }
+            if (user.isMember == null) {
+                datastore.setCommonhausUser(new UpdateEvent(user,
+                        (c, u) -> {
+                            if (u.status().updateFromPending()) {
+                                u.status(MemberStatus.ACTIVE);
+                            }
+                            u.isMember = true;
+                            u.application = null;
+                        },
+                        "Membership application accepted",
+                        true,
+                        true));
             }
-        } else {
+            // (re-)try adding the user to the team
+            if (!qc.hasErrors()
+                    && ctx.addTeamMember(applicant, teamFullName)
+                    && notificationEmail != null) {
+                String body = """
+                        🎉 Congratulations! 🎉
+
+                        Your membership application has been accepted.
+                        You are now a member of the Commonhaus Foundation.
+
+                        Please visit the Members-only section of the website for next steps:
+                        https://www.commonhaus.org/member/
+
+                        If you have any questions, please find us on Discord or send an email to hello@commonhaus.org.
+
+                        🥰 🚀
+                        """;
+                String htmlBody = MarkdownConverter.toHtml(body);
+                ctx.sendEmail(qc.getLogId(),
+                        "Welcome to the Commonhaus Foundation!",
+                        body, htmlBody, new String[] { notificationEmail });
+            }
+        } else if (user.isMember == null && ApplicationData.isDeclined(label)) {
             datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
                         if (u.status().updateFromPending()) {
                             u.status(MemberStatus.DECLINED);
+                            u.application = null;
                         }
                         u.isMember = false;
                     },
