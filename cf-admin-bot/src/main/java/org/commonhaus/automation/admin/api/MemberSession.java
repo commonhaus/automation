@@ -15,7 +15,7 @@ public class MemberSession {
 
     static MemberSession getMemberSession(AppContextService ctx, UserInfo userInfo, SecurityIdentity identity) {
         // Lookup based on userInfo, replace with cached session data if present
-        final MemberSession lookup = new MemberSession(userInfo);
+        final MemberSession lookup = new MemberSession(userInfo, identity);
 
         MemberSession memberProfile = AdminDataCache.MEMBER_SESSION.computeIfAbsent(lookup.nodeId, (k) -> {
             lookup.getUserData();
@@ -36,11 +36,13 @@ public class MemberSession {
 
     private transient GitHub connection;
     private transient IOException connectionError;
+    private transient SecurityIdentity identity;
     private GitHubUser userData;
 
-    private MemberSession(UserInfo userInfo) {
+    private MemberSession(UserInfo userInfo, SecurityIdentity identity) {
         this.userInfo = userInfo;
         this.nodeId = userInfo.getString("node_id");
+        this.identity = identity;
     }
 
     public void forgetUser(AppContextService ctx) {
@@ -135,5 +137,9 @@ public class MemberSession {
 
     public Throwable connectionError() {
         return connectionError;
+    }
+
+    public SecurityIdentity identity() {
+        return identity();
     }
 }

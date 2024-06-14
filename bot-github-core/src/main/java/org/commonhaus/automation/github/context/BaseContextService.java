@@ -70,7 +70,7 @@ public abstract class BaseContextService implements ContextService {
 
     public GitHub getInstallationClient(long installationId) {
         GitHub gh = BaseQueryCache.CONNECTION.get("gh-" + installationId);
-        if (gh != null && gh.isCredentialValid()) {
+        if (gh != null) {
             return gh;
         }
         // there is no way to test the graphql client's credentials for validity.

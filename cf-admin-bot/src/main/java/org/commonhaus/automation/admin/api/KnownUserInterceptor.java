@@ -25,7 +25,7 @@ public class KnownUserInterceptor implements Serializable {
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
         if (session.userIsKnown(appCtx)) {
-            Log.debugf("[%s] Known User %s, %s", session.nodeId(), session.login(), session.roles());
+            Log.debugf("[%s] Known User %s / %s: %s", session.login(), session.id(), session.nodeId(), session.roles());
 
             return ctx.proceed();
         }

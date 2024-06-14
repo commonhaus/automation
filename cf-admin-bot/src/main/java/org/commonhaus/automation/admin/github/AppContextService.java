@@ -200,7 +200,7 @@ public class AppContextService extends BaseContextService {
      * May return null if connection can not be established
      *
      * @param nodeId User Node ID
-     * @param identity Security Identity
+     * @param object Security Identity
      * @return GitHub connection or null
      * @throws IOException
      */

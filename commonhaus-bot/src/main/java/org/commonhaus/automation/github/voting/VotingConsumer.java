@@ -93,7 +93,6 @@ public class VotingConsumer {
         VoteConfig votingConfig = voteEvent.getVotingConfig();
 
         QueryContext qc = voteEvent.getQueryContext();
-        qc.refreshConnection(); // reauthenticate if necessary
 
         AtomicBoolean checkRunning = VOTE_CHECK.computeIfAbsent(voteEvent.getId(), (k) -> new AtomicBoolean(false));
         boolean iAmVoteCounter = checkRunning.compareAndSet(false, true);
