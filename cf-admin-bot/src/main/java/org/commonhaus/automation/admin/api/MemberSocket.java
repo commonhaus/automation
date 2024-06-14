@@ -12,18 +12,19 @@ import jakarta.websocket.OnError;
 import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
-import jakarta.websocket.server.ServerEndpoint;
 
-import org.commonhaus.automation.admin.api.ApiResponse.MessageDecoder;
-import org.commonhaus.automation.admin.api.ApiResponse.MessageEncoder;
+// import jakarta.websocket.server.ServerEndpoint;
+// import org.commonhaus.automation.admin.api.ApiResponse.MessageDecoder;
+// import org.commonhaus.automation.admin.api.ApiResponse.MessageEncoder;
 import org.commonhaus.automation.admin.api.ApiResponse.Type;
 import org.commonhaus.automation.admin.github.AppContextService;
 
 import io.quarkus.logging.Log;
-import io.quarkus.security.Authenticated;
 
-@Authenticated
-@ServerEndpoint(value = "/member/{id}/stream", encoders = MessageEncoder.class, decoders = MessageDecoder.class)
+// import io.quarkus.security.Authenticated;
+
+// @Authenticated
+// @ServerEndpoint(value = "/member/{id}/stream", encoders = MessageEncoder.class, decoders = MessageDecoder.class)
 public class MemberSocket {
 
     @Inject
