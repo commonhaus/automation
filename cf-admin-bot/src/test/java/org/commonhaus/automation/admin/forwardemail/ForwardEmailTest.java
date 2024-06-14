@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Set;
 
 import jakarta.inject.Inject;
+import jakarta.ws.rs.WebApplicationException;
 
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -31,7 +32,7 @@ public class ForwardEmailTest {
             System.out.println("Domain: " + domain.name);
             // Set<Alias> aliases = forwardEmailClient.getAliases(domain.name);
             // for (Alias alias : aliases) {
-            //     System.out.println("  Alias: " + alias.name);
+            // System.out.println(" Alias: " + alias.name);
             // }
         }
     }
@@ -39,21 +40,28 @@ public class ForwardEmailTest {
     @Test
     @Disabled
     public void testQueryAliases() {
-        // Set<Alias> aliases = forwardEmailClient.findAliasByName("commonhaus.dev", "ebullient");
+        // Set<Alias> aliases = forwardEmailClient.findAliasByName("commonhaus.dev",
+        // "ebullient");
         // for (Alias alias : aliases) {
-        //     System.out.println("Alias: " + alias);
+        // System.out.println("Alias: " + alias);
         // }
 
-        // Map<String, Alias> aliases = ctx.getAliases(List.of("ebullient@commonhaus.dev"), false);
+        // Map<String, Alias> aliases =
+        // ctx.getAliases(List.of("ebullient@commonhaus.dev"), false);
         // System.out.println("Alias: " + aliases);
 
         // Map<String, Set<String>> updates = aliases.entrySet().stream()
-        //         .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue().recipients));
+        // .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue().recipients));
         // aliases = ctx.setRecipients("Erin Schnabel", updates);
 
         Alias alias = forwardEmailClient.getAlias("commonhaus.dev", "automation");
         System.out.println("Alias: " + alias);
 
+        try {
+            alias = forwardEmailClient.getAlias("commonhaus.dev", "apples");
+        } catch (WebApplicationException e) {
+            System.out.println("ALIAS NOT FOUND: " + e);
+        }
         // ctx.generatePassword("automation@commonhaus.dev");
 
         // forwardEmailClient.updateAlias("commonhaus.dev", alias.id, alias);

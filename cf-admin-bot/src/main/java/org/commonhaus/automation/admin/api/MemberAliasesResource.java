@@ -54,8 +54,9 @@ public class MemberAliasesResource {
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
             if (!ctx.validAttestation(ID)) {
-                Log.errorf("getAliases|%s %s is an invalid attestation id", user.login(), ID);
-                return Response.status(Response.Status.BAD_REQUEST).build();
+                // Not the user's fault.. misconfiguration
+                Exception e = new Exception("Invalid attestation id");
+                ctx.logAndSendEmail("getAliases", ID + " is an nvalid attestation id", e, null);
             }
 
             Services services = user.services();
@@ -119,6 +120,9 @@ public class MemberAliasesResource {
                     .setData(ApiResponse.Type.ALIAS, aliasMap)
                     .finish();
         } catch (WebApplicationException e) {
+            if (e.getResponse().getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+                return new ApiResponse(ApiResponse.Type.ALIAS, Map.of()).finish();
+            }
             return e.getResponse();
         } catch (Throwable e) {
             return ctx.toResponseWithEmail("updateAliases", "Unable to update user aliases for " + session.login(), e);

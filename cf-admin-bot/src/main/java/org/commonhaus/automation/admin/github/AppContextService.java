@@ -384,10 +384,9 @@ public class AppContextService extends BaseContextService {
 
         Alias alias = resetCache ? null : AdminDataCache.ALIASES.get(email);
         if (alias == null) {
+            // will throw WebApplicationException if not found or error
             alias = forwardEmailClient.getAlias(domain, name);
-            if (alias != null) {
-                AdminDataCache.ALIASES.put(email, alias);
-            }
+            AdminDataCache.ALIASES.put(email, alias);
         }
         return alias;
     }
