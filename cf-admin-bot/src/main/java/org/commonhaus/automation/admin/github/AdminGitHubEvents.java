@@ -123,6 +123,7 @@ public class AdminGitHubEvents {
                 issue.number, actionType);
 
         try {
+            qc.getLabels(qc.getRepositoryId());
             applicationProcess.handleApplicationLabelAdded(qc, eventPayload.getIssue(), issue, label);
         } catch (Exception e) {
             ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
