@@ -227,7 +227,6 @@ public class TeamMemberSync {
             Set<String> existingCollaborators = repoQc.collaborators(repositoryName);
             for (String login : sponsorLogin) {
                 if (existingCollaborators.contains(login)) {
-                    Log.debugf("syncSponsors: %s is already a collaborator", login);
                     continue;
                 }
                 GHUser ghUser = repoQc.getUser(login);
