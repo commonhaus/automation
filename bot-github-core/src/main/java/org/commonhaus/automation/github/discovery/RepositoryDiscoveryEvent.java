@@ -13,7 +13,8 @@ public record RepositoryDiscoveryEvent(
         DynamicGraphQLClient graphQLClient,
         long installationId,
         GHRepository repository,
-        Optional<?> repoConfig) {
+        Optional<?> repoConfig,
+        boolean bootstrap) {
 
     public boolean added() {
         return action.added();

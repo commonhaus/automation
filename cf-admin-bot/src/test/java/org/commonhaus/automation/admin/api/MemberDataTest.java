@@ -77,6 +77,7 @@ public class MemberDataTest extends ContextHelper {
         Stream.of(AdminDataCache.values()).forEach(AdminDataCache::invalidateAll);
 
         mockContext = GitHubAppTestingContext.get();
+        setupInstallationRepositories(mockContext.mocks, ctx);
 
         botGithub = setupBotGithub(ctx, mockContext.mocks);
         when(botGithub.isCredentialValid()).thenReturn(true);
@@ -179,7 +180,7 @@ public class MemberDataTest extends ContextHelper {
     })
     void testGetCommonhausUserNotFound() throws Exception {
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
         when(dataStore.getFileContent(anyString())).thenThrow(new GHFileNotFoundException("Badness"));
@@ -208,7 +209,7 @@ public class MemberDataTest extends ContextHelper {
     })
     void testGetCommonhausUserBadnessHappens() throws Exception {
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
         when(dataStore.getFileContent(anyString())).thenThrow(new IOException("Badness"));
@@ -239,7 +240,7 @@ public class MemberDataTest extends ContextHelper {
         mockExistingCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         given()
                 .log().all()
@@ -277,7 +278,7 @@ public class MemberDataTest extends ContextHelper {
         GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/cf-voting", botUser);
+        appendMockTeam(sponsorsOrgName + "/cf-voting", botUser);
 
         given()
                 .log().all()
@@ -324,7 +325,7 @@ public class MemberDataTest extends ContextHelper {
     })
     void testPutUnknownAttestation() throws Exception {
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         AttestationPost attestation = new AttestationPost(
                 "unknown",
@@ -366,7 +367,7 @@ public class MemberDataTest extends ContextHelper {
         GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         given()
                 .log().all()
@@ -415,7 +416,7 @@ public class MemberDataTest extends ContextHelper {
     })
     void testGetUnknownApplication() throws Exception {
         GHUser botUser = botGithub.getUser(botLogin);
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx);
 
@@ -451,7 +452,7 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         when(botGithub.getMyself()).thenReturn(myself);
 
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
@@ -459,7 +460,7 @@ public class MemberDataTest extends ContextHelper {
         GHContentBuilder builder = mockUpdateCommonhausData(botGithub, ctx);
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationBadTitle.json");
-        when(mockContext.mocks.installationGraphQLClient(installationId)
+        when(mockContext.mocks.installationGraphQLClient(sponsorsInstallationId)
                 .executeSync(contains("query($id: ID!) {"), anyMap()))
                 .thenReturn(queryIssue);
 
@@ -501,17 +502,17 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         when(botGithub.getMyself()).thenReturn(myself);
 
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationMatch.json");
-        when(mockContext.mocks.installationGraphQLClient(installationId)
+        when(mockContext.mocks.installationGraphQLClient(datastoreInstallationId)
                 .executeSync(contains("query($id: ID!) {"), anyMap()))
                 .thenReturn(queryIssue);
 
         Response queryComments = mockResponse("src/test/resources/github/queryComments.json");
-        when(mockContext.mocks.installationGraphQLClient(installationId)
+        when(mockContext.mocks.installationGraphQLClient(datastoreInstallationId)
                 .executeSync(contains("comments(first: 50"), anyMap()))
                 .thenReturn(queryComments);
 
@@ -558,17 +559,17 @@ public class MemberDataTest extends ContextHelper {
         GHUser botUser = botGithub.getUser(botLogin);
         when(botGithub.getMyself()).thenReturn(myself);
 
-        appendMockTeam(organizationName + "/team-quorum-default", botUser);
+        appendMockTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
 
         Response queryIssue = mockResponse("src/test/resources/github/queryIssue-ApplicationMatch.json");
-        when(mockContext.mocks.installationGraphQLClient(installationId)
+        when(mockContext.mocks.installationGraphQLClient(datastoreInstallationId)
                 .executeSync(contains("query($id: ID!) {"), anyMap()))
                 .thenReturn(queryIssue);
 
         Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
-        when(mockContext.mocks.installationGraphQLClient(installationId)
+        when(mockContext.mocks.installationGraphQLClient(datastoreInstallationId)
                 .executeSync(contains("updateIssue(input: {"), anyMap()))
                 .thenReturn(updateIssue);
 

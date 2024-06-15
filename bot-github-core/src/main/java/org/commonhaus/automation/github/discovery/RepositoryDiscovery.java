@@ -43,6 +43,9 @@ public class RepositoryDiscovery {
     @Inject
     Event<RepositoryDiscoveryEvent> repositoryDiscoveryEvent;
 
+    @Inject
+    Event<PostInitialDiscoveryEvent> postDiscoveryEvent;
+
     private ContextService ctx;
 
     // discoverRepositories is/was being called twice. Avoid double discovery
@@ -67,11 +70,14 @@ public class RepositoryDiscovery {
                 DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(ghiId);
                 GHAuthenticatedAppInstallation ghai = github.getInstallation();
 
+                Log.debugf("[%s] Fire initial discovery events", ghiId);
                 for (GHRepository repo : ghai.listRepositories()) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                             DiscoveryAction.ADDED, github, graphQLClient, ghiId,
-                            repo, fetchConfigFile(repo)));
+                            repo, fetchConfigFile(repo), true));
                 }
+                Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
+                postDiscoveryEvent.fire(new PostInitialDiscoveryEvent(ghiId, github, graphQLClient));
             }
         } catch (GHIOException e) {
             ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", e, null);
@@ -114,14 +120,14 @@ public class RepositoryDiscovery {
                 for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                             DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
-                            repo, fetchConfigFile(repo)));
+                            repo, fetchConfigFile(repo), false));
                 }
             }
             case "deleted", "suspend" -> {
                 for (GHRepository repo : repositories) {
                     repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                             DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
-                            repo, null));
+                            repo, null, false));
                 }
             }
             default -> {
@@ -155,13 +161,13 @@ public class RepositoryDiscovery {
         for (GHRepository repo : added) {
             repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                     DiscoveryAction.ADDED, github, graphQLClient, installationId,
-                    repo, fetchConfigFile(repo)));
+                    repo, fetchConfigFile(repo), false));
         }
 
         for (GHRepository repo : removed) {
             repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                     DiscoveryAction.REMOVED, github, graphQLClient, installationId,
-                    repo, null));
+                    repo, null, false));
         }
     }
 

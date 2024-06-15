@@ -50,16 +50,21 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ContextHelper extends QueryContext {
 
-    public static final long installationId = 50263360;
-    public static final long organizationId = 144493209;
-    public static final String organizationName = "commonhaus-test";
+    public static final long sponsorsInstallationId = 50263360;
+    public static final long sponsorsOrgId = 144493209;
+    public static final String sponsorsOrgName = "commonhaus-test";
+    public static final String sponsorsRepo = "commonhaus-test/sponsors-test";
+    public static final String sponsorsRepoId = "R_sponsors";
+
+    public static final long datastoreInstallationId = 50264360;
+    public static final long datastoreOrganizationId = 801851090;
+    public static final String datastoreOrgName = "datastore";
+    public static final String datastoreRepoName = "datastore/org";
+    public static final String datastoreRepoId = "R_datastore";
 
     public static final long botId = 156364140;
     public static final String botLogin = "commonhaus-bot";
     public static final String botNodeId = "U_kgDOCVHtbA";
-
-    public static final String datastoreRepoId = "R_kgDOL8tG0g";
-    public static final String commonhausTestRepoId = "R_-2034603297";
 
     public static final DataLabel APP_NEW = new DataLabel.Builder()
             .name(ApplicationData.NEW).build();
@@ -81,7 +86,59 @@ public class ContextHelper extends QueryContext {
     }
 
     protected ContextHelper() {
-        super(mock(AppContextService.class), installationId);
+        super(mock(AppContextService.class), sponsorsInstallationId);
+    }
+
+    public void setupInstallationRepositories(GitHubMockSetupContext mocks, AppContextService ctx) throws IOException {
+        setLabels(datastoreRepoId, APP_LABELS);
+
+        GitHub s_gh = mocks.installationClient(sponsorsInstallationId);
+        ctx.updateConnection(sponsorsInstallationId, s_gh);
+        DynamicGraphQLClient s_dql = mocks.installationGraphQLClient(sponsorsInstallationId);
+        ctx.updateConnection(sponsorsInstallationId, s_dql);
+
+        setupMockRepository(mocks, s_gh, ctx, "commonhaus/foundation");
+        setupMockOrganization(mocks, sponsorsInstallationId, sponsorsOrgName, sponsorsOrgId);
+
+        GHRepository repo = setupMockRepository(mocks, s_gh, ctx, sponsorsRepo, sponsorsRepoId);
+        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
+                DiscoveryAction.ADDED,
+                mocks.installationClient(sponsorsInstallationId),
+                mocks.installationGraphQLClient(sponsorsInstallationId),
+                sponsorsInstallationId,
+                repo,
+                Optional.ofNullable(null),
+                false);
+
+        ctx.repositoryDiscovered(repoEvent);
+        ctx.writeToInstallId.put(sponsorsOrgName, sponsorsInstallationId);
+        ctx.writeToInstallId.put(sponsorsRepo, sponsorsInstallationId);
+        ctx.readToInstallId.put("commonhaus", sponsorsInstallationId);
+
+        GitHub ds_gh = mocks.installationClient(datastoreInstallationId);
+        ctx.updateConnection(datastoreInstallationId, ds_gh);
+        DynamicGraphQLClient ds_dql = mocks.installationGraphQLClient(datastoreInstallationId);
+        ctx.updateConnection(datastoreInstallationId, ds_dql);
+
+        repo = setupMockRepository(mocks, ds_gh, ctx, datastoreRepoName, datastoreRepoId);
+        setupMockOrganization(mocks, datastoreInstallationId, datastoreOrgName, datastoreOrganizationId);
+
+        repoEvent = new RepositoryDiscoveryEvent(
+                DiscoveryAction.ADDED,
+                mocks.installationClient(datastoreInstallationId),
+                mocks.installationGraphQLClient(datastoreInstallationId),
+                datastoreInstallationId,
+                repo,
+                Optional.ofNullable(null),
+                false);
+        ctx.repositoryDiscovered(repoEvent);
+        ctx.writeToInstallId.put(datastoreOrgName, datastoreInstallationId);
+        ctx.writeToInstallId.put(datastoreRepoName, datastoreInstallationId);
+
+        mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
+        AdminConfigFile config = AppContextService.yamlMapper().readValue(
+                getClass().getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
+        ctx.userConfig = config.userManagement();
     }
 
     public static GHUser mockGHUser(String login) {
@@ -99,13 +156,8 @@ public class ContextHelper extends QueryContext {
     }
 
     public GitHub setupMockTeam(GitHubMockSetupContext mocks) throws IOException {
-        GHOrganization org = Mockito.mock(GHOrganization.class);
-        when(org.getLogin()).thenReturn(organizationName);
-        when(org.getId()).thenReturn(organizationId);
-
-        GitHub gh = mocks.installationClient(installationId);
-        when(gh.getOrganization(organizationName)).thenReturn(org);
-        when(gh.isCredentialValid()).thenReturn(true);
+        GitHub gh = mocks.installationClient(sponsorsInstallationId);
+        GHOrganization org = gh.getOrganization(sponsorsOrgName);
 
         Set<GHUser> testQuorum = new HashSet<>();
         Set<GHUser> council = new HashSet<>();
@@ -139,6 +191,17 @@ public class ContextHelper extends QueryContext {
         return setupMockRepository(mocks, gh, ctx, repoName, "R_" + repoName.hashCode());
     }
 
+    protected GHOrganization setupMockOrganization(GitHubMockSetupContext mocks, long installationId, String orgName,
+            long orgId) throws IOException {
+        GHOrganization org = mocks.ghObject(GHOrganization.class, orgId);
+        when(org.getLogin()).thenReturn(orgName);
+        when(org.getId()).thenReturn(orgId);
+
+        GitHub gh = mocks.installationClient(installationId);
+        when(gh.getOrganization(orgName)).thenReturn(org);
+        return org;
+    }
+
     protected GHRepository setupMockRepository(GitHubMockSetupContext mocks, GitHub gh, AppContextService ctx,
             String repoName,
             String nodeId)
@@ -148,33 +211,8 @@ public class ContextHelper extends QueryContext {
         when(repo.getNodeId()).thenReturn(nodeId);
         when(gh.getRepository(repoName)).thenReturn(repo);
 
-        ctx.refreshScopedQueryContext(installationId, repo);
+        ctx.refreshScopedQueryContext(sponsorsInstallationId, repo);
         return repo;
-    }
-
-    void setupRepositoryAccess(GitHubMockSetupContext mocks, AppContextService ctx, GitHub gh) throws IOException {
-        GHRepository repo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
-        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
-                DiscoveryAction.ADDED,
-                mocks.installationClient(installationId),
-                mocks.installationGraphQLClient(installationId),
-                installationId,
-                repo,
-                Optional.ofNullable(null));
-        ctx.repositoryDiscovered(repoEvent);
-
-        repo = setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
-        repoEvent = new RepositoryDiscoveryEvent(
-                DiscoveryAction.ADDED,
-                mocks.installationClient(installationId),
-                mocks.installationGraphQLClient(installationId),
-                installationId,
-                repo,
-                Optional.ofNullable(null));
-        ctx.repositoryDiscovered(repoEvent);
-
-        ctx.writeToInstallId.put("commonhaus-test", installationId);
-        ctx.readToInstallId.put("commonhaus", installationId);
     }
 
     protected GHTeam setupMockTeam(GitHubMockSetupContext mocks, String name, GHOrganization org, Set<GHUser> userSet)
@@ -207,25 +245,14 @@ public class ContextHelper extends QueryContext {
     }
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
-        GitHub gh = mocks.installationClient(installationId);
-        ctx.updateConnection(installationId, gh);
-        DynamicGraphQLClient dql = mocks.installationGraphQLClient(installationId);
-        ctx.updateConnection(installationId, dql);
+        GitHub gh = mocks.installationClient(datastoreInstallationId);
 
         GHUser bot = mockGHUser(botLogin);
         when(gh.getUser(botLogin)).thenReturn(bot);
         ctx.updateUserConnection(botNodeId, gh);
 
-        setupRepositoryAccess(mocks, ctx, gh);
-        setLabels(datastoreRepoId, APP_LABELS);
-        setLabels(commonhausTestRepoId, APP_LABELS);
-
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");
-
-        AdminConfigFile config = AppContextService.yamlMapper().readValue(
-                getClass().getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
-        ctx.userConfig = config.userManagement();
 
         return gh;
     }
@@ -252,7 +279,7 @@ public class ContextHelper extends QueryContext {
         when(content.read()).thenReturn(Files.newInputStream(Path.of(filename)));
         when(content.getSha()).thenReturn("1234567890abcdef");
 
-        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
+        GHRepository dataStore = botGithub.getRepository(datastoreRepoName);
         when(dataStore.getFileContent(anyString())).thenReturn(content);
     }
 
@@ -278,7 +305,7 @@ public class ContextHelper extends QueryContext {
                 .thenReturn(Files.newInputStream(Path.of(filename)));
         when(responseContent.getSha()).thenReturn("1234567890adefgh");
 
-        GHRepository dataStore = botGithub.getRepository(ctx.getDataStore());
+        GHRepository dataStore = botGithub.getRepository(datastoreRepoName);
         when(dataStore.createContent()).thenReturn(builder);
 
         GHContentUpdateResponse response = Mockito.mock(GHContentUpdateResponse.class);

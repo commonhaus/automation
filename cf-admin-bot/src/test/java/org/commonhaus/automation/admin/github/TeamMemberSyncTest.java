@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutionException;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -120,7 +119,11 @@ public class TeamMemberSyncTest extends ContextHelper {
     void testQueryFailed() throws Exception {
         given()
                 .github(mocks -> {
-                    GHRepository foundationRepo = setupRepoConfigMocks(mocks);
+                    setupInstallationRepositories(mocks, ctx);
+                    addGraphQLTeamMemberResults(mocks);
+
+                    GitHub gh = mocks.installationClient(sponsorsInstallationId);
+                    GHRepository foundationRepo = gh.getRepository("commonhaus/foundation");
 
                     when(foundationRepo.getFileContent("CONTACTS.yaml"))
                             .thenThrow(new IOException("Test exception"));
@@ -138,24 +141,14 @@ public class TeamMemberSyncTest extends ContextHelper {
         assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(1);
     }
 
-    GHRepository setupRepoConfigMocks(GitHubMockSetupContext mocks) throws IOException {
-        mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
-
-        GitHub gh = setupMockTeam(mocks);
-        setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
-        setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
-        GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
-
-        setupRepositoryAccess(mocks, ctx, gh);
-        return foundationRepo;
-    }
-
     void setupFoundationContacts(GitHubMockSetupContext mocks) throws IOException {
-        GHRepository foundationRepo = setupRepoConfigMocks(mocks);
+        setupInstallationRepositories(mocks, ctx);
+        GitHub gh = setupMockTeam(mocks);
 
         GHContent content = mock(GHContent.class);
         when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
 
+        GHRepository foundationRepo = gh.getRepository("commonhaus/foundation");
         when(foundationRepo.getFileContent("CONTACTS.yaml")).thenReturn(content);
     }
 
@@ -165,19 +158,19 @@ public class TeamMemberSyncTest extends ContextHelper {
         Response queryQuorum = mockResponse("src/test/resources/github/query-TeamLogins-teamQuorum.json");
         Response querySponsorships = mockResponse("src/test/resources/github/querySponsorshipsAsMaintainer.json");
 
-        when(mocks.installationGraphQLClient(installationId)
+        when(mocks.installationGraphQLClient(sponsorsInstallationId)
                 .executeSync(anyString(),
                         argThat((Map<String, Object> map) -> map != null && map.containsValue("cf-council"))))
                 .thenReturn(queryCouncil);
-        when(mocks.installationGraphQLClient(installationId)
+        when(mocks.installationGraphQLClient(sponsorsInstallationId)
                 .executeSync(anyString(),
                         argThat((Map<String, Object> map) -> map != null && map.containsValue("cf-voting"))))
                 .thenReturn(queryVoting);
-        when(mocks.installationGraphQLClient(installationId)
+        when(mocks.installationGraphQLClient(sponsorsInstallationId)
                 .executeSync(anyString(),
                         argThat((Map<String, Object> map) -> map != null && map.containsValue("team-quorum-default"))))
                 .thenReturn(queryQuorum);
-        when(mocks.installationGraphQLClient(installationId)
+        when(mocks.installationGraphQLClient(sponsorsInstallationId)
                 .executeSync(contains("sponsorshipsAsMaintainer("), anyMap()))
                 .thenReturn(querySponsorships);
     }

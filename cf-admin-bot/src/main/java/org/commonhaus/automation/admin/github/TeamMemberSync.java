@@ -31,6 +31,7 @@ import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
 import org.commonhaus.automation.github.context.DataSponsorship;
 import org.commonhaus.automation.github.context.DataTeam;
+import org.commonhaus.automation.github.discovery.PostInitialDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHEventPayload;
@@ -106,15 +107,32 @@ public class TeamMemberSync {
         MonitoredRepo cfg = new MonitoredRepo(repoFullName, ghiId).refresh(repoConfig.get());
         monitoredRepos.put(cfg, repoFullName);
 
-        Log.debugf("repositoryDiscovered: %s", repo.getFullName());
+        Log.debugf("[%s] teamSync repositoryDiscovered: %s", repoEvent.installationId(), repo.getFullName());
+        if (!repoEvent.bootstrap()) {
+            // for bootstrap events, wait to queue until after all repositories are discovered
+            scheduleQueryRepository(cfg, repoEvent.github());
+        }
+    }
 
-        // Scan immediately in dev & test
-        scheduleQueryRepository(cfg, repo, repoEvent.github());
+    public void postStartupDiscovery(@Observes PostInitialDiscoveryEvent postEvent) {
+        long ghiId = postEvent.installationId();
+        GitHub github = postEvent.github();
+
+        for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
+            MonitoredRepo repoCfg = entry.getKey();
+
+            if (repoCfg.installationId() == ghiId) {
+                scheduleQueryRepository(repoCfg, github);
+            }
+        }
     }
 
     public void updateTeamMembers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Push GHEventPayload.Push pushEvent) {
         GHRepository repo = pushEvent.getRepository();
+        ctx.refreshScopedQueryContext(event.getInstallationId(), repo)
+                .addExisting(github).addExisting(graphQLClient);
+
         Log.debugf("updateTeamMembers (push): %s", repo.getFullName());
 
         for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
@@ -128,14 +146,13 @@ public class TeamMemberSync {
                 repoCfg.refresh(file);
 
                 // schedule a query for the repository to refresh the team membership to new config
-                scheduleQueryRepository(repoCfg, repo, github);
+                scheduleQueryRepository(repoCfg, github);
             }
         }
     }
 
     @Scheduled(cron = "${automation.admin.team-sync-cron:13 27 */5 * * ?}")
     void scheduledSync() {
-        String[] errorAddresses = null;
         try {
             Iterator<Entry<MonitoredRepo, String>> i = monitoredRepos.entrySet().iterator();
             while (i.hasNext()) {
@@ -145,7 +162,6 @@ public class TeamMemberSync {
 
                 GitHub github = ctx.getInstallationClient(repoCfg.installationId());
                 GHRepository repo = github.getRepository(repoCfg.repoFullName());
-
                 AdminConfigFile file = ctx.getConfiguration(repo);
                 repoCfg.refresh(file);
 
@@ -153,124 +169,136 @@ public class TeamMemberSync {
                     // Team sync no longer enabled. Remove the repository
                     i.remove();
                 } else {
-                    scheduleQueryRepository(repoCfg, repo, github);
+                    scheduleQueryRepository(repoCfg, github);
                 }
             }
         } catch (GHIOException e) {
-            ctx.logAndSendEmail("scheduledSync", "Error making GH Request", e, errorAddresses);
+            ctx.logAndSendEmail("scheduledSync", "Error making GH Request", e, null);
             if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
                 e.getResponseHeaderFields()
                         .forEach((k, v) -> Log.debugf("%s: %s", k, v));
                 e.printStackTrace();
             }
         } catch (Throwable t) {
-            ctx.logAndSendEmail("scheduledSync", "Error making GH Request", t, errorAddresses);
+            ctx.logAndSendEmail("scheduledSync", "Error making GH Request", t, null);
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
         }
     }
 
-    void scheduleQueryRepository(MonitoredRepo repoCfg, GHRepository repo, GitHub github) {
-        Log.debugf("scheduleQueryRepository: queue repository %s", repo.getFullName());
+    void scheduleQueryRepository(MonitoredRepo repoCfg, GitHub github) {
+        Log.debugf("scheduleQueryRepository: queue repository %s", repoCfg.repoFullName());
+
+        ScopedQueryContext qc = this.ctx.getScopedQueryContext(repoCfg.repoFullName());
+        if (qc == null) {
+            Log.errorf("[%s] scheduleQueryRepository: no query context for %s", repoCfg.installationId(),
+                    repoCfg.repoFullName());
+            return;
+        }
+        qc.addExisting(github).addExisting(repoCfg);
+
         for (TeamSourceConfig source : repoCfg.sourceConfig) {
             if (source.performSync()) {
-                taskQueue.add(() -> {
-                    ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repoCfg, repo).addExisting(github);
-                    syncTeamMembership(qc, source);
-                });
+                taskQueue.add(() -> syncTeamMembership(qc, source));
             }
         }
-
         if (repoCfg.sponsors() != null) {
-            taskQueue.add(() -> {
-                ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repoCfg, repo).addExisting(github);
-                syncSponsors(qc, repoCfg.sponsors());
-            });
+            taskQueue.add(() -> syncSponsors(qc, repoCfg.sponsors()));
         }
     }
 
     private void syncSponsors(ScopedQueryContext qc, SponsorsConfig sponsors) {
         try {
-            Log.debugf("syncSponsors: %s", sponsors);
-
-            String sponsorable = sponsors.sponsorable();
-            ScopedQueryContext sponsorableQc = ctx.getScopedQueryContext(sponsorable);
-
-            List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(sponsorableQc, sponsors.sponsorable());
-            if (recentSponsors == null) {
-                Log.warnf("[%s] syncSponsors: failed to query sponsors for %s",
-                        sponsorableQc.getLogId(), sponsors.sponsorable());
-                return;
-            }
-            Collection<String> sponsorLogin = recentSponsors.stream()
-                    .map(DataSponsorship::sponsorLogin)
-                    .collect(Collectors.toCollection(ArrayList::new));
-            Log.debugf("syncSponsors: recent sponsors for %s: %s", sponsorable, sponsorLogin);
-
-            String repositoryName = sponsors.repository();
-            ScopedQueryContext repoQc = ctx.getScopedQueryContext(repositoryName);
-
-            String orgName = ScopedQueryContext.toOrganizationName(repositoryName);
-            GHOrganization org = repoQc == null ? null : repoQc.getOrganization(orgName);
-            if (org == null) {
-                Log.warnf("syncSponsors: organization %s not found", orgName);
-                return;
-            }
-            GHRepository repo = repoQc == null ? null : repoQc.getRepository(repositoryName);
-            if (repo == null) {
-                Log.warnf("syncSponsors: repository %s not found", repositoryName);
-                return;
-            }
-
-            List<GHUser> missingCollaborators = new ArrayList<>();
-            Set<String> existingCollaborators = repoQc.collaborators(repositoryName);
-            for (String login : sponsorLogin) {
-                if (existingCollaborators.contains(login)) {
-                    continue;
-                }
-                GHUser ghUser = repoQc.getUser(login);
-                if (ghUser == null) {
-                    Log.warnf("syncSponsors: user %s not found", login);
-                    continue;
-                }
-                missingCollaborators.add(ghUser);
-            }
-
-            if (sponsors.dryRun()) {
-                List<String> added = missingCollaborators.stream().map(GHUser::getLogin).collect(Collectors.toList());
-                List<String> finalList = new ArrayList<>(existingCollaborators);
-                finalList.addAll(added);
-                Logins allLogins = new Logins(
-                        existingCollaborators,
-                        added,
-                        List.of(),
-                        finalList);
-                sendDryRunEmail(repositoryName + " collaborators:", allLogins, qc.dryRunEmailAddress());
-            } else {
-                repoQc.addCollaborators(repo, missingCollaborators);
-                if (repoQc.clearNotFound() && repoQc.hasErrors()) {
-                    throw repoQc.bundleExceptions();
-                }
-            }
+            Log.debugf("[%s] syncSponsors: %s", qc.getLogId(), sponsors);
+            Collection<String> sponsorLogins = getSponsors(sponsors.sponsorable());
+            addMissingCollaborators(sponsors.repository(), sponsorLogins, sponsors.dryRun(), qc.dryRunEmailAddress());
         } catch (Throwable t) {
             qc.logAndSendEmail("syncSponsors", "Error syncing sponsors", t);
         }
     }
 
+    Collection<String> getSponsors(String sponsorable) {
+        ScopedQueryContext qc = ctx.getScopedQueryContext(sponsorable);
+
+        List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);
+        if (recentSponsors == null) {
+            Log.warnf("[%s] syncSponsors: failed to query sponsors for %s",
+                    qc.getLogId(), sponsorable);
+            return List.of();
+        }
+        Collection<String> sponsorLogin = recentSponsors.stream()
+                .map(DataSponsorship::sponsorLogin)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        Log.debugf("[%s] syncSponsors: recent sponsors for %s: %s", qc.getLogId(),
+                sponsorable, sponsorLogin);
+        return sponsorLogin;
+    }
+
+    void addMissingCollaborators(String repositoryName, Collection<String> sponsorLogins, boolean isDryRun,
+            String[] dryRunEmail) throws Throwable {
+        ScopedQueryContext qc = ctx.getScopedQueryContext(repositoryName);
+        if (qc == null) {
+            throw new IllegalStateException("No query context for " + repositoryName);
+        }
+        String orgName = ScopedQueryContext.toOrganizationName(repositoryName);
+        GHOrganization org = qc.getOrganization(orgName);
+        if (org == null) {
+            Log.warnf("[%s] syncSponsors: organization %s not found", qc.getLogId(), orgName);
+            return;
+        }
+        GHRepository repo = qc.getRepository(repositoryName);
+        if (repo == null) {
+            Log.warnf("[%s] syncSponsors: repository %s not found", qc.getLogId(), repositoryName);
+            return;
+        }
+
+        Set<String> collaborators = qc.collaborators(repositoryName);
+
+        List<GHUser> missingCollaborators = new ArrayList<>();
+        for (String login : sponsorLogins) {
+            if (collaborators.contains(login)) {
+                continue;
+            }
+            GHUser ghUser = qc.getUser(login);
+            if (ghUser == null) {
+                Log.warnf("syncSponsors: user %s not found", login);
+                continue;
+            }
+            missingCollaborators.add(ghUser);
+        }
+
+        if (isDryRun) {
+            List<String> added = missingCollaborators.stream().map(GHUser::getLogin).collect(Collectors.toList());
+            List<String> finalList = new ArrayList<>(collaborators);
+            finalList.addAll(added);
+            Logins allLogins = new Logins(
+                    collaborators,
+                    added,
+                    List.of(),
+                    finalList);
+            sendDryRunEmail(repositoryName + " collaborators:", allLogins, dryRunEmail);
+        } else {
+            qc.addCollaborators(repo, missingCollaborators);
+            if (qc.clearNotFound() && qc.hasErrors()) {
+                throw qc.bundleExceptions();
+            }
+        }
+    }
+
     void syncTeamMembership(ScopedQueryContext qc, TeamSourceConfig source) {
-        Log.debugf("syncTeamMembership: %s / %s", source.repo(), source.path());
+        Log.debugf("[%s] syncTeamMembership: %s / %s", qc.getLogId(), source.repo(), source.path());
 
         GHRepository repo = qc.getRepository(source.repo());
         if (repo == null) {
-            Log.warnf("syncTeamMembership: source repository %s not found", source.repo());
+            Log.warnf("[%s] syncTeamMembership: source repository %s not found", qc.getLogId(), source.repo());
             return;
         }
 
         // get contents of file from the specified repo + path
         JsonNode data = qc.readSourceFile(repo, source.path());
         if (data == null) {
-            Log.warnf("syncTeamMembership: source file %s not found or could not be read", source.path());
             return;
         }
 
@@ -283,20 +311,19 @@ public class TeamMemberSync {
 
             JsonNode sourceTeamData = data.get(groupName);
             if (sourceTeamData != null && sourceTeamData.isArray()) {
-                Log.debugf("syncTeamMembership: field %s from %s to %s", field, groupName, sync.teams());
+                Log.debugf("[%s] syncTeamMembership: field %s from %s to %s", qc.getLogId(), field, groupName, sync.teams());
 
-                Set<String> logins = new HashSet<>();
-                logins.addAll(sync.preserveUsers(defaults));
+                Set<String> logins = new HashSet<>(sync.preserveUsers(defaults));
                 for (JsonNode member : sourceTeamData) {
                     JsonNode node = member.get(field);
                     String login = node == null || !node.isTextual() ? null : node.asText();
                     if (login == null || !login.matches("^[a-zA-Z0-9-]+$")) {
-                        Log.debugf("syncTeamMembership: ignoring empty %s in %s", member, groupName);
+                        Log.debugf("[%s] syncTeamMembership: ignoring empty %s in %s", qc.getLogId(), member, groupName);
                     } else {
                         logins.add(login);
                     }
                 }
-                Log.debugf("syncTeamMembership: source group %s has members %s", groupName, logins);
+                Log.debugf("[%s] syncTeamMembership: source group %s has members %s", qc.getLogId(), groupName, logins);
 
                 for (String targetTeam : sync.teams()) {
                     try {
@@ -309,7 +336,7 @@ public class TeamMemberSync {
                     }
                 }
             } else {
-                Log.debugf("syncTeamMembership: group %s not found in %s", groupName, data);
+                Log.debugf("[%s] syncTeamMembership: group %s not found in %s", qc.getLogId(), groupName, data);
             }
         }
     }
@@ -323,13 +350,14 @@ public class TeamMemberSync {
         ScopedQueryContext qc = ctx.getScopedQueryContext(orgName);
         GHOrganization org = qc == null ? null : qc.getOrganization(orgName);
         if (org == null) {
-            Log.warnf("doSyncTeamMembers: %s %s not found", qc == null ? "ScopedQueryContext for " : "Organization", orgName);
+            Log.warnf("doSyncTeamMembers: %s %s not found",
+                    qc == null ? "ScopedQueryContext for " : "Organization", orgName);
             return;
         }
 
         GHTeam team = qc.getTeam(org, relativeName);
         if (team == null) {
-            Log.warnf("doSyncTeamMembers: team %s not found in %s", relativeName, orgName);
+            Log.warnf("[%s] doSyncTeamMembers: team %s not found in %s", qc.getLogId(), relativeName, orgName);
             return;
         }
 
@@ -357,18 +385,18 @@ public class TeamMemberSync {
                     try {
                         GHUser user = gh.getUser(login);
                         team.add(user);
-                        Log.infof("doSyncTeamMembers: add %s to %s", user, fullTeamName);
+                        Log.infof("[%s] doSyncTeamMembers: add %s to %s", qc.getLogId(), user, fullTeamName);
                     } catch (IOException e) {
-                        Log.warnf("doSyncTeamMembers: failed to add %s to %s", login, fullTeamName);
+                        Log.warnf("[%s] doSyncTeamMembers: failed to add %s to %s", qc.getLogId(), login, fullTeamName);
                     }
                 }
                 for (String login : toRemove) {
                     try {
                         GHUser user = gh.getUser(login);
                         team.remove(user);
-                        Log.infof("doSyncTeamMembers: remove %s from %s", user, fullTeamName);
+                        Log.infof("[%s] doSyncTeamMembers: remove %s from %s", qc.getLogId(), user, fullTeamName);
                     } catch (IOException e) {
-                        Log.warnf("doSyncTeamMembers: failed to remove %s from %s", login, fullTeamName);
+                        Log.warnf("[%s] doSyncTeamMembers: failed to remove %s from %s", qc.getLogId(), login, fullTeamName);
                     }
                 }
                 return null;

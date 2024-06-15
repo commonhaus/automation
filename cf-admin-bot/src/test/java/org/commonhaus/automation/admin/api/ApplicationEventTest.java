@@ -20,7 +20,6 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
-import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,7 +75,7 @@ public class ApplicationEventTest extends ContextHelper {
 
         GitHubAppTesting.given()
                 .github(mocks -> {
-                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    setupInstallationRepositories(mocks, ctx);
 
                     GitHub botGithub = setupBotGithub(ctx, mocks);
                     when(botGithub.isCredentialValid()).thenReturn(true);
@@ -86,10 +85,10 @@ public class ApplicationEventTest extends ContextHelper {
 
                     mockUpdateCommonhausData(builder, botGithub, ctx);
 
-                    when(mocks.installationGraphQLClient(installationId)
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
                             .thenReturn(removeLabel);
-                    when(mocks.installationGraphQLClient(installationId)
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("RemoveReaction("), anyMap()))
                             .thenReturn(removeReaction);
                 })
@@ -115,12 +114,12 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(mocks.issue(2345115049L)).close();
 
                     // 5) remove application/new
-                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap());
-                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("RemoveReaction("), anyMap());
 
-                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
@@ -144,7 +143,7 @@ public class ApplicationEventTest extends ContextHelper {
 
         GitHubAppTesting.given()
                 .github(mocks -> {
-                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    setupInstallationRepositories(mocks, ctx);
 
                     GitHub botGithub = setupBotGithub(ctx, mocks);
                     when(botGithub.isCredentialValid()).thenReturn(true);
@@ -154,10 +153,10 @@ public class ApplicationEventTest extends ContextHelper {
 
                     mockUpdateCommonhausData(builder, botGithub, ctx);
 
-                    when(mocks.installationGraphQLClient(installationId)
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
                             .thenReturn(removeLabel);
-                    when(mocks.installationGraphQLClient(installationId)
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("RemoveReaction("), anyMap()))
                             .thenReturn(removeReaction);
                 })
@@ -181,12 +180,12 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(mocks.issue(2345115049L)).close();
 
                     // 5) remove application/new
-                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap());
-                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("RemoveReaction("), anyMap());
 
-                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
