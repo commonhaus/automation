@@ -149,7 +149,7 @@ public class AppContextService extends BaseContextService {
 
         if (action.added()) {
             InstallationAccess access = installationAccess.computeIfAbsent(installationId,
-                    InstallationAccess::new);
+                    k -> new InstallationAccess(installationId, orgName));
             access.write.add(repoFullName);
             access.write.add(orgName);
 

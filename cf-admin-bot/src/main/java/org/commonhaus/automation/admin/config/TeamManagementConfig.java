@@ -73,20 +73,20 @@ public class TeamManagementConfig extends RepositoryConfig {
     public void setAccess(InstallationAccess access) {
         sources.forEach(source -> {
             // we should have (at least) read access to the source repo
-            access.addRead(source.repo());
+            access.add(source.repo());
             if (source.performSync()) {
                 // If we have enough information to perform a sync,
                 // we should have write access for all of the target teams
                 // (which includes the organization, based on bot permissions)
                 source.sync().values().forEach(sync -> {
                     sync.teams().forEach(team -> {
-                        access.addWrite(QueryContext.toOrganizationName(team));
+                        access.add(QueryContext.toOrganizationName(team));
                     });
                 });
             }
         });
         if (sponsors != null && sponsors.repository() != null) {
-            access.addWrite(sponsors.repository());
+            access.add(sponsors.repository());
         }
     }
 }
