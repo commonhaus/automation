@@ -4,8 +4,10 @@ import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,22 +55,9 @@ public class TeamMemberSyncTest extends ContextHelper {
 
     @Test
     void testDiscoveryWhenInstallationAdded() throws Exception {
-
         given()
                 .github(mocks -> {
-                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
-
-                    GitHub gh = setupMockTeam(mocks);
-                    setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
-
-                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
-
-                    GHContent content = mock(GHContent.class);
-                    when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
-
-                    when(foundationRepo.getFileContent("CONTACTS.yaml"))
-                            .thenReturn(content);
-
+                    setupFoundationContacts(mocks);
                     addGraphQLTeamMemberResults(mocks);
                 })
                 .when().payloadFromClasspath("/github/eventInstallationAdded.json")
@@ -77,29 +66,33 @@ public class TeamMemberSyncTest extends ContextHelper {
 
                 });
 
-        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 3);
+        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 4);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
         List<Mail> mailList = mailbox.getMailsSentTo("dry-run@example.com");
-        assertThat(mailList).hasSize(3);
+        assertThat(mailList).hasSize(4);
 
         for (Mail m : mailList) {
             String subject = m.getSubject();
             String body = m.getText();
-            String finalGroup = body.replaceAll("(?s).*?(Final:.*)", "$1");
-            System.out.println("final group: " + finalGroup);
+            String finalGroup = body.replaceAll("(?s).*?(Final:.*)", "$1").trim();
 
             // see test CONTACTS.yaml for group members
             // see cf-admin.yml for sync parameters
             if (subject.contains("commonhaus-test/cf-council") || subject.contains("commonhaus-test/cf-voting")) {
                 // cf-council and cf-voting should be the same
                 assertTeamLogins(finalGroup,
-                        List.of("user1\n", "user2\n", "user3\n", "user9\n"));
+                        List.of("user1,", "user2,", "user3,", "user9,"));
             }
             if (subject.contains("commonhaus-test/team-quorum-default")) {
                 // team quorum has different membership + other preserved value
                 assertTeamLogins(finalGroup,
-                        List.of("user4\n", "user5\n", "user6\n", "user7\n", "user8\n", "user9\n", "user12\n"));
+                        List.of("user4,", "user5,", "user6,", "user7,", "user8,", "user9,", "user12,"));
+            }
+            if (subject.contains("collaborators")) {
+                // team quorum has different membership + other preserved value
+                assertTeamLogins(finalGroup,
+                        List.of("user1,", "user2,", "user3,", "user7,", "user8,", "user9,", "user12,", "user14,"));
             }
         }
     }
@@ -108,17 +101,7 @@ public class TeamMemberSyncTest extends ContextHelper {
     void testDiscoveryWhenInstallationCreated() throws Exception {
         given()
                 .github(mocks -> {
-                    GitHub gh = setupMockTeam(mocks);
-                    setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
-                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
-
-                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
-
-                    GHContent content = mock(GHContent.class);
-                    when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
-
-                    when(foundationRepo.getFileContent("CONTACTS.yaml")).thenReturn(content);
-
+                    setupFoundationContacts(mocks);
                     addGraphQLTeamMemberResults(mocks);
                 })
                 .when().payloadFromClasspath("/github/eventInstallationCreated.json")
@@ -127,20 +110,17 @@ public class TeamMemberSyncTest extends ContextHelper {
 
                 });
 
-        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 3);
+        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 4);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(3);
+        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(4);
     }
 
     @Test
     void testQueryFailed() throws Exception {
         given()
                 .github(mocks -> {
-                    GitHub gh = setupMockTeam(mocks);
-                    GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
-
-                    mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
+                    GHRepository foundationRepo = setupRepoConfigMocks(mocks);
 
                     when(foundationRepo.getFileContent("CONTACTS.yaml"))
                             .thenThrow(new IOException("Test exception"));
@@ -151,16 +131,39 @@ public class TeamMemberSyncTest extends ContextHelper {
 
                 });
 
-        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        // If CONTACTS.yaml is not found, we'll still look for sponsors/collaborators
+        await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 1);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(1);
-        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(1);
+    }
+
+    GHRepository setupRepoConfigMocks(GitHubMockSetupContext mocks) throws IOException {
+        mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
+
+        GitHub gh = setupMockTeam(mocks);
+        setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
+        setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
+        GHRepository foundationRepo = setupMockRepository(mocks, gh, ctx, "commonhaus/foundation");
+
+        setupRepositoryAccess(mocks, ctx, gh);
+        return foundationRepo;
+    }
+
+    void setupFoundationContacts(GitHubMockSetupContext mocks) throws IOException {
+        GHRepository foundationRepo = setupRepoConfigMocks(mocks);
+
+        GHContent content = mock(GHContent.class);
+        when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
+
+        when(foundationRepo.getFileContent("CONTACTS.yaml")).thenReturn(content);
     }
 
     void addGraphQLTeamMemberResults(GitHubMockSetupContext mocks) throws ExecutionException, InterruptedException {
         Response queryCouncil = mockResponse("src/test/resources/github/query-TeamLogins-council.json");
         Response queryVoting = mockResponse("src/test/resources/github/query-TeamLogins-voting.json");
         Response queryQuorum = mockResponse("src/test/resources/github/query-TeamLogins-teamQuorum.json");
+        Response querySponsorships = mockResponse("src/test/resources/github/querySponsorshipsAsMaintainer.json");
 
         when(mocks.installationGraphQLClient(installationId)
                 .executeSync(anyString(),
@@ -174,11 +177,15 @@ public class TeamMemberSyncTest extends ContextHelper {
                 .executeSync(anyString(),
                         argThat((Map<String, Object> map) -> map != null && map.containsValue("team-quorum-default"))))
                 .thenReturn(queryQuorum);
+        when(mocks.installationGraphQLClient(installationId)
+                .executeSync(contains("sponsorshipsAsMaintainer("), anyMap()))
+                .thenReturn(querySponsorships);
     }
 
     void assertTeamLogins(String text, List<String> logins) {
+        text += ",";
         for (int i = 1; i < 15; i++) {
-            String login = "user" + i + "\n";
+            String login = "user" + i + ",";
             if (logins.contains(login)) {
                 assertThat(text).contains(login);
             } else {

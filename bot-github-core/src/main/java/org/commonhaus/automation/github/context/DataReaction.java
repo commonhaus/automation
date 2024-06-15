@@ -33,7 +33,7 @@ public class DataReaction {
 
     static final String REACTION_FIELDS = """
             user {
-                """ + DataCommonObject.ACTOR_FIELDS_MIN + """
+                """ + DataActor.ACTOR_FIELDS_MIN + """
             }
             content
             createdAt

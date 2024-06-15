@@ -140,6 +140,6 @@ public class MemberSession {
     }
 
     public SecurityIdentity identity() {
-        return identity();
+        return identity;
     }
 }

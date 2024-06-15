@@ -1,0 +1,69 @@
+{
+  "organization": {
+    "sponsorshipsAsMaintainer": {
+      "totalCount": 29,
+      "nodes": [
+        {
+          "isActive": true,
+          "isOneTimePayment": true,
+          "sponsorEntity": {
+            "login": "user1"
+          }
+        },
+        {
+          "isActive": true,
+          "isOneTimePayment": false,
+          "sponsorEntity": {
+            "login": "user2"
+          }
+        },
+        {
+          "isActive": true,
+          "isOneTimePayment": false,
+          "sponsorEntity": {
+            "login": "user3"
+          }
+        },
+        {
+          "isActive": true,
+          "isOneTimePayment": false,
+          "sponsorEntity": {
+            "login": "user7"
+          }
+        },
+        {
+          "isActive": true,
+          "isOneTimePayment": false,
+          "sponsorEntity": {
+            "login": "user8"
+          }
+        },
+        {
+          "isActive": false,
+          "isOneTimePayment": true,
+          "sponsorEntity": {
+            "login": "user9"
+          }
+        },
+        {
+          "isActive": false,
+          "isOneTimePayment": true,
+          "sponsorEntity": {
+            "login": "user12"
+          }
+        },
+        {
+          "isActive": true,
+          "isOneTimePayment": false,
+          "sponsorEntity": {
+            "login": "user14"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Mjk"
+      }
+    }
+  }
+}

@@ -4,6 +4,10 @@
 # If dry_run is true, an email will be sent to the specified email 
 # address with the results of the dry run.
 groupManagement:
+  sponsors: 
+    sponsorable: commonhaus
+    repository: commonhaus-test/sponsors-test
+    dryRun: true
   sources:
   - path: CONTACTS.yaml
     repo: commonhaus/foundation

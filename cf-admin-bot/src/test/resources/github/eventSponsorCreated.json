@@ -1,0 +1,87 @@
+{
+  "action": "created",
+  "sponsorship": {
+    "node_id": "S_kwHOCJzKmc4AA_-i",
+    "created_at": "2024-06-13T12:36:54+00:00",
+    "sponsorable": {
+      "login": "commonhaus",
+      "id": 144493209,
+      "node_id": "O_kgDOCJzKmQ",
+      "url": "https://api.github.com/orgs/commonhaus",
+      "repos_url": "https://api.github.com/orgs/commonhaus/repos",
+      "events_url": "https://api.github.com/orgs/commonhaus/events",
+      "hooks_url": "https://api.github.com/orgs/commonhaus/hooks",
+      "issues_url": "https://api.github.com/orgs/commonhaus/issues",
+      "members_url": "https://api.github.com/orgs/commonhaus/members{/member}",
+      "public_members_url": "https://api.github.com/orgs/commonhaus/public_members{/member}",
+      "avatar_url": "https://avatars.githubusercontent.com/u/144493209?v=4",
+      "description": "A non-profit organization building a forever home for open-source projects."
+    },
+    "maintainer": {
+      "login": "commonhaus",
+      "id": 144493209,
+      "node_id": "O_kgDOCJzKmQ",
+      "url": "https://api.github.com/orgs/commonhaus",
+      "repos_url": "https://api.github.com/orgs/commonhaus/repos",
+      "events_url": "https://api.github.com/orgs/commonhaus/events",
+      "hooks_url": "https://api.github.com/orgs/commonhaus/hooks",
+      "issues_url": "https://api.github.com/orgs/commonhaus/issues",
+      "members_url": "https://api.github.com/orgs/commonhaus/members{/member}",
+      "public_members_url": "https://api.github.com/orgs/commonhaus/public_members{/member}",
+      "avatar_url": "https://avatars.githubusercontent.com/u/144493209?v=4",
+      "description": "A non-profit organization building a forever home for open-source projects."
+    },
+    "sponsor": {
+      "login": "commonhaus-test-bot[bot]",
+      "id": 156447886,
+      "node_id": "BOT_kgDOCVM0jg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/156364140?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D",
+      "html_url": "https://github.com/apps/commonhaus-test-bot",
+      "followers_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "privacy_level": "public",
+    "tier": {
+      "node_id": "ST_kwHOCJzKmc4ABe-d",
+      "created_at": "2024-03-17T18:11:57Z",
+      "description": "# ☕ A Sip of Support Tier\r\n$1/month or $8/year\r\n\r\nJoin us with a contribution of a fancy coffee! It's an easy way to express your support for open-source projects under the Commonhaus umbrella. \r\n\r\n- **Participation Equals Power:** While sponsoring alone is a huge help, diving into participation grants you voting rights and a `@commonhaus.dev` email address.\r\n\r\nYour support and involvement fuel the foundation's mission, ensuring the open-source projects you love continue to thrive and evolve. Let's raise a cup to innovation, collaboration, and the shared success of open-source communities!",
+      "monthly_price_in_cents": 800,
+      "monthly_price_in_dollars": 8,
+      "name": "$8 one time",
+      "is_one_time": true,
+      "is_custom_amount": false
+    }
+  },
+  "sender": {
+    "login": "commonhaus-test-bot[bot]",
+    "id": 156447886,
+    "node_id": "BOT_kgDOCVM0jg",
+    "avatar_url": "https://avatars.githubusercontent.com/u/156364140?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D",
+    "html_url": "https://github.com/apps/commonhaus-test-bot",
+    "followers_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/followers",
+    "following_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/following{/other_user}",
+    "gists_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/subscriptions",
+    "organizations_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/orgs",
+    "repos_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/repos",
+    "events_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/commonhaus-test-bot%5Bbot%5D/received_events",
+    "type": "User",
+    "site_admin": false
+  }
+}
+

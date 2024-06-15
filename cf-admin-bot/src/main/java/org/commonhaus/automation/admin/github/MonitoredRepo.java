@@ -4,12 +4,14 @@ import java.util.List;
 import java.util.Objects;
 
 import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.SponsorsConfig;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig;
 
 public final class MonitoredRepo {
     final String repoFullName;
     private final long installationId;
+    SponsorsConfig sponsors;
     List<TeamSourceConfig> sourceConfig;
     private String[] dryRunEmailAddress;
     private String[] errorEmailAddress;
@@ -21,6 +23,7 @@ public final class MonitoredRepo {
 
     MonitoredRepo refresh(AdminConfigFile file) {
         TeamManagementConfig groupManagement = TeamManagementConfig.getGroupManagementConfig(file);
+        this.sponsors = groupManagement.sponsors;
         this.sourceConfig = groupManagement.sources();
         this.dryRunEmailAddress = file.emailAddress() == null ? null : file.emailAddress().dryRun();
         this.errorEmailAddress = file.emailAddress() == null ? null : file.emailAddress().errors();
@@ -48,6 +51,10 @@ public final class MonitoredRepo {
 
     public String repoFullName() {
         return repoFullName;
+    }
+
+    public SponsorsConfig sponsors() {
+        return sponsors;
     }
 
     public List<TeamSourceConfig> sourceConfig() {

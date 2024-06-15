@@ -1,6 +1,7 @@
 package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -23,12 +24,15 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.config.AdminConfigFile;
+import org.commonhaus.automation.admin.config.SponsorsConfig;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
+import org.commonhaus.automation.github.context.DataSponsorship;
 import org.commonhaus.automation.github.context.DataTeam;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHOrganization;
@@ -176,6 +180,82 @@ public class TeamMemberSync {
                     syncTeamMembership(qc, source);
                 });
             }
+        }
+
+        if (repoCfg.sponsors() != null) {
+            taskQueue.add(() -> {
+                ScopedQueryContext qc = this.ctx.refreshScopedQueryContext(repoCfg, repo).addExisting(github);
+                syncSponsors(qc, repoCfg.sponsors());
+            });
+        }
+    }
+
+    private void syncSponsors(ScopedQueryContext qc, SponsorsConfig sponsors) {
+        try {
+            Log.debugf("syncSponsors: %s", sponsors);
+
+            String sponsorable = sponsors.sponsorable();
+            ScopedQueryContext sponsorableQc = ctx.getScopedQueryContext(sponsorable);
+
+            List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(sponsorableQc, sponsors.sponsorable());
+            if (recentSponsors == null) {
+                Log.warnf("[%s] syncSponsors: failed to query sponsors for %s",
+                        sponsorableQc.getLogId(), sponsors.sponsorable());
+                return;
+            }
+            Collection<String> sponsorLogin = recentSponsors.stream()
+                    .map(DataSponsorship::sponsorLogin)
+                    .collect(Collectors.toCollection(ArrayList::new));
+            Log.debugf("syncSponsors: recent sponsors for %s: %s", sponsorable, sponsorLogin);
+
+            String repositoryName = sponsors.repository();
+            ScopedQueryContext repoQc = ctx.getScopedQueryContext(repositoryName);
+
+            String orgName = ScopedQueryContext.toOrganizationName(repositoryName);
+            GHOrganization org = repoQc == null ? null : repoQc.getOrganization(orgName);
+            if (org == null) {
+                Log.warnf("syncSponsors: organization %s not found", orgName);
+                return;
+            }
+            GHRepository repo = repoQc == null ? null : repoQc.getRepository(repositoryName);
+            if (repo == null) {
+                Log.warnf("syncSponsors: repository %s not found", repositoryName);
+                return;
+            }
+
+            List<GHUser> missingCollaborators = new ArrayList<>();
+            Set<String> existingCollaborators = repoQc.collaborators(repositoryName);
+            for (String login : sponsorLogin) {
+                if (existingCollaborators.contains(login)) {
+                    Log.debugf("syncSponsors: %s is already a collaborator", login);
+                    continue;
+                }
+                GHUser ghUser = repoQc.getUser(login);
+                if (ghUser == null) {
+                    Log.warnf("syncSponsors: user %s not found", login);
+                    continue;
+                }
+                missingCollaborators.add(ghUser);
+            }
+
+            if (sponsors.dryRun()) {
+                List<String> added = missingCollaborators.stream().map(GHUser::getLogin).collect(Collectors.toList());
+                List<String> finalList = new ArrayList<>(existingCollaborators);
+                finalList.addAll(added);
+                Logins allLogins = new Logins(
+                        existingCollaborators,
+                        added,
+                        List.of(),
+                        finalList);
+                sendDryRunEmail(repositoryName + " collaborators:", allLogins, qc.dryRunEmailAddress());
+            } else {
+                repoQc.addCollaborators(repo, missingCollaborators);
+                if (repoQc.clearNotFound() && repoQc.hasErrors()) {
+                    throw repoQc.bundleExceptions();
+                }
+            }
+        } catch (Throwable t) {
+            qc.logAndSendEmail("syncSponsors", "Error syncing sponsors", t);
         }
     }
 
@@ -337,16 +417,7 @@ public class TeamMemberSync {
                 """.formatted(fullTeamName, toPlainList(logins.added), toPlainList(logins.removed),
                 toPlainList(logins.updated));
 
-        String htmlBody = """
-                <p>Team %s requires the following changes.</p>
-                <p>Add:</p>
-                %s
-                <p>Remove:</p>
-                %s
-                <p>Final:</p>
-                %s
-                """.formatted(fullTeamName, toHtmlList(logins.added), toHtmlList(logins.removed),
-                toHtmlList(logins.updated));
+        String htmlBody = MarkdownConverter.toHtml(txtBody);
 
         ctx.sendEmail("sendDryRunEmail|", title, txtBody, htmlBody, dryRunEmail);
     }
@@ -355,18 +426,6 @@ public class TeamMemberSync {
         if (members == null || members.isEmpty()) {
             return "none";
         }
-        return members.stream()
-                .map(x -> "- %s".formatted(x))
-                .collect(Collectors.joining("\n"));
-    }
-
-    public String toHtmlList(Collection<String> members) {
-        if (members == null || members.isEmpty()) {
-            return "none";
-        }
-        return "<ul>\n" + members.stream()
-                .map(x -> "<li>%s</li>".formatted(x))
-                .collect(Collectors.joining("\n"))
-                + "\n</ul>";
+        return String.join(", ", members);
     }
 }

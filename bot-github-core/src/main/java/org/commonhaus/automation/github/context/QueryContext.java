@@ -690,12 +690,6 @@ public class QueryContext {
         return members != null && members.contains(user);
     }
 
-    public boolean isCollaborator(GHUser user, String repoName) {
-        Set<String> collaborators = collaborators(repoName);
-        Log.debugf("%s members: %s", repoName, collaborators);
-        return collaborators != null && collaborators.contains(user.getLogin());
-    }
-
     public TeamList getTeamList(String teamFullName) {
         Set<GHUser> members = teamMembers(teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
@@ -735,6 +729,27 @@ public class QueryContext {
         return members;
     }
 
+    public void addTeamMember(GHUser user, String teamFullName) {
+        if (isDryRun()) {
+            Log.debugf("[%s] addTeamMember would add %s to %s", getLogId(), user.getLogin(), teamFullName);
+            return;
+        }
+        // this will trigger membership change events, which will come back around to update the cache.
+        TEAM_MEMBERS.invalidate(teamFullName);
+
+        String orgName = toOrganizationName(teamFullName);
+        String relativeName = toRelativeName(orgName, teamFullName);
+        GHOrganization org = getOrganization(orgName);
+        execGitHubSync((gh, dryRun) -> {
+            GHTeam ghTeam = org.getTeamByName(relativeName);
+            ghTeam.add(user);
+            return null;
+        });
+        if (hasErrors()) {
+            clearNotFound();
+        }
+    }
+
     public Set<String> collaborators(String repoFullName) {
         Set<String> collaborators = COLLABORATORS.get(repoFullName);
         if (collaborators == null) {
@@ -748,30 +763,29 @@ public class QueryContext {
                 clearNotFound();
                 return null;
             }
+            Log.debugf("%s members: %s", repoFullName, collaborators);
             COLLABORATORS.put(repoFullName, collaborators);
         }
         return collaborators;
     }
 
-    public void addTeamMember(GHUser user, String teamFullName) {
+    public void addCollaborators(GHRepository repo, List<GHUser> user) {
         if (isDryRun()) {
-            Log.debugf("[%s] addTeamMember would add %s to %s", getLogId(), user.getLogin(), teamFullName);
+            Log.debugf("[%s] addCollaborators would add %s to %s",
+                    getLogId(),
+                    user.stream().map(GHUser::getLogin).toList(),
+                    repo.getFullName());
             return;
         }
-        // this will trigger membership change events, which will come back around to update
-        // the cache.
-        String orgName = toOrganizationName(teamFullName);
-        String relativeName = toRelativeName(orgName, teamFullName);
-        GHOrganization org = getOrganization(orgName);
         execGitHubSync((gh, dryRun) -> {
-            GHTeam ghTeam = org.getTeamByName(relativeName);
-            ghTeam.add(user);
+            repo.addCollaborators(user);
             return null;
         });
-        if (hasErrors()) {
-            clearNotFound();
-        }
-        TEAM_MEMBERS.invalidate(teamFullName);
+    }
+
+    public boolean isCollaborator(GHUser user, String repoName) {
+        Set<String> collaborators = collaborators(repoName);
+        return collaborators != null && collaborators.contains(user.getLogin());
     }
 
     public String[] getErrorAddresses() {

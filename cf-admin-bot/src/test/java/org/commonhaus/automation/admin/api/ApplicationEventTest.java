@@ -164,7 +164,6 @@ public class ApplicationEventTest extends ContextHelper {
                 .when().payloadFromClasspath("/github/eventIssueLabeled-declined.json")
                 .event(GHEvent.ISSUES)
                 .then().github(mocks -> {
-
                     // 1) Set member flag, move status from UNKNOWN -> DECLINED
                     final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
                     verify(builder).content(contentCaptor.capture());
@@ -193,7 +192,6 @@ public class ApplicationEventTest extends ContextHelper {
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-
     }
 
 }

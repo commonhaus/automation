@@ -68,6 +68,7 @@ public enum JsonAttribute {
     company,
     content,
     createIssue,
+    createLabel,
     createdAt("created_at"),
     databaseId,
     discussion,
@@ -78,13 +79,19 @@ public enum JsonAttribute {
     hasNextPage,
     id,
     installation,
+    isActive,
+    isCustomAmount("is_custom_amount"),
+    isOneTime("is_one_time"),
     issue,
     issueComment,
     label,
     labelable,
     labels,
+    lastEditedAt,
     latestReviews,
     login,
+    monthlyPriceInCents("monthly_price_in_cents"),
+    monthlyPriceInDollars("monthly_price_in_dollars"),
     name,
     node,
     node_id,
@@ -102,8 +109,12 @@ public enum JsonAttribute {
     repository,
     reviewDecision,
     search,
+    sponsorEntity("sponsor"),
+    sponsorable,
+    sponsorshipsAsMaintainer,
     state,
     submittedAt("submitted_at"),
+    tier,
     title,
     updateDiscussionComment,
     updateIssue,
@@ -113,8 +124,6 @@ public enum JsonAttribute {
     url("html_url"),
     user,
     viewer,
-    lastEditedAt,
-    createLabel,
     ;
 
     /** Bridge between JSON-B parsed types and Jackson-created GH* types */
@@ -328,6 +337,14 @@ public enum JsonAttribute {
                 .map(JsonObject.class::cast)
                 .map(DataLabel::new)
                 .toList();
+    }
+
+    public DataTier tierFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataTier(field);
     }
 
     /** Bridge to GH* type usually parsed using Jackson; may be incomplete */

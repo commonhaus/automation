@@ -59,6 +59,7 @@ public class ContextHelper extends QueryContext {
     public static final String botNodeId = "U_kgDOCVHtbA";
 
     public static final String datastoreRepoId = "R_kgDOL8tG0g";
+    public static final String commonhausTestRepoId = "R_-2034603297";
 
     public static final DataLabel APP_NEW = new DataLabel.Builder()
             .name(ApplicationData.NEW).build();
@@ -151,6 +152,31 @@ public class ContextHelper extends QueryContext {
         return repo;
     }
 
+    void setupRepositoryAccess(GitHubMockSetupContext mocks, AppContextService ctx, GitHub gh) throws IOException {
+        GHRepository repo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore());
+        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
+                DiscoveryAction.ADDED,
+                mocks.installationClient(installationId),
+                mocks.installationGraphQLClient(installationId),
+                installationId,
+                repo,
+                Optional.ofNullable(null));
+        ctx.repositoryDiscovered(repoEvent);
+
+        repo = setupMockRepository(mocks, gh, ctx, "commonhaus-test/sponsors-test");
+        repoEvent = new RepositoryDiscoveryEvent(
+                DiscoveryAction.ADDED,
+                mocks.installationClient(installationId),
+                mocks.installationGraphQLClient(installationId),
+                installationId,
+                repo,
+                Optional.ofNullable(null));
+        ctx.repositoryDiscovered(repoEvent);
+
+        ctx.writeToInstallId.put("commonhaus-test", installationId);
+        ctx.readToInstallId.put("commonhaus", installationId);
+    }
+
     protected GHTeam setupMockTeam(GitHubMockSetupContext mocks, String name, GHOrganization org, Set<GHUser> userSet)
             throws IOException {
         setupMockTeam("commonhaus-test/" + name, userSet);
@@ -190,12 +216,9 @@ public class ContextHelper extends QueryContext {
         when(gh.getUser(botLogin)).thenReturn(bot);
         ctx.updateUserConnection(botNodeId, gh);
 
-        GHRepository dataStoreRepo = setupMockRepository(mocks, gh, ctx, ctx.getDataStore(), datastoreRepoId);
-        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
-                DiscoveryAction.ADDED, gh, dql, installationId, dataStoreRepo, Optional.ofNullable(null));
-
+        setupRepositoryAccess(mocks, ctx, gh);
         setLabels(datastoreRepoId, APP_LABELS);
-        ctx.repositoryDiscovered(repoEvent);
+        setLabels(commonhausTestRepoId, APP_LABELS);
 
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");

@@ -18,8 +18,8 @@ import io.smallrye.graphql.client.Response;
 public class DataLabel extends DataCommonType {
 
     static final String LABEL_FIELDS = """
-                id
-                name
+            id
+            name
             """;
     static final String FIRST_10_LABELS = """
             labels(first: 10) {

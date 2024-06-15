@@ -26,6 +26,7 @@ public class TeamManagementConfig extends RepositoryConfig {
         return repoConfigFile.groupManagement();
     }
 
+    public SponsorsConfig sponsors;
     public final List<TeamSourceConfig> sources = new ArrayList<>();
 
     TeamManagementConfig() {
@@ -84,5 +85,8 @@ public class TeamManagementConfig extends RepositoryConfig {
                 });
             }
         });
+        if (sponsors != null && sponsors.repository() != null) {
+            access.addWrite(sponsors.repository());
+        }
     }
 }

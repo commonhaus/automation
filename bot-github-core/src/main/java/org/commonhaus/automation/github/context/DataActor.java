@@ -10,6 +10,15 @@ import org.kohsuke.github.GHUser;
  * The WebHook provides an id (read by GHType), GraphQL doesn't.
  */
 public class DataActor extends DataCommonType {
+
+    static final String ACTOR_FIELDS_MIN = """
+            login
+            url
+            """;
+    static final String ACTOR_FIELDS = ACTOR_FIELDS_MIN + """
+            avatarUrl
+            """;
+
     public final String login;
     public final String url;
     public final String avatarUrl;
