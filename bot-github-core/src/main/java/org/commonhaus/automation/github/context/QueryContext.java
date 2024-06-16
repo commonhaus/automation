@@ -778,7 +778,8 @@ public class QueryContext {
             return;
         }
         execGitHubSync((gh, dryRun) -> {
-            repo.addCollaborators(user);
+            repo.addCollaborators(user,
+                    GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
             return null;
         });
     }
