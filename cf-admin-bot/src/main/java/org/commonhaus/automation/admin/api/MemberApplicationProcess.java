@@ -22,7 +22,6 @@ import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.ReactionContent;
 
 import io.quarkus.logging.Log;
 
@@ -88,21 +87,18 @@ public class MemberApplicationProcess {
         String teamFullName = ctx.getTeamForRole(CommonhausUser.MEMBER_ROLE);
         if (teamFullName == null) {
             // should not happen, but in case something gets misaligned...
-            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             throw new IllegalStateException("No team found for role " + CommonhausUser.MEMBER_ROLE);
         }
 
         CommonhausUser user = datastore.getCommonhausUser(login, applicant.getId(), false, false);
         if (user == null) {
             // should not happen, but in case something gets misaligned...
-            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             throw new IllegalStateException("Label added to an application for an unknown user " + login);
         }
 
         ApplicationData applicationData = new ApplicationData(login, item);
         // We haven't approved/declined this member yet: we need a valid application
         if (user.isMember == null && !applicationData.isValid()) {
-            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             throw new IllegalStateException(
                     "Unable to find valid application data for login %s and issue %s (%s)"
                             .formatted(login, item.id, item.title));
@@ -178,11 +174,9 @@ public class MemberApplicationProcess {
         }
 
         if (qc.hasErrors()) {
-            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
             throw qc.bundleExceptions();
         }
 
-        qc.removeBotReaction(item.id, ReactionContent.CONFUSED);
         qc.closeIssue(issue);
         qc.removeLabels(item.id, List.of(ApplicationData.NEW));
     }
@@ -216,10 +210,6 @@ public class MemberApplicationProcess {
                         content,
                         labels)
                 : qc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
-
-        if (qc.hasErrors() && item != null) {
-            qc.addBotReaction(item.id, ReactionContent.CONFUSED);
-        }
 
         return item == null
                 ? null

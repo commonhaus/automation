@@ -71,7 +71,7 @@ public class TeamMemberSync {
             if (task != null) {
                 task.run();
             }
-        }, 0, 10, TimeUnit.SECONDS);
+        }, 10, 10, TimeUnit.SECONDS);
     }
 
     @IfBuildProfile("test")
@@ -240,17 +240,17 @@ public class TeamMemberSync {
             String[] dryRunEmail) throws Throwable {
         ScopedQueryContext qc = ctx.getScopedQueryContext(repositoryName);
         if (qc == null) {
-            throw new IllegalStateException("No query context for " + repositoryName);
+            throw new IllegalStateException("addMissingCollaborators: No query context for " + repositoryName);
         }
         String orgName = ScopedQueryContext.toOrganizationName(repositoryName);
         GHOrganization org = qc.getOrganization(orgName);
         if (org == null) {
-            Log.warnf("[%s] syncSponsors: organization %s not found", qc.getLogId(), orgName);
+            Log.warnf("[%s] addMissingCollaborators: organization %s not found", qc.getLogId(), orgName);
             return;
         }
         GHRepository repo = qc.getRepository(repositoryName);
         if (repo == null) {
-            Log.warnf("[%s] syncSponsors: repository %s not found", qc.getLogId(), repositoryName);
+            Log.warnf("[%s] addMissingCollaborators: repository %s not found", qc.getLogId(), repositoryName);
             return;
         }
 
@@ -263,7 +263,7 @@ public class TeamMemberSync {
             }
             GHUser ghUser = qc.getUser(login);
             if (ghUser == null) {
-                Log.warnf("syncSponsors: user %s not found", login);
+                Log.warnf("[%s] addMissingCollaborators: user %s not found", qc.getLogId(), login);
                 continue;
             }
             missingCollaborators.add(ghUser);
@@ -285,6 +285,8 @@ public class TeamMemberSync {
                 throw qc.bundleExceptions();
             }
         }
+        Log.infof("[%s] addMissingCollaborators: finished syncing %s outside collaborators", qc.getLogId(),
+                missingCollaborators.size());
     }
 
     void syncTeamMembership(ScopedQueryContext qc, TeamSourceConfig source) {
@@ -348,10 +350,12 @@ public class TeamMemberSync {
         String relativeName = ScopedQueryContext.toRelativeName(orgName, fullTeamName);
 
         ScopedQueryContext qc = ctx.getScopedQueryContext(orgName);
-        GHOrganization org = qc == null ? null : qc.getOrganization(orgName);
+        if (qc == null) {
+            throw new IllegalStateException("doSyncTeamMembers: No query context for " + fullTeamName);
+        }
+        GHOrganization org = qc.getOrganization(orgName);
         if (org == null) {
-            Log.warnf("doSyncTeamMembers: %s %s not found",
-                    qc == null ? "ScopedQueryContext for " : "Organization", orgName);
+            Log.warnf("[%s] doSyncTeamMembers: organization %s not found", qc.getLogId(), orgName);
             return;
         }
 
@@ -413,6 +417,8 @@ public class TeamMemberSync {
             Logins allLogins = new Logins(currentLogins, toAdd, toRemove, finalLogins);
             sendDryRunEmail(fullTeamName, allLogins, dryRunEmail);
         }
+        Log.infof("[%s] doSyncTeamMembers: finished syncing %s; %s added; %s removed", qc.getLogId(),
+                fullTeamName, toAdd.size(), toRemove.size());
     }
 
     record Logins(
