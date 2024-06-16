@@ -66,16 +66,18 @@ public class TeamMemberSync {
     @UnlessBuildProfile("test")
     public void startup(@Observes StartupEvent startup) {
         // Don't flood. Be leisurely for scheduled/cron queries
+        Log.debug("TeamMemberSync.testStartup: DELAYED START");
         executor.scheduleAtFixedRate(() -> {
             Runnable task = taskQueue.poll();
             if (task != null) {
                 task.run();
             }
-        }, 10, 10, TimeUnit.SECONDS);
+        }, 120, 10, TimeUnit.SECONDS);
     }
 
     @IfBuildProfile("test")
     public void testStartup(@Observes StartupEvent startup) {
+        Log.debug("TeamMemberSync.testStartup: TEST INTERVALS");
         executor.scheduleAtFixedRate(() -> {
             Runnable task = taskQueue.poll();
             if (task != null) {
