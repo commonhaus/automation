@@ -4,7 +4,7 @@ import org.kohsuke.github.GitHub;
 
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public record PostInitialDiscoveryEvent(
+public record InstallationDiscoveryEvent(
         long installationId,
         GitHub github,
         DynamicGraphQLClient graphQLClient) {

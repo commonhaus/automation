@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github.discovery;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,7 +45,10 @@ public class RepositoryDiscovery {
     Event<RepositoryDiscoveryEvent> repositoryDiscoveryEvent;
 
     @Inject
-    Event<PostInitialDiscoveryEvent> postDiscoveryEvent;
+    Event<InstallationDiscoveryEvent> postInstallationDiscovery;
+
+    @Inject
+    Event<BootstrapDiscoveryEvent> postBootstrapDiscovery;
 
     private ContextService ctx;
 
@@ -62,6 +66,7 @@ public class RepositoryDiscovery {
             return;
         }
 
+        List<Long> installations = new ArrayList<>();
         try {
             GitHub ac = gitHubService.getApplicationClient();
             for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {
@@ -77,7 +82,8 @@ public class RepositoryDiscovery {
                             repo, fetchConfigFile(repo), true));
                 }
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
-                postDiscoveryEvent.fire(new PostInitialDiscoveryEvent(ghiId, github, graphQLClient));
+                postInstallationDiscovery.fire(new InstallationDiscoveryEvent(ghiId, github, graphQLClient));
+                installations.add(ghiId);
             }
         } catch (GHIOException e) {
             ctx.logAndSendEmail("discoverRepositories", "Error making GH Request", e, null);
@@ -91,6 +97,8 @@ public class RepositoryDiscovery {
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
+        } finally {
+            postBootstrapDiscovery.fire(new BootstrapDiscoveryEvent(installations));
         }
     }
 

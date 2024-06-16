@@ -7,12 +7,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -31,7 +29,7 @@ import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
 import org.commonhaus.automation.github.context.DataSponsorship;
 import org.commonhaus.automation.github.context.DataTeam;
-import org.commonhaus.automation.github.discovery.PostInitialDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.kohsuke.github.GHEventPayload;
@@ -46,44 +44,37 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Push;
-import io.quarkus.arc.profile.IfBuildProfile;
-import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
+import io.vertx.core.impl.ConcurrentHashSet;
 
 @ApplicationScoped
 public class TeamMemberSync {
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-    private final Map<MonitoredRepo, String> monitoredRepos = new ConcurrentHashMap<>();
+    private final Set<MonitoredRepo> monitoredRepos = new ConcurrentHashSet<>();
 
     @Inject
     AppContextService ctx;
 
-    @UnlessBuildProfile("test")
-    public void startup(@Observes StartupEvent startup) {
-        // Don't flood. Be leisurely for scheduled/cron queries
-        Log.debug("TeamMemberSync.testStartup: DELAYED START");
-        executor.scheduleAtFixedRate(() -> {
-            Runnable task = taskQueue.poll();
-            if (task != null) {
-                task.run();
-            }
-        }, 120, 10, TimeUnit.SECONDS);
-    }
-
-    @IfBuildProfile("test")
     public void testStartup(@Observes StartupEvent startup) {
+        int initialDelay = 120;
+        TimeUnit unit = TimeUnit.SECONDS;
+        if (LaunchMode.current() == LaunchMode.TEST) {
+            initialDelay = 0;
+            unit = TimeUnit.MILLISECONDS;
+        }
         Log.debug("TeamMemberSync.testStartup: TEST INTERVALS");
         executor.scheduleAtFixedRate(() -> {
             Runnable task = taskQueue.poll();
             if (task != null) {
                 task.run();
             }
-        }, 0, 30, TimeUnit.MILLISECONDS);
+        }, initialDelay, 30, unit);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -102,12 +93,12 @@ public class TeamMemberSync {
         TeamManagementConfig groupManagement = TeamManagementConfig.getGroupManagementConfig(repoConfig.orElse(null));
 
         if (repoEvent.removed() || repoConfig.isEmpty() || groupManagement.isDisabled()) {
-            monitoredRepos.entrySet().removeIf(entry -> entry.getValue().equals(repoFullName));
+            monitoredRepos.removeIf(entry -> entry.repoFullName().equals(repoFullName));
             return;
         }
 
         MonitoredRepo cfg = new MonitoredRepo(repoFullName, ghiId).refresh(repoConfig.get());
-        monitoredRepos.put(cfg, repoFullName);
+        monitoredRepos.add(cfg);
 
         Log.debugf("[%s] teamSync repositoryDiscovered: %s", repoEvent.installationId(), repo.getFullName());
         if (!repoEvent.bootstrap()) {
@@ -116,16 +107,10 @@ public class TeamMemberSync {
         }
     }
 
-    public void postStartupDiscovery(@Observes PostInitialDiscoveryEvent postEvent) {
-        long ghiId = postEvent.installationId();
-        GitHub github = postEvent.github();
-
-        for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
-            MonitoredRepo repoCfg = entry.getKey();
-
-            if (repoCfg.installationId() == ghiId) {
-                scheduleQueryRepository(repoCfg, github);
-            }
+    public void postBootstrapDiscovery(@Observes BootstrapDiscoveryEvent postEvent) {
+        Log.debugf("postBootstrapDiscovery: %s", postEvent.installations());
+        for (MonitoredRepo repoCfg : monitoredRepos) {
+            scheduleQueryRepository(repoCfg, ctx.getInstallationClient(repoCfg.installationId()));
         }
     }
 
@@ -137,8 +122,7 @@ public class TeamMemberSync {
 
         Log.debugf("updateTeamMembers (push): %s", repo.getFullName());
 
-        for (Entry<MonitoredRepo, String> entry : monitoredRepos.entrySet()) {
-            MonitoredRepo repoCfg = entry.getKey();
+        for (MonitoredRepo repoCfg : monitoredRepos) {
             if (repoCfg.repoFullName().equals(repo.getFullName())
                     && pushEvent.getRef().endsWith("/main")
                     && repoCfg.sourceConfig().stream().anyMatch(s -> ctx.commitsContain(pushEvent, s.path()))) {
@@ -156,11 +140,10 @@ public class TeamMemberSync {
     @Scheduled(cron = "${automation.admin.team-sync-cron:13 27 */5 * * ?}")
     void scheduledSync() {
         try {
-            Iterator<Entry<MonitoredRepo, String>> i = monitoredRepos.entrySet().iterator();
+            Iterator<MonitoredRepo> i = monitoredRepos.iterator();
             while (i.hasNext()) {
-                var e = i.next();
-                MonitoredRepo repoCfg = e.getKey();
-                Log.infof("scheduledSync: %s", repoCfg);
+                MonitoredRepo repoCfg = i.next();
+                Log.debugf("[%s] scheduledSync: %s", repoCfg.installationId(), repoCfg);
 
                 GitHub github = ctx.getInstallationClient(repoCfg.installationId());
                 GHRepository repo = github.getRepository(repoCfg.repoFullName());
@@ -169,6 +152,7 @@ public class TeamMemberSync {
 
                 if (repoCfg.sourceConfig() == null || repoCfg.sourceConfig().isEmpty()) {
                     // Team sync no longer enabled. Remove the repository
+                    Log.infof("[%s] scheduledSync: disable confogl for %s", repoCfg.installationId(), repoCfg.repoFullName());
                     i.remove();
                 } else {
                     scheduleQueryRepository(repoCfg, github);
