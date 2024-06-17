@@ -19,7 +19,7 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 @RegisterRestClient(configKey = "forward-email-api")
 @ClientHeaderParam(name = "Authorization", value = "{lookupAuth}")
 public interface ForwardEmailClient {
-    AtomicReference<String> token = new AtomicReference<>();
+    static AtomicReference<String> token = new AtomicReference<>();
 
     @GET
     @Path("/domains")
@@ -39,17 +39,15 @@ public interface ForwardEmailClient {
 
     @POST
     @Path("/domains/{fqdn}/aliases")
-    void createAlias(@PathParam("fqdn") String fqdn, Alias alias);
+    Alias createAlias(@PathParam("fqdn") String fqdn, Alias alias);
 
     @PUT
     @Path("/domains/{fqdn}/aliases/{id}")
-    void updateAlias(@PathParam("fqdn") String fqdn, @PathParam("id") String id, Alias alias);
+    Alias updateAlias(@PathParam("fqdn") String fqdn, @PathParam("id") String id, Alias alias);
 
-    // TODO: Not available yet... SOON
-    // @POST
-    // @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    // @Path("/domains/{fqdn}/aliases/{id}/generate-password")
-    // void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, @FormParam("name") String emailAddress);
+    @POST
+    @Path("/domains/{fqdn}/aliases/{id}/generate-password")
+    void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions);
 
     default String lookupAuth() {
         String value = token.get();
@@ -60,5 +58,4 @@ public interface ForwardEmailClient {
         }
         return value;
     }
-
 }

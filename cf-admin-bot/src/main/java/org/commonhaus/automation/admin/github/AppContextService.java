@@ -3,12 +3,10 @@ package org.commonhaus.automation.admin.github;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,15 +24,12 @@ import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
-import org.commonhaus.automation.admin.forwardemail.Alias;
-import org.commonhaus.automation.admin.forwardemail.ForwardEmailClient;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -71,9 +66,6 @@ public class AppContextService extends BaseContextService {
     final Map<Long, InstallationAccess> installationAccess = new ConcurrentHashMap<>();
     final Map<String, Long> writeToInstallId = new ConcurrentHashMap<>();
     final Map<String, Long> readToInstallId = new ConcurrentHashMap<>();
-
-    @RestClient
-    ForwardEmailClient forwardEmailClient;
 
     UserManagementConfig userConfig = UserManagementConfig.DISABLED;
 
@@ -218,6 +210,10 @@ public class AppContextService extends BaseContextService {
         BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
     }
 
+    public UserManagementConfig userManagementConfig() {
+        return userConfig;
+    }
+
     public Class<AdminConfigFile> getConfigType() {
         return AdminConfigFile.class;
     }
@@ -331,94 +327,6 @@ public class AppContextService extends BaseContextService {
 
     Boolean or(Boolean a, Boolean b) {
         return Boolean.TRUE.equals(a) || Boolean.TRUE.equals(b);
-    }
-
-    public Map<String, Alias> getAliases(List<String> emails, boolean resetCache) {
-        Map<String, Alias> aliases = new HashMap<>();
-        for (String email : emails) {
-            Alias alias = getAlias(email, resetCache);
-            if (alias != null) {
-                aliases.put(getKey(alias), alias);
-            }
-        }
-        return aliases;
-    }
-
-    public Map<String, Alias> setRecipients(String description, Map<String, Set<String>> aliases) {
-        Map<String, Alias> result = new HashMap<>();
-        for (Map.Entry<String, Set<String>> entry : aliases.entrySet()) {
-            Alias updated = putAlias(description, entry.getKey(), entry.getValue());
-            if (updated != null) {
-                result.put(getKey(updated), updated);
-            }
-        }
-        return result;
-    }
-
-    public boolean generatePassword(String email) {
-        if (userConfig.isDisabled()) {
-            return false;
-        }
-        Alias alias = getAlias(email, false);
-        // TODO: NOT YET.. SOOOON
-        // if (alias != null && alias.verified_recipients != null &&
-        // alias.verified_recipients.size() > 0) {
-        // forwardEmailClient.generatePassword(alias.domain.name, alias.id,
-        // alias.verified_recipients.iterator().next());
-        // return true;
-        // }
-        return false;
-    }
-
-    private String getKey(Alias alias) {
-        return alias.name + "@" + alias.domain.name;
-    }
-
-    private Alias getAlias(String email, boolean resetCache) {
-        if (userConfig.emailDisabled()) {
-            return null;
-        }
-        int at = email.indexOf('@');
-        String domain = at < 0 ? userConfig.defaultAliasDomain() : email.substring(at + 1);
-        String name = at < 0 ? email : email.substring(0, at);
-
-        Alias alias = resetCache ? null : AdminDataCache.ALIASES.get(email);
-        if (alias == null) {
-            // will throw WebApplicationException if not found or error
-            alias = forwardEmailClient.getAlias(domain, name);
-            AdminDataCache.ALIASES.put(email, alias);
-        }
-        return alias;
-    }
-
-    private Alias putAlias(String description, String email, Set<String> recipients) {
-        if (userConfig.emailDisabled() || recipients == null || recipients.isEmpty()) {
-            return null;
-        }
-        int at = email.indexOf('@');
-        String name = at < 0 ? email : email.substring(0, at);
-        String domain = at < 0 ? userConfig.defaultAliasDomain() : email.substring(at + 1);
-
-        Alias alias = getAlias(email, false);
-        if (alias == null) {
-            alias = new Alias();
-            alias.name = name;
-            alias.description = description;
-            alias.recipients = recipients;
-            alias.is_enabled = true;
-            alias.has_recipient_verification = true;
-            forwardEmailClient.createAlias(domain, alias);
-        } else if (!Objects.equals(alias.recipients, recipients) || !Objects.equals(alias.description, description)) {
-            alias.has_recipient_verification = true;
-            alias.description = description;
-            alias.recipients = recipients;
-            if (alias.verified_recipients != null) {
-                alias.verified_recipients.retainAll(recipients);
-            }
-            forwardEmailClient.updateAlias(domain, alias.id, alias);
-        }
-        AdminDataCache.ALIASES.put(email, alias);
-        return alias;
     }
 
     public MemberStatus getStatusForRole(String role) {

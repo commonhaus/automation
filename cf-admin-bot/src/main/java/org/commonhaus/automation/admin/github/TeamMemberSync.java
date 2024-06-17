@@ -62,13 +62,12 @@ public class TeamMemberSync {
     AppContextService ctx;
 
     public void testStartup(@Observes StartupEvent startup) {
-        int initialDelay = 120;
+        int initialDelay = 60;
         TimeUnit unit = TimeUnit.SECONDS;
         if (LaunchMode.current() == LaunchMode.TEST) {
             initialDelay = 0;
             unit = TimeUnit.MILLISECONDS;
         }
-        Log.debug("TeamMemberSync.testStartup: TEST INTERVALS");
         executor.scheduleAtFixedRate(() -> {
             Runnable task = taskQueue.poll();
             if (task != null) {
