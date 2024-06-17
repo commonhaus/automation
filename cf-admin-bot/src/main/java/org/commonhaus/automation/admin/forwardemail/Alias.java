@@ -1,5 +1,6 @@
 package org.commonhaus.automation.admin.forwardemail;
 
+import java.util.Objects;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -35,9 +36,14 @@ public class Alias {
 
     @Override
     public String toString() {
-        return "Alias [name=" + name + ", is_enabled=" + is_enabled
+        return "Alias [name=" + name + ", is_enabled=" + is_enabled + ", id=" + id
                 + ", has_recipient_verification=" + has_recipient_verification + ", recipients=" + recipients
                 + ", created_at=" + created_at + ", updated_at=" + updated_at + "]";
+    }
+
+    public boolean isDirty(String description, Set<String> recipients) {
+        return !Objects.equals(this.recipients, recipients)
+                || !Objects.equals(this.description, description);
     }
 
     public static class AliasDomain {

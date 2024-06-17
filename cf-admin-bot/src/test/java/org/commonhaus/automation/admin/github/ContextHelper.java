@@ -40,6 +40,8 @@ import org.mockito.Mockito;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonGenerator.Feature;
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 
@@ -138,6 +140,13 @@ public class ContextHelper extends QueryContext {
         mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
         AdminConfigFile config = AppContextService.yamlMapper().readValue(
                 getClass().getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
+        ctx.userConfig = config.userManagement();
+    }
+
+    public static void setUserManagementConfig(AppContextService ctx)
+            throws StreamReadException, DatabindException, IOException {
+        AdminConfigFile config = AppContextService.yamlMapper().readValue(
+                ContextHelper.class.getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
         ctx.userConfig = config.userManagement();
     }
 
