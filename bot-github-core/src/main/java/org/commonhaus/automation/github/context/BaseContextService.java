@@ -139,9 +139,13 @@ public abstract class BaseContextService implements ContextService {
     }
 
     public void logAndSendEmail(String logId, String title, Throwable t, String[] addresses) {
-        Log.errorf(t, "[%s] %s: %s", logId, title, t.toString());
-        if (Log.isDebugEnabled()) {
-            t.printStackTrace();
+        if (t == null) {
+            Log.errorf(t, "[%s] %s", logId, title);
+        } else {
+            Log.errorf(t, "[%s] %s: %s", logId, title, "" + t);
+            if (Log.isDebugEnabled()) {
+                t.printStackTrace();
+            }
         }
         MailEvent event = createErrorMailEvent(logId, title, "", t, addresses);
         if (event.hasAddresses()) {
@@ -153,7 +157,7 @@ public abstract class BaseContextService implements ContextService {
         if (t == null) {
             Log.errorf(t, "[%s] %s: %s", logId, title, body);
         } else {
-            Log.errorf(t, "[%s] %s: %s; %s", logId, title, t.toString(), body);
+            Log.errorf(t, "[%s] %s: %s; %s", logId, title, "" + t, body);
             if (Log.isDebugEnabled()) {
                 t.printStackTrace();
             }
