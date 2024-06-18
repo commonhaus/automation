@@ -250,6 +250,9 @@ public class VoteTally {
                         + duplicatesToString()
                         + ignoredToString();
             }
+            if (!isDone) {
+                result += "\r\n A vote manager comment containing `vote::result` will close the vote.";
+            }
         }
 
         return result;
