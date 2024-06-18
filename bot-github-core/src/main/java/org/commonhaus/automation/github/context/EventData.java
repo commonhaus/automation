@@ -48,10 +48,11 @@ public class EventData {
             this.installation = JsonAttribute.installation.appInstallationFrom(jsonData);
         }
 
-        this.logId = getRepoSlug() + ":"
-                + getEventType() + "."
-                + getActionType()
-                + (getNumber() >= 0 ? ("#" + getNumber()) : "");
+        this.logId = "%s:%s.%s%s".formatted(
+                installation, eventType, actionType,
+                repository == null
+                        ? ""
+                        : (":" + repository.getFullName() + (getNumber() >= 0 ? ("#" + getNumber()) : "")));
     }
 
     public String getLogId() {

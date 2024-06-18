@@ -27,7 +27,7 @@ public class ScheduledQueryContext extends QueryContext {
 
         this.repository = ghRepository;
         this.eventType = EventType.bot;
-        this.logId = "%s:scheduled.%s".formatted(repository.getFullName(), eventType);
+        this.logId = "%s:scheduled.%s:%s".formatted(installationId, eventType, repository.getFullName());
     }
 
     public ScheduledQueryContext(ScheduledQueryContext parent, EventType eventType) {
@@ -35,7 +35,7 @@ public class ScheduledQueryContext extends QueryContext {
 
         this.repository = parent.repository;
         this.eventType = eventType;
-        this.logId = "%s:scheduled.%s".formatted(repository.getFullName(), eventType);
+        this.logId = "%s:scheduled.%s:%s".formatted(installationId, eventType, repository.getFullName());
     }
 
     @Override
