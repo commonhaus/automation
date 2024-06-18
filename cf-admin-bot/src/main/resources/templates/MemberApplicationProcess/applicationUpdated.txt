@@ -1,0 +1,9 @@
+Your membership application has been updated. Please review the feedback and make any necessary updates.
+
+---
+
+{body}
+
+---
+
+If you have any questions or need further clarification, please find us on Discord or send an email to hello@commonhaus.org.

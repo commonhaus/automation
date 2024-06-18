@@ -23,9 +23,20 @@ import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHUser;
 
 import io.quarkus.logging.Log;
+import io.quarkus.qute.CheckedTemplate;
+import io.quarkus.qute.TemplateInstance;
 
 @ApplicationScoped
 public class MemberApplicationProcess {
+
+    @CheckedTemplate
+    static class Templates {
+        public static native TemplateInstance applicationAccepted();
+
+        public static native TemplateInstance applicationDeclined();
+
+        public static native TemplateInstance applicationUpdated(String body);
+    }
 
     @Inject
     AppContextService ctx;
@@ -44,21 +55,8 @@ public class MemberApplicationProcess {
         if (MembershipApplicationData.isUserFeedback(comment.body)) {
             Log.debugf("[%s] updateApplicationComments: #%s - user feedback", qc.getLogId(), issue.number);
             String notificationEmail = MembershipApplicationData.getNotificationEmail(issue);
-            if (notificationEmail != null) {
-                String body = """
-                        Your membership application has been updated. Please review the feedback and make any necessary updates.
-
-                        ---
-
-                        %s
-
-                        ---
-
-                        If you have any questions or need further clarification, please find us on Discord or send an email to hello@commonhaus.org.
-
-                        """
-                        .formatted(comment.body.replaceAll("::response::", "").trim());
-
+            if (isValid(notificationEmail)) {
+                String body = Templates.applicationUpdated(comment.body.replaceAll("\\s*::response::\\s*", "")).render();
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
                         "Commonhaus Foundation Membership Application",
@@ -123,19 +121,7 @@ public class MemberApplicationProcess {
             if (!qc.hasErrors()
                     && ctx.addTeamMember(applicant, teamFullName)
                     && isValid(notificationEmail)) {
-                String body = """
-                        🎉 Congratulations! 🎉
-
-                        Your membership application has been accepted.
-                        You are now a member of the Commonhaus Foundation.
-
-                        Please visit the Members-only section of the website for next steps:
-                        https://www.commonhaus.org/member/
-
-                        If you have any questions, please find us on Discord or send an email to hello@commonhaus.org.
-
-                        🥰 🙌 🚀
-                        """;
+                String body = Templates.applicationAccepted().render();
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
                         "Welcome to the Commonhaus Foundation!",
@@ -155,17 +141,7 @@ public class MemberApplicationProcess {
                     true));
 
             if (!qc.hasErrors() && isValid(notificationEmail)) {
-                String body = """
-                        🙏 Thank you for your interest in the Commonhaus Foundation. 🙏
-
-                        We regret to inform you that your membership application has not been accepted at this time.
-
-                        If you have any questions or need further clarification, please find us on Discord or send an email to hello@commonhaus.org.
-
-                        We appreciate your understanding and interest in our community.
-
-                        🫶
-                        """;
+                String body = Templates.applicationDeclined().render();
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
                         "Commonhaus Foundation Membership Application",

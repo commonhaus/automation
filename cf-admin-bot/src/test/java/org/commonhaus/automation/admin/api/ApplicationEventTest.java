@@ -56,16 +56,45 @@ public class ApplicationEventTest extends ContextHelper {
     void init() throws IOException {
         mailbox.clear();
         Stream.of(AdminDataCache.values()).forEach(AdminDataCache::invalidateAll);
-    }
 
-    @Test
-    void testApplicationApproved() throws Exception {
         // When a discussion is labeled, ...
         // from src/test/resources/github/eventIssueLabeled-accepted.json
         String issueId = "I_kwDOL8tG0s6Lx52p";
 
         // preload the cache: no request to fetch labels (and check our work)
         setLabels(issueId, Set.of());
+    }
+
+    @Test
+    void testApplicationComment() throws Exception {
+        final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+
+        GitHubAppTesting.given()
+                .github(mocks -> {
+                    setupInstallationRepositories(mocks, ctx);
+
+                    GitHub botGithub = setupBotGithub(ctx, mocks);
+                    when(botGithub.isCredentialValid()).thenReturn(true);
+
+                    setupMockTeam(mocks);
+                    mockExistingCommonhausData(botGithub, ctx, "src/test/resources/haus-member-application.yaml");
+
+                    mockUpdateCommonhausData(builder, botGithub, ctx);
+                })
+                .when().payloadFromClasspath("/github/eventIssueCommentCreated.json")
+                .event(GHEvent.ISSUE_COMMENT)
+                .then().github(mocks -> {
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
+                });
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+    }
+
+    @Test
+    void testApplicationApproved() throws Exception {
 
         Response removeLabel = mockResponse("src/test/resources/github/mutableRemoveLabelsFromLabelable.json");
         Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
@@ -129,12 +158,6 @@ public class ApplicationEventTest extends ContextHelper {
 
     @Test
     void testApplicationDenied() throws Exception {
-        // When a discussion is labeled, ...
-        // from src/test/resources/github/eventIssueLabeled-accepted.json
-        String issueId = "I_kwDOL8tG0s6Lx52p";
-
-        // preload the cache: no request to fetch labels (and check our work)
-        setLabels(issueId, Set.of());
 
         Response removeLabel = mockResponse("src/test/resources/github/mutableRemoveLabelsFromLabelable.json");
         Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
@@ -192,5 +215,4 @@ public class ApplicationEventTest extends ContextHelper {
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
-
 }
