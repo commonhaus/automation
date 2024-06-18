@@ -139,12 +139,15 @@ public class ForwardEmailService {
             // API CALL: will throw WebApplicationException if not found or error
             // Will throw 404 on not found
             Set<Alias> aliases = forwardEmailClient.findAliasByName(aliasKey.domain(), aliasKey.name());
-            if (aliases.size() > 1) {
+            if (aliases.isEmpty()) {
+                throw new WebApplicationException("Alias not found: " + aliasKey, Status.NOT_FOUND);
+            } else if (aliases.size() > 1) {
                 // should not happen, but...
                 throw new WebApplicationException("Multiple aliases found for " + aliasKey, Status.BAD_REQUEST);
+            } else {
+                alias = aliases.iterator().next();
+                AdminDataCache.ALIASES.put(lookup, alias);
             }
-            alias = aliases.iterator().next();
-            AdminDataCache.ALIASES.put(lookup, alias);
         }
         return alias;
     }

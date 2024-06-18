@@ -95,7 +95,7 @@ public class ForwardEmailTestEndpoint {
                     ForwardEmailTestEndpoint.create("second", "Second Alias", "second".hashCode() + "", domain));
         }
         if ("not_found".equals(name) || "make_new".equals(name)) {
-            throw new WebApplicationException(404);
+            return Set.of();
         }
         if ("error".equals(name)) {
             throw new WebApplicationException(500);

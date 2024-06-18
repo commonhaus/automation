@@ -81,7 +81,8 @@ public class ForwardEmailTest {
                 .when()
                 .get("domains/commonhaus.dev/aliases?name=not_found")
                 .then()
-                .statusCode(404);
+                .statusCode(200)
+                .body("size()", equalTo(0));
 
         given() // alias by name
                 .when()
