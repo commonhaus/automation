@@ -205,7 +205,7 @@ public class ForwardEmailService {
         int at = email.indexOf('@');
         String name = at < 0 ? email : email.substring(0, at);
         String domain = at < 0 ? defaultAliasDomain() : email.substring(at + 1);
-        return AliasKey.createKey(name, domain);
+        return AliasKey.createKey(name.toLowerCase(), domain.toLowerCase());
     }
 
     public Set<AliasKey> normalizeEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {
