@@ -13,6 +13,7 @@ public enum EventType {
     discussion,
     discussion_comment,
     issue,
+    issues,
     issue_comment,
     label,
     membership,
