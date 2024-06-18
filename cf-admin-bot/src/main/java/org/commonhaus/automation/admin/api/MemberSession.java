@@ -123,8 +123,10 @@ public class MemberSession {
         return getUserData().url;
     }
 
-    public void applicationStatus(boolean b) {
-        this.getUserData().hasApplication = b;
+    public GitHubUser updateApplication(CommonhausUser user) {
+        GitHubUser userData = this.getUserData();
+        userData.hasApplication = user.hasApplication();
+        return userData;
     }
 
     public GitHub connection() {

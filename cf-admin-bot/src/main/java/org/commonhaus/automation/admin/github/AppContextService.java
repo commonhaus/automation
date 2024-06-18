@@ -385,18 +385,22 @@ public class AppContextService extends BaseContextService {
     }
 
     public Response toResponse(String logId, String message, Throwable t) {
-        if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
-            return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
+        if (t == null) {
+            Log.errorf("[%s] %s; %s", logId, message, t);
+        } else {
+            if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
+                return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
+            }
+            Log.errorf(t, "[%s] %s; %s", logId, message, t);
         }
-        Log.errorf(t, "[%s] %s; %s", logId, message, t);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
 
     public Response toResponseWithEmail(String logId, String message, Throwable t) {
-        if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
+        logAndSendEmail(logId, message, t, null);
+        if (t != null && t.toString().toLowerCase().contains("timeout")) { // totally cheating
             return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
         }
-        logAndSendEmail(logId, message, t, null);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
 

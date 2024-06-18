@@ -62,6 +62,7 @@ public class MemberApplicationResource {
                         getNotificationEmail(session)); // WRITE
             }
             return user.toResponse()
+                    .setData(Type.INFO, session.updateApplication(user))
                     .setData(Type.APPLY, applicationData)
                     .finish();
         } catch (Throwable e) {
@@ -150,6 +151,7 @@ public class MemberApplicationResource {
                                 true));
                     }
                     return user.toResponse()
+                            .setData(Type.INFO, session.updateApplication(user))
                             .setData(Type.APPLY, applicationData)
                             .finish();
                 }
@@ -182,6 +184,7 @@ public class MemberApplicationResource {
 
                 return user.toResponse()
                         .setData(Type.APPLY, updated)
+                        .setData(Type.INFO, session.updateApplication(user))
                         .finish();
             } finally {
                 checkRunning.set(false);

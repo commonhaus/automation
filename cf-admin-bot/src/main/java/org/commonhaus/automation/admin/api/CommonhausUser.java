@@ -252,8 +252,8 @@ public class CommonhausUser {
         return false;
     }
 
-    public void updateApplicationStatus(MemberSession session) {
-        session.applicationStatus(this.application != null);
+    public boolean hasApplication() {
+        return application != null;
     }
 
     public ApiResponse toResponse() {

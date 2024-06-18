@@ -91,9 +91,8 @@ public class MemberResource {
                 // This should not happen after a fetch with create=true
                 return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             }
-            user.updateApplicationStatus(session);
             return user.toResponse()
-                    .setData(ApiResponse.Type.INFO, session.getUserData())
+                    .setData(ApiResponse.Type.INFO, session.updateApplication(user))
                     .finish();
         } catch (Exception e) {
             return ctx.toResponse("getCommonhausUser", "Unable to get user data for " + session.login(), e);
@@ -126,9 +125,8 @@ public class MemberResource {
                         false,
                         false));
             }
-            user.updateApplicationStatus(session);
             return user.toResponse()
-                    .setData(ApiResponse.Type.INFO, session.getUserData())
+                    .setData(ApiResponse.Type.INFO, session.updateApplication(user))
                     .finish();
         } catch (Exception e) {
             return ctx.toResponse("updateUserStatus", "Unable to update status for " + session.login(), e);
