@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.context;
 
 public enum ActionType {
+    added,
     answered,
     category_changed,
     closed,

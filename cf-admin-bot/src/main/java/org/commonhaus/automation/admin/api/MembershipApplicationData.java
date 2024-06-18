@@ -112,13 +112,13 @@ public class MembershipApplicationData {
                 <!--NOTES::-->
                 %s
                 <!--::NOTES-->
-                <!-- notify::%s -->
+                %s
                 """.formatted(
                 session.login(),
                 session.url(),
                 STRIP_COMMENTS.matcher(applicationPost.contributions()).replaceAll(" "),
                 STRIP_COMMENTS.matcher(applicationPost.additionalNotes()).replaceAll(" "),
-                notificationEmail);
+                notificationEmail == null ? "" : "<!-- notify::%s -->".formatted(notificationEmail));
     }
 
     public static String createTitle(MemberSession session) {

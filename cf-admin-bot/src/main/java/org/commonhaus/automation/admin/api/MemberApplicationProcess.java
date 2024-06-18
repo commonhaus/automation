@@ -58,6 +58,7 @@ public class MemberApplicationProcess {
 
                         """
                         .formatted(comment.body.replaceAll("::response::", "").trim());
+
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
                         "Commonhaus Foundation Membership Application",
@@ -176,6 +177,11 @@ public class MemberApplicationProcess {
             throw qc.bundleExceptions();
         }
 
+        if (isValid(notificationEmail)) {
+            // Try to remove the notification email from the issue body
+            String updated = MembershipApplicationData.NOTIFICATION.matcher(item.body).replaceAll("");
+            qc.updateItemDescription(EventType.issue, item.id, updated, DataCommonItem.ISSUE_FIELDS);
+        }
         qc.closeIssue(issue);
         qc.removeLabels(item.id, List.of(MembershipApplicationData.NEW));
     }

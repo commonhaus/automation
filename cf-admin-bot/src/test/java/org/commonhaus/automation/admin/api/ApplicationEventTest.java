@@ -68,6 +68,7 @@ public class ApplicationEventTest extends ContextHelper {
         setLabels(issueId, Set.of());
 
         Response removeLabel = mockResponse("src/test/resources/github/mutableRemoveLabelsFromLabelable.json");
+        Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
 
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
@@ -86,6 +87,10 @@ public class ApplicationEventTest extends ContextHelper {
                     when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
                             .thenReturn(removeLabel);
+
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
+                            .executeSync(contains("updateIssue(input: {"), anyMap()))
+                            .thenReturn(updateIssue);
                 })
                 .when().payloadFromClasspath("/github/eventIssueLabeled-accepted.json")
                 .event(GHEvent.ISSUES)
@@ -110,6 +115,8 @@ public class ApplicationEventTest extends ContextHelper {
 
                     // 5) remove application/new
                     verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
+                            .executeSync(contains("updateIssue(input: {"), anyMap());
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
@@ -130,6 +137,7 @@ public class ApplicationEventTest extends ContextHelper {
         setLabels(issueId, Set.of());
 
         Response removeLabel = mockResponse("src/test/resources/github/mutableRemoveLabelsFromLabelable.json");
+        Response updateIssue = mockResponse("src/test/resources/github/mutableUpdateIssue.json");
 
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
@@ -148,6 +156,9 @@ public class ApplicationEventTest extends ContextHelper {
                     when(mocks.installationGraphQLClient(datastoreInstallationId)
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap()))
                             .thenReturn(removeLabel);
+                    when(mocks.installationGraphQLClient(datastoreInstallationId)
+                            .executeSync(contains("updateIssue(input: {"), anyMap()))
+                            .thenReturn(updateIssue);
                 })
                 .when().payloadFromClasspath("/github/eventIssueLabeled-declined.json")
                 .event(GHEvent.ISSUES)
@@ -169,6 +180,8 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(mocks.issue(2345115049L)).close();
 
                     // 5) remove application/new
+                    verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
+                            .executeSync(contains("updateIssue(input: {"), anyMap());
                     verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
                             .executeSync(contains("removeLabelsFromLabelable("), anyMap());
 
