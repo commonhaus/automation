@@ -121,7 +121,7 @@ public class MemberApplicationProcess {
             // (re-)try adding the user to the team if the above went ok.
             if (!qc.hasErrors()
                     && ctx.addTeamMember(applicant, teamFullName)
-                    && notificationEmail != null) {
+                    && isValid(notificationEmail)) {
                 String body = """
                         🎉 Congratulations! 🎉
 
@@ -133,7 +133,7 @@ public class MemberApplicationProcess {
 
                         If you have any questions, please find us on Discord or send an email to hello@commonhaus.org.
 
-                        🥰 🚀
+                        🥰 🙌 🚀
                         """;
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
@@ -153,7 +153,7 @@ public class MemberApplicationProcess {
                     true,
                     true));
 
-            if (!qc.hasErrors() && notificationEmail != null) {
+            if (!qc.hasErrors() && isValid(notificationEmail)) {
                 String body = """
                         🙏 Thank you for your interest in the Commonhaus Foundation. 🙏
 
@@ -163,7 +163,7 @@ public class MemberApplicationProcess {
 
                         We appreciate your understanding and interest in our community.
 
-                        🌱 🚀
+                        🫶
                         """;
                 String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(qc.getLogId(),
@@ -178,6 +178,10 @@ public class MemberApplicationProcess {
 
         qc.closeIssue(issue);
         qc.removeLabels(item.id, List.of(MembershipApplicationData.NEW));
+    }
+
+    protected boolean isValid(String notificationEmail) {
+        return notificationEmail != null && !notificationEmail.isBlank();
     }
 
     /**
