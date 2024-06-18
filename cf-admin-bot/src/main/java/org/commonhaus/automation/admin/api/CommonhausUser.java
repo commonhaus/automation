@@ -32,52 +32,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public class CommonhausUser {
     public static final String MEMBER_ROLE = "member";
 
-    public enum MemberStatus {
-        REVOKED,
-        SUSPENDED,
-        DECLINED,
-        COMMITTEE,
-        ACTIVE,
-        INACTIVE,
-        PENDING,
-        SPONSOR,
-        UNKNOWN;
-
-        public static MemberStatus fromString(String role) {
-            if (role == null) {
-                return UNKNOWN;
-            }
-            try {
-                return MemberStatus.valueOf(role.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                return UNKNOWN;
-            }
-        }
-
-        public boolean mayHaveEmail() {
-            return this == COMMITTEE
-                    || this == ACTIVE
-                    || this == INACTIVE;
-        }
-
-        public boolean updateToPending() {
-            return this == UNKNOWN
-                    || this == SPONSOR
-                    || this == INACTIVE;
-        }
-
-        public boolean updateFromPending() {
-            return this == UNKNOWN
-                    || this == PENDING;
-        }
-
-        public boolean couldBeActiveMember() {
-            return this != MemberStatus.REVOKED
-                    && this != MemberStatus.SUSPENDED
-                    && this != MemberStatus.DECLINED;
-        }
-    }
-
     @SuppressWarnings("unused")
     public static class Discord {
         String id;

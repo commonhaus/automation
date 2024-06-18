@@ -19,7 +19,6 @@ import java.util.stream.Stream;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;

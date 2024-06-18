@@ -15,7 +15,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-public class ApplicationData {
+public class MembershipApplicationData {
     public static final String NEW = "application/new";
     public static final String ACCEPTED = "application/accepted";
     public static final String DECLINED = "application/declined";
@@ -36,7 +36,7 @@ public class ApplicationData {
     String additionalNotes;
     Feedback feedback;
 
-    public ApplicationData(String login, DataCommonItem issue) {
+    public MembershipApplicationData(String login, DataCommonItem issue) {
         this.title = issue == null ? null : issue.title;
         if (title == null || !ownerEquals(login)) {
             return;

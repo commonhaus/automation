@@ -16,7 +16,6 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
 import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;

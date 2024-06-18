@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.admin.api.ApplicationData;
 import org.commonhaus.automation.admin.api.MemberApplicationProcess;
+import org.commonhaus.automation.admin.api.MembershipApplicationData;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataCommonComment;
@@ -109,7 +109,7 @@ public class AdminGitHubEvents {
 
         // ignore if it isn't an issue in the datastore repository
         if (!repoFullName.equals(ctx.getDataStore())
-                || !ApplicationData.isMemberApplicationEvent(issue, label)) {
+                || !MembershipApplicationData.isMemberApplicationEvent(issue, label)) {
             return;
         }
 
@@ -152,7 +152,7 @@ public class AdminGitHubEvents {
 
         // ignore if it isn't an issue in the datastore repository
         if (!repoFullName.equals(ctx.getDataStore())
-                || !ApplicationData.isMemberApplicationEvent(issue, null)) {
+                || !MembershipApplicationData.isMemberApplicationEvent(issue, null)) {
             return;
         }
 

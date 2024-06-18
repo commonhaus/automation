@@ -7,10 +7,9 @@ import java.util.List;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
-import org.commonhaus.automation.admin.api.ApplicationData.Feedback;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
+import org.commonhaus.automation.admin.api.MembershipApplicationData.ApplicationPost;
+import org.commonhaus.automation.admin.api.MembershipApplicationData.Feedback;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -42,9 +41,9 @@ public class MemberApplicationProcess {
      * @param item
      */
     public void handleApplicationComment(ScopedQueryContext qc, DataCommonItem issue, DataCommonComment comment) {
-        if (ApplicationData.isUserFeedback(comment.body)) {
+        if (MembershipApplicationData.isUserFeedback(comment.body)) {
             Log.debugf("[%s] updateApplicationComments: #%s - user feedback", qc.getLogId(), issue.number);
-            String notificationEmail = ApplicationData.getNotificationEmail(issue);
+            String notificationEmail = MembershipApplicationData.getNotificationEmail(issue);
             if (notificationEmail != null) {
                 String body = """
                         Your membership application has been updated. Please review the feedback and make any necessary updates.
@@ -81,7 +80,7 @@ public class MemberApplicationProcess {
      */
     public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item,
             DataLabel label) throws Throwable {
-        String login = ApplicationData.getLogin(item);
+        String login = MembershipApplicationData.getLogin(item);
         GHUser applicant = qc.getUser(login);
 
         String teamFullName = ctx.getTeamForRole(CommonhausUser.MEMBER_ROLE);
@@ -96,7 +95,7 @@ public class MemberApplicationProcess {
             throw new IllegalStateException("Label added to an application for an unknown user " + login);
         }
 
-        ApplicationData applicationData = new ApplicationData(login, item);
+        MembershipApplicationData applicationData = new MembershipApplicationData(login, item);
         // We haven't approved/declined this member yet: we need a valid application
         if (user.isMember == null && !applicationData.isValid()) {
             throw new IllegalStateException(
@@ -104,8 +103,8 @@ public class MemberApplicationProcess {
                             .formatted(login, item.id, item.title));
         }
 
-        String notificationEmail = ApplicationData.getNotificationEmail(item);
-        if (ApplicationData.isAccepted(label)) {
+        String notificationEmail = MembershipApplicationData.getNotificationEmail(item);
+        if (MembershipApplicationData.isAccepted(label)) {
             if (user.isMember == null) {
                 datastore.setCommonhausUser(new UpdateEvent(user,
                         (c, u) -> {
@@ -141,7 +140,7 @@ public class MemberApplicationProcess {
                         "Welcome to the Commonhaus Foundation!",
                         body, htmlBody, new String[] { notificationEmail });
             }
-        } else if (user.isMember == null && ApplicationData.isDeclined(label)) {
+        } else if (user.isMember == null && MembershipApplicationData.isDeclined(label)) {
             datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
                         if (u.status().updateFromPending()) {
@@ -178,7 +177,7 @@ public class MemberApplicationProcess {
         }
 
         qc.closeIssue(issue);
-        qc.removeLabels(item.id, List.of(ApplicationData.NEW));
+        qc.removeLabels(item.id, List.of(MembershipApplicationData.NEW));
     }
 
     /**
@@ -193,37 +192,37 @@ public class MemberApplicationProcess {
      * @return updated ApplicationData object or null on error (see QueryContext for
      *         errors)
      */
-    public ApplicationData userUpdateApplicationIssue(
+    public MembershipApplicationData userUpdateApplicationIssue(
             MemberSession session,
             ScopedQueryContext qc,
-            ApplicationData applicationData,
+            MembershipApplicationData applicationData,
             ApplicationPost applicationPost,
             String notificationEmail) {
 
-        String content = ApplicationData.issueContent(session, applicationPost, notificationEmail);
-        Collection<DataLabel> labels = qc.findLabels(List.of(ApplicationData.NEW));
+        String content = MembershipApplicationData.issueContent(session, applicationPost, notificationEmail);
+        Collection<DataLabel> labels = qc.findLabels(List.of(MembershipApplicationData.NEW));
         MembershipApplication application = applicationData == null ? null : applicationData.application;
 
         DataCommonItem item = application == null
                 ? qc.createItem(EventType.issue,
-                        ApplicationData.createTitle(session),
+                        MembershipApplicationData.createTitle(session),
                         content,
                         labels)
                 : qc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
 
         return item == null
                 ? null
-                : new ApplicationData(session.login(), item);
+                : new MembershipApplicationData(session.login(), item);
     }
 
-    ApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments)
+    MembershipApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments)
             throws Throwable {
         ScopedQueryContext qc = ctx.getDatastoreContext();
         DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
         if (qc.hasErrors()) {
             throw qc.bundleExceptions();
         }
-        ApplicationData application = new ApplicationData(session.login(), issue);
+        MembershipApplicationData application = new MembershipApplicationData(session.login(), issue);
         if (application.isValid() && withComments) {
             Feedback feedback = getFeedback(qc, applicationId, issue.mostRecentEdit());
             if (feedback != null) {
@@ -235,7 +234,7 @@ public class MemberApplicationProcess {
 
     Feedback getFeedback(ScopedQueryContext qc, String nodeId, Date mostRecentEdit) {
         List<DataCommonComment> comments = qc.getComments(nodeId,
-                x -> ApplicationData.isUserFeedback(x.body) && ApplicationData.isNewer(x, mostRecentEdit));
+                x -> MembershipApplicationData.isUserFeedback(x.body) && MembershipApplicationData.isNewer(x, mostRecentEdit));
 
         return (comments == null || comments.isEmpty())
                 ? null

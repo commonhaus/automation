@@ -5,6 +5,15 @@ import java.util.Set;
 
 import org.commonhaus.automation.github.context.QueryContext;
 
+/**
+ * We have to reach across installations to keep team members in sync, and work
+ * between the user-logged-in session and the datastore repository.
+ *
+ * This class is used to keep track of the installations, the org it is associated with,
+ * and the repositories that are accessible to the installation.
+ * The bot is installed requires a certain set of permissions, which means it will be
+ * able to read/write any repository that is associated with its own org.
+ */
 public class InstallationAccess {
     final long installationId;
     final String orgName;

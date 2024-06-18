@@ -13,9 +13,8 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.ApiResponse.Type;
-import org.commonhaus.automation.admin.api.ApplicationData.ApplicationPost;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
+import org.commonhaus.automation.admin.api.MembershipApplicationData.ApplicationPost;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -52,7 +51,7 @@ public class MemberApplicationResource {
             }
 
             MembershipApplication application = user.application();
-            ApplicationData applicationData = application == null
+            MembershipApplicationData applicationData = application == null
                     ? null
                     : memberApplicationProcess.findUserApplication(session, application.nodeId(), true);
 
@@ -86,7 +85,7 @@ public class MemberApplicationResource {
             }
 
             MembershipApplication application = user.application();
-            ApplicationData applicationData = application == null
+            MembershipApplicationData applicationData = application == null
                     ? null
                     : memberApplicationProcess.findUserApplication(session, application.nodeId(), false);
 
@@ -113,7 +112,7 @@ public class MemberApplicationResource {
         return null;
     }
 
-    private Response doUserApplicationUpdate(CommonhausUser user, ApplicationData applicationData,
+    private Response doUserApplicationUpdate(CommonhausUser user, MembershipApplicationData applicationData,
             ApplicationPost post, String notificationEmail) {
         AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
                 (k) -> new AtomicBoolean(false));
@@ -156,7 +155,7 @@ public class MemberApplicationResource {
                 }
 
                 // UPDATE APPLICATION ISSUE
-                ApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc,
+                MembershipApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc,
                         applicationData, post, notificationEmail);
 
                 if (qc.hasErrors()) {

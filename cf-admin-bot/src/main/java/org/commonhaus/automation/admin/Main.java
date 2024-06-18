@@ -26,7 +26,6 @@ public class Main {
 
         @Override
         public int run(String... args) {
-            java.security.Security.setProperty("networkaddress.cache.ttl", "0");
             java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0");
 
             System.out.println("discoveryEnabled=" + ctx.isDiscoveryEnabled());

@@ -18,8 +18,8 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.AdminConfig;
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.CommonhausUser.MemberStatus;
 import org.commonhaus.automation.admin.api.MemberSession;
+import org.commonhaus.automation.admin.api.MemberStatus;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
