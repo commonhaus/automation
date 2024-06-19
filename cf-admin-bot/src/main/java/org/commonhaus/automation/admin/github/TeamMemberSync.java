@@ -21,6 +21,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.admin.api.CouncilResource.TeamSyncTriggerEvent;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.SponsorsConfig;
 import org.commonhaus.automation.admin.config.TeamManagementConfig;
@@ -54,15 +55,17 @@ import io.vertx.core.impl.ConcurrentHashSet;
 
 @ApplicationScoped
 public class TeamMemberSync {
+
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+
     private final Set<MonitoredRepo> monitoredRepos = new ConcurrentHashSet<>();
 
     @Inject
     AppContextService ctx;
 
-    public void testStartup(@Observes StartupEvent startup) {
-        int initialDelay = 60;
+    public void configureExecutor(@Observes StartupEvent startup) {
+        int initialDelay = 30;
         TimeUnit unit = TimeUnit.SECONDS;
         if (LaunchMode.current() == LaunchMode.TEST) {
             initialDelay = 0;
@@ -73,7 +76,7 @@ public class TeamMemberSync {
             if (task != null) {
                 task.run();
             }
-        }, initialDelay, 30, unit);
+        }, initialDelay, 10, unit);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -134,6 +137,11 @@ public class TeamMemberSync {
                 scheduleQueryRepository(repoCfg, github);
             }
         }
+    }
+
+    void syncTrigger(@Observes TeamSyncTriggerEvent event) {
+        Log.debug("syncTrigger: triggered by event");
+        scheduledSync();
     }
 
     @Scheduled(cron = "${automation.admin.team-sync-cron:13 27 */5 * * ?}")
@@ -199,7 +207,7 @@ public class TeamMemberSync {
             Collection<String> sponsorLogins = getSponsors(sponsors.sponsorable());
             addMissingCollaborators(sponsors.repository(), sponsorLogins, sponsors.dryRun(), qc.dryRunEmailAddress());
         } catch (Throwable t) {
-            qc.logAndSendEmail("syncSponsors", "Error syncing sponsors", t);
+            qc.logAndSendEmail("Error syncing sponsors", t);
         }
     }
 
@@ -319,7 +327,7 @@ public class TeamMemberSync {
                         }
                         doSyncTeamMembers(source, targetTeam, logins, qc.dryRunEmailAddress());
                     } catch (Throwable t) {
-                        qc.logAndSendEmail("doSyncTeamMembers", "Error syncing team members", t);
+                        qc.logAndSendEmail("Error syncing team members", t);
                     }
                 }
             } else {

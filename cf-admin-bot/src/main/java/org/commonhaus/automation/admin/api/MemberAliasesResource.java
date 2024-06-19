@@ -124,7 +124,7 @@ public class MemberAliasesResource {
         if (!ctx.validAttestation(ID)) {
             // Not the user's fault.. misconfiguration
             Exception e = new Exception("Invalid attestation id");
-            ctx.logAndSendEmail("getAliases", ID + " is an nvalid attestation id", e, null);
+            ctx.logAndSendEmail("getUser", ID + " is an nvalid attestation id", e, null);
         }
         return user;
     }

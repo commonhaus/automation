@@ -220,8 +220,8 @@ public class CommonhausUser {
         if (isMember() && !roles.contains(MEMBER_ROLE)) {
             // inconsistency: user is a member but does not have the member role
             // this could be a missed automation step
-            ctx.logAndSendEmail("status",
-                    "%s is a member but does not have the member role (missing group?)".formatted(login()),
+            ctx.logAndSendEmail("refreshStatus",
+                    "refreshStatus: %s is a member but does not have the member role (missing group?)".formatted(login()),
                     null, null);
             roles.add(MEMBER_ROLE);
         }

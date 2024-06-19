@@ -243,12 +243,12 @@ public class QueryContext {
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
             if (response != null && response.hasError()) {
-                logAndSendEmail(getLogId(), "Error executing GraphQL query", response.getErrors().toString(),
+                logAndSendEmail("Error executing GraphQL query", response.getErrors().toString(),
                         null);
                 errors.addAll(response.getErrors());
             }
         } catch (Throwable e) {
-            logAndSendEmail(getLogId(), "Error executing GraphQL query", e);
+            logAndSendEmail("Error executing GraphQL query", e);
             exceptions.add(e);
         }
         return response;
@@ -793,12 +793,12 @@ public class QueryContext {
         return ctx.botErrorEmailAddress();
     }
 
-    public void logAndSendEmail(String logId, String title, Throwable t) {
-        ctx.logAndSendEmail(logId, title, t, getErrorAddresses());
+    public void logAndSendEmail(String title, Throwable t) {
+        ctx.logAndSendEmail(getLogId(), title, t, getErrorAddresses());
     }
 
-    public void logAndSendEmail(String logId, String title, String body, Throwable t) {
-        ctx.logAndSendEmail(logId, title, body, t, getErrorAddresses());
+    public void logAndSendEmail(String title, String body, Throwable t) {
+        ctx.logAndSendEmail(getLogId(), title, body, t, getErrorAddresses());
     }
 
     public static String toOrganizationName(String fullName) {

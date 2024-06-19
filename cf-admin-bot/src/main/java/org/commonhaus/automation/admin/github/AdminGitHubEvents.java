@@ -126,7 +126,7 @@ public class AdminGitHubEvents {
             qc.getLabels(qc.getRepositoryId()); // pre-fetch
             applicationProcess.handleApplicationLabelAdded(qc, eventPayload.getIssue(), issue, label);
         } catch (Throwable e) {
-            ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
+            qc.logAndSendEmail("Error with issue label event", e);
         } finally {
             qc.clearErrors();
         }
@@ -166,7 +166,7 @@ public class AdminGitHubEvents {
         try {
             applicationProcess.handleApplicationComment(qc, issue, comment);
         } catch (Exception e) {
-            ctx.logAndSendEmail(qc.getLogId(), "Error with issue label event", e, null);
+            qc.logAndSendEmail("Error with issue label event", e);
         } finally {
             qc.clearErrors();
         }

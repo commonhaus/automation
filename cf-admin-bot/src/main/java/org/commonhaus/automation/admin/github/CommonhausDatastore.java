@@ -138,7 +138,7 @@ public class CommonhausDatastore {
      * @return A Commonhaus user object (never null)
      * @throws RuntimeException if GitHub or other API query fails
      */
-    @ConsumeEvent(value = READ)
+    @ConsumeEvent(READ)
     public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
         final String key = getKey(event);
 
@@ -168,7 +168,7 @@ public class CommonhausDatastore {
             return Uni.createFrom().failure(e);
         } else if (result == null && event.create()) {
             Exception e = new IllegalStateException("No result for user after fetch with create");
-            ctx.logAndSendEmail(qc.getLogId(), "Failed to update Commonhaus user", e, null);
+            qc.logAndSendEmail("Failed to update Commonhaus user", e);
             return Uni.createFrom().failure(e);
         }
 
@@ -186,7 +186,7 @@ public class CommonhausDatastore {
      * @throws RuntimeException if GitHub or other API query fails
      */
     @Blocking
-    @ConsumeEvent(value = WRITE)
+    @ConsumeEvent(WRITE)
     public Uni<CommonhausUser> pushCommonhausUser(UpdateEvent event) {
         final CommonhausUser user = event.user();
 
@@ -203,7 +203,7 @@ public class CommonhausDatastore {
         if (qc.hasErrors()) {
             Throwable e = qc.bundleExceptions();
             qc.clearErrors();
-            ctx.logAndSendEmail(qc.getLogId(), "Failed to update Commonhaus user", e, null);
+            qc.logAndSendEmail("Failed to update Commonhaus user", e);
             return Uni.createFrom().failure(e);
         }
 

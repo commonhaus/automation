@@ -58,6 +58,7 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 
 @Singleton
 public class AppContextService extends BaseContextService {
+    public static final String TEAM_SYNC_TRIGGER = "team-sync";
 
     // This all feels ridiculous. But we need to find the right installation
     // for the access we need across multiple installations to construct
