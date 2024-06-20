@@ -185,7 +185,7 @@ public class ForwardEmailService {
                 alias.verified_recipients.retainAll(recipients);
             }
             // API CALL: will throw WebApplicationException on error
-            alias = forwardEmailClient.updateAlias(aliasKey.domain(), description, alias);
+            alias = forwardEmailClient.updateAlias(aliasKey.domain(), alias.id, alias);
         }
         AdminDataCache.ALIASES.put(aliasKey.toString(), alias);
         return alias;

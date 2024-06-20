@@ -12,9 +12,11 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 
 import org.commonhaus.automation.admin.dev.ForwardEmailTestEndpoint;
+import org.commonhaus.automation.admin.dev.ForwardEmailTestEndpoint.TestAlias;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +35,14 @@ public class ForwardEmailTest {
 
     @Inject
     ForwardEmailService forwardEmailService;
+
+    @Inject
+    ForwardEmailTestEndpoint testEndpoint;
+
+    @BeforeEach
+    public void setup() {
+        testEndpoint.clear();
+    }
 
     /**
      * Sanity check the mock endpoint. This is used indirectly by
@@ -123,7 +133,14 @@ public class ForwardEmailTest {
         // This should not throw: 404 should be handled (empty response)
         forwardEmailService.fetchAliases(
                 Set.of(AliasKey.fromCache("not_found@commonhaus.dev")),
-                false);
+                true);
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(1);
+
+        var call = methodCalls.get(0);
+        assertThat(call.method()).isEqualTo("GET");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        assertThat(call.params()).containsEntry("name", "not_found");
     }
 
     @Test
@@ -132,8 +149,15 @@ public class ForwardEmailTest {
         assertThrows(WebApplicationException.class, () -> {
             forwardEmailService.fetchAliases(
                     Set.of(AliasKey.fromCache("error@commonhaus.dev")),
-                    false);
+                    true);
         });
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(1);
+
+        var call = methodCalls.get(0);
+        assertThat(call.method()).isEqualTo("GET");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        assertThat(call.params()).containsEntry("name", "error");
     }
 
     @Test
@@ -141,16 +165,40 @@ public class ForwardEmailTest {
         ContextHelper.setUserManagementConfig(ctx);
         Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
                 Set.of(AliasKey.fromCache("test@commonhaus.dev")),
-                false);
+                true);
         assertThat(aliases).size().isEqualTo(1);
+
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(1);
+
+        var call = methodCalls.get(0);
+        assertThat(call.method()).isEqualTo("GET");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        assertThat(call.params()).containsEntry("name", "test");
     }
 
     @Test
     public void testCreateAlias() throws Exception {
         ContextHelper.setUserManagementConfig(ctx);
-        forwardEmailService.postAliases(
+        Map<AliasKey, Alias> aliases = forwardEmailService.postAliases(
                 Map.of(AliasKey.fromCache("make_new@commonhaus.dev"), Set.of("new@commonhaus.org")),
                 "Test User");
+        assertThat(aliases).size().isEqualTo(1);
+
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(2);
+
+        var call = methodCalls.get(0);
+        assertThat(call.method()).isEqualTo("GET");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        assertThat(call.params()).containsEntry("name", "make_new");
+
+        call = methodCalls.get(1);
+        assertThat(call.method()).isEqualTo("POST");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        var alias = (TestAlias) call.params().get("alias");
+        assertThat(alias).isNotNull();
+        assertThat(alias.name).isEqualTo("make_new");
     }
 
     @Test
@@ -159,6 +207,20 @@ public class ForwardEmailTest {
         forwardEmailService.postAliases(
                 Map.of(AliasKey.fromCache("test@commonhaus.dev"), Set.of("test@commonhaus.org")),
                 "Test User");
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(2);
+
+        var call = methodCalls.get(0);
+        assertThat(call.method()).isEqualTo("GET");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases");
+        assertThat(call.params()).containsEntry("name", "test");
+
+        call = methodCalls.get(1);
+        assertThat(call.method()).isEqualTo("PUT");
+        assertThat(call.path()).isEqualTo("/domains/commonhaus.dev/aliases/" + ForwardEmailTestEndpoint.test.id);
+        var alias = (TestAlias) call.params().get("alias");
+        assertThat(alias).isNotNull();
+        assertThat(alias.name).isEqualTo("test");
     }
 
     @Test
@@ -167,6 +229,8 @@ public class ForwardEmailTest {
         GeneratePassword instructions = new GeneratePassword("test@commonhaus.org");
         forwardEmailClient.getAlias("commonhaus.dev", "66707183881a6ff4d292baeb");
         forwardEmailClient.generatePassword("commonhaus.dev", "66707183881a6ff4d292baeb", instructions);
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(1);
     }
 
     // @Test

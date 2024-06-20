@@ -1,7 +1,11 @@
 package org.commonhaus.automation.admin.dev;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import jakarta.inject.Singleton;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -20,6 +24,7 @@ import org.commonhaus.automation.admin.forwardemail.GeneratePassword;
 
 import io.quarkus.arc.profile.UnlessBuildProfile;
 
+@Singleton
 @UnlessBuildProfile("prod")
 @Path("/forward-email-test/v1")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -79,15 +84,31 @@ public class ForwardEmailTestEndpoint {
         test.domain.name = commonhaus.name;
     }
 
+    public static record ApiCall(String method, String path, Map<String, Object> params) {
+    }
+
+    List<ApiCall> methodCalls = new ArrayList<>();
+
+    public void clear() {
+        methodCalls.clear();
+    }
+
+    public List<ApiCall> getMethodCalls() {
+        return methodCalls;
+    }
+
     @GET
     @Path("/domains")
     public Set<TestDomain> getDomains() {
+        methodCalls.add(new ApiCall("GET", "/domains", null));
         return Set.of(commonhaus, hibernate);
     }
 
     @GET
     @Path("/domains/{fqdn}/aliases")
     public Set<TestAlias> getAliases(@PathParam("fqdn") String fqdn, @QueryParam("name") String name) {
+        methodCalls.add(new ApiCall("GET", "/domains/" + fqdn + "/aliases",
+                name == null ? null : Map.of("name", name)));
         TestDomain domain = fqdn.equals(commonhaus.name) ? commonhaus : hibernate;
         if (name == null) {
             return Set.of(
@@ -109,6 +130,7 @@ public class ForwardEmailTestEndpoint {
     @GET
     @Path("/domains/{fqdn}/aliases/{id}")
     public TestAlias getAlias(@PathParam("fqdn") String fqdn, @PathParam("id") String id) {
+        methodCalls.add(new ApiCall("GET", "/domains/" + fqdn + "/aliases/" + id, null));
         TestDomain domain = fqdn.equals(commonhaus.name) ? commonhaus : hibernate;
         if ("not_found".equals(id) || "make_new".equals(id)) {
             throw new WebApplicationException(404);
@@ -125,6 +147,7 @@ public class ForwardEmailTestEndpoint {
     @POST
     @Path("/domains/{fqdn}/aliases")
     public Response createAlias(@PathParam("fqdn") String fqdn, TestAlias alias) {
+        methodCalls.add(new ApiCall("POST", "/domains/" + fqdn + "/aliases", Map.of("alias", alias)));
         alias.domain = new AliasDomain();
         alias.domain.name = fqdn;
         return Response.ok().entity(alias).build();
@@ -133,6 +156,7 @@ public class ForwardEmailTestEndpoint {
     @PUT
     @Path("/domains/{fqdn}/aliases/{id}")
     public Response updateAlias(@PathParam("fqdn") String fqdn, @PathParam("id") String id, TestAlias alias) {
+        methodCalls.add(new ApiCall("PUT", "/domains/" + fqdn + "/aliases/" + id, Map.of("alias", alias)));
         alias.domain = new AliasDomain();
         alias.domain.name = fqdn;
         return Response.ok().entity(alias).build();
@@ -141,7 +165,8 @@ public class ForwardEmailTestEndpoint {
     @POST
     @Path("/domains/{fqdn}/aliases/{id}/generate-password")
     void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions) {
-
+        methodCalls.add(new ApiCall("POST", "/domains/" + fqdn + "/aliases/" + id + "/generate-password",
+                Map.of("instructions", instructions)));
     }
 
     public static TestAlias create(String name, String description, String id, TestDomain domain) {
