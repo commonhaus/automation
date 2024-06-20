@@ -6,18 +6,15 @@ import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 
 import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
-import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.AliasKey;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailService;
@@ -51,16 +48,12 @@ public class MemberAliasesResource {
     @GET
     @KnownUser
     @Produces("application/json")
-    public Response getAliases(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+    public Response getAliases() {
         try {
             CommonhausUser user = getUser();
-            Services services = user.services();
-            ForwardEmail emailConfig = services.forwardEmail();
-
-            Set<AliasKey> emailAddresses = emailService.normalizeEmailAddresses(session, emailConfig);
 
             // API CALL: get alias mappings
-            Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(emailAddresses, refresh);
+            Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
 
             // Return as map of string / alias
             return user.toResponse()
@@ -85,8 +78,7 @@ public class MemberAliasesResource {
             CommonhausUser user = getUser();
             ForwardEmail emailConfig = user.services().forwardEmail();
 
-            Set<AliasKey> emailAddresses = emailService.normalizeEmailAddresses(session, emailConfig);
-            Map<AliasKey, Set<String>> sanitized = emailService.sanitizeInputAddresses(aliases, emailAddresses);
+            Map<AliasKey, Set<String>> sanitized = emailService.sanitizeInputAddresses(session, user, aliases);
             if (sanitized.isEmpty()) {
                 Log.debugf("[%s] updateAliases: No valid email addresses to update: %s", session.login(), aliases.keySet());
                 return Response.status(Response.Status.NO_CONTENT).build();

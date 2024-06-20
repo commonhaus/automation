@@ -14,6 +14,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.admin.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -38,6 +39,9 @@ public class MemberResource {
 
     @Inject
     MemberSession session;
+
+    @Inject
+    ForwardEmailService emailService;
 
     @GET
     @Path("/github")
@@ -107,7 +111,6 @@ public class MemberResource {
         if (refresh) {
             // reset all the things.
             session.forgetUser(ctx);
-
             // re-fetch the user
             session.userIsKnown(ctx);
             Log.debugf("[%s] REFRESH /member/commonhaus/status %s", session.login(), session.roles());
@@ -115,6 +118,10 @@ public class MemberResource {
 
         try {
             CommonhausUser user = datastore.getCommonhausUser(session, refresh, false);
+            if (refresh) {
+                emailService.forgetUser(session, user);
+            }
+
             final Set<String> roles = session.roles();
             if (user.statusUpdateRequired(ctx, roles)) {
                 // Refresh the user's status

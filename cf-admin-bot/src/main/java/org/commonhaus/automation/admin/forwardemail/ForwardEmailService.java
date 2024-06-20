@@ -14,7 +14,9 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.CommonhausUser;
 import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
+import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -31,6 +33,14 @@ public class ForwardEmailService {
     @Inject
     AppContextService ctx;
 
+    public Map<AliasKey, Alias> fetchAliases(MemberSession session, CommonhausUser user) {
+        Set<AliasKey> emailAddresses = getConfiguredAliases(session, user);
+        if (emailAddresses.isEmpty()) {
+            return Map.of();
+        }
+        return fetchAliases(emailAddresses);
+    }
+
     /**
      * Fetch aliases using the ForwardEmail Rest Client
      *
@@ -40,7 +50,7 @@ public class ForwardEmailService {
      * @throws WebApplicationException on Rest Client error (including Not Found)
      * @see #getAlias(AliasKey, boolean)
      */
-    public Map<AliasKey, Alias> fetchAliases(Set<AliasKey> emails, boolean resetCache) {
+    public Map<AliasKey, Alias> fetchAliases(Set<AliasKey> emails) {
         if (emailDisabled()) {
             return Map.of();
         }
@@ -48,7 +58,7 @@ public class ForwardEmailService {
         for (AliasKey key : emails) {
             try {
                 // API CALL: will throw WebApplicationException if not found or error
-                Alias alias = getAlias(key, resetCache);
+                Alias alias = getAlias(key);
                 aliases.put(key, alias);
             } catch (WebApplicationException e) {
                 if (e.getResponse().getStatus() == 404) {
@@ -76,7 +86,7 @@ public class ForwardEmailService {
             return Map.of();
         }
         Map<AliasKey, Alias> result = new HashMap<>();
-        Map<AliasKey, Alias> existingAliases = fetchAliases(aliases.keySet(), false);
+        Map<AliasKey, Alias> existingAliases = fetchAliases(aliases.keySet());
         for (Map.Entry<AliasKey, Set<String>> entry : aliases.entrySet()) {
             try {
                 AliasKey key = entry.getKey();
@@ -121,6 +131,17 @@ public class ForwardEmailService {
     }
 
     /**
+     * Clear the cache of all aliases configured for the specified user
+     *
+     * @param session MemberSession
+     * @param user CommonhausUser
+     */
+    public void forgetUser(MemberSession session, CommonhausUser user) {
+        Set<AliasKey> emailAddresses = getConfiguredAliases(session, user);
+        emailAddresses.forEach(x -> AdminDataCache.ALIASES.invalidate(x.toString()));
+    }
+
+    /**
      * Wrap the call the ForwardEmailClient.getAlias to cache the result
      *
      * @param aliasKey Single aliasKey to fetch
@@ -129,12 +150,12 @@ public class ForwardEmailService {
      * @throws WebApplicationException on Rest Client error (including Not Found)
      *         or if the key resolves to multiple aliases
      */
-    protected Alias getAlias(@Nonnull AliasKey aliasKey, boolean resetCache) {
+    protected Alias getAlias(@Nonnull AliasKey aliasKey) {
         if (emailDisabled()) {
             return null;
         }
         String lookup = aliasKey.toString();
-        Alias alias = resetCache ? null : AdminDataCache.ALIASES.get(lookup);
+        Alias alias = AdminDataCache.ALIASES.get(lookup);
         if (alias == null) {
             // API CALL: will throw WebApplicationException if not found or error
             // Will throw 404 on not found
@@ -217,6 +238,30 @@ public class ForwardEmailService {
     }
 
     public Map<AliasKey, Set<String>> sanitizeInputAddresses(Map<String, Set<String>> input, Set<AliasKey> permitted) {
+        // Filter/Remove any unknown/extraneous email addresses
+        Map<AliasKey, Set<String>> sanitized = new HashMap<>();
+        input.entrySet().forEach(x -> {
+            AliasKey address = normalizeAlias(x.getKey());
+            if (permitted.contains(address)) {
+                sanitized.put(address, x.getValue());
+            }
+        });
+        return sanitized;
+    }
+
+    public Set<AliasKey> getConfiguredAliases(MemberSession session, CommonhausUser user) {
+        if (!user.status().mayHaveEmail() || emailDisabled()) {
+            return Set.of();
+        }
+        Services services = user.services();
+        ForwardEmail emailConfig = services.forwardEmail();
+        return normalizeEmailAddresses(session, emailConfig);
+    }
+
+    public Map<AliasKey, Set<String>> sanitizeInputAddresses(MemberSession session, CommonhausUser user,
+            Map<String, Set<String>> input) {
+        Set<AliasKey> permitted = getConfiguredAliases(session, user);
+
         // Filter/Remove any unknown/extraneous email addresses
         Map<AliasKey, Set<String>> sanitized = new HashMap<>();
         input.entrySet().forEach(x -> {

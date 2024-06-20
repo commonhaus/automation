@@ -11,6 +11,7 @@ import java.util.Set;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 
+import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.dev.ForwardEmailTestEndpoint;
 import org.commonhaus.automation.admin.dev.ForwardEmailTestEndpoint.TestAlias;
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -27,6 +28,7 @@ import io.restassured.http.ContentType;
 @QuarkusTest
 public class ForwardEmailTest {
 
+    @Inject
     @RestClient
     ForwardEmailClient forwardEmailClient;
 
@@ -42,6 +44,7 @@ public class ForwardEmailTest {
     @BeforeEach
     public void setup() {
         testEndpoint.clear();
+        AdminDataCache.ALIASES.invalidateAll();
     }
 
     /**
@@ -132,8 +135,7 @@ public class ForwardEmailTest {
         ContextHelper.setUserManagementConfig(ctx);
         // This should not throw: 404 should be handled (empty response)
         forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("not_found@commonhaus.dev")),
-                true);
+                Set.of(AliasKey.fromCache("not_found@commonhaus.dev")));
         var methodCalls = testEndpoint.getMethodCalls();
         assertThat(methodCalls).size().isEqualTo(1);
 
@@ -148,8 +150,7 @@ public class ForwardEmailTest {
         ContextHelper.setUserManagementConfig(ctx);
         assertThrows(WebApplicationException.class, () -> {
             forwardEmailService.fetchAliases(
-                    Set.of(AliasKey.fromCache("error@commonhaus.dev")),
-                    true);
+                    Set.of(AliasKey.fromCache("error@commonhaus.dev")));
         });
         var methodCalls = testEndpoint.getMethodCalls();
         assertThat(methodCalls).size().isEqualTo(1);
@@ -164,8 +165,7 @@ public class ForwardEmailTest {
     public void testQueryAliases() throws Exception {
         ContextHelper.setUserManagementConfig(ctx);
         Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")),
-                true);
+                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
         assertThat(aliases).size().isEqualTo(1);
 
         var methodCalls = testEndpoint.getMethodCalls();
