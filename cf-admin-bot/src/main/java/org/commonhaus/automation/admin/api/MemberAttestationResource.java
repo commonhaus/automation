@@ -57,7 +57,7 @@ public class MemberAttestationResource {
             user = datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
                         u.updateMemberStatus(c, roles);
-                        u.goodUntil().attestation.put(post.id(), newAttestation);
+                        u.goodUntil().attestation().put(post.id(), newAttestation);
                     },
                     message,
                     true,
@@ -97,7 +97,7 @@ public class MemberAttestationResource {
             user = datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
                         u.updateMemberStatus(c, roles);
-                        u.goodUntil().attestation.putAll(newAttestations);
+                        u.goodUntil().attestation().putAll(newAttestations);
                     },
                     message.toString(),
                     true,

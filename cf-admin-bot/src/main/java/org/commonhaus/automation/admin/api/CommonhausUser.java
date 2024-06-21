@@ -84,6 +84,13 @@ public class CommonhausUser {
         Map<String, Attestation> attestation = new HashMap<>();
         String contribution;
         String dues;
+
+        public Map<String, Attestation> attestation() {
+            if (attestation == null) {
+                attestation = new HashMap<>();
+            }
+            return attestation;
+        }
     }
 
     public record AttestationPost(
