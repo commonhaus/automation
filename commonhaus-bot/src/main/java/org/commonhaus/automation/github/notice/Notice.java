@@ -13,6 +13,7 @@ import org.commonhaus.automation.github.EventQueryContext;
 import org.commonhaus.automation.github.actions.Action;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.rules.Rule;
+import org.commonhaus.automation.github.rules.RuleConfig;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -43,13 +44,15 @@ public class Notice {
 
         NoticeConfig noticeConfig = NoticeConfig.getNoticeConfig(repoConfigFile);
         queryHelper.updateConfiguration(payload.getRepository(), repoConfigFile);
-        if (noticeConfig.isDisabled()) {
+
+        RuleConfig ruleConfig = noticeConfig.discussion;
+        if (noticeConfig.isDisabled() || ruleConfig == null) {
             return;
         }
 
         EventData eventData = new EventData(event, payload);
         EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
-        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.discussion.rules);
+        Set<String> desiredActions = findMatchingActions(qc, ruleConfig.rules);
 
         Log.infof("[%s] notice.onDiscussionEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
@@ -71,14 +74,16 @@ public class Notice {
 
         NoticeConfig noticeConfig = NoticeConfig.getNoticeConfig(repoConfigFile);
         queryHelper.updateConfiguration(payload.getRepository(), repoConfigFile);
-        if (noticeConfig.isDisabled()) {
+
+        RuleConfig ruleConfig = noticeConfig.issue;
+        if (noticeConfig.isDisabled() || ruleConfig == null) {
             return;
         }
 
         EventData eventData = new EventData(event, payload);
         EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
-        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.issue.rules);
+        Set<String> desiredActions = findMatchingActions(qc, ruleConfig.rules);
         Log.infof("[%s] notice.onIssueEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
 
@@ -99,14 +104,16 @@ public class Notice {
 
         NoticeConfig noticeConfig = NoticeConfig.getNoticeConfig(repoConfigFile);
         queryHelper.updateConfiguration(payload.getRepository(), repoConfigFile);
-        if (noticeConfig.isDisabled()) {
+
+        RuleConfig ruleConfig = noticeConfig.pullRequest;
+        if (noticeConfig.isDisabled() || ruleConfig == null) {
             return;
         }
 
         EventData eventData = new EventData(event, payload);
         EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
 
-        Set<String> desiredActions = findMatchingActions(qc, noticeConfig.pullRequest.rules);
+        Set<String> desiredActions = findMatchingActions(qc, ruleConfig.rules);
         Log.infof("[%s] notice.onPullRequestEvent: triggered (%s) actions: %s", eventData.getLogId(),
                 desiredActions.size(), desiredActions);
 
