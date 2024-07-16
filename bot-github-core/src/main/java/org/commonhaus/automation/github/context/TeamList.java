@@ -13,15 +13,17 @@ public class TeamList {
 
     public TeamList(String name, Collection<GHUser> members) {
         this.name = name;
-        this.members = members.stream()
-                .map(DataActor::new)
-                .collect(Collectors.toSet());
+        this.members = members == null
+                ? Set.of()
+                : members.stream()
+                        .map(DataActor::new)
+                        .collect(Collectors.toSet());
     }
 
     /** testing */
     public TeamList(String name, Set<DataActor> members) {
         this.name = name;
-        this.members = members;
+        this.members = members == null ? Set.of() : members;
     }
 
     public TeamList removeExcludedMembers(Predicate<DataActor> predicate) {
@@ -42,5 +44,9 @@ public class TeamList {
         return "TeamList[%s: %s]".formatted(name, members.stream()
                 .map(actor -> actor.login)
                 .collect(Collectors.joining(",")));
+    }
+
+    public boolean isEmpty() {
+        return members == null || members.isEmpty();
     }
 }

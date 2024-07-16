@@ -47,20 +47,22 @@ public class VoteInformation {
         QueryContext qc = event.getQueryContext();
         VoteConfig voteConfig = event.getVotingConfig();
         String bodyString = event.getBody();
+        String groupValue = null;
+        TeamList teamList = null;
 
         // Test body for "Voting group" followed by a team name
         Matcher groupM = groupPattern.matcher(bodyString);
         if (groupM.find()) {
-            this.group = groupM.group(1);
-            this.teamList = qc.getTeamList(this.group);
+            groupValue = groupM.group(1);
+            teamList = qc.getTeamList(groupValue);
             if (teamList != null) {
                 teamList.removeExcludedMembers(
                         a -> qc.isBot(a.login) || voteConfig.isMemberExcluded(a.login));
             }
-        } else {
-            this.group = null;
-            this.teamList = null;
         }
+        this.group = groupValue;
+        this.teamList = teamList;
+
         this.votingThreshold = voteConfig.votingThreshold(this.group);
 
         // Test body for "vote::marthas" or "vote::manual"
@@ -108,7 +110,7 @@ public class VoteInformation {
     }
 
     public boolean invalidGroup() {
-        return teamList == null;
+        return teamList == null || teamList.isEmpty();
     }
 
     public boolean invalidReactions() {

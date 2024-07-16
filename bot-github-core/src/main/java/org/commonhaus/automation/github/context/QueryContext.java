@@ -365,6 +365,9 @@ public class QueryContext {
         for (var g : groups) {
             if (g.startsWith("@")) {
                 TeamList team = getTeamList(g.substring(1));
+                if (team.isEmpty()) {
+                    return false;
+                }
                 return team.members.stream().anyMatch(m -> m.login.equals(login));
             }
             return g.equals(login);
