@@ -103,6 +103,32 @@ public class MemberAliasesResource {
         }
     }
 
+    @POST
+    @KnownUser
+    @Path("/password")
+    @Produces("application/json")
+    public Response generatePassword(AliasRequest request) {
+        try {
+            CommonhausUser user = getUser();
+            ForwardEmail emailConfig = user.services().forwardEmail();
+            if (!emailConfig.configured) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
+            AliasKey key = AliasKey.fromCache(request.email());
+            Alias alias = aliasMap.get(key);
+
+            return emailService.generatePassword(alias)
+                    ? Response.noContent().build()
+                    : Response.status(Response.Status.BAD_REQUEST).build();
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Throwable e) {
+            return ctx.toResponseWithEmail("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
+        }
+    }
+
     protected CommonhausUser getUser() {
         CommonhausUser user = datastore.getCommonhausUser(session);
         if (user == null) {
@@ -132,46 +158,6 @@ public class MemberAliasesResource {
                 false));
         return result == null ? user : result;
     }
-
-    // @POST
-    // @KnownUser
-    // @Path("/password")
-    // @Produces("application/json")
-    // public Response generatePassword(AliasRequest alias) {
-    //     try {
-    //         // TODO: Generate Password API is not available quite yet.. SOOOON
-    //         // CommonhausUser user = datastore.getCommonhausUser(memberSession);
-    //         // if (!user.status().mayHaveEmail()) {
-    //         // return Response.status(Response.Status.FORBIDDEN).build();
-    //         // }
-
-    //         // ForwardEmail forwardEmail = user.services().forwardEmail();
-
-    //         // boolean possibleMissingActive = !forwardEmail.active &&
-    //         // ctx.validAttestation(ID);
-    //         // boolean generatePassword = (forwardEmail.active || possibleMissingActive);
-    //         // if (generatePassword && !forwardEmail.validAddress(alias.email(),
-    //         // memberSession.login(), ctx.getDefaultDomain())) {
-    //         // return Response.status(Response.Status.BAD_REQUEST).build();
-    //         // }
-
-    //         // boolean updated = generatePassword && ctx.generatePassword(alias.email());
-
-    //         // MemberApiResponse responseEntity = new MemberApiResponse();
-
-    //         // if (possibleMissingActive && updated) {
-    //         // // Save/set active flag if aliases have been created
-    //         // responseEntity.addAll(updateActiveFlag(memberSession, user,
-    //         // "Update forward email service active flag for %s".formatted(user.id())));
-    //         // }
-
-    //         return Response.noContent().build();
-    //     } catch (WebApplicationException e) {
-    //         return e.getResponse();
-    //     } catch (Throwable e) {
-    //         return ctx.toResponseWithEmail("generatePassword", "Unable to generate SMTP password for " + alias.email(), e);
-    //     }
-    // }
 
     public record AliasRequest(String email) {
     }

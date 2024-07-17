@@ -111,23 +111,21 @@ public class ForwardEmailService {
     /**
      * Generate a password for the specified email alias using the ForwardEmail Rest Client
      *
-     * @param email
+     * @param alias
      * @return
      */
-    public boolean generatePassword(String email) {
-        if (emailDisabled()) {
+    public boolean generatePassword(Alias alias) {
+        if (emailDisabled() || alias == null || alias.verified_recipients == null || alias.verified_recipients.isEmpty()) {
             return false;
         }
+
         // API CALL: will throw WebApplicationException if not found or error
-        // Alias alias = getAlias(email, false);
-        // TODO: NOT YET.. SOOOON
-        // if (alias != null && alias.verified_recipients != null &&
-        // alias.verified_recipients.size() > 0) {
-        // forwardEmailClient.generatePassword(alias.domain.name, alias.id,
-        // alias.verified_recipients.iterator().next());
-        // return true;
-        // }
-        return false;
+        String targetEmail = alias.verified_recipients.iterator().next();
+        forwardEmailClient.generatePassword(
+                alias.domain.name,
+                alias.id,
+                new GeneratePassword(true, targetEmail));
+        return true;
     }
 
     /**

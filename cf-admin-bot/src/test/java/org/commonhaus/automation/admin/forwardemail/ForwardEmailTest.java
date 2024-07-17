@@ -18,7 +18,6 @@ import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.test.common.http.TestHTTPEndpoint;
@@ -224,13 +223,18 @@ public class ForwardEmailTest {
     }
 
     @Test
-    @Disabled
-    public void testGeneratePassword() {
-        GeneratePassword instructions = new GeneratePassword("test@commonhaus.org");
-        forwardEmailClient.getAlias("commonhaus.dev", "66707183881a6ff4d292baeb");
-        forwardEmailClient.generatePassword("commonhaus.dev", "66707183881a6ff4d292baeb", instructions);
+    public void testGeneratePassword() throws Exception {
+        ContextHelper.setUserManagementConfig(ctx);
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
+                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+
+        Alias testAlias = aliases.values().iterator().next();
+        testAlias.verified_recipients = Set.of("test@commonhaus.org");
+
+        forwardEmailService.generatePassword(testAlias);
+
         var methodCalls = testEndpoint.getMethodCalls();
-        assertThat(methodCalls).size().isEqualTo(1);
+        assertThat(methodCalls).size().isEqualTo(2);
     }
 
     // @Test

@@ -164,7 +164,7 @@ public class ForwardEmailTestEndpoint {
 
     @POST
     @Path("/domains/{fqdn}/aliases/{id}/generate-password")
-    void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions) {
+    public void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions) {
         methodCalls.add(new ApiCall("POST", "/domains/" + fqdn + "/aliases/" + id + "/generate-password",
                 Map.of("instructions", instructions)));
     }
