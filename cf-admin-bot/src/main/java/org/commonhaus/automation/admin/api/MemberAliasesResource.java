@@ -87,8 +87,9 @@ public class MemberAliasesResource {
             // API CALL: set/update alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.postAliases(sanitized, session.name());
 
-            if (!emailConfig.configured && !aliasMap.isEmpty()) {
-                user = updateConfiguredFlag(user);
+            if (!emailConfig.hasDefaultAlias
+                    && aliasMap.keySet().stream().anyMatch(k -> emailService.isDefaultAlias(session.login(), k))) {
+                user = updateHasDefaultFlag(user);
             }
 
             return user.toResponse()
@@ -110,11 +111,6 @@ public class MemberAliasesResource {
     public Response generatePassword(AliasRequest request) {
         try {
             CommonhausUser user = getUser();
-            ForwardEmail emailConfig = user.services().forwardEmail();
-            if (!emailConfig.configured) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
             AliasKey key = AliasKey.fromCache(request.email());
             Alias alias = aliasMap.get(key);
@@ -147,11 +143,11 @@ public class MemberAliasesResource {
         return user;
     }
 
-    CommonhausUser updateConfiguredFlag(CommonhausUser user) {
+    CommonhausUser updateHasDefaultFlag(CommonhausUser user) {
         // eventual consistency. No big deal if this
         CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
                 (c, u) -> {
-                    u.services().forwardEmail().configured = true;
+                    u.services().forwardEmail().hasDefaultAlias = true;
                 },
                 "Fix forward email service active flag",
                 false,

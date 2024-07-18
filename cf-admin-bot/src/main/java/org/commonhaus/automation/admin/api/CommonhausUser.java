@@ -42,8 +42,8 @@ public class CommonhausUser {
 
     public static class ForwardEmail {
         /** Is an alias active for this user */
-        @JsonAlias("active")
-        boolean configured;
+        @JsonAlias({ "active", "configured" })
+        boolean hasDefaultAlias;
 
         /** Additional ForwardEmail aliases. Optional and rare. */
         @JsonAlias("alt_alias")
@@ -51,10 +51,6 @@ public class CommonhausUser {
 
         public Collection<? extends String> altAlias() {
             return altAlias == null ? List.of() : altAlias;
-        }
-
-        public boolean validAddress(String email, String login, String defaultDomain) {
-            return email.equals(login + "@" + defaultDomain) || altAlias().contains(email);
         }
     }
 

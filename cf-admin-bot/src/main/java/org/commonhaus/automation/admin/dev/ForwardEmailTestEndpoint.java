@@ -46,7 +46,6 @@ public class ForwardEmailTestEndpoint {
 
         public boolean has_recipient_verification;
         public Set<String> verified_recipients;
-
     }
 
     public static class TestDomain extends Domain {

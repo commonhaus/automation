@@ -227,6 +227,10 @@ public class ForwardEmailService {
         return AliasKey.createKey(name.toLowerCase(), domain.toLowerCase());
     }
 
+    public boolean isDefaultAlias(String login, AliasKey email) {
+        return email.name().equals(login) && email.domain().equals(defaultAliasDomain());
+    }
+
     public Set<AliasKey> normalizeEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {
         List<String> addresses = new ArrayList<>();
         addresses.add(session.login());
