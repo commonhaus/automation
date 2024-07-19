@@ -1,0 +1,18 @@
+{#include includes/baseText}
+{#repoSlug}{repoSlug}{/repoSlug}
+{#dateTime}- comment [2] created by {comment.author.login} [3] on {comment.createdAt}
+
+{/dateTime}
+{#body}
+{comment.body}
+{/body}
+{#ghUrl}
+[1]: {item.url}
+{/ghUrl}
+{#commentUrl}
+[2]: {comment.url}
+{/commentUrl}
+{#authorUrl}
+[3]: {comment.author.url}
+{/authorUrl}
+{/include}

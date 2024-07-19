@@ -32,7 +32,13 @@ public class NoticeConfig extends RepositoryConfig {
 
     public RuleConfig discussion;
 
+    @JsonProperty("discussion_comment")
+    public RuleConfig discussionComment;
+
     public RuleConfig issue;
+
+    @JsonProperty("issue_comment")
+    public RuleConfig issueComment;
 
     @JsonProperty("pull_request")
     public RuleConfig pullRequest;

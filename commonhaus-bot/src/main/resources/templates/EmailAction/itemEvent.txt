@@ -1,11 +1,12 @@
 {#include includes/baseText}
 {#repoSlug}{repoSlug}{/repoSlug}
-{#ghUrl}{item.url}{/ghUrl}
-{#authorLogin}{item.author.login}{/authorLogin}
-{#authorUrl}{item.author.url}{/authorUrl}
-{#authorAvatarUrl}{item.author.avatarUrl}{/authorAvatarUrl}
-{#dateTime}
-- created {item.createdAt}
+{#ghUrl}
+[1]: {item.url}
+{/ghUrl}
+{#authorUrl}
+[2]: {item.author.url}
+{/authorUrl}
+{#dateTime}- created by {item.author.login} [2] on {item.createdAt}
 {#if item.closedAt && item.closedAt != item.createdAt}
 - closed {item.closedAt}
 {/if}
@@ -13,5 +14,6 @@
 - updated {item.updatedAt}
 {/if}
 {/dateTime}
-{#body}{item.body}{/body}
+{#body}{item.body}
+{/body}
 {/include}

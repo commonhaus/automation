@@ -5,13 +5,13 @@
 {#authorUrl}{item.author.url}{/authorUrl}
 {#authorAvatarUrl}{item.author.avatarUrl}{/authorAvatarUrl}
 {#dateTime}
-    <div class="posted">created <time>{time:format(item.createdAt, "dd MMM yyyy")}</time></div>
-    {#if item.closedAt && item.closedAt != item.createdAt}
-        <div class="closed">closed <time>{time:format(item.closedAt, "dd MMM yyyy")}</time></div>
-    {/if}
-    {#if item.updatedAt && item.updatedAt != item.createdAt && (!item.closedAt || item.updatedAt != item.closedAt)}
-        <div class="updated">updated <time>{time:format(item.updatedAt, "dd MMM yyyy")}</time></div>
-    {/if}
+  <div class="posted">created {item.createdAt}</div>
+  {#if item.closedAt && item.closedAt != item.createdAt}
+      <div class="closed">closed {item.closedAt}</div>
+  {/if}
+  {#if item.updatedAt && item.updatedAt != item.createdAt && (!item.closedAt || item.updatedAt != item.closedAt)}
+      <div class="updated">updated {item.updatedAt}</div>
+  {/if}
 {/dateTime}
 {#body}{htmlBody.raw}{/body}
 {/include}

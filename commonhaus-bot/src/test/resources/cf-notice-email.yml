@@ -16,6 +16,22 @@ notice:
           - notice
           - "vote/open"
         then: [announce]
+  discussion_comment:
+    rules:
+      - # If a discussion is created in Announcements or Consensus Building
+        # and it already has the notice label, send an email
+        action: 
+          - created
+        label: [notice]
+        then: [announce]
+  issue_comment:
+    rules:
+      - # If a discussion is created in Announcements or Consensus Building
+        # and it already has the notice label, send an email
+        action: 
+          - created
+        label: [notice]
+        then: [announce]
   pull_request:
     rules:
       - # If the notice or vote/open label is applied, send email

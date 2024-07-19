@@ -3,8 +3,10 @@ package org.commonhaus.automation.github.actions;
 import java.util.List;
 
 import org.commonhaus.automation.github.EventQueryContext;
+import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataDiscussion;
+import org.commonhaus.automation.github.context.DataDiscussionComment;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventPayload;
 import org.commonhaus.automation.mail.MailEvent;
@@ -24,8 +26,11 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 public class EmailAction extends Action {
     @CheckedTemplate
     static class Templates {
+        public static native MailTemplateInstance commentEvent(String title, String htmlBody,
+                DataCommonItem item, DataCommonComment comment, String repoSlug);
+
         public static native MailTemplateInstance itemEvent(String title, String htmlBody,
-                DataCommonItem item, String repoSlug, String status);
+                DataCommonItem item, String repoSlug);
     }
 
     @JsonProperty
@@ -53,7 +58,13 @@ public class EmailAction extends Action {
                 eventData.getLogId(), List.of(addresses));
 
         final String title;
-        final String status = qc.getStatus();
+        String status = qc.getStatus();
+        if ("created".equals(status)) {
+            status = "";
+        } else {
+            status = "(" + status + ") ";
+        }
+
         MailTemplateInstance mailTemplateInstance;
         try {
             mailTemplateInstance = switch (qc.getEventType()) {
@@ -63,27 +74,60 @@ public class EmailAction extends Action {
                             ? payload.pullRequest
                             : payload.issue;
 
-                    title = String.format("PR #%s %s",
+                    title = String.format("%s%s#%s %s",
+                            status,
+                            payload.issue == null ? "PR " : "",
                             item.number, item.title);
 
                     yield Templates.itemEvent(title,
-                            toHtmlBody(eventData, item.body),
+                            toHtmlBody(item.body),
                             item,
-                            eventData.getRepository().getFullName(),
-                            status);
+                            eventData.getRepository().getFullName());
+                }
+                case issue_comment -> {
+                    EventPayload.CommonItemCommentPayload payload = eventData.getEventPayload();
+                    DataCommonItem item = payload.issue == null
+                            ? payload.pullRequest
+                            : payload.issue;
+                    DataCommonComment comment = payload.comment;
+
+                    title = String.format("← %s - %s#%s %s",
+                            comment.author.login,
+                            payload.issue == null ? "PR " : "",
+                            item.number, item.title);
+
+                    yield Templates.commentEvent(title,
+                            toHtmlBody(comment.body),
+                            item,
+                            comment,
+                            eventData.getRepository().getFullName());
                 }
                 case discussion -> {
                     EventPayload.DiscussionPayload payload = eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
 
-                    title = String.format("#%s %s",
+                    title = String.format("%s#%s %s",
+                            status,
                             discussion.number, discussion.title);
 
                     yield Templates.itemEvent(title,
-                            toHtmlBody(eventData, discussion.body),
+                            toHtmlBody(discussion.body),
                             discussion,
-                            eventData.getRepository().getFullName(),
-                            status);
+                            eventData.getRepository().getFullName());
+                }
+                case discussion_comment -> {
+                    EventPayload.DiscussionCommentPayload payload = eventData.getEventPayload();
+                    DataDiscussion discussion = payload.discussion;
+                    DataDiscussionComment comment = payload.comment;
+
+                    title = String.format("↵ %s - #%s %s",
+                            comment.author.login, discussion.number, discussion.title);
+
+                    yield Templates.commentEvent(title,
+                            toHtmlBody(comment.body),
+                            discussion,
+                            comment,
+                            eventData.getRepository().getFullName());
                 }
                 default -> {
                     Log.warnf("[%s] EmailAction.apply: unsupported event type", eventData.getLogId());
@@ -96,7 +140,7 @@ public class EmailAction extends Action {
             return;
         }
 
-        String subject = "(" + status + ") " + title;
+        String subject = title;
 
         if (mailTemplateInstance != null) {
             Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
@@ -106,7 +150,7 @@ public class EmailAction extends Action {
         }
     }
 
-    private String toHtmlBody(EventData eventData, String body) {
+    private String toHtmlBody(String body) {
         return body == null
                 ? "<p></p>"
                 : MarkdownConverter.toHtml(body.replaceAll("<!--.*?-->", ""));

@@ -1,0 +1,11 @@
+{#include includes/base}
+{#repoSlug}{repoSlug}{/repoSlug}
+{#ghUrl}{comment.url}{/ghUrl}
+{#authorLogin}{comment.author.login}{/authorLogin}
+{#authorUrl}{comment.author.url}{/authorUrl}
+{#authorAvatarUrl}{comment.author.avatarUrl}{/authorAvatarUrl}
+{#dateTime}
+    <div class="posted">created {comment.createdAt}</div>
+{/dateTime}
+{#body}{htmlBody.raw}{/body}
+{/include}

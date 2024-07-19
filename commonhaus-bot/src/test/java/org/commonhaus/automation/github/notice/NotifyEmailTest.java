@@ -122,6 +122,28 @@ public class NotifyEmailTest extends ContextHelper {
     }
 
     @Test
+    void discussionCommentCreatedLabeled_SendEmail() throws Exception {
+        // Discussion comment on labeled discussion
+        String discussionId = "D_kwDOLDuJqs4AXOh5";
+        verifyNoLabelCache(discussionId);
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, notice);
+
+        given()
+                .github(mocks -> mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-email.yml"))
+                .when().payloadFromClasspath("/github/eventDiscussionCommentCreated.json")
+                .event(GHEvent.DISCUSSION_COMMENT)
+                .then().github(mocks -> {
+                    // 1 times: repo labels
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+    }
+
+    @Test
     void testPrLabeledNotice_SendEmail() throws Exception {
         // If a PR is labeled with notice, send an email
 

@@ -20,7 +20,9 @@ import org.kohsuke.github.GitHub;
 import io.quarkiverse.githubapp.ConfigFile;
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Discussion;
+import io.quarkiverse.githubapp.event.DiscussionComment;
 import io.quarkiverse.githubapp.event.Issue;
+import io.quarkiverse.githubapp.event.IssueComment;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
@@ -58,6 +60,36 @@ public class Notice {
                 desiredActions.size(), desiredActions);
 
         applyMatchingActions("notice.onDiscussionEvent", qc, desiredActions, noticeConfig.actions);
+    }
+
+    /**
+     * Called when there is a discussioncomment event.
+     *
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onDiscussionCommentEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @DiscussionComment GHEventPayload.DiscussionComment payload,
+            @ConfigFile(RepositoryConfigFile.NAME) RepositoryConfigFile repoConfigFile) {
+
+        NoticeConfig noticeConfig = NoticeConfig.getNoticeConfig(repoConfigFile);
+        queryHelper.updateConfiguration(payload.getRepository(), repoConfigFile);
+
+        RuleConfig ruleConfig = noticeConfig.discussionComment;
+        if (noticeConfig.isDisabled() || ruleConfig == null) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+        Set<String> desiredActions = findMatchingActions(qc, ruleConfig.rules);
+
+        Log.infof("[%s] notice.onDiscussionCommentEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
+
+        applyMatchingActions("notice.onDiscussionCommentEvent", qc, desiredActions, noticeConfig.actions);
     }
 
     /**
@@ -118,6 +150,36 @@ public class Notice {
                 desiredActions.size(), desiredActions);
 
         applyMatchingActions("notice.onPullRequestEvent", qc, desiredActions, noticeConfig.actions);
+    }
+
+    /**
+     * Called when there is a comment on an issue or pull request
+     *
+     * @param github GitHub API (connection instance)
+     * @param graphQLClient GraphQL API (connection instance)
+     * @param payload GitHub API parsed payload; connected GHRepository and GHOrganization
+     * @param repoConfigFile Bot Repo Configuration (if exists)
+     */
+    void onIssueCommentEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
+            @IssueComment GHEventPayload.IssueComment payload,
+            @ConfigFile(RepositoryConfigFile.NAME) RepositoryConfigFile repoConfigFile) {
+
+        NoticeConfig noticeConfig = NoticeConfig.getNoticeConfig(repoConfigFile);
+        queryHelper.updateConfiguration(payload.getRepository(), repoConfigFile);
+
+        RuleConfig ruleConfig = noticeConfig.issueComment;
+        if (noticeConfig.isDisabled() || ruleConfig == null) {
+            return;
+        }
+
+        EventData eventData = new EventData(event, payload);
+        EventQueryContext qc = queryHelper.newQueryContext(eventData, github, graphQLClient);
+
+        Set<String> desiredActions = findMatchingActions(qc, ruleConfig.rules);
+        Log.infof("[%s] notice.onIssueCommentEvent: triggered (%s) actions: %s", eventData.getLogId(),
+                desiredActions.size(), desiredActions);
+
+        applyMatchingActions("notice.onIssueCommentEvent", qc, desiredActions, noticeConfig.actions);
     }
 
     private Set<String> findMatchingActions(EventQueryContext qc, List<Rule> rules) {

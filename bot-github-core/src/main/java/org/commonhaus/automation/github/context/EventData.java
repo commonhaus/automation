@@ -49,7 +49,7 @@ public class EventData {
         }
 
         this.logId = "%s:%s.%s%s".formatted(
-                installation, eventType, actionType,
+                installation.getId(), eventType, actionType,
                 repository == null
                         ? ""
                         : (":" + repository.getFullName() + (getNumber() >= 0 ? ("#" + getNumber()) : "")));
