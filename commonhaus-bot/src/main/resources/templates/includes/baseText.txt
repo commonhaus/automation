@@ -1,5 +1,4 @@
 {@java.lang.String title}
-[{#insert repoSlug}{/}]
 {title} [1]
 
 {#insert body}{/}

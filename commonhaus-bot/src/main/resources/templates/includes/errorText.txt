@@ -1,5 +1,3 @@
-
-[{#insert repoSlug}{/}]
 {#insert title}{/} [1]
 
 {#insert body}{/}

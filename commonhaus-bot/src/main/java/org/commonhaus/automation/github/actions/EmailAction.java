@@ -74,9 +74,9 @@ public class EmailAction extends Action {
                             ? payload.pullRequest
                             : payload.issue;
 
-                    title = String.format("%s%s#%s %s",
+                    title = String.format("%s[%s] #%s %s",
                             status,
-                            payload.issue == null ? "PR " : "",
+                            eventData.getRepoSlug(),
                             item.number, item.title);
 
                     yield Templates.itemEvent(title,
@@ -91,9 +91,8 @@ public class EmailAction extends Action {
                             : payload.issue;
                     DataCommonComment comment = payload.comment;
 
-                    title = String.format("← %s - %s#%s %s",
-                            comment.author.login,
-                            payload.issue == null ? "PR " : "",
+                    title = String.format("Re: [%s] #%s %s",
+                            eventData.getRepoSlug(),
                             item.number, item.title);
 
                     yield Templates.commentEvent(title,
@@ -106,8 +105,9 @@ public class EmailAction extends Action {
                     EventPayload.DiscussionPayload payload = eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
 
-                    title = String.format("%s#%s %s",
+                    title = String.format("%s[%s] #%s %s",
                             status,
+                            eventData.getRepoSlug(),
                             discussion.number, discussion.title);
 
                     yield Templates.itemEvent(title,
@@ -120,8 +120,9 @@ public class EmailAction extends Action {
                     DataDiscussion discussion = payload.discussion;
                     DataDiscussionComment comment = payload.comment;
 
-                    title = String.format("↵ %s - #%s %s",
-                            comment.author.login, discussion.number, discussion.title);
+                    title = String.format("Re: [%s] #%s %s",
+                            eventData.getRepoSlug(),
+                            discussion.number, discussion.title);
 
                     yield Templates.commentEvent(title,
                             toHtmlBody(comment.body),

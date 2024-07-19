@@ -1,5 +1,4 @@
 {#include includes/baseText}
-{#repoSlug}{repoSlug}{/repoSlug}
 {#dateTime}- comment [2] created by {comment.author.login} [3] on {comment.createdAt}
 
 {/dateTime}

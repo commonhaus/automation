@@ -1,5 +1,4 @@
 {#include includes/baseText}
-{#repoSlug}{repoSlug}{/repoSlug}
 {#ghUrl}
 [1]: {item.url}
 {/ghUrl}
