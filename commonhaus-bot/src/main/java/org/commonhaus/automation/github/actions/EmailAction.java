@@ -11,6 +11,7 @@ import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventPayload;
 import org.commonhaus.automation.mail.MailEvent;
 import org.commonhaus.automation.markdown.MarkdownConverter;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,6 +25,8 @@ import io.vertx.mutiny.core.eventbus.EventBus;
 
 @JsonDeserialize(as = EmailAction.class)
 public class EmailAction extends Action {
+    static String fromAddress = null;
+
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance commentEvent(String title, String htmlBody,
@@ -58,6 +61,8 @@ public class EmailAction extends Action {
                 eventData.getLogId(), List.of(addresses));
 
         final String title;
+        final String sender;
+
         String status = qc.getStatus();
         if ("created".equals(status)) {
             status = "";
@@ -74,6 +79,7 @@ public class EmailAction extends Action {
                             ? payload.pullRequest
                             : payload.issue;
 
+                    sender = item.author.login;
                     title = String.format("%s[%s] #%s %s",
                             status,
                             eventData.getRepoSlug(),
@@ -91,6 +97,7 @@ public class EmailAction extends Action {
                             : payload.issue;
                     DataCommonComment comment = payload.comment;
 
+                    sender = comment.author.login;
                     title = String.format("Re: [%s] #%s %s",
                             eventData.getRepoSlug(),
                             item.number, item.title);
@@ -105,6 +112,7 @@ public class EmailAction extends Action {
                     EventPayload.DiscussionPayload payload = eventData.getEventPayload();
                     DataDiscussion discussion = payload.discussion;
 
+                    sender = discussion.author.login;
                     title = String.format("%s[%s] #%s %s",
                             status,
                             eventData.getRepoSlug(),
@@ -120,6 +128,7 @@ public class EmailAction extends Action {
                     DataDiscussion discussion = payload.discussion;
                     DataDiscussionComment comment = payload.comment;
 
+                    sender = comment.author.login;
                     title = String.format("Re: [%s] #%s %s",
                             eventData.getRepoSlug(),
                             discussion.number, discussion.title);
@@ -133,6 +142,7 @@ public class EmailAction extends Action {
                 default -> {
                     Log.warnf("[%s] EmailAction.apply: unsupported event type", eventData.getLogId());
                     title = null;
+                    sender = null;
                     yield null;
                 }
             };
@@ -144,7 +154,12 @@ public class EmailAction extends Action {
         String subject = title;
 
         if (mailTemplateInstance != null) {
+            if (fromAddress == null) {
+                fromAddress = ConfigProvider.getConfig().getValue("quarkus.mailer.from", String.class);
+            }
+
             Log.debugf("[%s] EmailAction.apply: Sending email to %s; %s", eventData.getLogId(), List.of(addresses), subject);
+            mailTemplateInstance.from(sender + " <" + fromAddress + ">");
             MailEvent mailEvent = new MailEvent(eventData.getLogId(),
                     mailTemplateInstance, subject, addresses);
             Arc.container().instance(EventBus.class).get().send(MailEvent.ADDRESS, mailEvent);
