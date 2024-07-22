@@ -689,7 +689,7 @@ public class QueryContext {
 
     public boolean isTeamMember(GHUser user, String teamFullName) {
         Set<GHUser> members = teamMembers(teamFullName);
-        Log.debugf("%s members: %s", teamFullName, members.stream().map(GHUser::getLogin).toList());
+        Log.debugf("%s members: %s", teamFullName, members == null ? "[]" : members.stream().map(GHUser::getLogin).toList());
         return members != null && members.contains(user);
     }
 
@@ -721,7 +721,7 @@ public class QueryContext {
         if (members == null) {
             members = execGitHubSync((gh, dryRun) -> {
                 GHTeam ghTeam = org.getTeamByName(relativeName);
-                return ghTeam == null ? Set.of() : ghTeam.getMembers();
+                return ghTeam == null ? null : ghTeam.getMembers();
             });
             if (hasErrors() || members == null) {
                 clearNotFound();

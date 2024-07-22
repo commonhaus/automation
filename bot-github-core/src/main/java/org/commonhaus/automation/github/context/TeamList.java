@@ -27,7 +27,9 @@ public class TeamList {
     }
 
     public TeamList removeExcludedMembers(Predicate<DataActor> predicate) {
-        members.removeIf(predicate::test);
+        if (!members.isEmpty()) {
+            members.removeIf(predicate::test);
+        }
         return this;
     }
 
