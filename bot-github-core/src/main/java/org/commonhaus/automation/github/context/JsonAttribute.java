@@ -316,22 +316,43 @@ public enum JsonAttribute {
     }
 
     public List<DataLabel> labelsFrom(JsonObject object) {
-        if (object == null) {
-            return null;
-        }
-        JsonObject field = jsonObjectFrom(object);
+        JsonValue field = valueFrom(object);
         if (field == null) {
             return null;
         }
 
         JsonArray list;
         if (field.getValueType() == ValueType.OBJECT) {
-            if (JsonAttribute.id.existsIn(field)) {
-                return List.of(new DataLabel(field));
+            // "labels": {
+            //     "nodes": [
+            //         {
+            //         "id": "LA_kwDOL8tG0s8AAAABpSSN4Q",
+            //         "name": "application/accepted"
+            //         }
+            //     ],
+            //     "pageInfo": {
+            //         "hasNextPage": false,
+            //         "endCursor": "MQ"
+            //     }
+            // }
+            JsonObject o = field.asJsonObject();
+            if (JsonAttribute.id.existsIn(o)) {
+                return List.of(new DataLabel(o));
             }
-            list = JsonAttribute.nodes.jsonArrayFrom(field);
+            list = JsonAttribute.nodes.jsonArrayFrom(o);
         } else {
-            list = jsonArrayFrom(field);
+            // "labels": [
+            //     {
+            //       "id": 6605129827,
+            //       "node_id": "LA_kwDOLDuJqs8AAAABibJIYw",
+            //       "url": "https://api.github.com/repos/commonhaus-test/automation-test/labels/vote/open",
+            //       "name": "vote/open",
+            //       "color": "5319e7",
+            //       "default": false,
+            //       "description": ""
+            //     }
+            //   ],
+            list = field.asJsonArray();
         }
         return list.stream()
                 .map(JsonObject.class::cast)
@@ -395,13 +416,17 @@ public enum JsonAttribute {
 
     /** @return JsonObject with nodeName (or name()) from object */
     public JsonObject jsonObjectFrom(JsonObject object) {
+        JsonValue value = valueFrom(object);
+        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonObject) value;
+    }
+
+    private JsonValue valueFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
-        JsonValue value = alternateName
+        return alternateName
                 ? object.getOrDefault(nodeName, object.get(name()))
                 : object.get(nodeName);
-        return value == null || value.getValueType() == ValueType.NULL ? null : (JsonObject) value;
     }
 
     /**
