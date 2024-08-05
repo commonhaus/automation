@@ -96,7 +96,7 @@ public class MemberApplicationProcess {
 
         MembershipApplicationData applicationData = new MembershipApplicationData(login, item);
         // We haven't approved/declined this member yet: we need a valid application
-        if (user.isMember == null && !applicationData.isValid()) {
+        if (user.emptyMember() && !applicationData.isValid()) {
             throw new IllegalStateException(
                     "Unable to find valid application data for login %s and issue %s (%s)"
                             .formatted(login, item.id, item.title));
@@ -104,7 +104,7 @@ public class MemberApplicationProcess {
 
         String notificationEmail = MembershipApplicationData.getNotificationEmail(item);
         if (MembershipApplicationData.isAccepted(label)) {
-            if (user.isMember == null) {
+            if (user.emptyMember()) {
                 datastore.setCommonhausUser(new UpdateEvent(user,
                         (c, u) -> {
                             if (u.status().updateFromPending()) {

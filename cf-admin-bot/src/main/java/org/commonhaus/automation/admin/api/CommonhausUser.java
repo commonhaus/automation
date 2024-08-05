@@ -20,6 +20,7 @@ import org.commonhaus.automation.github.context.DataCommonItem;
 import org.kohsuke.github.GHContent;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -213,6 +214,11 @@ public class CommonhausUser {
         history.add("%s %s".formatted(now(), message));
     }
 
+    public boolean emptyMember() {
+        return isMember == null;
+    }
+
+    @JsonIgnore
     public boolean isMember() {
         return data.status.couldBeActiveMember()
                 && (isMember != null && isMember);
