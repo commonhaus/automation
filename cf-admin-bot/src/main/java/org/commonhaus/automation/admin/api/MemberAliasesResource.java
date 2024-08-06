@@ -144,7 +144,6 @@ public class MemberAliasesResource {
     }
 
     CommonhausUser updateHasDefaultFlag(CommonhausUser user) {
-        // eventual consistency. No big deal if this
         CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
                 (c, u) -> {
                     u.services().forwardEmail().hasDefaultAlias = true;

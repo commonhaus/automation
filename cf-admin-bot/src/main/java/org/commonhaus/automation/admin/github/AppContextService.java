@@ -64,7 +64,7 @@ public class AppContextService extends BaseContextService {
     // for the access we need across multiple installations to construct
     // query contexts with the necessary permissions to modify team membership
     // or manage membership-related issues/user records.
-    final Map<Long, InstallationAccess> installationAccess = new ConcurrentHashMap<>();
+    final Map<Long, InstallationContext> installationAccess = new ConcurrentHashMap<>();
     final Map<String, Long> writeToInstallId = new ConcurrentHashMap<>();
     final Map<String, Long> readToInstallId = new ConcurrentHashMap<>();
 
@@ -115,7 +115,7 @@ public class AppContextService extends BaseContextService {
             Log.errorf("No installation found for %s", scope);
             return null;
         }
-        InstallationAccess access = installationAccess.get(installationId);
+        InstallationContext access = installationAccess.get(installationId);
         return access.containsRepo(scope)
                 ? new ScopedQueryContext(this, installationId, orgName, scope)
                 : new ScopedQueryContext(this, installationId, orgName, null);
@@ -141,8 +141,8 @@ public class AppContextService extends BaseContextService {
         Optional<AdminConfigFile> repoConfig = repoEvent.getRepositoryConfig();
 
         if (action.added()) {
-            InstallationAccess access = installationAccess.computeIfAbsent(installationId,
-                    k -> new InstallationAccess(installationId, orgName));
+            InstallationContext access = installationAccess.computeIfAbsent(installationId,
+                    k -> new InstallationContext(installationId, orgName));
             access.write.add(repoFullName);
             access.write.add(orgName);
 
@@ -163,7 +163,7 @@ public class AppContextService extends BaseContextService {
                 userConfig = UserManagementConfig.DISABLED;
             }
 
-            InstallationAccess access = installationAccess.get(installationId);
+            InstallationContext access = installationAccess.get(installationId);
             if (action.installation()) {
                 // Installation is removed, forget all access
                 access = installationAccess.remove(installationId);
@@ -193,7 +193,7 @@ public class AppContextService extends BaseContextService {
      * May return null if connection can not be established
      *
      * @param nodeId User Node ID
-     * @param object Security Identity
+     * @param identity Security Identity
      * @return GitHub connection or null
      * @throws IOException
      */

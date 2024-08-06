@@ -14,13 +14,13 @@ import org.commonhaus.automation.github.context.QueryContext;
  * The bot is installed requires a certain set of permissions, which means it will be
  * able to read/write any repository that is associated with its own org.
  */
-public class InstallationAccess {
+public class InstallationContext {
     final long installationId;
     final String orgName;
     final Set<String> write = new HashSet<>();
     final Set<String> read = new HashSet<>();
 
-    InstallationAccess(long installationId, String orgName) {
+    InstallationContext(long installationId, String orgName) {
         this.installationId = installationId;
         this.orgName = orgName;
     }

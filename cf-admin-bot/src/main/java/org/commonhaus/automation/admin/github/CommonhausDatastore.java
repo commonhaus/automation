@@ -120,8 +120,7 @@ public class CommonhausDatastore {
     /**
      * Update Commonhaus user data
      *
-     * @param user Commonhaus user object
-     * @param message Commit message
+     * @param updateEvent Update message containing the user and commit message
      *
      * @throws RuntimeException if GitHub or other API query fails
      */
@@ -338,9 +337,5 @@ public class CommonhausDatastore {
 
     public static String getKey(CommonhausUser user) {
         return user.login() + ":" + user.id();
-    }
-
-    public static String getKey(MemberSession session) {
-        return session.login() + ":" + session.nodeId();
     }
 }

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.commonhaus.automation.admin.github.InstallationAccess;
+import org.commonhaus.automation.admin.github.InstallationContext;
 import org.commonhaus.automation.github.context.QueryContext;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -70,7 +70,7 @@ public class TeamManagementConfig extends RepositoryConfig {
      *
      * @param access the installation access object
      */
-    public void setAccess(InstallationAccess access) {
+    public void setAccess(InstallationContext access) {
         sources.forEach(source -> {
             // we should have (at least) read access to the source repo
             access.add(source.repo());

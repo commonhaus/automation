@@ -9,6 +9,7 @@ public enum MemberStatus {
     INACTIVE,
     PENDING,
     SPONSOR,
+    CONTRIBUTOR, // project contributor, not sponsor or member
     UNKNOWN;
 
     public static MemberStatus fromString(String role) {

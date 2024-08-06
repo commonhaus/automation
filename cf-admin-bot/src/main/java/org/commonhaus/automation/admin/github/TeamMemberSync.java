@@ -116,6 +116,10 @@ public class TeamMemberSync {
         }
     }
 
+    /**
+     * Push event
+     * If the pushed file matches the configuration file, re-read the configuration and update the team members.
+     */
     public void updateTeamMembers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Push GHEventPayload.Push pushEvent) {
         GHRepository repo = pushEvent.getRepository();
