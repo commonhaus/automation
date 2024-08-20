@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 
 import jakarta.json.JsonObject;
 
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHIssue;
@@ -28,6 +29,8 @@ import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
 import org.kohsuke.github.ReactionContent;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
@@ -312,30 +315,6 @@ public class QueryContext {
             clearNotFound();
             return org;
         });
-    }
-
-    /**
-     * This is an indirect lookup: list of teams is fetched first,
-     * then the team is found by name.
-     *
-     * @param org GHOrganization
-     * @param relativeName name relative to organization
-     * @return GHTeam or null if not found
-     */
-    public GHTeam getTeam(GHOrganization org, String relativeName) {
-        String fullName = toFullName(org.getLogin(), relativeName);
-        GHTeam team = TEAM_MEMBERS.get("ghTeam-" + fullName);
-        if (team == null) {
-            team = execGitHubSync((gh, dryRun) -> {
-                GHTeam result = org.getTeamByName(relativeName);
-                clearNotFound();
-                return result;
-            });
-            if (team != null) {
-                TEAM_MEMBERS.put("ghTeam-" + fullName, team);
-            }
-        }
-        return team;
     }
 
     public boolean isBot(String login) {
@@ -687,6 +666,30 @@ public class QueryContext {
         return DataLabel.createLabel(this, this.getRepositoryId(), labelName, color);
     }
 
+    /**
+     * This is an indirect lookup: list of teams is fetched first,
+     * then the team is found by name.
+     *
+     * @param org GHOrganization
+     * @param relativeName name relative to organization
+     * @return GHTeam or null if not found
+     */
+    public GHTeam getTeam(GHOrganization org, String relativeName) {
+        String fullName = toFullName(org.getLogin(), relativeName);
+        GHTeam team = TEAM_MEMBERS.get("ghTeam-" + fullName);
+        if (team == null) {
+            team = execGitHubSync((gh, dryRun) -> {
+                GHTeam result = org.getTeamByName(relativeName);
+                clearNotFound();
+                return result;
+            });
+            if (team != null) {
+                TEAM_MEMBERS.put("ghTeam-" + fullName, team);
+            }
+        }
+        return team;
+    }
+
     public boolean isTeamMember(GHUser user, String teamFullName) {
         Set<GHUser> members = teamMembers(teamFullName);
         Log.debugf("%s members: %s", teamFullName, members == null ? "[]" : members.stream().map(GHUser::getLogin).toList());
@@ -790,6 +793,37 @@ public class QueryContext {
     public boolean isCollaborator(GHUser user, String repoName) {
         Set<String> collaborators = collaborators(repoName);
         return collaborators != null && collaborators.contains(user.getLogin());
+    }
+
+    public JsonNode readYamlSourceFile(GHRepository repo, String path) {
+        GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
+        if (content == null || hasErrors()) {
+            clearNotFound();
+            Log.warnf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            return null;
+        }
+
+        try {
+            JsonNode node = ctx.parseYamlFile(content);
+            return node == null || node.isNull() ? null : node;
+        } catch (IOException e) {
+            logAndSendEmail("readSourceFile",
+                    "Unable to read file %s from repo %s".formatted(path, repo.getFullName()),
+                    e);
+            return null;
+        }
+    }
+
+    JsonNode parseYamlFile(GHContent content) throws IOException {
+        return ctx.parseYamlFile(content);
+    }
+
+    public <T> T parseYamlFile(GHContent content, Class<T> type) throws IOException {
+        return ctx.parseYamlFile(content, type);
+    }
+
+    public <T> String writeYamlValue(T user) throws IOException {
+        return ctx.writeYamlValue(user);
     }
 
     public String[] getErrorAddresses() {

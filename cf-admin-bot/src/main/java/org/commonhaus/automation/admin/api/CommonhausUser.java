@@ -280,7 +280,7 @@ public class CommonhausUser {
     }
 
     public static CommonhausUser parseFile(ScopedQueryContext qc, GHContent content) throws IOException {
-        CommonhausUser user = qc.parseFile(content, CommonhausUser.class);
+        CommonhausUser user = qc.parseYamlFile(content, CommonhausUser.class);
         if (user != null) {
             user.sha = content.getSha();
         }

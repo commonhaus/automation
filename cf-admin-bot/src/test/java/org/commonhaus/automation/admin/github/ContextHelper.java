@@ -138,14 +138,14 @@ public class ContextHelper extends QueryContext {
         ctx.writeToInstallId.put(datastoreRepoName, datastoreInstallationId);
 
         mocks.configFile(AdminConfigFile.NAME).fromClasspath("/cf-admin.yml");
-        AdminConfigFile config = AppContextService.yamlMapper().readValue(
+        AdminConfigFile config = ctx.yamlMapper().readValue(
                 getClass().getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
         ctx.userConfig = config.userManagement();
     }
 
     public static void setUserManagementConfig(AppContextService ctx)
             throws StreamReadException, DatabindException, IOException {
-        AdminConfigFile config = AppContextService.yamlMapper().readValue(
+        AdminConfigFile config = ctx.yamlMapper().readValue(
                 ContextHelper.class.getResourceAsStream("/cf-admin.yml"), AdminConfigFile.class);
         ctx.userConfig = config.userManagement();
     }

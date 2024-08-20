@@ -298,7 +298,7 @@ public class MemberDataTest extends ContextHelper {
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
-        CommonhausUser result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(),
+        CommonhausUser result = ctx.yamlMapper().readValue(contentCaptor.getValue(),
                 CommonhausUser.class);
         assertThat(result.status()).isEqualTo(MemberStatus.COMMITTEE);
 
@@ -383,7 +383,7 @@ public class MemberDataTest extends ContextHelper {
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
-        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.status()).isEqualTo(MemberStatus.ACTIVE);
 
         assertThat(result.goodUntil().attestation).hasSize(2);
@@ -474,7 +474,7 @@ public class MemberDataTest extends ContextHelper {
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
-        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application).isNull();
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
@@ -530,7 +530,7 @@ public class MemberDataTest extends ContextHelper {
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
-        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING);
 
@@ -599,7 +599,7 @@ public class MemberDataTest extends ContextHelper {
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
-        var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+        var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
         assertThat(result.application).isNotNull();
         assertThat(result.data.status).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING

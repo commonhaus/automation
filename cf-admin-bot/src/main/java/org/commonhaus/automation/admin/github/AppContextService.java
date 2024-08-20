@@ -36,18 +36,8 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.DumperOptions.FlowStyle;
-import org.yaml.snakeyaml.DumperOptions.ScalarStyle;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactoryBuilder;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkiverse.githubapp.GitHubConfigFileProvider;
@@ -69,8 +59,6 @@ public class AppContextService extends BaseContextService {
     final Map<String, Long> readToInstallId = new ConcurrentHashMap<>();
 
     UserManagementConfig userConfig = UserManagementConfig.DISABLED;
-
-    private static ObjectMapper yamlMapper;
 
     final AdminConfig adminData;
 
@@ -235,7 +223,7 @@ public class AppContextService extends BaseContextService {
         if (userConfig.isDisabled()) {
             return;
         }
-        JsonNode agreements = qc.readSourceFile(qc.getRepository(), userConfig.attestations().path());
+        JsonNode agreements = qc.readYamlSourceFile(qc.getRepository(), userConfig.attestations().path());
         if (agreements != null) {
             List<String> newIds = new ArrayList<>();
             JsonNode attestations = agreements.get("attestations");
@@ -403,22 +391,5 @@ public class AppContextService extends BaseContextService {
             return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
         }
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
-    public static ObjectMapper yamlMapper() {
-        if (yamlMapper == null) {
-            DumperOptions options = new DumperOptions();
-            options.setDefaultScalarStyle(ScalarStyle.PLAIN);
-            options.setDefaultFlowStyle(FlowStyle.AUTO);
-            options.setPrettyFlow(true);
-
-            yamlMapper = new ObjectMapper(new YAMLFactoryBuilder(new YAMLFactory())
-                    .dumperOptions(options).build())
-                    .findAndRegisterModules()
-                    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                    .setSerializationInclusion(Include.NON_EMPTY)
-                    .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
-        }
-        return yamlMapper;
     }
 }

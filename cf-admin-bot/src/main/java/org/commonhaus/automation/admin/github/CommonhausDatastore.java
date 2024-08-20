@@ -320,7 +320,7 @@ public class CommonhausDatastore {
 
     private String writeUser(ScopedQueryContext qc, CommonhausUser input) {
         try {
-            return qc.writeValue(input);
+            return qc.writeYamlValue(input);
         } catch (IOException e) {
             qc.addException(e);
             return null;

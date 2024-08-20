@@ -129,7 +129,7 @@ public class ApplicationEventTest extends ContextHelper {
                     // 2) remove application
                     final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
                     verify(builder).content(contentCaptor.capture());
-                    var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+                    var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
                     assertThat(result.application).isNull();
                     assertThat(result.isMember).isTrue();
@@ -189,7 +189,7 @@ public class ApplicationEventTest extends ContextHelper {
                     // 1) Set member flag, move status from UNKNOWN -> DECLINED
                     final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
                     verify(builder).content(contentCaptor.capture());
-                    var result = AppContextService.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
+                    var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
                     assertThat(result.application).isNull();
                     assertThat(result.isMember).isFalse();

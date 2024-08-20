@@ -296,7 +296,7 @@ public class TeamMemberSync {
         }
 
         // get contents of file from the specified repo + path
-        JsonNode data = qc.readSourceFile(repo, source.path());
+        JsonNode data = qc.readYamlSourceFile(repo, source.path());
         if (data == null) {
             return;
         }
