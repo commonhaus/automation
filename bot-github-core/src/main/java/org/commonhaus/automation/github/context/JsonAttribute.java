@@ -370,7 +370,11 @@ public enum JsonAttribute {
 
     /** Bridge to GH* type usually parsed using Jackson; may be incomplete */
     public GHRepository repositoryFrom(JsonObject object) {
-        String value = stringFrom(object);
+        if (object == null) {
+            return null;
+        }
+        JsonObject field = jsonObjectFrom(object);
+        String value = field.toString();
         return value == null
                 ? null
                 : tryOrNull(value, GHRepository.class);
