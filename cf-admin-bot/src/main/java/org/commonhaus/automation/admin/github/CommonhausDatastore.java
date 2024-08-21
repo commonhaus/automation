@@ -141,8 +141,8 @@ public class CommonhausDatastore {
     public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
         final String key = getKey(event);
 
-        ScopedQueryContext qc = ctx.getDatastoreContext();
-        if (qc == null) {
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
+        if (dqc == null) {
             return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
         }
 
@@ -151,27 +151,27 @@ public class CommonhausDatastore {
                 : deepCopy(AdminDataCache.COMMONHAUS_DATA.get(key));
 
         if (result == null) {
-            GHRepository repo = qc.getRepository();
-            result = readCommonhausUser(qc, repo, event, key);
+            GHRepository repo = dqc.getRepository();
+            result = readCommonhausUser(dqc, repo, event, key);
         }
-        if (result == null && qc.clearNotFound() && event.create()) {
+        if (result == null && dqc.clearNotFound() && event.create()) {
             // create a new user if not found and no errors
             result = CommonhausUser.create(event.login(), event.id());
         }
 
         // any other kind of error (including parse errors) will be logged and returned
-        if (qc.hasErrors()) {
-            Throwable e = qc.bundleExceptions();
-            qc.clearErrors();
-            Log.errorf(e, "[%s|%s] Unable to fetch user data for %s", qc.getLogId(), event.login(), e);
+        if (dqc.hasErrors()) {
+            Throwable e = dqc.bundleExceptions();
+            dqc.clearErrors();
+            Log.errorf(e, "[%s|%s] Unable to fetch user data for %s", dqc.getLogId(), event.login(), e);
             return Uni.createFrom().failure(e);
         } else if (result == null && event.create()) {
             Exception e = new IllegalStateException("No result for user after fetch with create");
-            qc.logAndSendEmail("Failed to update Commonhaus user", e);
+            dqc.logAndSendEmail("Failed to update Commonhaus user", e);
             return Uni.createFrom().failure(e);
         }
 
-        Log.debugf("[%s|%s] Fetched Commonhaus user data: %s", qc.getLogId(), event.login(), result);
+        Log.debugf("[%s|%s] Fetched Commonhaus user data: %s", dqc.getLogId(), event.login(), result);
         final CommonhausUser r = result;
         return Uni.createFrom().item(() -> r).emitOn(executor);
     }
@@ -190,29 +190,29 @@ public class CommonhausDatastore {
         final CommonhausUser user = event.user();
 
         CommonhausUser result = null;
-        ScopedQueryContext qc = ctx.getDatastoreContext();
-        if (qc == null) {
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
+        if (dqc == null) {
             Exception e = new IllegalStateException("No query context");
             ctx.logAndSendEmail("pushCommonhausUser", "Unable to get datastore query context", e, null);
             return Uni.createFrom().failure(e);
-        } else if (!qc.hasErrors()) {
-            result = updateCommonhausUser(qc, event);
+        } else if (!dqc.hasErrors()) {
+            result = updateCommonhausUser(dqc, event);
         }
 
-        if (qc.hasErrors()) {
-            Throwable e = qc.bundleExceptions();
-            qc.clearErrors();
-            qc.logAndSendEmail("Failed to update Commonhaus user", e);
+        if (dqc.hasErrors()) {
+            Throwable e = dqc.bundleExceptions();
+            dqc.clearErrors();
+            dqc.logAndSendEmail("Failed to update Commonhaus user", e);
             return Uni.createFrom().failure(e);
         }
 
-        Log.debugf("[%s|%s] Updated Commonhaus user data: %s", qc.getLogId(), user.login(), result);
+        Log.debugf("[%s|%s] Updated Commonhaus user data: %s", dqc.getLogId(), user.login(), result);
         final CommonhausUser u = result;
         return Uni.createFrom().item(() -> u).emitOn(executor);
     }
 
-    private CommonhausUser updateCommonhausUser(ScopedQueryContext qc, UpdateEvent event) {
-        GHRepository repo = qc.getRepository();
+    private CommonhausUser updateCommonhausUser(DatastoreQueryContext dqc, UpdateEvent event) {
+        GHRepository repo = dqc.getRepository();
         CommonhausUser user = deepCopy(event.user()); // leave original alone
         String key = getKey(user);
 
@@ -222,11 +222,11 @@ public class CommonhausDatastore {
             user.addHistory(event.message());
         }
 
-        if (qc.isDryRun()) {
+        if (dqc.isDryRun()) {
             return user;
         }
 
-        String content = writeUser(qc, user);
+        String content = writeUser(dqc, user);
         if (content == null) {
             // If it can't be serialized, bail and return the original
             return event.user();
@@ -241,26 +241,26 @@ public class CommonhausDatastore {
             update.sha(user.sha());
         }
 
-        GHContentUpdateResponse response = qc.execGitHubSync((gh3, dryRun3) -> update.commit());
-        HttpException ex = qc.getConflict();
+        GHContentUpdateResponse response = dqc.execGitHubSync((gh3, dryRun3) -> update.commit());
+        HttpException ex = dqc.getConflict();
         if (ex != null) {
-            qc.clearConflict();
-            Log.debugf("[%s|%s] Conflict updating Commonhaus user data", qc.getLogId(), user.login());
+            dqc.clearConflict();
+            Log.debugf("[%s|%s] Conflict updating Commonhaus user data", dqc.getLogId(), user.login());
 
             // we're here after a save conflict; re-read the data
-            user = readCommonhausUser(qc, repo, event, key);
+            user = readCommonhausUser(dqc, repo, event, key);
             if (user != null) {
                 if (event.retry()) {
                     // retry the update
-                    return updateCommonhausUser(qc, UpdateEvent.retryEvent(event, user));
+                    return updateCommonhausUser(dqc, UpdateEvent.retryEvent(event, user));
                 } else {
                     // allow caller to handle unresolved conflict
                     user.setConflict(true);
                 }
             }
-        } else if (!qc.hasErrors()) {
+        } else if (!dqc.hasErrors()) {
             GHContent responseContent = response.getContent();
-            user = parseUser(qc, responseContent);
+            user = parseUser(dqc, responseContent);
             if (user != null) {
                 AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(user));
             }
@@ -270,20 +270,20 @@ public class CommonhausDatastore {
     }
 
     /** Get user data: will return null on IOException (including not found) */
-    private CommonhausUser readCommonhausUser(ScopedQueryContext qc, GHRepository repo,
+    private CommonhausUser readCommonhausUser(DatastoreQueryContext dqc, GHRepository repo,
             DatastoreEvent event, String key) {
 
-        CommonhausUser response = qc.execGitHubSync((gh, dryRun) -> {
+        CommonhausUser response = dqc.execGitHubSync((gh, dryRun) -> {
             GHContent content = repo.getFileContent(dataPath(event.id()));
             return content == null
                     ? null
-                    : CommonhausUser.parseFile(qc, content);
+                    : CommonhausUser.parseFile(dqc, content);
         });
 
-        if (qc.hasErrors() || response == null) {
+        if (dqc.hasErrors() || response == null) {
             Log.debugf("[%s|%s] Commonhaus user data not found or could not be parsed",
-                    qc.getLogId(), event.login());
-            if (qc.clearNotFound() || event.create()) {
+                    dqc.getLogId(), event.login());
+            if (dqc.clearNotFound() || event.create()) {
                 // create a new user
                 return CommonhausUser.create(event.login(), event.id());
             }
@@ -309,20 +309,20 @@ public class CommonhausDatastore {
         return user;
     }
 
-    private CommonhausUser parseUser(ScopedQueryContext qc, GHContent responseContent) {
+    private CommonhausUser parseUser(DatastoreQueryContext dqc, GHContent responseContent) {
         try {
-            return CommonhausUser.parseFile(qc, responseContent);
+            return CommonhausUser.parseFile(dqc, responseContent);
         } catch (IOException e) {
-            qc.addException(e);
+            dqc.addException(e);
             return null;
         }
     }
 
-    private String writeUser(ScopedQueryContext qc, CommonhausUser input) {
+    private String writeUser(DatastoreQueryContext dqc, CommonhausUser input) {
         try {
-            return qc.writeYamlValue(input);
+            return dqc.writeYamlValue(input);
         } catch (IOException e) {
-            qc.addException(e);
+            dqc.addException(e);
             return null;
         }
     }

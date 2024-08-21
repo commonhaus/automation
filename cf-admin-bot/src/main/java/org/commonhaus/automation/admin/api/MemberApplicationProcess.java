@@ -13,7 +13,7 @@ import org.commonhaus.automation.admin.api.MembershipApplicationData.Feedback;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
-import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.commonhaus.automation.admin.github.DatastoreQueryContext;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
@@ -45,25 +45,25 @@ public class MemberApplicationProcess {
     CommonhausDatastore datastore;
 
     /**
-     * Handle an application comment event
+     * Handle an application comment event.
      *
-     * @param qc
+     * @param dqc QueryContext for the datastore repository
      * @param issue
      * @param item
      */
-    public void handleApplicationComment(ScopedQueryContext qc, DataCommonItem issue, DataCommonComment comment) {
+    public void handleApplicationComment(DatastoreQueryContext dqc, DataCommonItem issue, DataCommonComment comment) {
         if (MembershipApplicationData.isUserFeedback(comment.body)) {
-            Log.debugf("[%s] updateApplicationComments: #%s - user feedback", qc.getLogId(), issue.number);
+            Log.debugf("[%s] updateApplicationComments: #%s - user feedback", dqc.getLogId(), issue.number);
             String notificationEmail = MembershipApplicationData.getNotificationEmail(issue);
             if (isValid(notificationEmail)) {
                 String body = Templates.applicationUpdated(comment.body.replaceAll("\\s*::response::\\s*", "")).render();
                 String htmlBody = MarkdownConverter.toHtml(body);
-                ctx.sendEmail(qc.getLogId(),
+                ctx.sendEmail(dqc.getLogId(),
                         "Commonhaus Foundation Membership Application",
                         body, htmlBody, new String[] { notificationEmail });
             }
         } else {
-            Log.debugf("[%s] updateApplicationComments: #%s - not user feedback", qc.getLogId(), issue.number);
+            Log.debugf("[%s] updateApplicationComments: #%s - not user feedback", dqc.getLogId(), issue.number);
         }
     }
 
@@ -71,16 +71,15 @@ public class MemberApplicationProcess {
      * Handle an application event (issue label change) for a membership
      * application.
      *
-     * @param qc QueryContext for the repository containing the issue
-     * @param issue The issue that was updated
+     * @param dqc QueryContext for the datastore repository
      * @param item The issue as Json-derived data
      * @param label The label that was added
      * @throws Throwable
      */
-    public void handleApplicationLabelAdded(ScopedQueryContext qc, GHIssue issue, DataCommonItem item,
-            DataLabel label) throws Throwable {
+    public void handleApplicationLabelAdded(DatastoreQueryContext dqc, GHIssue issue, DataCommonItem item, DataLabel label)
+            throws Throwable {
         String login = MembershipApplicationData.getLogin(item);
-        GHUser applicant = qc.getUser(login);
+        GHUser applicant = dqc.getUser(login);
 
         String teamFullName = ctx.getTeamForRole(CommonhausUser.MEMBER_ROLE);
         if (teamFullName == null) {
@@ -118,12 +117,12 @@ public class MemberApplicationProcess {
                         true));
             }
             // (re-)try adding the user to the team if the above went ok.
-            if (!qc.hasErrors()
+            if (!dqc.hasErrors()
                     && ctx.addTeamMember(applicant, teamFullName)
                     && isValid(notificationEmail)) {
                 String body = Templates.applicationAccepted().render();
                 String htmlBody = MarkdownConverter.toHtml(body);
-                ctx.sendEmail(qc.getLogId(),
+                ctx.sendEmail(dqc.getLogId(),
                         "Welcome to the Commonhaus Foundation!",
                         body, htmlBody, new String[] { notificationEmail });
             }
@@ -140,26 +139,26 @@ public class MemberApplicationProcess {
                     true,
                     true));
 
-            if (!qc.hasErrors() && isValid(notificationEmail)) {
+            if (!dqc.hasErrors() && isValid(notificationEmail)) {
                 String body = Templates.applicationDeclined().render();
                 String htmlBody = MarkdownConverter.toHtml(body);
-                ctx.sendEmail(qc.getLogId(),
+                ctx.sendEmail(dqc.getLogId(),
                         "Commonhaus Foundation Membership Application",
                         body, htmlBody, new String[] { notificationEmail });
             }
         }
 
-        if (qc.hasErrors()) {
-            throw qc.bundleExceptions();
+        if (dqc.hasErrors()) {
+            throw dqc.bundleExceptions();
         }
 
         if (isValid(notificationEmail)) {
             // Try to remove the notification email from the issue body
             String updated = MembershipApplicationData.NOTIFICATION.matcher(item.body).replaceAll("");
-            qc.updateItemDescription(EventType.issue, item.id, updated, DataCommonItem.ISSUE_FIELDS);
+            dqc.updateItemDescription(EventType.issue, item.id, updated, DataCommonItem.ISSUE_FIELDS);
         }
-        qc.closeIssue(issue);
-        qc.removeLabels(item.id, List.of(MembershipApplicationData.NEW));
+        dqc.closeIssue(issue);
+        dqc.removeLabels(item.id, List.of(MembershipApplicationData.NEW));
     }
 
     protected boolean isValid(String notificationEmail) {
@@ -171,8 +170,7 @@ public class MemberApplicationProcess {
      * application
      *
      * @param session User session
-     * @param qc Datastore QueryContext (for making changes to the
-     *        application issue)
+     * @param dqc QueryContext for the datastore repository
      * @param applicationData Current application data
      * @param applicationPost Application data from the user
      * @return updated ApplicationData object or null on error (see QueryContext for
@@ -180,21 +178,21 @@ public class MemberApplicationProcess {
      */
     public MembershipApplicationData userUpdateApplicationIssue(
             MemberSession session,
-            ScopedQueryContext qc,
+            DatastoreQueryContext dqc,
             MembershipApplicationData applicationData,
             ApplicationPost applicationPost,
             String notificationEmail) {
 
         String content = MembershipApplicationData.issueContent(session, applicationPost, notificationEmail);
-        Collection<DataLabel> labels = qc.findLabels(List.of(MembershipApplicationData.NEW));
+        Collection<DataLabel> labels = dqc.findLabels(List.of(MembershipApplicationData.NEW));
         MembershipApplication application = applicationData == null ? null : applicationData.application;
 
         DataCommonItem item = application == null
-                ? qc.createItem(EventType.issue,
+                ? dqc.createItem(EventType.issue,
                         MembershipApplicationData.createTitle(session),
                         content,
                         labels)
-                : qc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
+                : dqc.updateItemDescription(EventType.issue, application.nodeId(), content, DataCommonItem.ISSUE_FIELDS);
 
         return item == null
                 ? null
@@ -203,14 +201,14 @@ public class MemberApplicationProcess {
 
     MembershipApplicationData findUserApplication(MemberSession session, String applicationId, boolean withComments)
             throws Throwable {
-        ScopedQueryContext qc = ctx.getDatastoreContext();
-        DataCommonItem issue = qc.getItem(EventType.issue, applicationId);
-        if (qc.hasErrors()) {
-            throw qc.bundleExceptions();
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
+        DataCommonItem issue = dqc.getItem(EventType.issue, applicationId);
+        if (dqc.hasErrors()) {
+            throw dqc.bundleExceptions();
         }
         MembershipApplicationData application = new MembershipApplicationData(session.login(), issue);
         if (application.isValid() && withComments) {
-            Feedback feedback = getFeedback(qc, applicationId, issue.mostRecentEdit());
+            Feedback feedback = getFeedback(dqc, applicationId, issue.mostRecentEdit());
             if (feedback != null) {
                 application.setFeedback(feedback);
             }
@@ -218,8 +216,8 @@ public class MemberApplicationProcess {
         return application;
     }
 
-    Feedback getFeedback(ScopedQueryContext qc, String nodeId, Date mostRecentEdit) {
-        List<DataCommonComment> comments = qc.getComments(nodeId,
+    Feedback getFeedback(DatastoreQueryContext dqc, String nodeId, Date mostRecentEdit) {
+        List<DataCommonComment> comments = dqc.getComments(nodeId,
                 x -> MembershipApplicationData.isUserFeedback(x.body) && MembershipApplicationData.isNewer(x, mostRecentEdit));
 
         return (comments == null || comments.isEmpty())

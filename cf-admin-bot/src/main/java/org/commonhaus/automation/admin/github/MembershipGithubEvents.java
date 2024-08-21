@@ -53,22 +53,17 @@ public class MembershipGithubEvents {
             return;
         }
 
-        ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                installationId,
-                eventPayload.getRepository())
-                .addExisting(graphQLClient)
-                .addExisting(github);
-
-        Log.debugf("[%s] applicationIssueLabelAdded #%s - %s", qc.getLogId(),
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
+        Log.debugf("[%s] applicationIssueLabelAdded #%s - %s", dqc.getLogId(),
                 issue.number, actionType);
 
         try {
-            qc.getLabels(qc.getRepositoryId()); // pre-fetch
-            applicationProcess.handleApplicationLabelAdded(qc, eventPayload.getIssue(), issue, label);
+            dqc.getLabels(dqc.getRepositoryId()); // pre-fetch
+            applicationProcess.handleApplicationLabelAdded(dqc, eventPayload.getIssue(), issue, label);
         } catch (Throwable e) {
-            qc.logAndSendEmail("Error with issue label event", e);
+            dqc.logAndSendEmail("Error with issue label event", e);
         } finally {
-            qc.clearErrors();
+            dqc.clearErrors();
         }
     }
 
@@ -96,19 +91,14 @@ public class MembershipGithubEvents {
             return;
         }
 
-        ScopedQueryContext qc = ctx.refreshScopedQueryContext(
-                eventPayload.getInstallation().getId(),
-                eventPayload.getRepository())
-                .addExisting(github)
-                .addExisting(graphQLClient);
-
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
         DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(data);
         try {
-            applicationProcess.handleApplicationComment(qc, issue, comment);
+            applicationProcess.handleApplicationComment(dqc, issue, comment);
         } catch (Exception e) {
-            qc.logAndSendEmail("Error with issue label event", e);
+            dqc.logAndSendEmail("Error with issue label event", e);
         } finally {
-            qc.clearErrors();
+            dqc.clearErrors();
         }
     }
 

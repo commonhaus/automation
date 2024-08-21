@@ -6,8 +6,11 @@ import java.util.Set;
 import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.UserQueryContext;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubBuilder;
 
+import io.quarkus.oidc.AccessTokenCredential;
 import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.identity.SecurityIdentity;
 
@@ -24,11 +27,34 @@ public class MemberSession {
 
         // Create/renew GitHub connection
         try {
-            memberProfile.connection = ctx.getUserConnection(memberProfile.nodeId(), identity);
+            memberProfile.connection = getUserConnection(memberProfile.nodeId(), identity);
         } catch (IOException e) {
             memberProfile.connectionError = e;
         }
         return memberProfile;
+    }
+
+    /**
+     * Create or renew a GitHub connection for a user.
+     * May return null if connection can not be established
+     *
+     * @param nodeId User Node ID
+     * @param identity Security Identity
+     * @return GitHub connection or null
+     * @throws IOException
+     */
+    public static GitHub getUserConnection(String nodeId, SecurityIdentity identity) throws IOException {
+        GitHub connect = BaseQueryCache.CONNECTION.get("user-" + nodeId);
+        if (connect == null || !connect.isCredentialValid()) {
+            AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
+            connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
+            BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
+        }
+        return connect;
+    }
+
+    public static void updateUserConnection(String nodeId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
     }
 
     private final String nodeId;

@@ -1,6 +1,5 @@
 package org.commonhaus.automation.admin.github;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.annotation.Nonnull;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.core.Response;
 
@@ -26,7 +26,6 @@ import org.commonhaus.automation.admin.config.UserManagementConfig;
 import org.commonhaus.automation.admin.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseContextService;
-import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -34,21 +33,21 @@ import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
 import io.quarkiverse.githubapp.GitHubConfigFileProvider;
+import io.quarkiverse.githubapp.TokenGitHubClients;
 import io.quarkus.logging.Log;
-import io.quarkus.oidc.AccessTokenCredential;
-import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
 @Singleton
 public class AppContextService extends BaseContextService {
     public static final String TEAM_SYNC_TRIGGER = "team-sync";
+
+    @Inject
+    TokenGitHubClients tokenClients;
 
     // This all feels ridiculous. But we need to find the right installation
     // for the access we need across multiple installations to construct
@@ -84,10 +83,6 @@ public class AppContextService extends BaseContextService {
         return new ScopedQueryContext(this, installationId, org, repository);
     }
 
-    public ScopedQueryContext getDatastoreContext() {
-        return getScopedQueryContext(getDataStore());
-    }
-
     public ScopedQueryContext getScopedQueryContext(String scope) {
         String orgName = QueryContext.toOrganizationName(scope);
 
@@ -107,6 +102,10 @@ public class AppContextService extends BaseContextService {
         return access.containsRepo(scope)
                 ? new ScopedQueryContext(this, installationId, orgName, scope)
                 : new ScopedQueryContext(this, installationId, orgName, null);
+    }
+
+    public DatastoreQueryContext getDatastoreContext() {
+        return new DatastoreQueryContext(this, tokenClients, getDataStore());
     }
 
     public UserQueryContext newUserQueryContext(MemberSession memberSession) {
@@ -176,29 +175,6 @@ public class AppContextService extends BaseContextService {
         }
     }
 
-    /**
-     * Create or renew a GitHub connection for a user.
-     * May return null if connection can not be established
-     *
-     * @param nodeId User Node ID
-     * @param identity Security Identity
-     * @return GitHub connection or null
-     * @throws IOException
-     */
-    public GitHub getUserConnection(String nodeId, SecurityIdentity identity) throws IOException {
-        GitHub connect = BaseQueryCache.CONNECTION.get("user-" + nodeId);
-        if (connect == null || !connect.isCredentialValid()) {
-            AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
-            connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
-            BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
-        }
-        return connect;
-    }
-
-    public void updateUserConnection(String nodeId, GitHub gh) {
-        BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
-    }
-
     public UserManagementConfig userManagementConfig() {
         return userConfig;
     }
@@ -212,7 +188,7 @@ public class AppContextService extends BaseContextService {
     }
 
     public String getDataStore() {
-        return adminData.dataStore();
+        return adminData.datastore();
     }
 
     public URI getMemberHome() {

@@ -18,7 +18,7 @@ import org.commonhaus.automation.admin.api.MembershipApplicationData.Application
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
-import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.commonhaus.automation.admin.github.DatastoreQueryContext;
 import org.kohsuke.github.GHMyself;
 
 import io.quarkus.logging.Log;
@@ -120,7 +120,7 @@ public class MemberApplicationResource {
 
         if (checkRunning.compareAndSet(false, true)) {
             try {
-                ScopedQueryContext qc = ctx.getDatastoreContext();
+                DatastoreQueryContext dqc = ctx.getDatastoreContext();
 
                 boolean notFound = applicationData == null && post == null;
                 boolean notOwner = applicationData != null && !applicationData.isValid();
@@ -157,13 +157,13 @@ public class MemberApplicationResource {
                 }
 
                 // UPDATE APPLICATION ISSUE
-                MembershipApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, qc,
+                MembershipApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, dqc,
                         applicationData, post, notificationEmail);
 
-                if (qc.hasErrors()) {
-                    Throwable e = qc.bundleExceptions();
-                    qc.clearErrors();
-                    return ctx.toResponseWithEmail(qc.getLogId(),
+                if (dqc.hasErrors()) {
+                    Throwable e = dqc.bundleExceptions();
+                    dqc.clearErrors();
+                    return ctx.toResponseWithEmail(dqc.getLogId(),
                             "doUserApplicationUpdate: Failed to update MembershipApplication issue", e);
                 }
                 if (updated == null) {
