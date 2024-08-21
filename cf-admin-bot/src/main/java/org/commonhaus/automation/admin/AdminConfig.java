@@ -9,7 +9,7 @@ import io.smallrye.config.ConfigMapping;
 public interface AdminConfig {
     Optional<String> teamSyncCron();
 
-    String dataStore();
+    String datastore();
 
     URI memberHome();
 }

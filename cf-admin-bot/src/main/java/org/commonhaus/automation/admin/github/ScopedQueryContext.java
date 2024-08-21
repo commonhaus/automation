@@ -12,8 +12,8 @@ import org.kohsuke.github.GitHub;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ScopedQueryContext extends QueryContext {
-    private String ownerName;
-    private String repoFullName;
+    private final String ownerName;
+    private final String repoFullName;
 
     private GHRepository repository;
     private MonitoredRepo repoConfig;
@@ -53,12 +53,8 @@ public class ScopedQueryContext extends QueryContext {
             @Nonnull GHOrganization org, GHRepository repo) {
         super(contextService, installationId);
         this.ownerName = org.getLogin();
+        this.repoFullName = repo == null ? null : repo.getFullName();
         this.repository = repo;
-    }
-
-    public ScopedQueryContext addExisting(MonitoredRepo repoCfg) {
-        this.repoConfig = repoCfg;
-        return this;
     }
 
     @Override
@@ -92,6 +88,11 @@ public class ScopedQueryContext extends QueryContext {
 
     public ScopedQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
         super.addExisting(graphQLClient);
+        return this;
+    }
+
+    public ScopedQueryContext addExisting(MonitoredRepo repoCfg) {
+        this.repoConfig = repoCfg;
         return this;
     }
 

@@ -20,6 +20,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.api.MembershipApplicationData;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.BaseQueryCache;
@@ -45,6 +46,7 @@ import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 
+import io.quarkiverse.githubapp.TokenGitHubClients;
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.quarkus.jackson.ObjectMapperCustomizer;
 import io.smallrye.graphql.client.Response;
@@ -58,7 +60,7 @@ public class ContextHelper extends QueryContext {
     public static final String sponsorsRepo = "commonhaus-test/sponsors-test";
     public static final String sponsorsRepoId = "R_sponsors";
 
-    public static final long datastoreInstallationId = 50264360;
+    public static final long datastoreInstallationId = -5;
     public static final long datastoreOrganizationId = 801851090;
     public static final String datastoreOrgName = "datastore";
     public static final String datastoreRepoName = "datastore/org";
@@ -255,10 +257,18 @@ public class ContextHelper extends QueryContext {
 
     public GitHub setupBotGithub(AppContextService ctx, GitHubMockSetupContext mocks) throws IOException {
         GitHub gh = mocks.installationClient(datastoreInstallationId);
+        DynamicGraphQLClient dql = mocks.installationGraphQLClient(datastoreInstallationId);
+
+        BaseQueryCache.CONNECTION.put("ghds-" + datastoreRepoName, gh);
+        BaseQueryCache.CONNECTION.put("gqlds-" + datastoreRepoName, dql);
 
         GHUser bot = mockGHUser(botLogin);
         when(gh.getUser(botLogin)).thenReturn(bot);
-        ctx.updateUserConnection(botNodeId, gh);
+        MemberSession.updateUserConnection(botNodeId, gh);
+
+        ctx.tokenClients = Mockito.mock(TokenGitHubClients.class);
+        when(ctx.tokenClients.getRestClient()).thenReturn(gh);
+        when(ctx.tokenClients.getGraphQLClient()).thenReturn(dql);
 
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");

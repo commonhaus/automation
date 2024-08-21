@@ -15,7 +15,7 @@ import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.github.AppContextService;
-import org.commonhaus.automation.admin.github.ScopedQueryContext;
+import org.commonhaus.automation.admin.github.DatastoreQueryContext;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.kohsuke.github.GHContent;
 
@@ -279,8 +279,8 @@ public class CommonhausUser {
         return DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.MINUTES));
     }
 
-    public static CommonhausUser parseFile(ScopedQueryContext qc, GHContent content) throws IOException {
-        CommonhausUser user = qc.parseYamlFile(content, CommonhausUser.class);
+    public static CommonhausUser parseFile(DatastoreQueryContext dqc, GHContent content) throws IOException {
+        CommonhausUser user = dqc.parseYamlFile(content, CommonhausUser.class);
         if (user != null) {
             user.sha = content.getSha();
         }
