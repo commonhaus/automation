@@ -1,7 +1,5 @@
 package org.commonhaus.automation.admin.github;
 
-import java.io.IOException;
-
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GitHub;
@@ -43,15 +41,5 @@ public class UserQueryContext extends QueryContext {
     @Override
     public DynamicGraphQLClient getGraphQLClient() {
         return graphQLClient;
-    }
-
-    @Override
-    public void refreshConnection() {
-        try {
-            ctx.getUserConnection(session.nodeId(), session.identity());
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                    "Unable to create a GitHub client for the user " + session.login(), e);
-        }
     }
 }

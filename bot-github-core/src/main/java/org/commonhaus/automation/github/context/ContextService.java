@@ -69,6 +69,11 @@ public interface ContextService {
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
 
+    default void updateConnections(long installationId, GitHub github, DynamicGraphQLClient graphQLClient) {
+        updateConnection(installationId, github);
+        updateConnection(installationId, graphQLClient);
+    }
+
     void updateConnection(long installationId, GitHub gh);
 
     void updateConnection(long installationId, DynamicGraphQLClient gql);

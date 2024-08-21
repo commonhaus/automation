@@ -130,11 +130,6 @@ public class QueryContext {
         return installationId;
     }
 
-    public void refreshConnection() {
-        github = ctx.getInstallationClient(getInstallationId());
-        graphQLClient = null;
-    }
-
     public void addException(Exception e) {
         exceptions.add(e);
     }
