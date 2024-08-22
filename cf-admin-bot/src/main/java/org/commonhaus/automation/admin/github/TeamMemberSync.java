@@ -148,7 +148,7 @@ public class TeamMemberSync {
         scheduledSync();
     }
 
-    @Scheduled(cron = "${automation.admin.team-sync-cron:13 27 */5 * * ?}")
+    @Scheduled(cron = "${automation.admin.team-sync-cron:23 25 3 ? * * *}")
     void scheduledSync() {
         try {
             Iterator<MonitoredRepo> i = monitoredRepos.iterator();
