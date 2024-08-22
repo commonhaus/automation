@@ -838,7 +838,7 @@ public class VotingTest extends ContextHelper {
 
         // Supermajority (2/3) have voted
 
-        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.supermajority);
+        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.twothirds);
         voteInfo = new VoteInformation(event);
         assertVoteTally(34, true, voteInfo, extraReactions, teamReactions);
         assertVoteTally(33, false, voteInfo, extraReactions, teamReactions);

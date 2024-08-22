@@ -20,7 +20,8 @@ public class VoteConfig extends RepositoryConfig {
     public enum Threshold {
         all,
         majority,
-        supermajority
+        twothirds,
+        fourfifths
     }
 
     public static class StatusLinks {

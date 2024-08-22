@@ -123,7 +123,8 @@ public class VoteTally {
         hasQuorum = switch (votingThreshold) {
             case all -> groupVotes >= groupSize;
             case majority -> groupVotes > groupSize / 2;
-            case supermajority -> groupVotes > groupSize * 2 / 3;
+            case twothirds -> groupVotes > groupSize * 2 / 3;
+            case fourfifths -> groupVotes > groupSize * 4 / 5;
         };
 
         manualCloseComments = resultComments.isEmpty()
