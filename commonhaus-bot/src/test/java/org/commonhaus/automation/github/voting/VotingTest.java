@@ -433,6 +433,59 @@ public class VotingTest extends ContextHelper {
     }
 
     @Test
+    void testVoteOpenValidManualVote() throws Exception {
+        // Valid vote; only some team have voted + extra; update comment
+
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        Response reactions = mockResponse(Path.of("src/test/resources/github/queryReactionsSomeTeam.json"));
+        Response updateComment = mockResponse(
+                Path.of("src/test/resources/github/mutableUpdateDiscussionComment.json"));
+        Response addLabel = mockResponse(
+                Path.of("src/test/resources/github/mutableAddLabelsToLabelable.VotingQuorum.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
+                    when(mocks.installationClient(installationId).isCredentialValid())
+                            .thenReturn(true);
+
+                    GHUser user1 = mockGHUser("nmcl");
+                    GHUser user2 = mockGHUser("evanchooly");
+                    GHUser user3 = mockGHUser("kenfinnigan");
+                    mockGHUser("ebullient");
+
+                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
+
+                    setupBotComment(discussionId);
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("reactions(first: 100"), anyMap()))
+                            .thenReturn(reactions);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("updateDiscussionComment("), anyMap()))
+                            .thenReturn(updateComment);
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(addLabel);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionEditedManual.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("reactions(first: 100"), anyMap());
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("updateDiscussionComment("), anyMap());
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+        verifyBotCommentCache(discussionId, botCommentId);
+    }
+
+    @Test
     public void testManualResultsCommentAdded() throws Exception {
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
