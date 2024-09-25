@@ -1,18 +1,17 @@
 # Haus Rules: Voting and Notices
 
 - [Example configuration](#example-configuration)
-- [Notice](#notice)
+- [Notice configuration](#notice-configuration)
+- [Voting configuration](#voting-configuration)
 - [Voting General flow](#voting-general-flow)
 - [Describing a vote](#describing-a-vote)
-- [Open a vote](#open-a-vote)
-- [Close a vote](#close-a-vote)
-- [Label usage](#label-usage)
 - [References](#references)
 
 The CF follows an adapted form of Martha's Rules for decision making. This GitHub App helps automate the process.
 
-The group that should be used to determine quorum must be specified in the item description
-(a default group can be specified in the bot config). See [Vote markers](#vote-markers).
+The group that should be used to determine quorum must be specified in the item description (a default group can be specified in the bot config).
+
+See [Voting General flow](#voting-general-flow).
 
 ## Example configuration
 
@@ -24,13 +23,13 @@ These configurations are used in test, but provide a general overview of how the
 
 ## Notice configuration
 
-```
+```yaml
 notice:
   discussion:
     rules:
       - # If a discussion is created in or moved to Announcements or Consensus Building
         # and it does not have the notice label, apply the notice label
-        action: 
+        action:
           - created
           - category_changed
         category:
@@ -60,18 +59,53 @@ Configuration is broken in to two sections that appear under the type of item (d
     - If the value is a list or an array of lists, it is a label action
     - If the value contains `address` field, it is an email action.
     - To remove a label using a label action, prepend a `!` to its name: `["!vote/open"]` will remove the `vote/open` label.
-- `rules` Rules define a list of conditions. 
+- `rules` Rules define a list of conditions.
     - `category` (optional). Conditions apply to Discussions only, and are true if the discussion matches one of the listed categories.
     - `action` (optional). Specify the event action (created, edited)
     - `label` (optional). A list of one or more labels that the item could have (OR). To exclude a label, use `!` as a prefix.
     - `label_change` applies specifically to label change events. Specify a list of labels that should trigger an action (the `then` clause) when they are added. Use a `!` prefix to match labels that have been removed.
-    - `then` (required). A list of named actions to apply if the conditions of this rule match the event. 
+    - `then` (required). A list of named actions to apply if the conditions of this rule match the event.
 
 See the two notice-related config examples above.
 
+## Voting General flow
+
+```mermaid
+stateDiagram-v2
+    vopen: 🏷️ vote/open (👤)
+    vquorum: 🏷️ vote/quorum (🤖)
+    vresult: 📝 result (👤)
+    vdone: 🏷️ vote/done (🤖)
+
+    [*] --> vopen
+
+    vopen --> vquorum
+    vopen --> vresult
+    vquorum --> vresult
+    
+    vresult --> vdone
+    vdone --> [*]
+```
+
+- 🏷️ `vote/open` (👤) - Marks an open/active vote.
+
+    The bot will count reactions, comments or PR reviews. It will create and update a comment with the current vote tally, including whether or not quorum has been reached. The bot will check for quorum any time the item is changed, or once an hour.
+
+- 🏷️ `vote/quorum` (🤖) - Quorum has been reached for electronic participation
+
+    When quorum is reached, the bot will add a label to the item indicating that quorum has been reached.
+
+- 💬 `vote::result`(👤) - Vote manager (usually CFC member) indicates a vote should be closed
+
+    The comment should summarize the outcome of the vote. It will appear as a summary at the top / ahead of voting results, as shown [here](https://www.commonhaus.org/votes/commonhaus/foundation/147.html).
+
+- 🏷️ `vote/done` - (🤖) vote is done; results have been summarized
+
+    The bot will update the vote summary with the result (as summarized by a human) and remove the `vote/open` label.
+
 ## Voting configuration
 
-```
+```yaml
 voting:
   managers:
     - "@commonhaus/test-quorum-default"
@@ -87,40 +121,6 @@ voting:
 - `status` (optional)
     - `badge` if status badges will be created for votes, provide a URI template that can be used to generate links to each svg asset.
     - `page` if vote status or summary pages are created for votes, provide a URI template that can be used to generate links to each page.
-
-
-## Voting General flow
-
-```mermaid
-stateDiagram-v2
-    vopen: 🏷️ vote/open
-    vquorum: 🏷️ vote/quorum
-    vresult: 📝 result
-    finish: ① result label
-    vdone: 🏷️ vote/done
-
-    [*] --> vopen: labeled (👤 or 🤖)
-
-    vopen --> vquorum: labeled (🤖)
-    vopen --> vresult: comment (👤)
-    vquorum --> vresult: comment (👤)
-    
-    vresult --> vdone: labeled (🤖)
-    vresult --> finish: labeled (🤖)
-    
-    finish --> [*]
-    vdone --> [*]
-```
-
-The item should be closed once the vote concludes.
-
-① Possible outcomes
-
-- **proceed**: If the vote passes, the proposal is adopted. That could mean an idea is accepted and work begins on a PR, it could mean that a PR is merged (e.g. for policy or bylaw changes).
-- **revise**: The sponsor will work on a revised proposal in a new item (discussion, issue, or PR) to address concerns and start the process again.
-- **withdraw**:The sponsor can withdraw the proposal in its entirety.
-
-If work continues into a new item (either because it is revised, or because an approved proposal leads to a PR or other follow-on activity), cross-references should be added to both items.
 
 ## Describing a vote
 
@@ -143,51 +143,6 @@ If work continues into a new item (either because it is revised, or because an a
     - *Aliases:*
         - `+1`: `plus_one`, `thumbs_up`
         - `-1`: `minus_one`, `thumbs_down`
-
-## Open a vote
-
-A vote is open when the `vote/open` label is added
-
-## Close a vote
-
-"Vote managers" can close/wrap up votes by adding a comment to the issue that contains `vote::result` at a minimum.
-
-If `vote::result proceed`, `vote::result revise`, or `vote::result withdraw` are present, the bot will add additional labels to indicate that result.
-
-> [!TIP]  
-> The comment should summarize the outcome of the vote. It will appear as a summary at the top / ahead of voting results, as shown [here](https://www.commonhaus.org/votes/commonhaus/foundation/147.html).
-
-## Label usage
-
-- 🏷️ `vote/open` - start tallying reactions, comments, or PR reviews
-
-    When the vote is open, the bot will count reactions, comments or PR reviews. It will create and update a comment with the current vote tally, including whether or not quorum has been reached. The bot will check for quorum any time the item is changed, or once an hour.
-
-    (👤 or 🤖, *TBD*) This label could be applied directly by a human, or by the bot as a result of an action, like changing the category of a discussion or using a command.
-
-- 🏷️ `vote/quorum` - quorum has been reached for electronic participation
-
-    When quorum is reached, the bot will add a label to the item indicating that quorum has been reached.
-
-    (🤖) This label should applied by the bot, not a human.
-
-- 🏷️ `vote/done` - vote is done; results have been summarized
-
-    The bot will update the vote summary with the result (as summarized by a human) and remove the `vote/open` label.
-
-    (🤖) This label should be applied by the bot. Use a `vote::result` comment to trigger the bot to wrap up vote counting.
-
-- 🏷️ `vote/proceed` - vote is closed; consensus: proceed
-
-    When the vote is closed, the bot will copy the vote summary into a comment and add this label if the consensus is to proceed.
-
-    (🤖) This label should applied by the bot, not a human.
-
-- 🏷️ `vote/revise` - vote is closed; consensus: revise
-
-    When the vote is closed, the bot will copy the vote summary into a comment and add this label if the consensus recommends revision.
-
-    (🤖) This label should applied by the bot, not a human.
 
 ## References
 
