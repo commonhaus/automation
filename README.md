@@ -1,5 +1,6 @@
 # Commonhaus Foundation Automation tools
 
+![healthchecks.io](https://healthchecks.io/badge/cf79a99a-7caa-4972-9b25-58122a/aRxnUm_v-2.svg)
 
 ## GitHub App
 
