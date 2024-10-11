@@ -5,7 +5,7 @@
                 {
                     "id": "D_kwDOLDuJqs4AXNhB",
                     "number": 5,
-                    "title": "new idea",
+                    "title": "Common title",
                     "category": {
                         "name": "Ideas",
                         "id": "DIC_kwDOLDuJqs4CcW_b",
@@ -32,7 +32,7 @@
                 {
                     "id": "D_kwDOLDuJqs4AXNcB",
                     "number": 4,
-                    "title": "another test",
+                    "title": "Common title",
                     "category": {
                         "name": "Q&A",
                         "id": "DIC_kwDOLDuJqs4CcW_a",
@@ -59,7 +59,7 @@
                 {
                     "id": "D_kwDOLDuJqs4AXNal",
                     "number": 3,
-                    "title": "A general topic",
+                    "title": "Common title",
                     "category": {
                         "name": "General",
                         "id": "DIC_kwDOLDuJqs4CcW_Z",
@@ -86,7 +86,7 @@
                 {
                     "id": "D_kwDOLDuJqs4AXNaT",
                     "number": 2,
-                    "title": "New announcement",
+                    "title": "Common title",
                     "category": {
                         "name": "Announcements",
                         "id": "DIC_kwDOLDuJqs4CcW_Y",
@@ -113,7 +113,7 @@
                 {
                     "id": "D_kwDOLDuJqs4AXNIj",
                     "number": 1,
-                    "title": "One discussion",
+                    "title": "Common title",
                     "category": {
                         "name": "General",
                         "id": "DIC_kwDOLDuJqs4CcW_Z",
