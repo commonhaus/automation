@@ -38,6 +38,9 @@ public class VoteTally {
             .comparing(VoteRecord::login);
 
     @JsonProperty
+    final String title;
+
+    @JsonProperty
     final VoteInformation.Type voteType;
 
     @JsonProperty
@@ -89,6 +92,7 @@ public class VoteTally {
     public VoteTally(VoteInformation info, List<DataReaction> votes,
             List<DataCommonComment> comments, List<DataCommonComment> resultComments) {
         this.isPullRequest = info.isPullRequest();
+        this.title = info.getTitle();
 
         Set<DataActor> teamMembers = info.teamList.members;
         missingGroupActors = new HashSet<>(teamMembers);

@@ -225,4 +225,8 @@ public class VoteInformation {
                 .map(DataReaction::reactionContentFrom)
                 .toList();
     }
+
+    public String getTitle() {
+        return event.getTitle();
+    }
 }

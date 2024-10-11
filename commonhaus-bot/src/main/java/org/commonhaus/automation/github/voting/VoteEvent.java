@@ -42,6 +42,7 @@ public class VoteEvent {
     private final QueryContext qc;
     private final VoteConfig votingConfig;
 
+    private final String title;
     private final String body;
     /** Discussion or Issue/PullRequest */
     private final EventType itemType;
@@ -80,6 +81,7 @@ public class VoteEvent {
 
         this.nodeId = eventData.getNodeId();
         this.nodeUrl = eventData.getNodeUrl();
+        this.title = eventData.getTitle();
         this.body = eventData.getBody();
         this.number = eventData.getNumber();
         this.logId = eventData.getLogId();
@@ -96,6 +98,7 @@ public class VoteEvent {
         this.nodeId = item.id;
         this.nodeUrl = item.url;
         this.number = item.number;
+        this.title = item.title;
         this.body = item.body;
         this.logId = qc.getLogId() + "#" + number;
         this.isClosed = item.closedAt != null;
@@ -131,6 +134,10 @@ public class VoteEvent {
 
     public boolean itemIsOpen() {
         return !isClosed;
+    }
+
+    public String getTitle() {
+        return title;
     }
 
     public String getBody() {

@@ -656,7 +656,8 @@ public class VotingTest extends ContextHelper {
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
         assertThat(botComment.getBodyString()).contains(
                 "🙏, but not in required group",
-                "outsider");
+                "outsider",
+                "Common title");
     }
 
     @Test
@@ -737,7 +738,8 @@ public class VotingTest extends ContextHelper {
         assertThat(botComment.getBodyString()).contains(
                 "This vote has been [closed]",
                 "🙏, but not in required group",
-                "outsider");
+                "outsider",
+                "Common title");
     }
 
     @Test
