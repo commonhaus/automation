@@ -27,7 +27,17 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  main-root:
+    outputs:
+      is-main: ${{ steps.is-main-root.outputs.test }}
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'commonhaus/automation'
+        id: is-main-root
+        run: echo "test=true" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: main-root
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,7 +105,7 @@ jobs:
           -Dquarkus.container-image.build=true
 
     - name: Update release with snapshot artifact
-      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      if: ${{needs.main-root.outputs.is-main}}
       id: mvn-release-snapshot
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -123,7 +133,7 @@ jobs:
         gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
 
     - name: Log in to the Container registry
-      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      if: ${{needs.main-root.outputs.is-main}}
       uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
       with:
         registry: ${{ env.REGISTRY }}
@@ -131,7 +141,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Publish OCI (native)
-      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      if: ${{needs.main-root.outputs.is-main}}
       id: publish-oci
       env:
         SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
@@ -145,7 +155,7 @@ jobs:
         docker push "ghcr.io/${image}"
 
     - name: Mark snapshot release as non-draft
-      if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
+      if: ${{needs.main-root.outputs.is-main}}
       id: update-snapshot-release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -158,8 +168,8 @@ jobs:
       run: find ~/.m2 -name \*-SNAPSHOT -type d -exec rm -rf {} +
 
   deploy:
-    if: ${{ github.event_name == 'push' && github.repository == 'commonhaus/automation' }}
-    needs: build
+    needs: [main-root, build]
+    if: ${{needs.main-root.outputs.is-main}}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -177,7 +187,6 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
           SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
-
 
       - name: Update CF Bot
         run: |
