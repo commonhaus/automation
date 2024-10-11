@@ -23,13 +23,9 @@ public class EventData {
 
     final ActionType actionType;
     final EventType eventType;
+    final DataCommonItem commonItem;
 
     private EventPayload eventPayload;
-    private String nodeId;
-    private String nodeUrl;
-    private String body;
-    private Boolean isClosed;
-    private int number = 0;
 
     public EventData(GitHubEvent event, GHEventPayload payload) {
         this.event = event;
@@ -37,6 +33,22 @@ public class EventData {
         this.eventType = EventType.fromString(event.getEvent());
         this.actionType = ActionType.fromString(event.getAction());
         this.jsonData = JsonAttribute.unpack(event.getPayload());
+
+        this.commonItem = switch (eventType) {
+            case discussion, discussion_comment -> {
+                yield JsonAttribute.discussion.commonItemFrom(jsonData);
+            }
+            case issue, issue_comment -> {
+                yield JsonAttribute.issue.commonItemFrom(jsonData);
+            }
+            case pull_request, pull_request_review -> {
+                yield JsonAttribute.pullRequest.commonItemFrom(jsonData);
+            }
+            default -> {
+                Log.errorf("getTitle: DataCommonItem unsupported event type %s", eventType);
+                yield null;
+            }
+        };
 
         if (payload != null) {
             this.repository = payload.getRepository();
@@ -115,166 +127,26 @@ public class EventData {
      * @return the id of the primary item for this event
      */
     public String getNodeId() {
-        String id = nodeId;
-        if (id == null) {
-            id = nodeId = switch (eventType) {
-                case discussion, discussion_comment -> {
-                    EventPayload.DiscussionPayload payload = getEventPayload();
-                    DataDiscussion discussion = payload.discussion;
-                    yield discussion.id;
-                }
-                case issue -> {
-                    GHEventPayload.Issue payload = getGHEventPayload();
-                    yield payload.getIssue().getNodeId();
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = getGHEventPayload();
-                    yield payload.getIssue().getNodeId();
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = getGHEventPayload();
-                    yield payload.getPullRequest().getNodeId();
-                }
-                case pull_request_review -> {
-                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
-                    yield payload.getPullRequest().getNodeId();
-                }
-                default -> {
-                    Log.errorf("[%s] EventData.getNodeId: unsupported event type: %s", logId, eventType);
-                    yield null;
-                }
-            };
-        }
-        return id;
+        return commonItem == null ? null : commonItem.id;
     }
 
     public String getNodeUrl() {
-        String url = nodeUrl;
-        if (url == null) {
-            url = nodeUrl = switch (eventType) {
-                case discussion, discussion_comment -> {
-                    EventPayload.DiscussionPayload payload = getEventPayload();
-                    DataDiscussion discussion = payload.discussion;
-                    yield discussion.url;
-                }
-                case issue -> {
-                    GHEventPayload.Issue payload = getGHEventPayload();
-                    yield payload.getIssue().getHtmlUrl().toString();
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = getGHEventPayload();
-                    yield payload.getIssue().getHtmlUrl().toString();
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = getGHEventPayload();
-                    yield payload.getPullRequest().getHtmlUrl().toString();
-                }
-                case pull_request_review -> {
-                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
-                    yield payload.getPullRequest().getHtmlUrl().toString();
-                }
-                default -> {
-                    Log.errorf("[%s] EventData.getNodeUrl: unsupported event type %s", logId, eventType);
-                    yield null;
-                }
-            };
-        }
-        return url;
+        return commonItem == null ? null : commonItem.url;
+    }
+
+    public String getTitle() {
+        return commonItem == null ? null : commonItem.title;
     }
 
     public String getBody() {
-        String result = body;
-        if (result == null) {
-            result = switch (eventType) {
-                case discussion, discussion_comment -> {
-                    EventPayload.DiscussionPayload payload = getEventPayload();
-                    DataDiscussion discussion = payload.discussion;
-                    yield discussion.body;
-                }
-                case issue -> {
-                    GHEventPayload.Issue payload = getGHEventPayload();
-                    yield payload.getIssue().getBody();
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = getGHEventPayload();
-                    yield payload.getIssue().getBody();
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = getGHEventPayload();
-                    yield payload.getPullRequest().getBody();
-                }
-                case pull_request_review -> {
-                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
-                    yield payload.getPullRequest().getBody();
-                }
-                default -> {
-                    Log.errorf("[%s] EventData.getBody: unsupported event type %s", logId, eventType);
-                    yield null;
-                }
-            };
-            result = body = result == null ? "" : result;
-        }
-        return result;
+        return commonItem == null ? "" : commonItem.body;
     }
 
     public int getNumber() {
-        int result = number;
-        if (result == 0) {
-            result = number = switch (eventType) {
-                case discussion, discussion_comment -> {
-                    EventPayload.DiscussionPayload payload = getEventPayload();
-                    DataDiscussion discussion = payload.discussion;
-                    yield discussion.number;
-                }
-                case issue -> {
-                    GHEventPayload.Issue payload = getGHEventPayload();
-                    yield payload.getIssue().getNumber();
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = getGHEventPayload();
-                    yield payload.getIssue().getNumber();
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = getGHEventPayload();
-                    yield payload.getPullRequest().getNumber();
-                }
-                case pull_request_review -> {
-                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
-                    yield payload.getPullRequest().getNumber();
-                }
-                default -> -1;
-            };
-        }
-        return result;
+        return commonItem == null ? -1 : commonItem.number;
     }
 
     public boolean isClosed() {
-        if (isClosed == null) {
-            isClosed = switch (eventType) {
-                case discussion, discussion_comment -> {
-                    EventPayload.DiscussionPayload payload = getEventPayload();
-                    DataDiscussion discussion = payload.discussion;
-                    yield discussion.closed;
-                }
-                case issue -> {
-                    GHEventPayload.Issue payload = getGHEventPayload();
-                    yield payload.getIssue().getClosedAt() != null;
-                }
-                case issue_comment -> {
-                    GHEventPayload.IssueComment payload = getGHEventPayload();
-                    yield payload.getIssue().getClosedAt() != null;
-                }
-                case pull_request -> {
-                    GHEventPayload.PullRequest payload = getGHEventPayload();
-                    yield payload.getPullRequest().getClosedAt() != null;
-                }
-                case pull_request_review -> {
-                    GHEventPayload.PullRequestReview payload = getGHEventPayload();
-                    yield payload.getPullRequest().getClosedAt() != null;
-                }
-                default -> false;
-            };
-        }
-        return isClosed;
+        return commonItem == null ? false : commonItem.closedAt != null;
     }
 }

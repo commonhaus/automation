@@ -61,7 +61,7 @@ public enum JsonAttribute {
     category,
     changes,
     closed,
-    closedAt,
+    closedAt("closed_at"),
     comment,
     commentEdge,
     comments,
