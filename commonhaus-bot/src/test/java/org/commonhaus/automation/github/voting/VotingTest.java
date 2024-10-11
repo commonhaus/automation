@@ -484,7 +484,7 @@ public class VotingTest extends ContextHelper {
                 });
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
         assertThat(botComment.getBodyString()).contains(
-                "🙏, but not in required group",
+                "Additional input (🙏 🥰 🙌):",
                 "outsider");
     }
 
@@ -655,7 +655,7 @@ public class VotingTest extends ContextHelper {
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
         assertThat(botComment.getBodyString()).contains(
-                "🙏, but not in required group",
+                "Additional input (🙏 🥰 🙌):",
                 "outsider",
                 "Common title");
     }
@@ -737,7 +737,7 @@ public class VotingTest extends ContextHelper {
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
         assertThat(botComment.getBodyString()).contains(
                 "This vote has been [closed]",
-                "🙏, but not in required group",
+                "Additional input (🙏 🥰 🙌):",
                 "outsider",
                 "Common title");
     }
@@ -816,7 +816,7 @@ public class VotingTest extends ContextHelper {
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
         assertThat(botComment.getBodyString()).contains(
                 "This vote has been [closed]",
-                "🙏, but not in required group",
+                "Additional input (🙏 🥰 🙌):",
                 "outsider");
     }
 

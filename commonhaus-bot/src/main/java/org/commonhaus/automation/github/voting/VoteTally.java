@@ -284,7 +284,7 @@ public class VoteTally {
         if (otherVotes.isEmpty()) {
             return "";
         }
-        return "\r\nThe following votes were not counted (🙏, but not in required group):\r\n"
+        return "\r\nAdditional input (🙏 🥰 🙌):\r\n"
                 + otherVotes.stream()
                         .map(d -> String.format("[%s](%s)(%s)",
                                 d.login, d.url, d.reaction))
