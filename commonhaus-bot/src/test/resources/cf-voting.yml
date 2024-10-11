@@ -3,6 +3,18 @@ voting:
     - "@commonhaus/test-quorum-default"
   error_email_address:
     - test@commonhaus.org
+  fallback:
+    - source: CONTACTS.yaml
+      repo: commonhaus/foundation
+      mapping:
+      - primary: 
+          data: egc
+          team: commonhaus/cf-egc
+        secondary: 
+          data: egc-second
+          team: commonhaus/cf-egc-second
+        mapping: project
+
   status:
     badge: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.svg
     page: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.html

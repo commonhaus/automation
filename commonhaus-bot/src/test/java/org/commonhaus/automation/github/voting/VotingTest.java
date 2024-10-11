@@ -482,7 +482,10 @@ public class VotingTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
-        verifyBotCommentCache(discussionId, botCommentId);
+        BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(botComment.getBodyString()).contains(
+                "🙏, but not in required group",
+                "outsider");
     }
 
     @Test
@@ -529,7 +532,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
-        botComment.getBodyString().contains("This vote has been [closed]");
+        assertThat(botComment.getBodyString()).doesNotContain("This vote has been [closed]");
     }
 
     @Test
@@ -592,7 +595,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
-        botComment.getBodyString().contains("This vote has been [closed]");
+        assertThat(botComment.getBodyString()).contains("This vote has been [closed]");
     }
 
     @Test
@@ -650,7 +653,10 @@ public class VotingTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        verifyBotCommentCache(pullRequestId, botCommentId);
+        BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
+        assertThat(botComment.getBodyString()).contains(
+                "🙏, but not in required group",
+                "outsider");
     }
 
     @Test
@@ -728,7 +734,10 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
-        botComment.getBodyString().contains("This vote has been [closed]");
+        assertThat(botComment.getBodyString()).contains(
+                "This vote has been [closed]",
+                "🙏, but not in required group",
+                "outsider");
     }
 
     @Test
@@ -803,7 +812,10 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
-        botComment.getBodyString().contains("This vote has been [closed]");
+        assertThat(botComment.getBodyString()).contains(
+                "This vote has been [closed]",
+                "🙏, but not in required group",
+                "outsider");
     }
 
     @Test

@@ -71,6 +71,9 @@ public class VoteTally {
     final List<VoteRecord> duplicates = new ArrayList<>();
 
     @JsonProperty
+    final List<VoteRecord> otherVotes = new ArrayList<>();
+
+    @JsonProperty
     @JsonSerialize(contentUsing = VoteTally.ActorSerializer.class)
     Collection<DataActor> missingGroupActors;
 
@@ -79,6 +82,7 @@ public class VoteTally {
 
     @JsonIgnore
     final boolean notMarthasMethod;
+
     @JsonIgnore
     final boolean isPullRequest;
 
@@ -120,6 +124,9 @@ public class VoteTally {
         countedVotes = categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey()))
                 .mapToInt(e -> e.getValue().total).sum();
+        otherVotes.addAll(categories.values().stream()
+                .flatMap(c -> c.otherVotes.stream())
+                .toList());
         hasQuorum = switch (votingThreshold) {
             case all -> groupVotes >= groupSize;
             case majority -> groupVotes > groupSize / 2;
@@ -248,6 +255,7 @@ public class VoteTally {
                         + "| --- | --- | --- | --- |\r\n"
                         + categoriesToRows()
                         + "\r\n"
+                        + othersToString()
                         + duplicatesToString()
                         + ignoredToString();
             }
@@ -266,6 +274,18 @@ public class VoteTally {
                         e.getKey(), e.getValue().total, e.getValue().teamTotal,
                         actorsToString(e.getValue().team)))
                 .collect(Collectors.joining("\r\n"));
+    }
+
+    String othersToString() {
+        if (otherVotes.isEmpty()) {
+            return "";
+        }
+        return "\r\nThe following votes were not counted (🙏, but not in required group):\r\n"
+                + otherVotes.stream()
+                        .map(d -> String.format("[%s](%s)(%s)",
+                                d.login, d.url, d.reaction))
+                        .collect(Collectors.joining(", "))
+                + "\r\n";
     }
 
     String duplicatesToString() {
@@ -310,6 +330,8 @@ public class VoteTally {
 
         @JsonProperty
         final Set<VoteRecord> team = new TreeSet<>(compareRecords);
+        @JsonProperty
+        final Set<VoteRecord> otherVotes = new TreeSet<>(compareRecords);
 
         @JsonProperty
         int teamTotal = 0;
@@ -326,6 +348,8 @@ public class VoteTally {
             if (teamLogins.get(record.login) != null) {
                 teamTotal++;
                 team.add(record);
+            } else {
+                otherVotes.add(record);
             }
         }
     }
@@ -363,7 +387,6 @@ public class VoteTally {
                     .replaceAll("<!--.*?-->", "");
             this.url = result.url;
         }
-
     }
 
     public static class ActorSerializer extends StdSerializer<DataActor> {
