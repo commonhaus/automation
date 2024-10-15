@@ -93,6 +93,7 @@ public class TeamMemberSyncTest extends ContextHelper {
                 assertTeamLogins(finalGroup,
                         List.of("user1,", "user2,", "user3,", "user7,", "user8,", "user9,", "user12,", "user14,"));
             }
+            assertThat(body).doesNotContain("Exception");
         }
     }
 
@@ -112,7 +113,12 @@ public class TeamMemberSyncTest extends ContextHelper {
         await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 4);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(4);
+        List<Mail> mailList = mailbox.getMailsSentTo("dry-run@example.com");
+        assertThat(mailList).hasSize(4);
+        for (Mail m : mailList) {
+            String body = m.getText();
+            assertThat(body).doesNotContain("Exception");
+        }
     }
 
     @Test
@@ -138,7 +144,13 @@ public class TeamMemberSyncTest extends ContextHelper {
         await().atMost(15, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 1);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(1);
-        assertThat(mailbox.getMailsSentTo("dry-run@example.com")).hasSize(1);
+        List<Mail> mailList = mailbox.getMailsSentTo("dry-run@example.com");
+
+        assertThat(mailList).hasSize(1);
+        for (Mail m : mailList) {
+            String body = m.getText();
+            assertThat(body).doesNotContain("Exception");
+        }
     }
 
     void setupFoundationContacts(GitHubMockSetupContext mocks) throws IOException {

@@ -64,6 +64,9 @@ public class TeamMemberSync {
     @Inject
     AppContextService ctx;
 
+    @Inject
+    CommonhausDatastore datastore;
+
     public void configureExecutor(@Observes StartupEvent startup) {
         int initialDelay = 30;
         TimeUnit unit = TimeUnit.SECONDS;
@@ -365,43 +368,45 @@ public class TeamMemberSync {
         // Use GraphQL to get the _immediate_ team members (exclude child teams)
         List<String> currentLogins = DataTeam.queryImmediateTeamMemberLogin(qc, orgName, relativeName);
 
-        Set<String> toAdd = new HashSet<>(sourceLogins);
-        Set<String> toRemove = new HashSet<>();
+        Set<String> toVerify = new HashSet<>(sourceLogins);
+        toVerify.addAll(currentLogins);
 
-        currentLogins.forEach(user -> {
-            if (sourceLogins.contains(user)) {
-                toAdd.remove(user); // already in team
-            } else {
-                toRemove.add(user);
-            }
-        });
+        Set<String> toAdd = new HashSet<>(sourceLogins);
+        toAdd.removeAll(currentLogins);
+
+        Set<String> toRemove = new HashSet<>(currentLogins);
+        toRemove.removeAll(sourceLogins);
 
         if (productionRun) {
+            final Set<GHUser> validate = new HashSet<>();
             // Membership events will update the team cache; do nothing with the cache here.
             qc.execGitHubSync((gh, dryRun) -> {
                 if (dryRun) {
                     return null;
                 }
-                for (String login : toAdd) {
+                for (String login : toVerify) {
                     try {
                         GHUser user = gh.getUser(login);
-                        team.add(user);
-                        Log.infof("[%s] doSyncTeamMembers: add %s to %s", qc.getLogId(), user, fullTeamName);
+                        if (toRemove.contains(login)) {
+                            team.remove(user);
+                            Log.infof("[%s] doSyncTeamMembers: remove %s from %s", qc.getLogId(), user, fullTeamName);
+                        } else {
+                            validate.add(user);
+                            if (toAdd.contains(login)) {
+                                team.add(user);
+                                Log.infof("[%s] doSyncTeamMembers: add %s to %s", qc.getLogId(), user, fullTeamName);
+                            }
+                        }
                     } catch (IOException e) {
-                        Log.warnf("[%s] doSyncTeamMembers: failed to add %s to %s", qc.getLogId(), login, fullTeamName);
-                    }
-                }
-                for (String login : toRemove) {
-                    try {
-                        GHUser user = gh.getUser(login);
-                        team.remove(user);
-                        Log.infof("[%s] doSyncTeamMembers: remove %s from %s", qc.getLogId(), user, fullTeamName);
-                    } catch (IOException e) {
-                        Log.warnf("[%s] doSyncTeamMembers: failed to remove %s from %s", qc.getLogId(), login, fullTeamName);
+                        Log.warnf("[%s] doSyncTeamMembers: failed to find, add, or remove user %s", qc.getLogId(), login);
+                        ;
                     }
                 }
                 return null;
             });
+            for (GHUser user : validate) {
+                datastore.asyncEnsureCommonhausUser(user);
+            }
         } else {
             Set<String> finalLogins = new HashSet<>(currentLogins);
             finalLogins.addAll(toAdd);

@@ -14,6 +14,7 @@ import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.HttpException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,6 +30,7 @@ import io.vertx.mutiny.core.eventbus.Message;
 @ApplicationScoped
 public class CommonhausDatastore {
     public static final String READ = "commonhaus-read";
+    public static final String CREATE = "commonhaus-create";
     public static final String WRITE = "commonhaus-write";
 
     @Inject
@@ -106,6 +108,14 @@ public class CommonhausDatastore {
     }
 
     /**
+     * Async: ensure a Commonhaus User exists.
+     */
+    public void asyncEnsureCommonhausUser(GHUser user) {
+        QueryEvent query = new QueryEvent(user.getLogin(), user.getId(), false, true);
+        ctx.getBus().send(CommonhausDatastore.CREATE, query); // fire and forget
+    }
+
+    /**
      * GET Commonhaus user data
      *
      * @return A Commonhaus user object (never null)
@@ -127,6 +137,19 @@ public class CommonhausDatastore {
     public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {
         Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, updateEvent);
         return response.body();
+    }
+
+    @Blocking
+    @ConsumeEvent(CREATE)
+    public void createCommonhausUser(QueryEvent query) {
+        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
+        CommonhausUser cfUser = response.body();
+        if (cfUser != null && cfUser.isNew()) {
+            ctx.getBus().send(CommonhausDatastore.WRITE, new UpdateEvent(cfUser,
+                    (ctx, u) -> {
+                    },
+                    "Created by bot", true, false));
+        }
     }
 
     /**

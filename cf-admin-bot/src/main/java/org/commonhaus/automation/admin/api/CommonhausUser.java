@@ -265,6 +265,11 @@ public class CommonhausUser {
         return application != null;
     }
 
+    @JsonIgnore
+    public boolean isNew() {
+        return history.isEmpty();
+    }
+
     public ApiResponse toResponse() {
         return new ApiResponse(ApiResponse.Type.HAUS, data)
                 .responseStatus(postConflict() ? Response.Status.CONFLICT : Response.Status.OK);
