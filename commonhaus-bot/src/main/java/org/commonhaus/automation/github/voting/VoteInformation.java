@@ -46,7 +46,7 @@ public class VoteInformation {
 
         QueryContext qc = event.getQueryContext();
         VoteConfig voteConfig = event.getVotingConfig();
-        String bodyString = event.getBody();
+        String bodyString = event.getVoteBody();
         String groupValue = null;
         TeamList teamList = null;
 

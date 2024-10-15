@@ -398,7 +398,7 @@ public class QueryContext {
         if (comment == null && botComment == null) {
             if (isDryRun()) {
                 // Create a fake comment based on one in commonhaus/automation-test
-                botComment = new BotComment(itemId).setBodyString(commentBody);
+                botComment = new BotComment(itemId).setBody(commentBody);
             } else {
                 // new comment
                 comment = switch (itemType) {
@@ -417,7 +417,7 @@ public class QueryContext {
             if (isDryRun()) {
                 Log.debugf("[%s] updateBotComment would edit comment %s with %s", getLogId(), botComment.getCommentId(),
                         commentBody);
-                botComment.setBodyString(commentBody);
+                botComment.setBody(commentBody);
             } else {
                 comment = switch (itemType) {
                     case discussion ->
@@ -430,7 +430,7 @@ public class QueryContext {
                     }
                 };
                 // if an error happened, comment will be null, we should clear the cache
-                botComment = comment == null ? null : botComment.setBodyString(commentBody);
+                botComment = comment == null ? null : botComment.setBody(commentBody);
             }
         } else {
             Log.debugf("[%s] updateBotComment: comment %s unchanged", getLogId(), botComment.getCommentId());

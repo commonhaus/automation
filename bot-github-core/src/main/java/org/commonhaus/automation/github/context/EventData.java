@@ -138,8 +138,25 @@ public class EventData {
         return commonItem == null ? null : commonItem.title;
     }
 
-    public String getBody() {
+    /**
+     * @return the body of the item (discussion, issue, pull request, etc.)
+     */
+    public String getItemBody() {
         return commonItem == null ? "" : commonItem.body;
+    }
+
+    /**
+     * @return return the body of the item or comment
+     */
+    public String getBody() {
+        return switch (eventType) {
+            case discussion, issue, pull_request -> getItemBody();
+            case issue_comment, discussion_comment -> {
+                DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(jsonData);
+                yield comment == null ? null : comment.body;
+            }
+            default -> null;
+        };
     }
 
     public int getNumber() {

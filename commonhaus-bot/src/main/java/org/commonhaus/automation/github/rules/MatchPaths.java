@@ -25,6 +25,14 @@ public class MatchPaths {
 
     List<String> paths;
 
+    public MatchPaths() {
+        this.paths = List.of();
+    }
+
+    public MatchPaths(List<String> paths) {
+        this.paths = paths;
+    }
+
     public boolean matches(EventQueryContext qc) {
         if (qc.getEventType() != EventType.pull_request) {
             return false;

@@ -236,11 +236,11 @@ public class VotingConsumer {
     private void updateBotComment(VoteEvent voteEvent, String commentBody) {
         QueryContext qc = voteEvent.getQueryContext();
         BotComment comment = qc.updateBotComment(voteEvent.commentPattern(),
-                voteEvent.getItemType(), voteEvent.getId(), commentBody, voteEvent.getBody());
+                voteEvent.getItemType(), voteEvent.getId(), commentBody, voteEvent.getVoteBody());
         if (comment != null) {
             // Use informaton from the existing comment to construct replacement text
             String newBody = voteEvent.updateItemText(comment);
-            if (newBody.equals(voteEvent.getBody())) {
+            if (newBody.equals(voteEvent.getVoteBody())) {
                 Log.debugf("[%s] voting.checkVotes: item description unchanged", voteEvent.getLogId());
             } else {
                 qc.updateItemDescription(voteEvent.getItemType(), voteEvent.getId(), newBody);

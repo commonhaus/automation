@@ -483,7 +483,7 @@ public class VotingTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
-        assertThat(botComment.getBodyString()).contains(
+        assertThat(botComment.getBody()).contains(
                 "Additional input (🙏 🥰 🙌):",
                 "outsider");
     }
@@ -532,7 +532,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
-        assertThat(botComment.getBodyString()).doesNotContain("This vote has been [closed]");
+        assertThat(botComment.getBody()).doesNotContain("This vote has been [closed]");
     }
 
     @Test
@@ -595,7 +595,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
-        assertThat(botComment.getBodyString()).contains("This vote has been [closed]");
+        assertThat(botComment.getBody()).contains("This vote has been [closed]");
     }
 
     @Test
@@ -654,7 +654,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
-        assertThat(botComment.getBodyString()).contains(
+        assertThat(botComment.getBody()).contains(
                 "Additional input (🙏 🥰 🙌):",
                 "outsider",
                 "Common title");
@@ -735,7 +735,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
-        assertThat(botComment.getBodyString()).contains(
+        assertThat(botComment.getBody()).contains(
                 "This vote has been [closed]",
                 "Additional input (🙏 🥰 🙌):",
                 "outsider",
@@ -814,7 +814,7 @@ public class VotingTest extends ContextHelper {
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
-        assertThat(botComment.getBodyString()).contains(
+        assertThat(botComment.getBody()).contains(
                 "This vote has been [closed]",
                 "Additional input (🙏 🥰 🙌):",
                 "outsider");
@@ -959,7 +959,7 @@ public class VotingTest extends ContextHelper {
     VoteEvent createVoteEvent(QueryContext qc, VoteConfig votingConfig, String group,
             VoteConfig.Threshold threshold, String body) {
         EventData eventData = Mockito.mock(EventData.class);
-        when(eventData.getBody()).thenReturn(body);
+        when(eventData.getItemBody()).thenReturn(body);
         when(eventData.getEventType()).thenReturn(EventType.discussion);
 
         votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.all);

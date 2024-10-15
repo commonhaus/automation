@@ -18,19 +18,13 @@ notice:
         then: [announce]
   discussion_comment:
     rules:
-      - # If a discussion is created in Announcements or Consensus Building
-        # and it already has the notice label, send an email
+      - # If a comment is added to a discussion with a notice label
+        # and that comment does not contain bot phrases,
+        # send the email
         action: 
           - created
         label: [notice]
-        then: [announce]
-  issue_comment:
-    rules:
-      - # If a discussion is created in Announcements or Consensus Building
-        # and it already has the notice label, send an email
-        action: 
-          - created
-        label: [notice]
+        body: "^(?!.*(?:non-bot reactions|vote::result will close the vote)).*$"
         then: [announce]
   pull_request:
     rules:
@@ -39,6 +33,17 @@ notice:
         label_change:
           - notice
           - "vote/open"
+        then: [announce]
+  issue_comment:
+    rules:
+      - # If a comment is added to an issue or pull request
+        # for an issue with a notice label
+        # and that comment does not contain bot phrases,
+        # send the email
+        action: 
+          - created
+        label: [notice]
+        body: "^(?!.*(?:non-bot reactions|vote::result will close the vote)).*$"
         then: [announce]
   actions:
     apply_notice: [notice]

@@ -16,6 +16,14 @@ public class MatchCategory {
     final static List<EventType> eventsWithCategories = List.of(EventType.discussion, EventType.discussion_comment);
     List<String> category;
 
+    public MatchCategory() {
+        this.category = List.of();
+    }
+
+    public MatchCategory(List<String> category) {
+        this.category = category;
+    }
+
     public boolean matches(EventQueryContext qc) {
         EventData eventData = qc.getEventData();
         if (eventData == null || !eventsWithCategories.contains(qc.getEventType())) {

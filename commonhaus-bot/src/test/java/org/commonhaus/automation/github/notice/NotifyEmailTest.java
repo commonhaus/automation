@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.notice;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -68,6 +69,7 @@ public class NotifyEmailTest extends ContextHelper {
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(1);
     }
 
     @Test
@@ -93,8 +95,31 @@ public class NotifyEmailTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
-                .atMost(5, SECONDS);
+        await().atMost(5, SECONDS).failFast(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0);
+    }
+
+    @Test
+    void issueCommentVoteResultBody_NoEmail() throws Exception {
+        String issueId = "PR_kwDOLDuJqs5mlMVl";
+        verifyNoLabelCache(issueId);
+
+        // preset cache to avoid requests
+        setLabels(repositoryId, notice);
+        setLabels(issueId, notice, VOTE_OPEN);
+
+        given()
+                .github(mocks -> mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-email.yml"))
+                .when().payloadFromClasspath("/github/eventIssueCommentCreatedBotVoteComment.json")
+                .event(GHEvent.ISSUE_COMMENT)
+                .then().github(mocks -> {
+                    // 1 times: repo labels
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        await().atMost(5, SECONDS).failFast(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0);
     }
 
     @Test
@@ -119,6 +144,7 @@ public class NotifyEmailTest extends ContextHelper {
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(1);
     }
 
     @Test
@@ -141,6 +167,7 @@ public class NotifyEmailTest extends ContextHelper {
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(1);
     }
 
     @Test
@@ -164,5 +191,6 @@ public class NotifyEmailTest extends ContextHelper {
                 });
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(1);
     }
 }

@@ -44,11 +44,11 @@ public class BotComment {
         return url;
     }
 
-    public String getBodyString() {
+    public String getBody() {
         return bodyString;
     }
 
-    public BotComment setBodyString(String bodyString) {
+    public BotComment setBody(String bodyString) {
         this.bodyString = bodyString;
         return this;
     }

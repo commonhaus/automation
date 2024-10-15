@@ -43,7 +43,7 @@ public class VoteEvent {
     private final VoteConfig votingConfig;
 
     private final String title;
-    private final String body;
+    private final String voteBody;
     /** Discussion or Issue/PullRequest */
     private final EventType itemType;
     private final String eventTime;
@@ -82,7 +82,7 @@ public class VoteEvent {
         this.nodeId = eventData.getNodeId();
         this.nodeUrl = eventData.getNodeUrl();
         this.title = eventData.getTitle();
-        this.body = eventData.getBody();
+        this.voteBody = eventData.getItemBody();
         this.number = eventData.getNumber();
         this.logId = eventData.getLogId();
         this.isClosed = eventData.isClosed();
@@ -99,7 +99,7 @@ public class VoteEvent {
         this.nodeUrl = item.url;
         this.number = item.number;
         this.title = item.title;
-        this.body = item.body;
+        this.voteBody = item.body;
         this.logId = qc.getLogId() + "#" + number;
         this.isClosed = item.closedAt != null;
     }
@@ -140,8 +140,8 @@ public class VoteEvent {
         return title;
     }
 
-    public String getBody() {
-        return body;
+    public String getVoteBody() {
+        return voteBody;
     }
 
     public EventType getItemType() {
@@ -203,11 +203,11 @@ public class VoteEvent {
 
     public String updateItemText(BotComment comment) {
         String prefix = getVoteHeaderText(comment);
-        Matcher matcher = botCommentPattern.matcher(body);
+        Matcher matcher = botCommentPattern.matcher(voteBody);
         if (matcher.find()) {
             return matcher.replaceFirst(prefix);
         }
-        return prefix + "\r\n\r\n" + body;
+        return prefix + "\r\n\r\n" + voteBody;
     }
 
     public static boolean isManualVoteResult(QueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {

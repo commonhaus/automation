@@ -17,6 +17,7 @@ public class Rule {
     };
 
     MatchAction action;
+    MatchBody body;
     MatchCategory category;
     MatchPaths paths;
     MatchLabel label;
@@ -28,6 +29,9 @@ public class Rule {
         boolean matches = true;
         if (action != null) {
             matches = action.matches(qc);
+        }
+        if (matches && body != null) {
+            matches = body.matches(qc);
         }
         if (matches && category != null) {
             matches = category.matches(qc);
@@ -60,26 +64,40 @@ public class Rule {
             ObjectMapper mapper = (ObjectMapper) p.getCodec();
             JsonNode node = mapper.readTree(p);
             Rule rule = new Rule();
-            if (RuleType.action.existsIn(node)) {
-                rule.action = new MatchAction(mapper.convertValue(RuleType.action.getFrom(node), LIST_STRING));
+
+            JsonNode child = RuleType.action.getFrom(node);
+            if (child != null) {
+                rule.action = new MatchAction(mapper.convertValue(child, LIST_STRING));
             }
-            if (RuleType.category.existsIn(node)) {
-                rule.category = new MatchCategory();
-                rule.category.category = mapper.convertValue(RuleType.category.getFrom(node), LIST_STRING);
+
+            child = RuleType.body.getFrom(node);
+            if (child != null) {
+                rule.body = new MatchBody(child.asText());
             }
-            if (RuleType.label.existsIn(node)) {
-                rule.label = new MatchLabel(mapper.convertValue(RuleType.label.getFrom(node), LIST_STRING));
+
+            child = RuleType.category.getFrom(node);
+            if (child != null) {
+                rule.category = new MatchCategory(mapper.convertValue(child, LIST_STRING));
             }
-            if (RuleType.label_change.existsIn(node)) {
-                rule.changedLabel = new MatchChangedLabel(
-                        mapper.convertValue(RuleType.label_change.getFrom(node), LIST_STRING));
+
+            child = RuleType.label.getFrom(node);
+            if (child != null) {
+                rule.label = new MatchLabel(mapper.convertValue(child, LIST_STRING));
             }
-            if (RuleType.paths.existsIn(node)) {
-                rule.paths = new MatchPaths();
-                rule.paths.paths = mapper.convertValue(RuleType.paths.getFrom(node), LIST_STRING);
+
+            child = RuleType.label_change.getFrom(node);
+            if (child != null) {
+                rule.changedLabel = new MatchChangedLabel(mapper.convertValue(child, LIST_STRING));
             }
-            if (RuleType.then.existsIn(node)) {
-                rule.then = mapper.convertValue(RuleType.then.getFrom(node), LIST_STRING);
+
+            child = RuleType.paths.getFrom(node);
+            if (child != null) {
+                rule.paths = new MatchPaths(mapper.convertValue(child, LIST_STRING));
+            }
+
+            child = RuleType.then.getFrom(node);
+            if (child != null) {
+                rule.then = mapper.convertValue(child, LIST_STRING);
             }
             return rule;
         }
@@ -87,6 +105,7 @@ public class Rule {
 
     enum RuleType {
         action,
+        body,
         category,
         label,
         label_change,
