@@ -20,8 +20,31 @@ public class VoteConfig extends RepositoryConfig {
     public enum Threshold {
         all,
         majority,
-        twothirds,
-        fourfifths
+        twothirds("2/3"),
+        fourfifths("4/5");
+
+        final String label;
+
+        Threshold() {
+            this.label = name();
+        }
+
+        Threshold(String label) {
+            this.label = label;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public static Threshold fromString(String group) {
+            for (Threshold t : values()) {
+                if (t.name().equalsIgnoreCase(group) || t.label.equalsIgnoreCase(group)) {
+                    return t;
+                }
+            }
+            return all;
+        }
     }
 
     public static class StatusLinks {

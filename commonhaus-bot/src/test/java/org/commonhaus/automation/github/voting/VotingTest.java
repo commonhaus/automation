@@ -275,7 +275,8 @@ public class VotingTest extends ContextHelper {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        verifyBotCommentCache(discussionId, botCommentId);
+        BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(comment.getBody()).contains("fourfifths");
     }
 
     @Test

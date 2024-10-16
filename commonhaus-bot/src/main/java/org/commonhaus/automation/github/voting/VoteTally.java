@@ -242,11 +242,12 @@ public class VoteTally {
             result += "\r\nNo votes (non-bot %s) found on this item.".formatted(
                     useComments ? "comments" : "reactions");
         } else {
-            result += String.format("\r\n%s%d of %d members of @%s have voted (%s%s).",
+            result += String.format("\r\n%s%d of %d members of @%s have voted (%s%s, quorum=%s).",
                     (hasQuorum ? "✅ " : "🗳️"),
                     groupVotes, groupSize, group,
                     voteType != VoteInformation.Type.manualComments ? "reaction" : "comment",
-                    isPullRequest ? " or review" : "");
+                    isPullRequest ? " or review" : "",
+                    votingThreshold.label());
 
             if (useComments) {
                 Category c = categories.get("comment");

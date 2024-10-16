@@ -11,6 +11,7 @@ import org.commonhaus.automation.github.context.DataPullRequestReview;
 import org.commonhaus.automation.github.context.DataReaction;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.context.TeamList;
+import org.commonhaus.automation.github.voting.VoteConfig.Threshold;
 import org.kohsuke.github.ReactionContent;
 
 public class VoteInformation {
@@ -25,10 +26,10 @@ public class VoteInformation {
 
     static final String quoted = "['\"]([^'\"]*)['\"]";
     static final Pattern consensusPattern = Pattern.compile(
-            "<!--vote::marthas approve=" + quoted + " ok=" + quoted + " revise=" + quoted + " -->",
+            "<!--vote::marthas approve=" + quoted + " ok=" + quoted + " revise=" + quoted + "(.*?)-->",
             Pattern.CASE_INSENSITIVE);
-
     static final Pattern manualPattern = Pattern.compile("<!--vote::manual (.*?)-->", Pattern.CASE_INSENSITIVE);
+    static final Pattern thresholdPattern = Pattern.compile("threshold=" + quoted, Pattern.CASE_INSENSITIVE);
 
     private final VoteEvent event;
 
@@ -63,23 +64,24 @@ public class VoteInformation {
         this.group = groupValue;
         this.teamList = teamList;
 
-        this.votingThreshold = voteConfig.votingThreshold(this.group);
-
         // Test body for "vote::marthas" or "vote::manual"
         Matcher consensusM = consensusPattern.matcher(bodyString);
         boolean hasConsensus = consensusM.find();
         Matcher manualM = manualPattern.matcher(bodyString);
         boolean hasManual = manualM.find();
+        Matcher thresholdM = null;
         if (hasConsensus) {
             this.voteType = Type.marthas;
             this.approve = listFrom(consensusM.group(1));
             this.ok = listFrom(consensusM.group(2));
             this.revise = listFrom(consensusM.group(3));
+            thresholdM = thresholdPattern.matcher(consensusM.group(0));
         } else if (hasManual) {
             this.voteType = manualM.group(1).contains("comments") ? Type.manualComments : Type.manualReactions;
             this.approve = List.of();
             this.ok = List.of();
             this.revise = List.of();
+            thresholdM = thresholdPattern.matcher(manualM.group(0));
         } else if (isPullRequest()) {
             this.voteType = Type.marthas;
             this.approve = List.of(ReactionContent.PLUS_ONE);
@@ -91,6 +93,10 @@ public class VoteInformation {
             this.ok = List.of();
             this.revise = List.of();
         }
+
+        this.votingThreshold = thresholdM != null && thresholdM.find()
+                ? Threshold.fromString(thresholdM.group(1))
+                : voteConfig.votingThreshold(this.group);
     }
 
     public Collection<DataPullRequestReview> getReviews() {
