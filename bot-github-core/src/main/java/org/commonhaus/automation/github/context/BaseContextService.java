@@ -112,7 +112,7 @@ public abstract class BaseContextService implements ContextService {
     }
 
     public <F> void updateConfiguration(GHRepository repo, F repositoryConfig) {
-        REPO_CONFIG.put(repo.getNodeId(), Optional.of(repositoryConfig));
+        REPO_CONFIG.put(repo.getNodeId(), Optional.ofNullable(repositoryConfig));
     }
 
     public <F> F getConfiguration(GHRepository repo) {
