@@ -144,12 +144,20 @@ public class MembershipApplicationData {
         return body.contains("::response::");
     }
 
+    public static boolean isNew(DataLabel label) {
+        return NEW.equals(label.name);
+    }
+
     public static boolean isAccepted(DataLabel label) {
         return ACCEPTED.equals(label.name);
     }
 
     public static boolean isDeclined(DataLabel label) {
         return DECLINED.equals(label.name);
+    }
+
+    public static boolean isComplete(DataLabel label) {
+        return isAccepted(label) || isDeclined(label);
     }
 
     public static boolean isNewer(DataCommonComment x, Date issueMostRecent) {

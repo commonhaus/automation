@@ -1,5 +1,7 @@
 package org.commonhaus.automation.admin.github;
 
+import java.util.Collection;
+
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
@@ -93,10 +95,22 @@ public class MembershipGithubEvents {
 
         DatastoreQueryContext dqc = ctx.getDatastoreContext();
         DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(data);
+
+        Collection<DataLabel> labels = dqc.getLabels(issue.id);
+        boolean hasNew = labels.stream().anyMatch(l -> MembershipApplicationData.isNew(l));
+        DataLabel finishLabel = labels.stream()
+                .filter(l -> MembershipApplicationData.isComplete(l))
+                .findFirst().orElse(null);
         try {
             applicationProcess.handleApplicationComment(dqc, issue, comment);
-        } catch (Exception e) {
-            dqc.logAndSendEmail("Error with issue label event", e);
+
+            // Handle missed label event
+            if (hasNew && finishLabel != null) {
+                dqc.getLabels(dqc.getRepositoryId()); // pre-fetch
+                applicationProcess.handleApplicationLabelAdded(dqc, eventPayload.getIssue(), issue, finishLabel);
+            }
+        } catch (Throwable e) {
+            dqc.logAndSendEmail("Error with issue comment event", e);
         } finally {
             dqc.clearErrors();
         }
