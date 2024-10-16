@@ -37,7 +37,7 @@ public enum EventType {
         return switch (this) {
             case discussion -> new DiscussionPayload(action, jsonData);
             case discussion_comment -> new DiscussionCommentPayload(action, jsonData);
-            case issue, pull_request -> new CommonItemPayload(action, jsonData);
+            case issues, issue, pull_request -> new CommonItemPayload(action, jsonData);
             case issue_comment -> new CommonItemCommentPayload(action, jsonData);
             default -> {
                 Log.errorf("EventType.getDataFrom: unsupported event type %s", this);

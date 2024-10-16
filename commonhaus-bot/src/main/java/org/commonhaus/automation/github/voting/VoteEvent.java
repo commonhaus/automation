@@ -65,7 +65,7 @@ public class VoteEvent {
 
         this.itemType = switch (eventData.getEventType()) {
             case discussion, discussion_comment -> EventType.discussion;
-            case issue -> EventType.issue;
+            case issue, issues -> EventType.issue;
             case pull_request, pull_request_review -> EventType.pull_request;
             case issue_comment -> {
                 JsonObject issue = JsonAttribute.issue.jsonObjectFrom(eventData.getJsonData());

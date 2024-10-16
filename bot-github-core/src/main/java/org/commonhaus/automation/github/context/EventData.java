@@ -38,7 +38,7 @@ public class EventData {
             case discussion, discussion_comment -> {
                 yield JsonAttribute.discussion.commonItemFrom(jsonData);
             }
-            case issue, issue_comment -> {
+            case issues, issue, issue_comment -> {
                 yield JsonAttribute.issue.commonItemFrom(jsonData);
             }
             case pull_request, pull_request_review -> {
