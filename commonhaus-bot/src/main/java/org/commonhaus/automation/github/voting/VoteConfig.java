@@ -37,6 +37,16 @@ public class VoteConfig extends RepositoryConfig {
             return label;
         }
 
+        public int requiredVotes(int groupSize) {
+            // Always round up: whole people vote, not fractions
+            return switch (this) {
+                case all -> groupSize;
+                case majority -> (groupSize + 1) / 2;
+                case twothirds -> (int) Math.ceil(groupSize * 2.0 / 3.0);
+                case fourfifths -> (int) Math.ceil(groupSize * 4.0 / 5.0);
+            };
+        }
+
         public static Threshold fromString(String group) {
             for (Threshold t : values()) {
                 if (t.name().equalsIgnoreCase(group) || t.label.equalsIgnoreCase(group)) {

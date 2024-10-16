@@ -131,12 +131,7 @@ public class VoteTally {
         otherVotes.addAll(categories.values().stream()
                 .flatMap(c -> c.otherVotes.stream())
                 .toList());
-        hasQuorum = switch (votingThreshold) {
-            case all -> groupVotes >= groupSize;
-            case majority -> groupVotes > groupSize / 2;
-            case twothirds -> groupVotes > groupSize * 2 / 3;
-            case fourfifths -> groupVotes > groupSize * 4 / 5;
-        };
+        hasQuorum = groupVotes >= votingThreshold.requiredVotes(groupSize);
 
         manualCloseComments = resultComments.isEmpty()
                 ? null

@@ -3,6 +3,8 @@ package org.commonhaus.automation.github.voting;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -1061,5 +1063,32 @@ public class VotingTest extends ContextHelper {
         }
 
         return voteTally;
+    }
+
+    @Test
+    void testQuorum() {
+        // Test cases for different thresholds and group sizes
+        assertAll("Threshold required votes",
+                // Group size 3
+                () -> assertEquals(3, VoteConfig.Threshold.all.requiredVotes(3), "All members required for group size 3"),
+                () -> assertEquals(2, VoteConfig.Threshold.majority.requiredVotes(3), "Majority required for group size 3"),
+                () -> assertEquals(2, VoteConfig.Threshold.twothirds.requiredVotes(3), "Two-thirds required for group size 3"),
+                () -> assertEquals(3, VoteConfig.Threshold.fourfifths.requiredVotes(3),
+                        "Four-fifths required for group size 3"),
+
+                // Group size 5
+                () -> assertEquals(5, VoteConfig.Threshold.all.requiredVotes(5), "All members required for group size 5"),
+                () -> assertEquals(3, VoteConfig.Threshold.majority.requiredVotes(5), "Majority required for group size 5"),
+                () -> assertEquals(4, VoteConfig.Threshold.twothirds.requiredVotes(5), "Two-thirds required for group size 5"),
+                () -> assertEquals(4, VoteConfig.Threshold.fourfifths.requiredVotes(5),
+                        "Four-fifths required for group size 5"),
+
+                // Group size 10
+                () -> assertEquals(10, VoteConfig.Threshold.all.requiredVotes(10), "All members required for group size 10"),
+                () -> assertEquals(5, VoteConfig.Threshold.majority.requiredVotes(10), "Majority required for group size 10"),
+                () -> assertEquals(7, VoteConfig.Threshold.twothirds.requiredVotes(10),
+                        "Two-thirds required for group size 10"),
+                () -> assertEquals(8, VoteConfig.Threshold.fourfifths.requiredVotes(10),
+                        "Four-fifths required for group size 10"));
     }
 }
