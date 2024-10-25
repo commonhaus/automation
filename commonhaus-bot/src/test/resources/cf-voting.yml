@@ -14,6 +14,8 @@ voting:
           data: egc-second
           team: commonhaus/cf-egc-second
         mapping: project
+  vote_threshold:
+    commonhaus/cf-egc: twothirds
 
   status:
     badge: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.svg

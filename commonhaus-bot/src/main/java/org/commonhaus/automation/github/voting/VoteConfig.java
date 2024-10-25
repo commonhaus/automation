@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github.voting;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -7,6 +8,12 @@ import org.commonhaus.automation.RepositoryConfigFile;
 import org.commonhaus.automation.RepositoryConfigFile.RepositoryConfig;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
 public class VoteConfig extends RepositoryConfig {
     public static VoteConfig getVotingConfig(RepositoryConfigFile repoConfigFile) {
@@ -92,6 +99,7 @@ public class VoteConfig extends RepositoryConfig {
      * Map of voting group to required threshold to reach quorum for electronic participation.
      */
     @JsonAlias("vote_threshold")
+    @JsonDeserialize(contentUsing = ThresholdDeserializer.class)
     public Map<String, Threshold> voteThreshold;
 
     /**
@@ -115,5 +123,22 @@ public class VoteConfig extends RepositoryConfig {
             return false;
         }
         return excludeLogin.contains(login);
+    }
+
+    public static class ThresholdDeserializer extends StdDeserializer<Threshold> {
+        public ThresholdDeserializer() {
+            this(null);
+        }
+
+        public ThresholdDeserializer(Class<Threshold> vc) {
+            super(vc);
+        }
+
+        @Override
+        public Threshold deserialize(JsonParser jp, DeserializationContext context) throws IOException {
+            ObjectMapper mapper = (ObjectMapper) jp.getCodec();
+            JsonNode root = mapper.readTree(jp);
+            return Threshold.fromString(root.asText());
+        }
     }
 }
