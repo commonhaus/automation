@@ -113,6 +113,7 @@ public class MembershipApplicationData {
                 %s
                 <!--::NOTES-->
                 %s
+                <!--vote::marthas approve="+1" ok="eyes" revise="-1" threshold="twothirds"-->
                 """.formatted(
                 session.login(),
                 session.url(),
