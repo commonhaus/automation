@@ -1,6 +1,7 @@
 package org.commonhaus.automation.github.voting;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,10 +26,10 @@ public class VoteInformation {
     static final Pattern groupPattern = Pattern.compile("voting group[^@]+@([^\\s]+)", Pattern.CASE_INSENSITIVE);
 
     static final String quoted = "['\"]([^'\"]*)['\"]";
-    static final Pattern consensusPattern = Pattern.compile(
-            "<!--vote::marthas approve=" + quoted + " ok=" + quoted + " revise=" + quoted + "(.*?)-->",
-            Pattern.CASE_INSENSITIVE);
-    static final Pattern manualPattern = Pattern.compile("<!--vote::manual (.*?)-->", Pattern.CASE_INSENSITIVE);
+    static final Pattern votePattern = Pattern.compile("<!--vote(.*?)-->", Pattern.CASE_INSENSITIVE);
+    static final Pattern okPattern = Pattern.compile("ok=" + quoted, Pattern.CASE_INSENSITIVE);
+    static final Pattern approvePattern = Pattern.compile("approve=" + quoted, Pattern.CASE_INSENSITIVE);
+    static final Pattern revisePattern = Pattern.compile("revise=" + quoted, Pattern.CASE_INSENSITIVE);
     static final Pattern thresholdPattern = Pattern.compile("threshold=" + quoted, Pattern.CASE_INSENSITIVE);
 
     private final VoteEvent event;
@@ -64,39 +65,47 @@ public class VoteInformation {
         this.group = groupValue;
         this.teamList = teamList;
 
-        // Test body for "vote::marthas" or "vote::manual"
-        Matcher consensusM = consensusPattern.matcher(bodyString);
-        boolean hasConsensus = consensusM.find();
-        Matcher manualM = manualPattern.matcher(bodyString);
-        boolean hasManual = manualM.find();
-        Matcher thresholdM = null;
-        if (hasConsensus) {
-            this.voteType = Type.marthas;
-            this.approve = listFrom(consensusM.group(1));
-            this.ok = listFrom(consensusM.group(2));
-            this.revise = listFrom(consensusM.group(3));
-            thresholdM = thresholdPattern.matcher(consensusM.group(0));
-        } else if (hasManual) {
-            this.voteType = manualM.group(1).contains("comments") ? Type.manualComments : Type.manualReactions;
-            this.approve = List.of();
-            this.ok = List.of();
-            this.revise = List.of();
-            thresholdM = thresholdPattern.matcher(manualM.group(0));
-        } else if (isPullRequest()) {
-            this.voteType = Type.marthas;
-            this.approve = List.of(ReactionContent.PLUS_ONE);
-            this.ok = List.of(ReactionContent.EYES);
-            this.revise = List.of(ReactionContent.MINUS_ONE);
-        } else {
-            this.voteType = Type.undefined;
-            this.approve = List.of();
-            this.ok = List.of();
-            this.revise = List.of();
+        Matcher voteM = votePattern.matcher(bodyString);
+        String voteDefinition = voteM.find() ? voteM.group(1).toLowerCase() : null;
+        if (isPullRequest()) {
+            voteDefinition = "::marthas " + (voteDefinition == null ? "" : voteDefinition);
         }
 
-        this.votingThreshold = thresholdM != null && thresholdM.find()
-                ? Threshold.fromString(thresholdM.group(1))
-                : voteConfig.votingThreshold(this.group);
+        Type voteType = Type.undefined;
+        Threshold votingThreshold = voteConfig.votingThreshold(this.group);
+        List<ReactionContent> approve = List.of();
+        List<ReactionContent> ok = List.of();
+        List<ReactionContent> revise = List.of();
+
+        if (voteDefinition == null) {
+            voteType = Type.undefined;
+        } else {
+            Matcher thresholdM = thresholdPattern.matcher(voteDefinition);
+            votingThreshold = thresholdM != null && thresholdM.find()
+                    ? Threshold.fromString(thresholdM.group(1))
+                    : voteConfig.votingThreshold(this.group);
+
+            if (voteDefinition.startsWith("::marthas")) {
+                voteType = Type.marthas;
+
+                Matcher approveM = approvePattern.matcher(voteDefinition);
+                approve = approveM.find() ? listFrom(approveM.group(1)) : List.of(ReactionContent.PLUS_ONE);
+
+                Matcher okM = okPattern.matcher(voteDefinition);
+                ok = okM.find() ? listFrom(okM.group(1)) : List.of(ReactionContent.EYES);
+
+                Matcher reviseM = revisePattern.matcher(voteDefinition);
+                revise = reviseM.find() ? listFrom(reviseM.group(1)) : List.of(ReactionContent.MINUS_ONE);
+            } else if (voteDefinition.startsWith("::manual")) {
+                voteType = voteDefinition.contains("comments") ? Type.manualComments : Type.manualReactions;
+            }
+        }
+
+        this.voteType = voteType;
+        this.votingThreshold = votingThreshold;
+        this.approve = approve;
+        this.ok = ok;
+        this.revise = revise;
     }
 
     public Collection<DataPullRequestReview> getReviews() {
@@ -128,7 +137,14 @@ public class VoteInformation {
             // all reactions are valid if they are being counted by humans
             return false;
         }
-        return approve.isEmpty() || ok.isEmpty() || revise.isEmpty();
+        if (approve.isEmpty() || ok.isEmpty() || revise.isEmpty()) {
+            return true;
+        }
+        if (Collections.disjoint(ok, approve) && Collections.disjoint(ok, revise) && Collections.disjoint(approve, revise)) {
+            // None of the groups overlap
+            return false;
+        }
+        return true;
     }
 
     public String getErrorContent() {
