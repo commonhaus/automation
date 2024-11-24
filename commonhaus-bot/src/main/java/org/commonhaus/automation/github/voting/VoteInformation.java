@@ -2,20 +2,37 @@ package org.commonhaus.automation.github.voting;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.commonhaus.automation.github.context.DataActor;
 import org.commonhaus.automation.github.context.DataPullRequestReview;
 import org.commonhaus.automation.github.context.DataReaction;
+import org.commonhaus.automation.github.context.QueryCache;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.context.TeamList;
+import org.commonhaus.automation.github.voting.VoteConfig.AlternateConfig;
+import org.commonhaus.automation.github.voting.VoteConfig.AlternateDefinition;
 import org.commonhaus.automation.github.voting.VoteConfig.Threshold;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.ReactionContent;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
+import io.quarkus.logging.Log;
+
 public class VoteInformation {
+    static final QueryCache ALT_ACTORS = QueryCache.create("", b -> b.expireAfterWrite(1, TimeUnit.DAYS));
+
     enum Type {
         marthas,
         manualReactions,
@@ -23,7 +40,10 @@ public class VoteInformation {
         undefined
     }
 
-    static final Pattern groupPattern = Pattern.compile("voting group[^@]+@([^\\s]+)", Pattern.CASE_INSENSITIVE);
+    public record Alternates(int hash, Map<String, Map<String, DataActor>> alternates) {
+    }
+
+    static final Pattern groupPattern = Pattern.compile("voting group[^@]+@([\\S]+)", Pattern.CASE_INSENSITIVE);
 
     static final String quoted = "['\"]([^'\"]*)['\"]";
     static final Pattern votePattern = Pattern.compile("<!--vote(.*?)-->", Pattern.CASE_INSENSITIVE);
@@ -40,7 +60,8 @@ public class VoteInformation {
     public final List<ReactionContent> approve;
 
     public final String group;
-    public final TeamList teamList;
+    public final Set<DataActor> teamList;
+    public final Map<String, DataActor> alternates;
     public final VoteConfig.Threshold votingThreshold;
 
     public VoteInformation(VoteEvent event) {
@@ -50,20 +71,24 @@ public class VoteInformation {
         VoteConfig voteConfig = event.getVotingConfig();
         String bodyString = event.getVoteBody();
         String groupValue = null;
-        TeamList teamList = null;
+        Set<DataActor> teamList = null;
+        Map<String, DataActor> alternates = null;
 
         // Test body for "Voting group" followed by a team name
         Matcher groupM = groupPattern.matcher(bodyString);
         if (groupM.find()) {
             groupValue = groupM.group(1);
-            teamList = qc.getTeamList(groupValue);
-            if (teamList != null) {
-                teamList.removeExcludedMembers(
+            TeamList list = qc.getTeamList(groupValue);
+            if (list != null) {
+                list.removeExcludedMembers(
                         a -> qc.isBot(a.login) || voteConfig.isMemberExcluded(a.login));
+                teamList = list.members;
             }
+            alternates = getAlternates(qc, groupValue, voteConfig);
         }
         this.group = groupValue;
         this.teamList = teamList;
+        this.alternates = alternates;
 
         Matcher voteM = votePattern.matcher(bodyString);
         String voteDefinition = voteM.find() ? voteM.group(1).toLowerCase() : null;
@@ -77,11 +102,9 @@ public class VoteInformation {
         List<ReactionContent> ok = List.of();
         List<ReactionContent> revise = List.of();
 
-        if (voteDefinition == null) {
-            voteType = Type.undefined;
-        } else {
+        if (voteDefinition != null) {
             Matcher thresholdM = thresholdPattern.matcher(voteDefinition);
-            votingThreshold = thresholdM != null && thresholdM.find()
+            votingThreshold = thresholdM.find()
                     ? Threshold.fromString(thresholdM.group(1))
                     : voteConfig.votingThreshold(this.group);
 
@@ -140,11 +163,9 @@ public class VoteInformation {
         if (approve.isEmpty() || ok.isEmpty() || revise.isEmpty()) {
             return true;
         }
-        if (Collections.disjoint(ok, approve) && Collections.disjoint(ok, revise) && Collections.disjoint(approve, revise)) {
-            // None of the groups overlap
-            return false;
-        }
-        return true;
+        // None of the groups should overlap
+        return !Collections.disjoint(ok, approve) || !Collections.disjoint(ok, revise)
+                || !Collections.disjoint(approve, revise);
     }
 
     public String getErrorContent() {
@@ -180,9 +201,9 @@ public class VoteInformation {
 
         return String.format("""
                 - %s:\r
-                    - approve: %s\r
-                    - ok: %s\r
-                    - revise: %s""",
+                - approve: %s\r
+                - ok: %s\r
+                - revise: %s""",
                 description,
                 showReactions(approve) + (isPullRequest() ? ", PR review approved" : ""),
                 showReactions(ok) + (isPullRequest() ? ", PR review closed with comments" : ""),
@@ -250,5 +271,134 @@ public class VoteInformation {
 
     public String getTitle() {
         return event.getTitle();
+    }
+
+    private Map<String, DataActor> getAlternates(QueryContext qc, String teamName, VoteConfig voteConfig) {
+        // Generate a cache key using the repository ID
+        String key = "ALTS_" + qc.getRepositoryId();
+
+        // Look up or compute the alternates for the given key
+        Alternates alts = ALT_ACTORS.computeIfAbsent(key, k -> {
+            List<AlternateConfig> alternates = voteConfig.alternates;
+            int hash = alternates == null ? 0 : alternates.hashCode();
+
+            // If no alternates are configured, return an empty map
+            if (alternates == null) {
+                return new Alternates(hash, Map.of());
+            }
+
+            // Iterate over the list of alternate configurations
+            Map<String, Map<String, DataActor>> githubTeamToAlternates = new HashMap<>();
+            for (AlternateConfig alt : alternates) {
+                if (!alt.valid()) {
+                    continue;
+                }
+
+                // Retrieve the configuration data for the alternate
+                Optional<JsonNode> configDataNode = getAlternateConfigData(qc, alt);
+                if (configDataNode.isEmpty()) {
+                    continue;
+                }
+
+                // Map logins from the primary team to the secondary team
+                JsonNode data = configDataNode.get();
+                for (AlternateDefinition altDef : alt.mapping()) {
+                    String primaryTeam = altDef.primary().team();
+                    Map<String, DataActor> loginToSecond = mapLoginToSecond(qc, data, altDef);
+                    if (loginToSecond.isEmpty()) {
+                        continue;
+                    }
+                    githubTeamToAlternates.computeIfAbsent(primaryTeam, x -> new HashMap<>()).putAll(loginToSecond);
+                }
+            }
+            // Return the computed alternates
+            return new Alternates(hash, githubTeamToAlternates);
+        });
+
+        // Return the alternates for the specified team name (if any)
+        return alts.alternates().get(teamName);
+    }
+
+    private Optional<JsonNode> getAlternateConfigData(QueryContext qc, AlternateConfig altConfig) {
+        GHRepository repo = qc.getRepository(altConfig.repo());
+        if (repo == null) {
+            Log.warnf("[%s] voteInformation.getAlternateConfigData: source repository %s not found",
+                    qc.getLogId(), altConfig.repo());
+            return Optional.empty();
+        }
+        // get contents of file from the specified repo + path
+        Optional<JsonNode> config = Optional.ofNullable(qc.readYamlSourceFile(repo, altConfig.source()));
+        if (config.isEmpty()) {
+            Log.warnf("[%s] voteInformation.getAlternateConfigData: source %s:%s not found",
+                    qc.getLogId(), altConfig.repo(), altConfig.repo());
+            return Optional.empty();
+        }
+        return config;
+    }
+
+    private Map<String, DataActor> mapLoginToSecond(QueryContext qc, JsonNode data, AlternateDefinition altDef) {
+        // AlternateDefinition has been checked for validity.
+        // Contents of data (JsonNode) have not.
+        TeamList primaryTeam = qc.getTeamList(altDef.primary().team());
+        Optional<JsonNode> primaryDataNode = getValidDataNode(altDef.primary().data(), data);
+        if (primaryDataNode.isEmpty()) {
+            Log.warnf("[%s] voteInformation.getAlternates: primary config group (%s) or github team (%s) not found",
+                    qc.getLogId(), altDef.primary().data(), altDef.primary().team());
+            return Map.of();
+        }
+
+        TeamList secondaryTeam = qc.getTeamList(altDef.secondary().team());
+        Optional<JsonNode> secondaryDataNode = getValidDataNode(altDef.secondary().data(), data);
+        if (secondaryDataNode.isEmpty()) {
+            Log.warnf("[%s] voteInformation.getAlternates: secondary config group (%s) or github team (%s) not found",
+                    qc.getLogId(), altDef.secondary().data(), altDef.secondary().team());
+            return Map.of();
+        }
+
+        String match = altDef.field();
+        Map<String, DataActor> result = new HashMap<>();
+        Map<String, String> primaryMap = fieldToLoginMap(match, primaryDataNode.get());
+        Map<String, String> secondaryMap = fieldToLoginMap(match, secondaryDataNode.get());
+        for (Entry<String, String> entry : primaryMap.entrySet()) {
+            String primaryLogin = entry.getValue();
+            String secondaryLogin = secondaryMap.get(entry.getKey());
+            if (primaryLogin == null || secondaryLogin == null) {
+                continue;
+            }
+            if (primaryTeam.hasLogin(primaryLogin)) {
+                secondaryTeam.members.stream()
+                        .filter(a -> a.login.equals(secondaryLogin))
+                        .findFirst()
+                        .ifPresent(a -> result.put(primaryLogin, a));
+            }
+        }
+        return result;
+    }
+
+    private Optional<JsonNode> getValidDataNode(String key, JsonNode node) {
+        if (key == null || key.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(node.get(key)).filter(JsonNode::isArray);
+    }
+
+    // egc:
+    // - project: jbang
+    //   login: maxandersen
+    private Map<String, String> fieldToLoginMap(String field, JsonNode node) {
+        Map<String, String> fieldToLogin = new HashMap<>();
+        node.elements().forEachRemaining(x -> {
+            String fieldValue = stringFrom(x, field);
+            String login = stringFrom(x, "login");
+            if (fieldValue != null && login != null) {
+                fieldToLogin.put(fieldValue, login);
+            }
+        });
+        return fieldToLogin;
+    }
+
+    private String stringFrom(JsonNode x, String fieldName) {
+        JsonNode field = x.get(fieldName);
+        return field == null ? null : field.asText();
     }
 }

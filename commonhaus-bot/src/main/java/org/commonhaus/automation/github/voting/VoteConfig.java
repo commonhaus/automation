@@ -64,9 +64,41 @@ public class VoteConfig extends RepositoryConfig {
         }
     }
 
-    public static class StatusLinks {
-        public String badge;
-        public String page;
+    public record StatusLinks(
+            String badge,
+            String page) {
+    }
+
+    public record TeamMapping(
+            String data,
+            String team) {
+        boolean valid() {
+            return data != null && team != null;
+        }
+    }
+
+    public record AlternateDefinition(
+            String field,
+            TeamMapping primary,
+            TeamMapping secondary) {
+        boolean valid() {
+            return field != null
+                    && primary != null && primary.valid()
+                    && secondary != null && secondary.valid();
+        }
+    }
+
+    public record AlternateConfig(
+            String source,
+            String repo,
+            List<AlternateDefinition> mapping) {
+        boolean valid() {
+            return source != null
+                    && repo != null
+                    && mapping != null
+                    && !mapping.isEmpty()
+                    && mapping.stream().allMatch(AlternateDefinition::valid);
+        }
     }
 
     public static final VoteConfig DISABLED = new VoteConfig() {
@@ -101,6 +133,11 @@ public class VoteConfig extends RepositoryConfig {
     @JsonAlias("vote_threshold")
     @JsonDeserialize(contentUsing = ThresholdDeserializer.class)
     public Map<String, Threshold> voteThreshold;
+
+    /**
+     * Configuration for alternate representatives.
+     */
+    public List<AlternateConfig> alternates;
 
     /**
      * Link templates for status badges and pages.

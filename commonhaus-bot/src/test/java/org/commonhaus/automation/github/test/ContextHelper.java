@@ -30,8 +30,11 @@ import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHPullRequestFileDetail;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
+import org.kohsuke.github.GitHub;
 import org.kohsuke.github.PagedIterable;
 import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
@@ -85,13 +88,28 @@ public class ContextHelper extends QueryContext {
         BaseQueryCache.BOT_LOGIN.put("" + installationId, login);
     }
 
-    public void setupMockTeam(GitHubMockSetupContext mocks) {
-        GHUser user1 = mockGHUser("user1");
-        GHUser user2 = mockGHUser("user2");
-        GHUser user3 = mockGHUser("user3");
+    public void setupMockTeam(GitHubMockSetupContext mocks, GHUser... users) throws Exception {
         mockGHUser("user4");
 
-        BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
+        if (users.length == 0) {
+            GHUser user1 = mockGHUser("user1");
+            GHUser user2 = mockGHUser("user2");
+            GHUser user3 = mockGHUser("user3");
+            BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
+        } else {
+            BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(users));
+        }
+
+        GHUser second = mockGHUser("second");
+        BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-seconds", Set.of(second));
+
+        GitHub gh = mocks.installationClient(installationId);
+
+        GHContent content = mock(GHContent.class);
+        when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
+
+        GHRepository foundationRepo = gh.getRepository("commonhaus/foundation");
+        when(foundationRepo.getFileContent("CONTACTS.yaml")).thenReturn(content);
     }
 
     public void setupMockTeam(String teamName, Set<GHUser> users) {

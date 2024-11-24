@@ -94,7 +94,10 @@ public class VoteTally {
         this.isPullRequest = info.isPullRequest();
         this.title = info.getTitle();
 
-        Set<DataActor> teamMembers = info.teamList.members;
+        Set<DataActor> teamMembers = info.teamList;
+        Set<DataActor> seenLogins = new HashSet<>();
+
+        Map<String, DataActor> teamLogins = teamMembers.stream().collect(Collectors.toMap(a -> a.login, a -> a));
         missingGroupActors = new HashSet<>(teamMembers);
 
         voteType = info.voteType;
@@ -102,9 +105,6 @@ public class VoteTally {
         groupSize = teamMembers.size();
         votingThreshold = info.votingThreshold;
         notMarthasMethod = (info.ok.size() + info.revise.size() + info.approve.size()) == 0;
-
-        Map<String, DataActor> teamLogins = teamMembers.stream().collect(Collectors.toMap(a -> a.login, a -> a));
-        Set<DataActor> seenLogins = new HashSet<>();
 
         if (info.voteType == VoteInformation.Type.manualComments) {
             if (isPullRequest) {
@@ -121,6 +121,7 @@ public class VoteTally {
             droppedVotes = duplicates.size() + ignoredVotes();
         }
         missingGroupActors.removeAll(seenLogins);
+        countAlternates(categories, missingGroupActors, info.alternates);
 
         groupVotes = categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey()))
@@ -226,6 +227,17 @@ public class VoteTally {
             } else {
                 duplicates.add(new VoteRecord(reaction));
             }
+        }
+    }
+
+    void countAlternates(Map<String, VoteTally.Category> categories,
+            Collection<DataActor> missingGroupActors,
+            Map<String, DataActor> alternates) {
+        if (missingGroupActors.isEmpty() || alternates == null || alternates.isEmpty()) {
+            return;
+        }
+        for (Category c : categories.values()) {
+            c.countAlternates(missingGroupActors, alternates);
         }
     }
 
@@ -350,6 +362,24 @@ public class VoteTally {
                 team.add(record);
             } else {
                 otherVotes.add(record);
+            }
+        }
+
+        void countAlternates(Collection<DataActor> missingGroupActors, Map<String, DataActor> alternates) {
+            for (DataActor actor : missingGroupActors) {
+                DataActor alternate = alternates.get(actor.login);
+                if (alternate != null) {
+                    VoteRecord alternateVote = otherVotes.stream()
+                            .filter(vr -> vr.login.equals(alternate.login))
+                            .findFirst().orElse(null);
+                    if (alternateVote != null) {
+                        // Promote to a team vote.
+                        teamTotal++;
+                        team.add(alternateVote);
+                        otherVotes.remove(alternateVote);
+                        alternateVote.setAlternate(true); // indicate this is an alternate
+                    }
+                }
             }
         }
     }

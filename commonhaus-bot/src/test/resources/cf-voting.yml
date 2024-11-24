@@ -3,17 +3,17 @@ voting:
     - "@commonhaus/test-quorum-default"
   error_email_address:
     - test@commonhaus.org
-  fallback:
+  alternates:
     - source: CONTACTS.yaml
       repo: commonhaus/foundation
       mapping:
-      - primary: 
-          data: egc
-          team: commonhaus/cf-egc
-        secondary: 
-          data: egc-second
-          team: commonhaus/cf-egc-second
-        mapping: project
+        - field: project 
+          primary: 
+            data: egc
+            team: commonhaus/test-quorum-default
+          secondary: 
+            data: egc-second
+            team: commonhaus/test-quorum-seconds
   vote_threshold:
     commonhaus/cf-egc: twothirds
 

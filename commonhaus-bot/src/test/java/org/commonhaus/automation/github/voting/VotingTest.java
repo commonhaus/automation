@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -37,6 +38,10 @@ import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.test.ContextHelper;
+import org.commonhaus.automation.github.voting.VoteConfig.AlternateConfig;
+import org.commonhaus.automation.github.voting.VoteConfig.AlternateDefinition;
+import org.commonhaus.automation.github.voting.VoteConfig.TeamMapping;
+import org.commonhaus.automation.github.voting.VoteInformation.Alternates;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +81,8 @@ public class VotingTest extends ContextHelper {
     }
 
     @AfterEach
-    protected void noErrorMail() throws Exception {
+    protected void noErrorMail() {
+        VoteInformation.ALT_ACTORS.invalidateAll();
         await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
                 .atMost(3, TimeUnit.SECONDS);
     }
@@ -97,9 +103,10 @@ public class VotingTest extends ContextHelper {
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
+                    setupMockTeam(mocks);
+
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
-
                     when(mocks.installationGraphQLClient(installationId)
                             .executeSync(contains("addReaction("), anyMap()))
                             .thenReturn(addReaction);
@@ -149,6 +156,8 @@ public class VotingTest extends ContextHelper {
         given()
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
+                    setupMockTeam(mocks);
+
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
                     when(mocks.installationGraphQLClient(installationId)
@@ -226,7 +235,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("updateDiscussion("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
         verifyBotCommentCache(discussionId, botCommentId);
     }
@@ -274,7 +282,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("updateDiscussion("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
@@ -330,7 +337,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
         verifyBotCommentCache(discussionId, botCommentId);
     }
@@ -375,7 +381,6 @@ public class VotingTest extends ContextHelper {
                     verify(mocks.repository(repoFullName), atLeastOnce()).getFullName();
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
         verifyBotCommentCache(discussionId, botCommentId);
     }
@@ -405,8 +410,7 @@ public class VotingTest extends ContextHelper {
                     GHUser user3 = mockGHUser("kenfinnigan");
                     mockGHUser("ebullient");
 
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
-
+                    setupMockTeam(mocks, user1, user2, user3);
                     setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
@@ -430,7 +434,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
         verifyBotCommentCache(discussionId, botCommentId);
     }
@@ -460,8 +463,7 @@ public class VotingTest extends ContextHelper {
                     GHUser user3 = mockGHUser("kenfinnigan");
                     mockGHUser("ebullient");
 
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
-
+                    setupMockTeam(mocks, user1, user2, user3);
                     setupBotComment(discussionId);
 
                     when(mocks.installationGraphQLClient(installationId)
@@ -483,7 +485,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("updateDiscussionComment("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
         assertThat(botComment.getBody()).contains(
@@ -531,7 +532,6 @@ public class VotingTest extends ContextHelper {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("updateDiscussion("), anyMap());
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
@@ -557,10 +557,9 @@ public class VotingTest extends ContextHelper {
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
 
-                    setupBotComment(discussionId);
-
                     GHUser manager = mockGHUser("ebullient");
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(manager));
+                    setupMockTeam(mocks, manager);
+                    setupBotComment(discussionId);
 
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
@@ -594,7 +593,6 @@ public class VotingTest extends ContextHelper {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment botComment = verifyBotCommentCache(discussionId, botCommentId);
@@ -620,11 +618,7 @@ public class VotingTest extends ContextHelper {
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
 
-                    GHUser user1 = mockGHUser("commonhaus-bot");
-                    GHUser user2 = mockGHUser("ebullient");
-
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
-
+                    setupMockTeam(mocks);
                     setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
@@ -653,7 +647,6 @@ public class VotingTest extends ContextHelper {
                             .executeSync(contains("updatePullRequest("), anyMap());
 
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
@@ -690,8 +683,7 @@ public class VotingTest extends ContextHelper {
                     GHUser user1 = mockGHUser("commonhaus-bot");
                     GHUser user2 = mockGHUser("ebullient");
 
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
-
+                    setupMockTeam(mocks, user1, user2);
                     setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
@@ -734,7 +726,6 @@ public class VotingTest extends ContextHelper {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
@@ -771,8 +762,8 @@ public class VotingTest extends ContextHelper {
 
                     GHUser user1 = mockGHUser("commonhaus-bot");
                     GHUser user2 = mockGHUser("ebullient");
-                    setupMockTeam("commonhaus/test-quorum-default", Set.of(user1, user2));
 
+                    setupMockTeam(mocks, user1, user2);
                     setupBotComment(pullRequestId);
 
                     when(mocks.installationGraphQLClient(installationId)
@@ -813,7 +804,6 @@ public class VotingTest extends ContextHelper {
                     verify(mocks.installationGraphQLClient(installationId), timeout(500))
                             .executeSync(contains("addLabelsToLabelable("), anyMap());
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
-                    verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
         BotComment botComment = verifyBotCommentCache(pullRequestId, botCommentId);
@@ -837,18 +827,27 @@ public class VotingTest extends ContextHelper {
         when(qc.getOrganization()).thenReturn(org);
         when(qc.getTeamList(anyString())).thenCallRealMethod();
         when(qc.teamMembers(anyString())).thenCallRealMethod();
+        when(qc.getRepositoryId()).thenReturn(repositoryId);
 
         List<DataReaction> teamReactions = new ArrayList<>(51);
         Set<GHUser> teamUsers = new HashSet<>(51);
         List<DataReaction> unignore = new ArrayList<>(3);
         List<DataReaction> duplicates = new ArrayList<>(3);
+        List<DataReaction> primary = new ArrayList<>(1);
         Date date = new Date();
         for (int i = 1; i < 51; i++) {
             GHUser ghUser = mockGHUser("user" + i);
             DataActor user = new DataActor(ghUser);
             teamUsers.add(ghUser);
-            teamReactions.add(new DataReaction(user,
-                    i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
+
+            if (i == 28) {
+                // don't add the primary user to the list of team reactions. Secondary user will be counted instead
+                primary.add(new DataReaction(user, "thumbs_up", date));
+            } else {
+                teamReactions.add(new DataReaction(user,
+                        i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
+            }
+
             if (i % 13 == 0) {
                 unignore.add(new DataReaction(user, "eyes", date));
             }
@@ -856,19 +855,36 @@ public class VotingTest extends ContextHelper {
                 duplicates.add(new DataReaction(user, "thumbs_down", date));
             }
         }
+        teamUsers.add(mockGHUser("excluded")); // should be excluded from totals
+
         List<DataReaction> extraReactions = new ArrayList<>(10);
         for (int i = 1; i < 11; i++) {
             DataActor user = new DataActor(mockGHUser("extra" + i));
             extraReactions.add(new DataReaction(user,
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
         }
-        teamUsers.add(mockGHUser("excluded")); // should be excluded from totals
+
+        GHUser alternate = mockGHUser("alt_1");
+        DataActor alternateUser = new DataActor(alternate);
+        extraReactions.add(new DataReaction(alternateUser, "thumbs_down", date)); // opposite of primary
+
         setupMockTeam("commonhaus/test-quorum-default", teamUsers);
+        setupMockTeam("commonhaus/test-quorum-seconds", Set.of(alternate));
 
         VoteConfig votingConfig = new VoteConfig();
         votingConfig.voteThreshold = new java.util.HashMap<>();
         votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.all);
         votingConfig.excludeLogin = List.of("excluded");
+
+        votingConfig.alternates = List.of(new AlternateConfig(
+                "CONTACTS.yaml", "commonhaus/foundation",
+                List.of(new AlternateDefinition("project",
+                        new TeamMapping("egc", "commonhaus/test-quorum-default"),
+                        new TeamMapping("egc-second", "commonhaus/test-quorum-seconds")))));
+
+        setupMockAlternates(votingConfig.alternates.hashCode(),
+                "commonhaus/test-quorum-default",
+                Map.of(primary.get(0).user.login, alternateUser));
 
         VoteEvent event = createVoteEvent(qc, votingConfig,
                 "commonhaus/test-quorum-default",
@@ -879,6 +895,7 @@ public class VotingTest extends ContextHelper {
         VoteInformation voteInfo = new VoteInformation(event);
         assertThat(voteInfo.isValid()).isTrue();
         assertThat(voteInfo.group).isEqualTo("commonhaus/test-quorum-default");
+        assertThat(voteInfo.alternates).isNotNull();
         assertThat(voteInfo.votingThreshold).isEqualTo(VoteConfig.Threshold.all);
         assertThat(voteInfo.approve).containsExactlyInAnyOrder(ReactionContent.PLUS_ONE);
         assertThat(voteInfo.ok).containsExactlyInAnyOrder(ReactionContent.EYES);
@@ -886,25 +903,28 @@ public class VotingTest extends ContextHelper {
         assertThat(voteInfo.voteType).isEqualTo(VoteInformation.Type.marthas);
 
         // All have voted: but some are ignored!
+        // All have voted, but user28 vote is replaced by an alternate
 
         VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions);
         assertThat(voteTally.categories.get("approve")).isNotNull();
         assertThat(voteTally.categories.get("ok")).isNotNull();
         assertThat(voteTally.categories.get("revise")).isNotNull();
         assertThat(voteTally.categories.get("ignored")).isNotNull();
-        assertThat(voteTally.missingGroupActors).size().isEqualTo(3);
+        assertThat(voteTally.missingGroupActors).size().isEqualTo(4); // 3 ignored values, missing primary vote
 
         // now add the missing votes with valid (not ignored) and duplicate values
         extraReactions.addAll(unignore);
         extraReactions.addAll(duplicates);
+
+        // secondary should be counted to meet quorum
         voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
 
         // Majority have voted
 
         votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.majority);
         voteInfo = new VoteInformation(event);
-        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions);
-        assertVoteTally(23, false, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(26, 27, true, voteInfo, extraReactions, teamReactions); // alt_1 still included
+        assertVoteTally(23, 24, false, voteInfo, extraReactions, teamReactions); // alt_1 still included
 
         // Supermajority (2/3) have voted
 
@@ -984,7 +1004,7 @@ public class VotingTest extends ContextHelper {
 
         List<DataReaction> reactions = Stream
                 .concat(teamReactions.stream(), extraReactions.stream())
-                .filter(x -> Integer.parseInt(x.user.id.replace("user", "").replace("extra", "")) <= numUsers)
+                .filter(x -> Integer.parseInt(x.user.id.replaceAll("(user|extra|alt_)", "")) <= numUsers)
                 .toList();
         List<DataCommonComment> comments = List.of();
 
@@ -1030,7 +1050,6 @@ public class VotingTest extends ContextHelper {
         }
 
         if (!voteTally.duplicates.isEmpty()) {
-            System.out.println(json);
             assertThat(json)
                     .as("json duplicate user should be present")
                     .doesNotContain("{\"user\":{}");
@@ -1090,5 +1109,10 @@ public class VotingTest extends ContextHelper {
                         "Two-thirds required for group size 10"),
                 () -> assertEquals(8, VoteConfig.Threshold.fourfifths.requiredVotes(10),
                         "Four-fifths required for group size 10"));
+    }
+
+    void setupMockAlternates(int hash, String primaryTeam, Map<String, DataActor> alternateLogins) {
+        Alternates alts = new Alternates(hash, Map.of(primaryTeam, alternateLogins));
+        VoteInformation.ALT_ACTORS.put("ALTS_" + repositoryId, alts);
     }
 }

@@ -10,12 +10,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class VoteRecord {
     public final String login;
     public final String url;
     public final Date createdAt;
     public final String reaction;
+    boolean alternate = false;
 
     public VoteRecord(DataReaction reaction) {
         this.login = reaction.user.login;
@@ -33,6 +34,14 @@ public class VoteRecord {
 
     public String login() {
         return login;
+    }
+
+    public boolean isAlternate() {
+        return alternate;
+    }
+
+    public void setAlternate(boolean alternate) {
+        this.alternate = alternate;
     }
 
     @Override
