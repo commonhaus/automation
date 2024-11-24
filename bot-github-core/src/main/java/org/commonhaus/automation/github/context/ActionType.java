@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.context;
 public enum ActionType {
     added,
     answered,
+    assigned,
     category_changed,
     closed,
     created,
@@ -12,6 +13,7 @@ public enum ActionType {
     locked,
     opened,
     pinned,
+    removed,
     reopened,
     review_requested,
     submitted,

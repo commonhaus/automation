@@ -190,8 +190,8 @@ public class VoteEvent {
     }
 
     public String getVoteHeaderText(BotComment comment) {
-        if (votingConfig.status != null && votingConfig.status.badge != null) {
-            String badgeLink = votingConfig.status.badge
+        if (votingConfig.status != null && votingConfig.status.badge() != null) {
+            String badgeLink = votingConfig.status.badge()
                     .replace("{{repoName}}", qc.getRepository().getFullName())
                     .replace("{{number}}", number + "");
 
