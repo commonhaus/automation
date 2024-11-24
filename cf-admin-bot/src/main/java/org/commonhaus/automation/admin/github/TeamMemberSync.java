@@ -1,6 +1,8 @@
 package org.commonhaus.automation.admin.github;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -21,6 +23,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.admin.Routes;
 import org.commonhaus.automation.admin.api.CouncilResource.TeamSyncTriggerEvent;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.SponsorsConfig;
@@ -60,6 +63,7 @@ public class TeamMemberSync {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     private final Set<MonitoredRepo> monitoredRepos = new ConcurrentHashSet<>();
+    private static volatile String lastRun = "never";
 
     @Inject
     AppContextService ctx;
@@ -80,6 +84,8 @@ public class TeamMemberSync {
                 task.run();
             }
         }, initialDelay, 10, unit);
+
+        Routes.registerSupplier("TeamMemberSync", () -> lastRun);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -90,6 +96,8 @@ public class TeamMemberSync {
      * Event handler for repository discovery.
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
         long ghiId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -125,6 +133,8 @@ public class TeamMemberSync {
      */
     public void updateTeamMembers(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Push GHEventPayload.Push pushEvent) {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
         GHRepository repo = pushEvent.getRepository();
         ctx.refreshScopedQueryContext(event.getInstallationId(), repo)
                 .addExisting(github).addExisting(graphQLClient);
@@ -153,6 +163,8 @@ public class TeamMemberSync {
 
     @Scheduled(cron = "${automation.admin.team-sync-cron:23 25 3 ? * * *}")
     void scheduledSync() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
         try {
             Iterator<MonitoredRepo> i = monitoredRepos.iterator();
             while (i.hasNext()) {

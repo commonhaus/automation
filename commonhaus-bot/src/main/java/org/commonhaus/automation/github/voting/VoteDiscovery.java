@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github.voting;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
@@ -16,6 +18,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.RepositoryConfigFile;
+import org.commonhaus.automation.Routes;
 import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.ScheduledQueryContext;
 import org.commonhaus.automation.github.ScheduledQueryContext.ScheduledItemQueryContext;
@@ -43,6 +46,8 @@ public class VoteDiscovery {
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
+    private static volatile String lastRun = "never";
+
     @Inject
     EventBus eventBus;
 
@@ -60,6 +65,8 @@ public class VoteDiscovery {
                 task.run();
             }
         }, 0, 10, TimeUnit.SECONDS);
+
+        Routes.registerSupplier("VoteDiscovery", () -> lastRun);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -70,6 +77,8 @@ public class VoteDiscovery {
      * Event handler for repository discovery.
      */
     public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
         long ghiId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();
         Optional<RepositoryConfigFile> repoConfig = repoEvent.getRepositoryConfig();
@@ -84,8 +93,9 @@ public class VoteDiscovery {
         }
     }
 
-    @Scheduled(cron = "${automation.voting.cron:13 27 */5 * * ?}")
+    @Scheduled(cron = "${automation.voting.cron:13 27 */3 * * ?}")
     void discoverVotes() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
         try {
             Iterator<Entry<String, Long>> i = votingRepositories.entrySet().iterator();
             while (i.hasNext()) {
