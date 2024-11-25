@@ -1,5 +1,7 @@
 package org.commonhaus.automation.admin;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -32,7 +34,10 @@ public class Routes {
         routingExchange
                 .ok()
                 .putHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex")
-                .end(engine.getTemplate("index.html").data("items", result).render());
+                .end(engine.getTemplate("index.html")
+                        .data("items", result)
+                        .data("now", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+                        .render());
     }
 
     @Route(path = "/ping", order = 99, produces = "text/html", methods = { HttpMethod.GET })

@@ -27,9 +27,7 @@
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>bot-github-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
-
         <dependency>
             <groupId>io.quarkiverse.githubapp</groupId>
             <artifactId>quarkus-github-app</artifactId>
