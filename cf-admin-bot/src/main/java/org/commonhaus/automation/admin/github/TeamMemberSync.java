@@ -389,6 +389,9 @@ public class TeamMemberSync {
         Set<String> toRemove = new HashSet<>(currentLogins);
         toRemove.removeAll(sourceLogins);
 
+        Log.debugf("[%s] doSyncTeamMembers: %s; add %s; remove %s", qc.getLogId(),
+                fullTeamName, toAdd, toRemove);
+
         if (productionRun) {
             final Set<GHUser> validate = new HashSet<>();
             // Membership events will update the team cache; do nothing with the cache here.
@@ -410,8 +413,7 @@ public class TeamMemberSync {
                             }
                         }
                     } catch (IOException e) {
-                        Log.warnf("[%s] doSyncTeamMembers: failed to find, add, or remove user %s", qc.getLogId(), login);
-                        ;
+                        Log.errorf(e, "[%s] doSyncTeamMembers: failed to find, add, or remove user %s", qc.getLogId(), login);
                     }
                 }
                 return null;

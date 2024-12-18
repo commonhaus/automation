@@ -104,6 +104,9 @@ public class RepositoryDiscovery {
 
     void onEvent(@RawEvent GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient) {
         ctx = ctxInstance.get();
+        if (event == null || event.getInstallationId() == null) {
+            return;
+        }
         ctx.updateConnections(event.getInstallationId(), github, graphQLClient);
     }
 

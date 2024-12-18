@@ -19,6 +19,7 @@ public enum ActionType {
     submitted,
     synchronize,
     transferred,
+    unassigned,
     unanswered,
     unlabeled,
     unlocked,
