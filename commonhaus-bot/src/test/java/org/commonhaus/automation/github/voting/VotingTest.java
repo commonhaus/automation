@@ -405,10 +405,10 @@ public class VotingTest extends ContextHelper {
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
 
-                    GHUser user1 = mockGHUser("nmcl");
-                    GHUser user2 = mockGHUser("evanchooly");
-                    GHUser user3 = mockGHUser("kenfinnigan");
-                    mockGHUser("ebullient");
+                    GHUser user1 = mockGHUser(mocks, "nmcl");
+                    GHUser user2 = mockGHUser(mocks, "evanchooly");
+                    GHUser user3 = mockGHUser(mocks, "kenfinnigan");
+                    mockGHUser(mocks, "ebullient");
 
                     setupMockTeam(mocks, user1, user2, user3);
                     setupBotComment(discussionId);
@@ -458,10 +458,10 @@ public class VotingTest extends ContextHelper {
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
 
-                    GHUser user1 = mockGHUser("nmcl");
-                    GHUser user2 = mockGHUser("evanchooly");
-                    GHUser user3 = mockGHUser("kenfinnigan");
-                    mockGHUser("ebullient");
+                    GHUser user1 = mockGHUser(mocks, "nmcl");
+                    GHUser user2 = mockGHUser(mocks, "evanchooly");
+                    GHUser user3 = mockGHUser(mocks, "kenfinnigan");
+                    mockGHUser(mocks, "ebullient");
 
                     setupMockTeam(mocks, user1, user2, user3);
                     setupBotComment(discussionId);
@@ -557,7 +557,7 @@ public class VotingTest extends ContextHelper {
                 .github(mocks -> {
                     mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-voting.yml");
 
-                    GHUser manager = mockGHUser("ebullient");
+                    GHUser manager = mockGHUser(mocks, "ebullient");
                     setupMockTeam(mocks, manager);
                     setupBotComment(discussionId);
 
@@ -680,8 +680,8 @@ public class VotingTest extends ContextHelper {
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
 
-                    GHUser user1 = mockGHUser("commonhaus-bot");
-                    GHUser user2 = mockGHUser("ebullient");
+                    GHUser user1 = mockGHUser(mocks, "commonhaus-bot");
+                    GHUser user2 = mockGHUser(mocks, "ebullient");
 
                     setupMockTeam(mocks, user1, user2);
                     setupBotComment(pullRequestId);
@@ -760,8 +760,8 @@ public class VotingTest extends ContextHelper {
                     when(mocks.installationClient(installationId).isCredentialValid())
                             .thenReturn(true);
 
-                    GHUser user1 = mockGHUser("commonhaus-bot");
-                    GHUser user2 = mockGHUser("ebullient");
+                    GHUser user1 = mockGHUser(mocks, "commonhaus-bot");
+                    GHUser user2 = mockGHUser(mocks, "ebullient");
 
                     setupMockTeam(mocks, user1, user2);
                     setupBotComment(pullRequestId);
@@ -814,7 +814,7 @@ public class VotingTest extends ContextHelper {
     }
 
     @Test
-    void testVoteTally() throws JsonProcessingException {
+    void testVoteTally() throws Exception {
         String body = """
                 voting group: @commonhaus/test-quorum-default
                 <!--vote::marthas approve="+1" ok="eyes" revise="-1" -->
@@ -836,7 +836,7 @@ public class VotingTest extends ContextHelper {
         List<DataReaction> primary = new ArrayList<>(1);
         Date date = new Date();
         for (int i = 1; i < 51; i++) {
-            GHUser ghUser = mockGHUser("user" + i);
+            GHUser ghUser = mockGHUser(null, "user" + i);
             DataActor user = new DataActor(ghUser);
             teamUsers.add(ghUser);
 
@@ -855,16 +855,16 @@ public class VotingTest extends ContextHelper {
                 duplicates.add(new DataReaction(user, "thumbs_down", date));
             }
         }
-        teamUsers.add(mockGHUser("excluded")); // should be excluded from totals
+        teamUsers.add(mockGHUser(null, "excluded")); // should be excluded from totals
 
         List<DataReaction> extraReactions = new ArrayList<>(10);
         for (int i = 1; i < 11; i++) {
-            DataActor user = new DataActor(mockGHUser("extra" + i));
+            DataActor user = new DataActor(mockGHUser(null, "extra" + i));
             extraReactions.add(new DataReaction(user,
                     i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
         }
 
-        GHUser alternate = mockGHUser("alt_1");
+        GHUser alternate = mockGHUser(null, "alt_1");
         DataActor alternateUser = new DataActor(alternate);
         extraReactions.add(new DataReaction(alternateUser, "thumbs_down", date)); // opposite of primary
 

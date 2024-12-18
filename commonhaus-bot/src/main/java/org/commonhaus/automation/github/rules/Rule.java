@@ -22,6 +22,7 @@ public class Rule {
     MatchPaths paths;
     MatchLabel label;
     MatchChangedLabel changedLabel;
+    MatchMember member;
 
     public List<String> then;
 
@@ -44,6 +45,9 @@ public class Rule {
         }
         if (matches && changedLabel != null) {
             matches = changedLabel.matches(qc);
+        }
+        if (matches && member != null) {
+            matches = member.matches(qc);
         }
         return matches;
     }
@@ -90,6 +94,11 @@ public class Rule {
                 rule.changedLabel = new MatchChangedLabel(mapper.convertValue(child, LIST_STRING));
             }
 
+            child = RuleType.member.getFrom(node);
+            if (child != null) {
+                rule.member = new MatchMember(mapper.convertValue(child, LIST_STRING));
+            }
+
             child = RuleType.paths.getFrom(node);
             if (child != null) {
                 rule.paths = new MatchPaths(mapper.convertValue(child, LIST_STRING));
@@ -109,6 +118,7 @@ public class Rule {
         category,
         label,
         label_change,
+        member,
         paths,
         then;
 

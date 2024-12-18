@@ -1,0 +1,17 @@
+notice:
+  discussion:
+    rules:
+      - # If a discussion is created in or moved to Announcements or Consensus Building
+        # and it does not have the notice label, apply the notice label
+        action: 
+          - created
+          - category_changed
+        category:
+          - Announcements
+          - Consensus Building
+        label: ["!notice"]
+        member:
+          - commonhaus
+        then: [apply_notice]
+  actions:
+    apply_notice: [notice]
