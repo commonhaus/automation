@@ -4,6 +4,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -31,6 +32,7 @@ import org.commonhaus.automation.github.context.QueryContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHContent;
+import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHPullRequestFileDetail;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
@@ -40,6 +42,7 @@ import org.kohsuke.github.PagedIterator;
 import org.mockito.Mockito;
 
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
+import io.quarkiverse.githubapp.testing.dsl.GitHubMockVerificationContext;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 
@@ -89,21 +92,25 @@ public class ContextHelper extends QueryContext {
     }
 
     public void setupMockTeam(GitHubMockSetupContext mocks, GHUser... users) throws Exception {
-        mockGHUser("user4");
+        mockGHUser(mocks, "user4");
 
         if (users.length == 0) {
-            GHUser user1 = mockGHUser("user1");
-            GHUser user2 = mockGHUser("user2");
-            GHUser user3 = mockGHUser("user3");
+            GHUser user1 = mockGHUser(mocks, "user1");
+            GHUser user2 = mockGHUser(mocks, "user2");
+            GHUser user3 = mockGHUser(mocks, "user3");
             BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(user1, user2, user3));
         } else {
             BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(users));
         }
 
-        GHUser second = mockGHUser("second");
+        GHUser second = mockGHUser(mocks, "second");
         BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-seconds", Set.of(second));
 
         GitHub gh = mocks.installationClient(installationId);
+
+        GHOrganization org = mocks.ghObject(GHOrganization.class, organizationId);
+        when(org.getLogin()).thenReturn("commonhaus");
+        when(gh.getOrganization("commonhaus")).thenReturn(org);
 
         GHContent content = mock(GHContent.class);
         when(content.read()).thenReturn(Files.newInputStream(Path.of("src/test/resources/CONTACTS.yaml")));
@@ -114,6 +121,24 @@ public class ContextHelper extends QueryContext {
 
     public void setupMockTeam(String teamName, Set<GHUser> users) {
         BaseQueryCache.TEAM_MEMBERS.put(teamName, users);
+    }
+
+    public void setupAuthor(GitHubMockSetupContext mocks, boolean inOrg, boolean inTeam) throws Exception {
+        GHUser user = mockGHUser(mocks, "ebullient");
+        GitHub gh = mocks.installationClient(installationId);
+        GHOrganization org = gh.getOrganization("commonhaus");
+        when(org.hasMember(user)).thenReturn(inOrg);
+        if (inTeam) {
+            BaseQueryCache.TEAM_MEMBERS.put("commonhaus/test-quorum-default", Set.of(user));
+        }
+    }
+
+    public void verifyOrganizationMember(GitHubMockVerificationContext mocks) throws Exception {
+        GitHub gh = mocks.installationClient(installationId);
+        GHOrganization org = gh.getOrganization("commonhaus");
+        GHUser ebullient = gh.getUser("ebullient");
+
+        verify(org).hasMember(ebullient);
     }
 
     public void setLabels(String id, DataLabel... labels) {
@@ -212,7 +237,7 @@ public class ContextHelper extends QueryContext {
         return labels.stream().map(label -> label.name).collect(Collectors.joining(", "));
     }
 
-    public static GHUser mockGHUser(String login) {
+    public static GHUser mockGHUser(GitHubMockSetupContext mocks, String login) throws IOException {
         final URL url = mock(URL.class);
         lenient().when(url.toString()).thenReturn("");
         GHUser mock = mock(GHUser.class);
@@ -222,6 +247,11 @@ public class ContextHelper extends QueryContext {
         lenient().when(mock.getHtmlUrl()).thenReturn(url);
         lenient().when(mock.getUrl()).thenReturn(url);
         lenient().when(mock.getAvatarUrl()).thenReturn("");
+
+        if (mocks != null) {
+            GitHub gh = mocks.installationClient(installationId);
+            lenient().when(gh.getUser(login)).thenReturn(mock);
+        }
         return mock;
     }
 

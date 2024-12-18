@@ -121,6 +121,142 @@ public class NotifyLabelsTest extends ContextHelper {
     }
 
     @Test
+    void discussionCreatedOrganizationMember() throws Exception {
+        // When a discussion is created in announcements
+        // - labels are fetched (label rule): no notice label
+        // - organization membership is checked: pass
+        // - the notice label is added
+
+        // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
+
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/mutableAddLabelsToLabelable.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-label-organization.yml");
+                    setupMockTeam(mocks);
+                    setupAuthor(mocks, true, false);
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(modifiedLabel);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verifyOrganizationMember(mocks);
+
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+        verifyLabelCache(discussionId, 1, List.of("notice"));
+    }
+
+    @Test
+    void discussionCreatedNotOrganizationMember() throws Exception {
+        // When a discussion is created in announcements
+        // - labels are fetched (label rule): no notice label
+        // - organization membership is checked: fail
+        // - the notice label is not added
+
+        // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-label-organization.yml");
+                    setupMockTeam(mocks);
+                    setupAuthor(mocks, false, false);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verifyOrganizationMember(mocks);
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        verifyLabelCache(discussionId, 1, List.of("bug"));
+    }
+
+    @Test
+    void discussionCreatedTeamMember() throws Exception {
+        // When a discussion is created in announcements
+        // - labels are fetched (label rule): no notice label
+        // - team membership is checked: pass
+        // - the notice label is added
+
+        // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
+
+        Response modifiedLabel = mockResponse(Path.of("src/test/resources/github/mutableAddLabelsToLabelable.json"));
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-label-team.yml");
+                    setupMockTeam(mocks);
+                    setupAuthor(mocks, false, true);
+
+                    when(mocks.installationGraphQLClient(installationId)
+                            .executeSync(contains("addLabelsToLabelable("), anyMap()))
+                            .thenReturn(modifiedLabel);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                            .executeSync(contains("addLabelsToLabelable("), anyMap());
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+
+        verifyLabelCache(discussionId, 1, List.of("notice"));
+    }
+
+    @Test
+    void discussionCreatedNotTeamMember() throws Exception {
+        // When a discussion is created in announcements
+        // - labels are fetched (label rule): no notice label
+        // - team membership is checked: fail
+        // - the notice label is not added
+
+        // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+
+        setLabels(repositoryId, notice);
+        setLabels(discussionId, bug);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(RepositoryConfigFile.NAME).fromClasspath("/cf-notice-label-team.yml");
+                    setupMockTeam(mocks);
+                    setupAuthor(mocks, false, false);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                    verifyNoMoreInteractions(mocks.ghObjects());
+                });
+        verifyLabelCache(discussionId, 1, List.of("bug"));
+    }
+
+    @Test
     void discussionCategoryChangedLabeled() throws Exception {
         // When a discussion is created and it already has the
         // notice label, nothing else happens

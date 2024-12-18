@@ -166,4 +166,8 @@ public class EventData {
     public boolean isClosed() {
         return commonItem == null ? false : commonItem.closedAt != null;
     }
+
+    public DataActor getAuthor() {
+        return commonItem == null ? null : commonItem.author;
+    }
 }
