@@ -14,7 +14,9 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 
-import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
+import org.commonhaus.automation.admin.data.ApiResponse;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.CommonhausUserData.ForwardEmail;
 import org.commonhaus.automation.admin.forwardemail.Alias;
 import org.commonhaus.automation.admin.forwardemail.AliasKey;
 import org.commonhaus.automation.admin.forwardemail.ForwardEmailService;
@@ -87,7 +89,7 @@ public class MemberAliasesResource {
             // API CALL: set/update alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.postAliases(sanitized, session.name());
 
-            if (!emailConfig.hasDefaultAlias
+            if (!emailConfig.hasDefaultAlias()
                     && aliasMap.keySet().stream().anyMatch(k -> emailService.isDefaultAlias(session.login(), k))) {
                 user = updateHasDefaultFlag(user);
             }
@@ -146,7 +148,7 @@ public class MemberAliasesResource {
     CommonhausUser updateHasDefaultFlag(CommonhausUser user) {
         CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
                 (c, u) -> {
-                    u.services().forwardEmail().hasDefaultAlias = true;
+                    u.services().forwardEmail().enableDefaultAlias();
                 },
                 "Fix forward email service active flag",
                 false,

@@ -12,9 +12,11 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.ApiResponse.Type;
-import org.commonhaus.automation.admin.api.CommonhausUser.MembershipApplication;
-import org.commonhaus.automation.admin.api.MembershipApplicationData.ApplicationPost;
+import org.commonhaus.automation.admin.api.MemberApplicationProcess.ApplicationPost;
+import org.commonhaus.automation.admin.data.ApiResponse.Type;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.MemberStatus;
+import org.commonhaus.automation.admin.data.MembershipApplication;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -51,7 +53,7 @@ public class MemberApplicationResource {
             }
 
             MembershipApplication application = user.application();
-            MembershipApplicationData applicationData = application == null
+            MemberApplicationProcess.MemberApplicationIssue applicationData = application == null
                     ? null
                     : memberApplicationProcess.findUserApplication(session, application.nodeId(), true);
 
@@ -86,7 +88,7 @@ public class MemberApplicationResource {
             }
 
             MembershipApplication application = user.application();
-            MembershipApplicationData applicationData = application == null
+            MemberApplicationProcess.MemberApplicationIssue applicationData = application == null
                     ? null
                     : memberApplicationProcess.findUserApplication(session, application.nodeId(), false);
 
@@ -113,7 +115,8 @@ public class MemberApplicationResource {
         return null;
     }
 
-    private Response doUserApplicationUpdate(CommonhausUser user, MembershipApplicationData applicationData,
+    private Response doUserApplicationUpdate(CommonhausUser user,
+            MemberApplicationProcess.MemberApplicationIssue applicationData,
             ApplicationPost post, String notificationEmail) {
         AtomicBoolean checkRunning = AdminDataCache.APPLICATION_CHECK.computeIfAbsent(session.login(),
                 (k) -> new AtomicBoolean(false));
@@ -130,7 +133,7 @@ public class MemberApplicationResource {
                     String state = notFound ? "not found" : "not owner";
                     user = datastore.setCommonhausUser(new UpdateEvent(user,
                             (c, u) -> {
-                                u.application = null;
+                                u.setApplication(null);
                             },
                             "Remove membership application (" + state + ")",
                             false,
@@ -143,7 +146,7 @@ public class MemberApplicationResource {
                         user = datastore.setCommonhausUser(new UpdateEvent(user,
                                 (c, u) -> {
                                     if (u.status().updateToPending()) {
-                                        u.status(MemberStatus.PENDING);
+                                        u.setStatus(MemberStatus.PENDING);
                                     }
                                 },
                                 "Set status to PENDING",
@@ -157,7 +160,8 @@ public class MemberApplicationResource {
                 }
 
                 // UPDATE APPLICATION ISSUE
-                MembershipApplicationData updated = memberApplicationProcess.userUpdateApplicationIssue(session, dqc,
+                MemberApplicationProcess.MemberApplicationIssue updated = memberApplicationProcess.userUpdateApplicationIssue(
+                        session, dqc,
                         applicationData, post, notificationEmail);
 
                 if (dqc.hasErrors()) {
@@ -173,9 +177,9 @@ public class MemberApplicationResource {
                 final MembershipApplication application = updated.application;
                 user = datastore.setCommonhausUser(new UpdateEvent(user,
                         (c, u) -> {
-                            u.application = application;
+                            u.setApplication(application);
                             if (u.status().updateToPending()) {
-                                u.status(MemberStatus.PENDING);
+                                u.setStatus(MemberStatus.PENDING);
                             }
                         },
                         "Updated membership application",

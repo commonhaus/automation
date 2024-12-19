@@ -8,8 +8,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.CommonhausUser;
 import org.commonhaus.automation.admin.api.MemberSession;
+import org.commonhaus.automation.admin.data.CommonhausUser;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;

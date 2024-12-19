@@ -14,11 +14,11 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.CommonhausUser;
-import org.commonhaus.automation.admin.api.CommonhausUser.ForwardEmail;
-import org.commonhaus.automation.admin.api.CommonhausUser.Services;
 import org.commonhaus.automation.admin.api.MemberSession;
 import org.commonhaus.automation.admin.config.UserManagementConfig;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.CommonhausUserData.ForwardEmail;
+import org.commonhaus.automation.admin.data.CommonhausUserData.Services;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 

@@ -1,4 +1,4 @@
-package org.commonhaus.automation.admin.api;
+package org.commonhaus.automation.admin.data;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -8,26 +8,14 @@ import jakarta.ws.rs.core.Response;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
 public class ApiResponse {
 
-    static ObjectMapper mapper;
-
-    static ObjectMapper getMapper() {
-        ObjectMapper om = mapper;
-        if (om == null) {
-            om = mapper = Arc.container().instance(ObjectMapper.class).get();
-        }
-        return om;
-    }
-
-    enum Type {
+    public enum Type {
         ALIAS,
         APPLY,
         EMAIL,

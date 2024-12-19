@@ -6,7 +6,6 @@ import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.api.MemberApplicationProcess;
-import org.commonhaus.automation.admin.api.MembershipApplicationData;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
@@ -51,7 +50,7 @@ public class MembershipGithubEvents {
 
         // ignore if it isn't an issue in the datastore repository
         if (!repoFullName.equals(ctx.getDataStore())
-                || !MembershipApplicationData.isMemberApplicationEvent(issue, label)) {
+                || !MemberApplicationProcess.isMemberApplicationEvent(issue, label)) {
             return;
         }
 
@@ -89,7 +88,7 @@ public class MembershipGithubEvents {
 
         // ignore if it isn't an issue in the datastore repository
         if (!repoFullName.equals(ctx.getDataStore())
-                || !MembershipApplicationData.isMemberApplicationEvent(issue, null)) {
+                || !MemberApplicationProcess.isMemberApplicationEvent(issue, null)) {
             return;
         }
 
@@ -97,9 +96,9 @@ public class MembershipGithubEvents {
         DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(data);
 
         Collection<DataLabel> labels = dqc.getLabels(issue.id);
-        boolean hasNew = labels.stream().anyMatch(l -> MembershipApplicationData.isNew(l));
+        boolean hasNew = labels.stream().anyMatch(l -> MemberApplicationProcess.isNew(l));
         DataLabel finishLabel = labels.stream()
-                .filter(l -> MembershipApplicationData.isComplete(l))
+                .filter(l -> MemberApplicationProcess.isComplete(l))
                 .findFirst().orElse(null);
         try {
             applicationProcess.handleApplicationComment(dqc, issue, comment);

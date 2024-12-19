@@ -1,4 +1,4 @@
-package org.commonhaus.automation.admin.api;
+package org.commonhaus.automation.admin.data;
 
 public enum MemberStatus {
     REVOKED,

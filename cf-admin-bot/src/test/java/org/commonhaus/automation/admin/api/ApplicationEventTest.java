@@ -19,6 +19,8 @@ import java.util.stream.Stream;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -131,9 +133,9 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(builder).content(contentCaptor.capture());
                     var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
-                    assertThat(result.application).isNull();
-                    assertThat(result.isMember).isTrue();
-                    assertThat(result.data.status).isEqualTo(MemberStatus.ACTIVE); // changed from UNKNOWN -> PENDING
+                    assertThat(result.application()).isNull();
+                    assertThat(result.isMember()).isTrue();
+                    assertThat(result.status()).isEqualTo(MemberStatus.ACTIVE); // changed from UNKNOWN -> PENDING
 
                     // 3) add user to target team
                     GHTeam target = mocks.team("team-quorum-default".hashCode());
@@ -191,9 +193,9 @@ public class ApplicationEventTest extends ContextHelper {
                     verify(builder).content(contentCaptor.capture());
                     var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
-                    assertThat(result.application).isNull();
-                    assertThat(result.isMember).isFalse();
-                    assertThat(result.data.status).isEqualTo(MemberStatus.DECLINED); // changed from UNKNOWN -> PENDING
+                    assertThat(result.application()).isNull();
+                    assertThat(result.isMember()).isFalse();
+                    assertThat(result.status()).isEqualTo(MemberStatus.DECLINED); // changed from UNKNOWN -> PENDING
 
                     // 3) add user to target team
                     GHTeam target = mocks.team("team-quorum-default".hashCode());

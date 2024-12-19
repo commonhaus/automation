@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Set;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.data.CommonhausUser;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.UserQueryContext;
 import org.commonhaus.automation.github.context.BaseQueryCache;

@@ -1,25 +1,22 @@
-package org.commonhaus.automation.admin.api;
+package org.commonhaus.automation.admin.data;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.admin.data.CommonhausUserData.GoodStanding;
+import org.commonhaus.automation.admin.data.CommonhausUserData.Services;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.DatastoreQueryContext;
-import org.commonhaus.automation.github.context.DataCommonItem;
 import org.kohsuke.github.GHContent;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -33,99 +30,12 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public class CommonhausUser {
     public static final String MEMBER_ROLE = "member";
 
-    @SuppressWarnings("unused")
-    public static class Discord {
-        String id;
-        String username;
-        String discriminator;
-        boolean verified;
-    }
-
-    public static class ForwardEmail {
-        /** Is an alias active for this user */
-        @JsonAlias({ "active", "configured" })
-        boolean hasDefaultAlias;
-
-        /** Additional ForwardEmail aliases. Optional and rare. */
-        @JsonAlias("alt_alias")
-        List<String> altAlias;
-
-        public Collection<? extends String> altAlias() {
-            return altAlias == null ? List.of() : altAlias;
-        }
-    }
-
-    @SuppressWarnings("unused")
-    public static class Services {
-        @JsonAlias("forward_email")
-        ForwardEmail forwardEmail;
-        Discord discord;
-
-        public ForwardEmail forwardEmail() {
-            if (forwardEmail == null) {
-                forwardEmail = new ForwardEmail();
-            }
-            return forwardEmail;
-        }
-
-        public Discord discord() {
-            if (discord == null) {
-                discord = new Discord();
-            }
-            return discord;
-        }
-    }
-
-    @SuppressWarnings("unused")
-    public static class GoodStanding {
-        Map<String, Attestation> attestation = new HashMap<>();
-        String contribution;
-        String dues;
-
-        public Map<String, Attestation> attestation() {
-            if (attestation == null) {
-                attestation = new HashMap<>();
-            }
-            return attestation;
-        }
-    }
-
-    public record AttestationPost(
-            @Nonnull String id,
-            @Nonnull String version) {
-    }
-
-    public record Attestation(
-            @Nonnull @JsonAlias("with_status") MemberStatus withStatus,
-            @Nonnull String date,
-            @Nonnull String version) {
-    }
-
-    public static class Data {
-        @Nonnull
-        MemberStatus status = MemberStatus.UNKNOWN;
-
-        @JsonAlias("good_until")
-        GoodStanding goodUntil = new GoodStanding();
-
-        Services services = new Services();
-    }
-
-    public record MembershipApplication(
-            @Nonnull String nodeId,
-            @Nonnull String htmlUrl) {
-
-        static MembershipApplication fromDataCommonType(DataCommonItem data) {
-            return new MembershipApplication(data.id, data.url);
-        }
-    }
-
     @Nonnull
     final String login;
     @Nonnull
     final long id;
     @Nonnull
-    final Data data;
+    final CommonhausUserData data;
     @Nonnull
     final List<String> history;
 
@@ -139,7 +49,7 @@ public class CommonhausUser {
     private CommonhausUser(Builder builder) {
         this.login = builder.login;
         this.id = builder.id;
-        this.data = builder.data == null ? new Data() : builder.data;
+        this.data = builder.data == null ? new CommonhausUserData() : builder.data;
         this.history = builder.history == null ? new ArrayList<>() : builder.history;
         this.application = builder.application;
         this.isMember = builder.isMember;
@@ -149,7 +59,7 @@ public class CommonhausUser {
     private CommonhausUser(String login, long id) {
         this.login = login;
         this.id = id;
-        this.data = new Data();
+        this.data = new CommonhausUserData();
         this.history = new ArrayList<>();
         this.isMember = null;
         this.statusChange = null;
@@ -163,6 +73,11 @@ public class CommonhausUser {
         return id;
     }
 
+    @JsonIgnore
+    public boolean isNew() {
+        return history.isEmpty();
+    }
+
     public Services services() {
         if (data.services == null) {
             data.services = new Services();
@@ -174,17 +89,16 @@ public class CommonhausUser {
         return sha;
     }
 
-    public MemberStatus status() {
-        return data.status;
-    }
-
-    public void status(MemberStatus status) {
-        data.status = status;
-        statusChange = now();
-    }
-
     public void sha(String sha) {
         this.sha = sha;
+    }
+
+    public boolean conflictOccurred() {
+        return conflict;
+    }
+
+    public void setConflict(boolean conflict) {
+        this.conflict = conflict;
     }
 
     public GoodStanding goodUntil() {
@@ -194,19 +108,15 @@ public class CommonhausUser {
         return data.goodUntil;
     }
 
-    public boolean postConflict() {
-        return conflict;
-    }
-
-    public void setConflict(boolean conflict) {
-        this.conflict = conflict;
+    public boolean hasApplication() {
+        return application != null;
     }
 
     public MembershipApplication application() {
         return application;
     }
 
-    public void application(MembershipApplication application) {
+    public void setApplication(MembershipApplication application) {
         this.application = application;
     }
 
@@ -214,7 +124,7 @@ public class CommonhausUser {
         history.add("%s %s".formatted(now(), message));
     }
 
-    public boolean emptyMember() {
+    public boolean isMemberUndefined() {
         return isMember == null;
     }
 
@@ -222,6 +132,23 @@ public class CommonhausUser {
     public boolean isMember() {
         return data.status.couldBeActiveMember()
                 && (isMember != null && isMember);
+    }
+
+    public void setIsMember(boolean isMember) {
+        this.isMember = isMember;
+    }
+
+    public MemberStatus status() {
+        return data.status;
+    }
+
+    public boolean setStatus(MemberStatus status) {
+        if (data.status == status) {
+            return false;
+        }
+        data.status = status;
+        statusChange = now();
+        return true;
     }
 
     MemberStatus refreshStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
@@ -251,28 +178,14 @@ public class CommonhausUser {
     }
 
     // update user status
-    boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
-        MemberStatus oldStatus = data.status;
-        data.status = refreshStatus(ctx, roles, data.status);
-        if (oldStatus != data.status) {
-            statusChange = now();
-            return true;
-        }
-        return false;
-    }
-
-    public boolean hasApplication() {
-        return application != null;
-    }
-
-    @JsonIgnore
-    public boolean isNew() {
-        return history.isEmpty();
+    public boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
+        MemberStatus newStatus = refreshStatus(ctx, roles, data.status);
+        return setStatus(newStatus);
     }
 
     public ApiResponse toResponse() {
         return new ApiResponse(ApiResponse.Type.HAUS, data)
-                .responseStatus(postConflict() ? Response.Status.CONFLICT : Response.Status.OK);
+                .responseStatus(conflictOccurred() ? Response.Status.CONFLICT : Response.Status.OK);
     }
 
     @Override
@@ -294,7 +207,6 @@ public class CommonhausUser {
 
     public static CommonhausUser create(String login, long id) {
         CommonhausUser user = new CommonhausUser(login, id);
-        user.data.status = MemberStatus.UNKNOWN;
         return user;
     }
 
@@ -302,7 +214,7 @@ public class CommonhausUser {
     public static class Builder {
         private String login;
         private long id;
-        private Data data;
+        private CommonhausUserData data;
         private Boolean isMember;
         private String statusChange;
 
@@ -319,7 +231,7 @@ public class CommonhausUser {
             return this;
         }
 
-        public Builder withData(Data data) {
+        public Builder withData(CommonhausUserData data) {
             this.data = data;
             return this;
         }

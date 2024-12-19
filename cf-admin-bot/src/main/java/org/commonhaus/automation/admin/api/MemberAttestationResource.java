@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
@@ -14,8 +15,9 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
-import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.CommonhausUserData.Attestation;
+import org.commonhaus.automation.admin.data.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.CommonhausDatastore;
 import org.commonhaus.automation.admin.github.CommonhausDatastore.UpdateEvent;
@@ -116,5 +118,10 @@ public class MemberAttestationResource {
                 userStatus,
                 date.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 post.version());
+    }
+
+    public record AttestationPost(
+            @Nonnull String id,
+            @Nonnull String version) {
     }
 }

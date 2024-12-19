@@ -24,9 +24,11 @@ import java.util.stream.Stream;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
-import org.commonhaus.automation.admin.api.CommonhausUser.Attestation;
-import org.commonhaus.automation.admin.api.CommonhausUser.AttestationPost;
-import org.commonhaus.automation.admin.api.MembershipApplicationData.ApplicationPost;
+import org.commonhaus.automation.admin.api.MemberApplicationProcess.ApplicationPost;
+import org.commonhaus.automation.admin.api.MemberAttestationResource.AttestationPost;
+import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.CommonhausUserData.Attestation;
+import org.commonhaus.automation.admin.data.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
 import org.commonhaus.automation.admin.github.ContextHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -302,9 +304,9 @@ public class MemberDataTest extends ContextHelper {
                 CommonhausUser.class);
         assertThat(result.status()).isEqualTo(MemberStatus.COMMITTEE);
 
-        assertThat(result.goodUntil().attestation).hasSize(2);
-        assertThat(result.goodUntil().attestation).containsKey("member");
-        Attestation att = result.goodUntil().attestation.get("member");
+        assertThat(result.goodUntil().attestation()).hasSize(2);
+        assertThat(result.goodUntil().attestation()).containsKey("member");
+        Attestation att = result.goodUntil().attestation().get("member");
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("draft");
         assertThat(att.withStatus()).isEqualTo(MemberStatus.COMMITTEE);
@@ -386,16 +388,16 @@ public class MemberDataTest extends ContextHelper {
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.status()).isEqualTo(MemberStatus.ACTIVE);
 
-        assertThat(result.goodUntil().attestation).hasSize(2);
-        assertThat(result.goodUntil().attestation).containsKey("member");
-        assertThat(result.goodUntil().attestation).containsKey("coc");
+        assertThat(result.goodUntil().attestation()).hasSize(2);
+        assertThat(result.goodUntil().attestation()).containsKey("member");
+        assertThat(result.goodUntil().attestation()).containsKey("coc");
 
-        var att = result.goodUntil().attestation.get("member");
+        var att = result.goodUntil().attestation().get("member");
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("draft");
         assertThat(att.withStatus()).isEqualTo(MemberStatus.ACTIVE);
 
-        att = result.goodUntil().attestation.get("coc");
+        att = result.goodUntil().attestation().get("coc");
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("2.0");
         assertThat(att.withStatus()).isEqualTo(MemberStatus.ACTIVE);
@@ -475,7 +477,7 @@ public class MemberDataTest extends ContextHelper {
         verify(builder).content(contentCaptor.capture());
 
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.application).isNull();
+        assertThat(result.application()).isNull();
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
@@ -531,8 +533,8 @@ public class MemberDataTest extends ContextHelper {
         verify(builder).content(contentCaptor.capture());
 
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.application).isNotNull();
-        assertThat(result.data.status).isEqualTo(MemberStatus.PENDING);
+        assertThat(result.application()).isNotNull();
+        assertThat(result.status()).isEqualTo(MemberStatus.PENDING);
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
@@ -601,8 +603,8 @@ public class MemberDataTest extends ContextHelper {
 
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
 
-        assertThat(result.application).isNotNull();
-        assertThat(result.data.status).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
+        assertThat(result.application()).isNotNull();
+        assertThat(result.status()).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
 
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);

@@ -20,8 +20,8 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.admin.AdminDataCache;
+import org.commonhaus.automation.admin.api.MemberApplicationProcess;
 import org.commonhaus.automation.admin.api.MemberSession;
-import org.commonhaus.automation.admin.api.MembershipApplicationData;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.DataLabel;
@@ -71,12 +71,12 @@ public class ContextHelper extends QueryContext {
     public static final String botNodeId = "U_kgDOCVHtbA";
 
     public static final DataLabel APP_NEW = new DataLabel.Builder()
-            .name(MembershipApplicationData.NEW).build();
+            .name(MemberApplicationProcess.NEW).build();
     public static final DataLabel APP_ACCEPTED = new DataLabel.Builder()
-            .name(MembershipApplicationData.ACCEPTED).build();
+            .name(MemberApplicationProcess.ACCEPTED).build();
     public static final DataLabel APP_DECLINED = new DataLabel.Builder()
             .id("LA_kwDOKRPTI88AAAABhGp_7g")
-            .name(MembershipApplicationData.DECLINED).build();
+            .name(MemberApplicationProcess.DECLINED).build();
     public static final Set<DataLabel> APP_LABELS = Set.of(APP_NEW, APP_ACCEPTED, APP_DECLINED);
 
     @Singleton
