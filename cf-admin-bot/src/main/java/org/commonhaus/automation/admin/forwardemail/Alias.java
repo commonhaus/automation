@@ -48,7 +48,18 @@ public class Alias {
 
     public static class AliasDomain {
         public String name;
-        String id;
+        public String id;
+
+        public AliasDomain() {
+        }
+
+        // present in API responses
+        // com.fasterxml.jackson.databind.exc.MismatchedInputException:
+        // Cannot construct instance of `org.commonhaus.automation.admin.forwardemail.Alias$AliasDomain` (although at least one Creator exists):
+        // no String-argument constructor/factory method to deserialize from String value ('6579da3c730fe30d10910be6')
+        AliasDomain(String id) {
+            this.id = id;
+        }
 
         @Override
         public String toString() {
