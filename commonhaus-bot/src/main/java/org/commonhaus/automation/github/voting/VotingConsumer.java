@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.voting;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -217,7 +218,7 @@ public class VotingConsumer {
 
         // GraphQL fetch of all reactions on item (return if none)
         // Could query by group first, but pagination happens either way.
-        List<DataReaction> reactions = qc.getReactions(voteEvent.getId());
+        List<DataReaction> reactions = new ArrayList<>(qc.getReactions(voteEvent.getId()));
 
         // The bot's votes never count.
         reactions.removeIf(x -> {
