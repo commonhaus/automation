@@ -43,7 +43,8 @@ class GitHubUser {
 
     @Override
     public String toString() {
-        return "GitHubUser [login=" + login + ", id=" + id + ", nodeId=" + nodeId + ", name=" + name + ", roles=" + roles + "]";
+        return "GitHubUser [login=%s, id=%s, nodeId=%s, roles=%s]"
+                .formatted(login, id, nodeId, roles);
     }
 
     @Override

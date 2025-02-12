@@ -27,6 +27,7 @@ import org.commonhaus.automation.admin.AdminDataCache;
 import org.commonhaus.automation.admin.api.MemberApplicationProcess.ApplicationPost;
 import org.commonhaus.automation.admin.api.MemberAttestationResource.AttestationPost;
 import org.commonhaus.automation.admin.data.CommonhausUser;
+import org.commonhaus.automation.admin.data.CommonhausUserData;
 import org.commonhaus.automation.admin.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.admin.data.MemberStatus;
 import org.commonhaus.automation.admin.github.AppContextService;
@@ -255,6 +256,32 @@ public class MemberDataTest extends ContextHelper {
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+    }
+
+    @Test
+    void testGetCommonhausUserStatus() throws Exception {
+
+        setUserManagementConfig(ctx);
+        ctx.getStatusForRole("sponsor");
+
+        CommonhausUser user = new CommonhausUser.Builder()
+                .withId(12345)
+                .withData(new CommonhausUserData())
+                .build();
+
+        assertThat(user.status()).isEqualTo(MemberStatus.UNKNOWN);
+
+        Set<String> roles = Set.of("sponsor");
+        boolean update = user.statusUpdateRequired(ctx, roles);
+        assertThat(update).isTrue();
+        user.updateMemberStatus(ctx, roles);
+        assertThat(user.status()).isEqualTo(MemberStatus.SPONSOR);
+
+        roles = Set.of("sponsor", "member", "egc");
+        update = user.statusUpdateRequired(ctx, roles);
+        assertThat(update).isTrue();
+        user.updateMemberStatus(ctx, roles);
+        assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
     }
 
     @Test

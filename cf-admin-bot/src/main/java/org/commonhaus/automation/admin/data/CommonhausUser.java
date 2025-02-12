@@ -161,7 +161,7 @@ public class CommonhausUser {
                     null, null);
             roles.add(MEMBER_ROLE);
         }
-        if (newStatus == MemberStatus.UNKNOWN && !roles.isEmpty()) {
+        if (!roles.isEmpty()) {
             List<MemberStatus> status = roles.stream()
                     .map(r -> ctx.getStatusForRole(r))
                     .sorted()
@@ -190,7 +190,8 @@ public class CommonhausUser {
 
     @Override
     public String toString() {
-        return "CommonhausUser [login=" + login + ", id=" + id + ", sha=" + sha + ", conflict=" + conflict + "]";
+        return "CommonhausUser [login=%s, id=%s, sha=%s, conflict=%s, status=%s]"
+                .formatted(login, id, sha, conflict, status());
     }
 
     private String now() {
