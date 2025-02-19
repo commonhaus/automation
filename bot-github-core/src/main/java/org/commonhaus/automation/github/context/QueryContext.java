@@ -794,7 +794,7 @@ public class QueryContext {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
             clearNotFound();
-            Log.warnf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
             return null;
         }
 
@@ -810,12 +810,14 @@ public class QueryContext {
     }
 
     public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
-        JsonNode node = readYamlSourceFile(repo, path);
-        if (node == null) {
+        GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
+        if (content == null || hasErrors()) {
+            clearNotFound();
+            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
             return null;
         }
         try {
-            return ctx.yamlMapper().treeToValue(node, type);
+            return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
             logAndSendEmail("readYamlSourceFile",
                     "Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),

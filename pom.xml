@@ -348,6 +348,7 @@
     <modules>
         <module>bot-github-core</module>
         <module>haus-rules</module>
+        <module>haus-manager</module>
         <module>cf-admin-bot</module>
     </modules>
 </project>

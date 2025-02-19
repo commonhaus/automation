@@ -73,5 +73,3 @@ userManagement:
     member: ACTIVE
     sponsor: SPONSOR
 ```
-
-
