@@ -114,10 +114,10 @@ jobs:
         git config user.name ${{ env.GH_BOT_NAME }}
         git config user.email ${{ env.GH_BOT_EMAIL }}
 
-        CB=commonhaus-bot-${SNAPSHOT}-runner
-        ls -al ./commonhaus-bot/target
-        gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}.jar#${CB}.jar
-        gh release upload "${SNAPSHOT}" --clobber ./commonhaus-bot/target/${CB}#${CB}
+        CB=haus-rules-${SNAPSHOT}-runner
+        ls -al ./haus-rules/target
+        gh release upload "${SNAPSHOT}" --clobber ./haus-rules/target/${CB}.jar#${CB}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./haus-rules/target/${CB}#${CB}
 
         CB=cf-admin-bot-${SNAPSHOT}-runner
         ls -al ./cf-admin-bot/target
@@ -146,7 +146,7 @@ jobs:
       env:
         SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
       run: |
-        image="commonhaus/commonhaus-bot:${SNAPSHOT}"
+        image="commonhaus/haus-rules:${SNAPSHOT}"
         docker tag "${image}" "ghcr.io/${image}"
         docker push "ghcr.io/${image}"
 

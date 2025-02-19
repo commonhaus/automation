@@ -347,7 +347,7 @@
     <!-- submodules -->
     <modules>
         <module>bot-github-core</module>
-        <module>commonhaus-bot</module>
+        <module>haus-rules</module>
         <module>cf-admin-bot</module>
     </modules>
 </project>

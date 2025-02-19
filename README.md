@@ -6,7 +6,7 @@
 
 - [bot-github-core](./bot-github-core/) Common library.
 - [cf-admin-bot](./cf-admin-bot/) CF Admin / Haus Keeper. Cross-organization team synchronization and user management
-- [commonhaus-bot](./commonhaus-bot/) Haus Rules. Voting and Notices
+- [haus-rules](./haus-rules/) Haus Rules. Voting and Notices
 
 ## References
 

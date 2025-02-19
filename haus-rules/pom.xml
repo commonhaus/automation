@@ -13,9 +13,9 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>commonhaus-bot</artifactId>
+    <artifactId>haus-rules</artifactId>
 
-    <name>Commonhaus Bot - Notice and Voting</name>
+    <name>Haus Rules - Notice and Voting</name>
     <description>Notice and Voting activities</description>
 
     <properties>
