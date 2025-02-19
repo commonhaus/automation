@@ -802,8 +802,23 @@ public class QueryContext {
             JsonNode node = ctx.parseYamlFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
-            logAndSendEmail("readSourceFile",
+            logAndSendEmail("readYamlSourceFile",
                     "Unable to read file %s from repo %s".formatted(path, repo.getFullName()),
+                    e);
+            return null;
+        }
+    }
+
+    public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
+        JsonNode node = readYamlSourceFile(repo, path);
+        if (node == null) {
+            return null;
+        }
+        try {
+            return ctx.yamlMapper().treeToValue(node, type);
+        } catch (IOException e) {
+            logAndSendEmail("readYamlSourceFile",
+                    "Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),
                     e);
             return null;
         }

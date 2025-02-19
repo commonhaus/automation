@@ -181,6 +181,9 @@ public class RepositoryDiscovery {
     }
 
     Optional<?> fetchConfigFile(GHRepository ghRepository) {
+        if (ctx.getConfigFileName() == null || ctx.getConfigType() == null) {
+            return Optional.empty();
+        }
         try {
             return configProvider.fetchConfigFile(ghRepository,
                     ctx.getConfigFileName(),

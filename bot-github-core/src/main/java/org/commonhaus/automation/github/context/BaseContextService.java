@@ -125,6 +125,9 @@ public abstract class BaseContextService implements ContextService {
             String configFileName = getConfigFileName();
             @SuppressWarnings("unchecked")
             Class<F> configType = (Class<F>) getConfigType();
+            if (configFileName == null || configType == null) {
+                return null;
+            }
             repoConfig = configProvider.fetchConfigFile(repo, configFileName, Source.DEFAULT, configType);
             REPO_CONFIG.put(repo.getNodeId(), repoConfig);
         }
