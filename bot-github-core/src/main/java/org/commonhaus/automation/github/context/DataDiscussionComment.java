@@ -13,7 +13,37 @@ public class DataDiscussionComment extends DataCommonComment {
             discussion {
                 id
             }
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String ADD_DISCUSSION_COMMENT = """
+            mutation AddDiscussionComment($discussionId: ID!, $comment: String!) {
+                addDiscussionComment(input: {
+                    discussionId: $discussionId,
+                    body: $comment
+                }) {
+                    clientMutationId
+                    comment {
+                        """ + DISCUSSION_COMMENT_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String EDIT_DISCUSSION_COMMENT = """
+            mutation($commentId: ID!, $body: String!) {
+                updateDiscussionComment(input: {
+                    commentId: $commentId,
+                    body: $body
+                }) {
+                    clientMutationId
+                    comment {
+                        """ + DISCUSSION_COMMENT_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     /** {@literal discussion_id} for webhook events (possibly null) */
     public final Integer discussion_id;
@@ -38,19 +68,7 @@ public class DataDiscussionComment extends DataCommonComment {
         variables.put("discussionId", discussionId);
         variables.put("comment", markdownText);
 
-        Response response = qc.execQuerySync("""
-                mutation AddDiscussionComment($discussionId: ID!, $comment: String!) {
-                    addDiscussionComment(input: {
-                        discussionId: $discussionId,
-                        body: $comment
-                    }) {
-                        clientMutationId
-                        comment {
-                            """ + DISCUSSION_COMMENT_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(ADD_DISCUSSION_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
@@ -66,19 +84,7 @@ public class DataDiscussionComment extends DataCommonComment {
         variables.put("commentId", commentId);
         variables.put("body", commentBody);
 
-        Response response = qc.execQuerySync("""
-                mutation($commentId: ID!, $body: String!) {
-                    updateDiscussionComment(input: {
-                        commentId: $commentId,
-                        body: $body
-                    }) {
-                        clientMutationId
-                        comment {
-                            """ + DISCUSSION_COMMENT_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(EDIT_DISCUSSION_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;

@@ -14,10 +14,10 @@ public class DataActor extends DataCommonType {
     static final String ACTOR_FIELDS_MIN = """
             login
             url
-            """;
+            """.stripIndent();
     static final String ACTOR_FIELDS = ACTOR_FIELDS_MIN + """
             avatarUrl
-            """;
+            """.stripIndent();
 
     public final String login;
     public final String url;

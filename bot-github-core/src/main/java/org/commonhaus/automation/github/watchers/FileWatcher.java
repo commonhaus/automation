@@ -1,0 +1,204 @@
+package org.commonhaus.automation.github.watchers;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Consumer;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+
+import io.quarkus.logging.Log;
+
+@ApplicationScoped
+public class FileWatcher {
+    static final String me = "fileWatcher";
+
+    final Map<String, WatchedFiles> repositoryFiles = new HashMap<>();
+
+    final PeriodicUpdateQueue periodicSync;
+
+    public FileWatcher(PeriodicUpdateQueue periodicSync) {
+        this.periodicSync = periodicSync;
+    }
+
+    /**
+     * Watch for repository discovery events and clean up watchers
+     * if repositories or installations (association between GH App and an Organization)
+     * are removed
+     *
+     * @param repoEvent
+     */
+    protected void onRepositoryDiscovery(@Observes RepositoryDiscoveryEvent repoEvent) {
+        if (repoEvent.removed()) {
+            if (repoEvent.installation()) {
+                // If an entire installation is removed, clean up all watchers for that installation
+                long installationId = repoEvent.installationId();
+                repositoryFiles.entrySet().removeIf(entry -> entry.getValue().installationId == installationId);
+                Log.debugf("%s: cleared watchers for installation %d", me, installationId);
+            } else {
+                // Otherwise just remove watchers for the specific repository
+                String repoFullName = repoEvent.repository().getFullName();
+                repositoryFiles.remove(repoFullName);
+                Log.debugf("%s: cleared watchers for repository %s", me, repoFullName);
+            }
+        }
+    }
+
+    /**
+     * Create a new file watcher for the specified repository and file.
+     * When the file is updated, the callback will be invoked.
+     * <p>
+     * Registered watchers will be automatically cleaned up if app loses visiblity to the
+     * repository or organization (DiscoveryAction: REMOVED, INSTALL_REMOVED)
+     *
+     *
+     * @param taskGroupName Name of the task group to use for periodic updates
+     * @param installationId Installation ID for the repository
+     * @param repoName Name of the repository
+     * @param fileName Name of the file to watch
+     * @param callback Callback function to invoke when the file is updated (with FileUpdate object)
+     */
+    public void watchFile(String taskGroupName, long installationId, String repoName, String fileName,
+            Consumer<FileUpdate> callback) {
+        repositoryFiles.computeIfAbsent(repoName, k -> new WatchedFiles(repoName, installationId))
+                .add(fileName, new TaskCallback<FileUpdate>(taskGroupName, callback));
+    }
+
+    public void unwatchAll(String taskGroup) {
+        for (var entry : repositoryFiles.entrySet()) {
+            entry.getValue().filesByPath.values().removeIf(callbacks -> {
+                callbacks.removeIf(callback -> callback.taskGroupName().equals(taskGroup));
+                return callbacks.isEmpty();
+            });
+        }
+        repositoryFiles.values().removeIf(x -> x.filesByPath.isEmpty());
+    }
+
+    public void handleEvent(FilePushEvent fileEvent) {
+        GHRepository repo = fileEvent.repository();
+        GHEventPayload.Push pushEvent = fileEvent.pushEvent();
+        WatchedFiles watcher = repositoryFiles.get(repo.getFullName());
+
+        // Only watch the main branch of repositories we are monitoring
+        if (watcher == null || !pushEvent.getRef().equals("refs/heads/main")) {
+            return;
+        }
+
+        watcher.handlePush(fileEvent, periodicSync);
+    }
+
+    static class WatchedFiles {
+        final String repoFullName;
+        final long installationId;
+        final Map<String, Set<TaskCallback<FileUpdate>>> filesByPath = new HashMap<>();
+
+        public WatchedFiles(String repoFullName, long installationId) {
+            this.repoFullName = repoFullName;
+            this.installationId = installationId;
+        }
+
+        /**
+         * Add file to list of interesting files to watch
+         *
+         * @param filePath Path of file to watch
+         * @param callback Callback to invoke if this file is changed
+         */
+        public void add(String filePath, TaskCallback<FileUpdate> callback) {
+            filesByPath.computeIfAbsent(filePath, k -> new HashSet<>())
+                    .add(callback);
+        }
+
+        /**
+         * See if the Push Event touched any interesting files.
+         * If it did, queue invocation of the callback
+         *
+         * @param event FileEvent (PushEvent, GHRepository, GitHub)
+         * @param periodicSync Queue for periodic events and updates
+         */
+        public void handlePush(FilePushEvent event, PeriodicUpdateQueue periodicSync) {
+            for (var entry : filesByPath.entrySet()) {
+                Set<TaskCallback<FileUpdate>> callbacks = entry.getValue();
+                FileUpdateType updateType = commitsContain(event.pushEvent(), entry.getKey());
+                if (updateType != null) {
+                    FileUpdate update = new FileUpdate(entry.getKey(), updateType, event);
+                    for (var callback : callbacks) {
+                        // Found an interesting file in the push event, queue an update
+                        periodicSync.queue(callback.taskGroupName(),
+                                () -> callback.run(update));
+                    }
+                    break;
+                }
+            }
+        }
+
+        /**
+         * Event filter: check if the push event contains changes to the specified path
+         *
+         * @param pushEvent the push event
+         * @param path the path to check
+         * @return true if the push event contains changes to the path
+         */
+        FileUpdateType commitsContain(GHEventPayload.Push pushEvent, String path) {
+            FileUpdateType updateType = null;
+            for (var commit : pushEvent.getCommits()) {
+                // Last one wins.
+                if (commit.getAdded().contains(path)) {
+                    updateType = FileUpdateType.ADDED;
+                } else if (commit.getRemoved().contains(path)) {
+                    updateType = FileUpdateType.REMOVED;
+                } else if (commit.getModified().contains(path)) {
+                    updateType = FileUpdateType.MODIFIED;
+                }
+            }
+            return updateType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof WatchedFiles that))
+                return false;
+            return installationId == that.installationId && repoFullName.equals(that.repoFullName);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(repoFullName, installationId);
+        }
+    }
+
+    public enum FileUpdateType {
+        ADDED,
+        MODIFIED,
+        REMOVED
+    }
+
+    public static record FileUpdate(
+            String filePath,
+            FileUpdateType updateType,
+            long installationId,
+            GHRepository repository,
+            GitHub github) {
+
+        public FileUpdate(String filePath, FileUpdateType updateType, FilePushEvent pushEvent) {
+            this(filePath, updateType, pushEvent.installationId(), pushEvent.repository(), pushEvent.github());
+        }
+    }
+
+    public static record FilePushEvent(
+            GHEventPayload.Push pushEvent,
+            long installationId,
+            GHRepository repository,
+            GitHub github) {
+    }
+}

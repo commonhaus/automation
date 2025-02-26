@@ -32,7 +32,7 @@ public class EventData {
         this.ghPayload = payload;
         this.eventType = EventType.fromString(event.getEvent());
         this.actionType = ActionType.fromString(event.getAction());
-        this.jsonData = JsonAttribute.unpack(event.getPayload());
+        this.jsonData = JsonAttributeAccessor.unpack(event.getPayload());
 
         this.commonItem = switch (eventType) {
             case discussion, discussion_comment -> {
@@ -87,7 +87,7 @@ public class EventData {
         return eventType;
     }
 
-    public String getRepoSlug() {
+    public String getRepoFullName() {
         return repository.getFullName();
     }
 

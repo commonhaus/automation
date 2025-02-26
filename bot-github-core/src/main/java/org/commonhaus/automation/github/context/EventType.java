@@ -19,7 +19,8 @@ public enum EventType {
     membership,
     pull_request,
     pull_request_review,
-    bot;
+    bot,
+    unknown;
 
     public boolean isDiscussion() {
         return this == discussion || this == discussion_comment;

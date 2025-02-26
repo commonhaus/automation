@@ -16,7 +16,27 @@ public class DataPullRequestReview extends DataCommonObject {
     static final String REVIEW_FIELDS = DataCommonObject.COMMON_OBJECT_MIN + """
             state
             submittedAt
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String QUERY_PR_REVIEW = """
+            query($pr_id: ID!, $after: String) {
+                node(id: $pr_id) {
+                    ... on PullRequest {
+                        latestReviews(first: 100, after: $after) {
+                            nodes {
+                                """ + REVIEW_FIELDS + """
+                            }
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     public final DataActor author;
     public final String state;
@@ -43,29 +63,12 @@ public class DataPullRequestReview extends DataCommonObject {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", pullRequestId);
 
-        JsonObject pageInfo;
-        String cursor = null;
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
 
         // paginated...
         do {
-            variables.put("after", cursor);
-            Response response = qc.execRepoQuerySync("""
-                    query($id: ID!, $after: String) {
-                        node(id: $id) {
-                            ... on PullRequest {
-                                latestReviews(first: 100, after: $after) {
-                                    nodes {
-                                        """ + REVIEW_FIELDS + """
-                                    }
-                                    pageInfo {
-                                        hasNextPage
-                                        endCursor
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    """, variables);
+            variables.put("after", pageInfo.cursor());
+            Response response = qc.execRepoQuerySync(QUERY_PR_REVIEW, variables);
             if (qc.hasErrors()) {
                 qc.clearNotFound();
                 break;
@@ -78,9 +81,8 @@ public class DataPullRequestReview extends DataCommonObject {
                     .map(DataPullRequestReview::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(latestReviews);
-            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(latestReviews);
+        } while (pageInfo.hasNextPage());
         return prReviews;
     }
 }

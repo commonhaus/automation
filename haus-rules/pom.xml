@@ -55,6 +55,13 @@
         </dependency>
 
         <dependency>
+            <groupId>org.commonhaus.automation</groupId>
+            <artifactId>bot-github-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.quarkiverse.githubapp</groupId>
             <artifactId>quarkus-github-app-testing</artifactId>
             <scope>test</scope>

@@ -17,4 +17,8 @@ public enum DiscoveryAction {
     public boolean installation() {
         return this == INSTALL_ADDED || this == INSTALL_REMOVED;
     }
+
+    public boolean repository() {
+        return this == ADDED || this == REMOVED;
+    }
 }

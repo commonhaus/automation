@@ -1,0 +1,26 @@
+projects:
+  source:
+    filePath: PROJECTS.yaml
+teamMembership:
+  dryRun: true
+  source:
+    repository: commonhaus/foundation
+    filePath: CONTACTS.yaml
+  defaults:
+    field: login
+    preserve_users:
+      - commonhaus-bot
+  sync:
+    cf-council:
+      teams:
+        - commonhaus-test/cf-council
+        - commonhaus-test/admin
+    egc:
+      teams:
+        - commonhaus-test/team-quorum-default
+  
+emailNotifications:
+  errors:
+    - test@commonhaus.org
+  dryRun:
+    - test@commonhaus.org
