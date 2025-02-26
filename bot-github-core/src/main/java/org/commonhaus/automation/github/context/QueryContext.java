@@ -37,7 +37,32 @@ import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
+/**
+ * Base class for short-lived context objects that can handle a series of GitHub
+ * API calls and GraphQL queries for a single event.
+ * <p>
+ * It provides context for the duration of processing one event and aggregates
+ * errors that occur during this processing for centralized handling.
+ * <p>
+ * This context is created by a {@link ContextService} implementation and should not
+ * be retained beyond the scope of a single event processing.
+ * <p>
+ * Error handling in QueryContext is designed to collect errors during processing
+ * to allow continuation where possible, with final error handling and/or reporting
+ * performed by the caller.
+ * <p>
+ * This class is not thread-safe and should not be shared between threads.
+ * It can be garbage collected after the event processing is complete.
+ */
 public class QueryContext {
+    static final String QUERY_BOT_LOGIN = """
+            query {
+                viewer {
+                login
+                }
+            }
+            """.stripIndent();
+
     @FunctionalInterface
     public interface GitHubParameterApiCall<R> {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
@@ -60,6 +85,13 @@ public class QueryContext {
     public QueryContext(QueryContext other) {
         this.ctx = other.ctx;
         this.installationId = other.installationId;
+    }
+
+    /** Optional: clean up resources used by this obect ahead of GC */
+    public void done() {
+        clearErrors();
+        github = null;
+        graphQLClient = null;
     }
 
     public String getLogId() {
@@ -90,11 +122,23 @@ public class QueryContext {
         throw new UnsupportedOperationException("Unimplemented method 'getJsonData'");
     }
 
+    /**
+     * @return true if the context is in dry run mode
+     */
     public boolean isDryRun() {
         return ctx.isDryRun();
     }
 
-    public QueryContext addExisting(GitHub github) {
+    /**
+     * Use an existing GitHub client instance.
+     * <p>
+     * Useful when creating a new context from an existing one
+     * (to isolate errors or exceptions, for example).
+     *
+     * @param github Existing GitHub instance
+     * @return this context
+     */
+    public QueryContext withExisting(GitHub github) {
         this.github = github;
         return this;
     }
@@ -110,7 +154,16 @@ public class QueryContext {
         return github;
     }
 
-    public QueryContext addExisting(DynamicGraphQLClient graphQLClient) {
+    /**
+     * Use an existing GraphQL client instance.
+     * <p>
+     * Useful when creating a new context from an existing one
+     * (to isolate errors or exceptions, for example).
+     *
+     * @param graphQLClient Existing DynamicGraphQLClient instance
+     * @return this context
+     */
+    public QueryContext withExisting(DynamicGraphQLClient graphQLClient) {
         this.graphQLClient = graphQLClient;
         return this;
     }
@@ -126,43 +179,78 @@ public class QueryContext {
         return graphQLClient;
     }
 
+    /**
+     * The installationId is the unique identifier for the GitHub App installation
+     * associated with this context. It is almost always set.
+     * <p>
+     * It is not set for Sponsorship events (REST API only).
+     *
+     * @return the installationId associated with this context
+     */
     public long getInstallationId() {
         return installationId;
     }
 
+    /**
+     * Add an exception to the context. This could be a GraphQL error
+     * or a GitHub API exception.
+     *
+     * @param e Exception
+     */
     public void addException(Exception e) {
         exceptions.add(e);
     }
 
+    /**
+     * @return true if there are errors or exceptions
+     */
     public boolean hasErrors() {
         return !errors.isEmpty() || !exceptions.isEmpty();
     }
 
+    /**
+     * Clear errors and exceptions
+     */
     public void clearErrors() {
         errors.clear();
         exceptions.clear();
     }
 
-    public Throwable bundleExceptions() {
-        if (exceptions.size() == 1) {
-            return exceptions.get(0);
-        }
+    /**
+     * @return PackagedException if there are multiple exceptions or errors; or null
+     */
+    public PackagedException bundleExceptions() {
         return hasErrors()
                 ? new PackagedException(exceptions, errors)
                 : null;
     }
 
+    /**
+     * Check the GraphQLError for a specific type
+     *
+     * @param e GraphQL error
+     * @param testType GraphQL error type to test for
+     * @return true if the error has the specified type
+     */
+    private boolean hasFieldError(GraphQLError e, String testType) {
+        var others = e.getOtherFields();
+        var type = others == null ? null : others.get("type");
+        return testType.equals(type);
+    }
+
+    /**
+     * @return true if a not found exception occurred
+     */
     public boolean hasNotFound() {
         return exceptions.stream().anyMatch(e -> e instanceof GHFileNotFoundException)
                 || errors.stream().anyMatch(e -> hasFieldError(e, "NOT_FOUND"));
     }
 
-    private boolean hasFieldError(GraphQLError e, String message) {
-        var others = e.getOtherFields();
-        var type = others == null ? null : others.get("type");
-        return message.equals(type);
-    }
-
+    /**
+     * If there are any not found exceptions, clear them and return true
+     *
+     * @return true if there were any not found exceptions
+     */
     public boolean clearNotFound() {
         if (hasNotFound()) {
             clearErrors();
@@ -171,10 +259,16 @@ public class QueryContext {
         return false;
     }
 
+    /**
+     * @return true if a conflict occurred
+     */
     public boolean hasConflict() {
         return getConflict() != null;
     }
 
+    /**
+     * @return the Exception if a conflict occurred (409 response code or message contains 409)
+     */
     public HttpException getConflict() {
         return exceptions.stream()
                 .filter(e -> e instanceof HttpException)
@@ -184,6 +278,11 @@ public class QueryContext {
                 .map(e -> (HttpException) e).orElse(null);
     }
 
+    /**
+     * If there is a conflict exception, clear it and return true
+     *
+     * @return true if there was a conflict exception
+     */
     public boolean clearConflict() {
         if (hasConflict()) {
             clearErrors();
@@ -193,12 +292,33 @@ public class QueryContext {
     }
 
     /**
-     * Invoke passed argument with GitHub instance.
-     * Exceptions will be captured in the query context.
+     * Invoke the specified function within a try/finally using the GitHub instance
+     * held in this context.
+     * <p>
+     * The dryRun parameter is passed to the function.
+     * <p>
+     * Operations will not be attempted if there are errors present in the context
+     * (connection issues, for example).
+     * <p>
+     * Some exceptions, specifically those related to connections with GitHub
+     * will result in an email being sent to the configured error addresses.
+     * <p>
+     * Recoverable exceptions (like file not found errors) are captured and can be
+     * checked for with {@link #hasNotFound()} or cleared with {@link #clearNotFound()}.
+     * <p>
+     * Errors and exceptions are captured for the caller in the queryContext,
+     * and can be checked with {@link #hasErrors()},
+     * bundled for final error handling with {@link #bundleExceptions()}
+     * or cleared with {@link #clearErrors()}.
      *
      * @param <R> return type
      * @param ghApiCall Function to be invoked with GitHub instance
      * @return result of ghApiCall or null of there were errors
+     * @see #hasNotFound()
+     * @see #clearNotFound()
+     * @see #hasErrors()
+     * @see #bundleExceptions()
+     * @see #clearErrors()
      */
     public <R> R execGitHubSync(GitHubParameterApiCall<R> ghApiCall) {
         if (hasErrors()) {
@@ -214,12 +334,25 @@ public class QueryContext {
         } catch (IOException | RuntimeException e) {
             logAndSendEmail(getLogId(), "Error making GH Request", e);
             addException(e);
+        } catch (Throwable e) {
+            logAndSendEmail("Unexpected error making GH Request", e);
+            exceptions.add(e);
         }
         return null;
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with parameters.
+     * Overall behavior is similar to {@link #execGitHubSync(GitHubParameterApiCall)}
+     * <p>
+     * If a mutation is detected and the bot is in dryRun mode, the query will be logged
+     * but not executed. It will return null, as it can not otherwise determine the correct
+     * response type.
+     * <p>
+     * Errors executing GraphQL queries will be stored as errors in the context
+     * to be inspected by the caller. An email will also be sent to the configured error
+     * addresses, as this can indicate a connection issue or other problem with the
+     * GraphQL endpoint.
      *
      * @param query GraphQL query.
      * @return GraphQL Response
@@ -253,7 +386,9 @@ public class QueryContext {
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with standard repository parameters.
+     * <p>
+     * Overall behavior is similar to {@link #execQuerySync(String, Map)}
      *
      * @param query GraphQL query. Values for repository owner and name
      *        ({@code $name: String!, $owner: String!})
@@ -266,7 +401,9 @@ public class QueryContext {
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with standard repository and other parameters.
+     * <p>
+     * Overall behavior is similar to {@link #execQuerySync(String, Map)}
      *
      * @param query GraphQL query. Values for repository owner and name
      *        ({@code $name: String!, $owner: String!})
@@ -314,13 +451,7 @@ public class QueryContext {
 
     public boolean isBot(String login) {
         String botLogin = BOT_LOGIN.computeIfAbsent("" + getInstallationId(), k -> {
-            Response response = execQuerySync("""
-                        query {
-                            viewer {
-                            login
-                            }
-                        }
-                    """, new HashMap<>());
+            Response response = execQuerySync(QUERY_BOT_LOGIN, new HashMap<>());
             if (hasErrors() || response == null) {
                 return "unknown";
             }

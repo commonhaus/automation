@@ -22,6 +22,11 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public interface ContextService {
 
+    /**
+     * A YAML mapper that is configured to be pretty-printed and to use plain scalars.
+     * <p>
+     * Supplier creates the singleton instance when the interface is loaded.
+     */
     ObjectMapper yamlMapper = new Supplier<ObjectMapper>() {
         @Override
         public ObjectMapper get() {
@@ -57,10 +62,6 @@ public interface ContextService {
 
     boolean isDryRun();
 
-    Class<?> getConfigType();
-
-    String getConfigFileName();
-
     boolean isDiscoveryEnabled();
 
     String[] botErrorEmailAddress();
@@ -68,15 +69,6 @@ public interface ContextService {
     GitHub getInstallationClient(long installationId);
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
-
-    default void updateConnections(long installationId, GitHub github, DynamicGraphQLClient graphQLClient) {
-        updateConnection(installationId, github);
-        updateConnection(installationId, graphQLClient);
-    }
-
-    void updateConnection(long installationId, GitHub gh);
-
-    void updateConnection(long installationId, DynamicGraphQLClient gql);
 
     void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 

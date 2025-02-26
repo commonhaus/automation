@@ -12,6 +12,26 @@ import io.smallrye.graphql.client.Response;
 
 public class DataTeam {
 
+    // @formatter:off
+    static final String QUERY_TEAM_MEMBERSHIP = """
+            query($login: String!, $slug: String!, $after: String) {
+                organization(login: $login) {
+                    team(slug: $slug) {
+                        members(first: 100, membership: IMMEDIATE, after: $after) {
+                            nodes {
+                                login
+                            }
+                            pageInfo {
+                                endCursor
+                                hasNextPage
+                            }
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
+
     public static List<String> queryImmediateTeamMemberLogin(QueryContext qc, String orgName, String teamSlug) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("login", orgName);
@@ -22,23 +42,7 @@ public class DataTeam {
         String cursor = null;
         do {
             variables.put("after", cursor);
-            Response response = qc.execQuerySync("""
-                    query($login: String!, $slug: String!, $after: String) {
-                        organization(login: $login) {
-                            team(slug: $slug) {
-                                members(first: 100, membership: IMMEDIATE, after: $after) {
-                                    nodes {
-                                        login
-                                    }
-                                    pageInfo {
-                                        endCursor
-                                        hasNextPage
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    """, variables);
+            Response response = qc.execQuerySync(QUERY_TEAM_MEMBERSHIP, variables);
             if (qc.hasErrors() || response == null) {
                 break;
             }

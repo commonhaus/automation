@@ -1,6 +1,7 @@
 package org.commonhaus.automation.mail;
 
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -13,18 +14,20 @@ import io.vertx.mutiny.core.eventbus.Message;
 
 @ApplicationScoped
 class MailConsumer {
+    static Optional<String> replyAddress = null;
 
-    static boolean initialized = false;
-    static String replyToAddress = null;
-
+    /**
+     * Add the reply-to address to the mail template instance.
+     *
+     * @param mailTemplateInstance the mail template instance
+     */
     static void addReplyTo(MailTemplateInstance mailTemplateInstance) {
-        String replyTo = replyToAddress;
-        if (replyTo == null && !initialized) {
-            replyToAddress = replyTo = ConfigProvider.getConfig().getValue("automation.reply-to", String.class);
-            initialized = true;
+        if (replyAddress == null) {
+            // This is not thread-sensitive: it's okay if multiple threads set the value.
+            replyAddress = ConfigProvider.getConfig().getOptionalValue("automation.error-email-address", String.class);
         }
-        if (replyTo != null) {
-            mailTemplateInstance.replyTo(replyTo);
+        if (replyAddress.isPresent()) {
+            mailTemplateInstance.replyTo(replyAddress.get());
         }
     }
 

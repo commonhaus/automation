@@ -13,6 +13,34 @@ import io.smallrye.graphql.client.Response;
 
 public class DataSponsorship extends DataCommonType {
 
+    // @formatter:off
+    static final String QUERY_RECENT_SPONSORS = """
+            query($login: String!) {
+                organization(login: $login) {
+                sponsorshipsAsMaintainer(first: 50, activeOnly: false, orderBy: {field: CREATED_AT, direction: DESC}) {
+                    totalCount
+                    nodes {
+                        isActive
+                        isOneTimePayment
+                            sponsorEntity {
+                                ... on User {
+                                    login
+                                }
+                                ... on Organization {
+                                    login
+                                }
+                            }
+                        }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
+
     public final boolean isActive;
     public final Date createdAt;
     public final DataActor sponsorable;
@@ -51,33 +79,7 @@ public class DataSponsorship extends DataCommonType {
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("login", login);
-        Response response = qc.execQuerySync("""
-                query($login: String!) {
-                    organization(login: $login) {
-                    sponsorshipsAsMaintainer(first: 50, activeOnly: false, orderBy: {field: CREATED_AT, direction: DESC}) {
-                        totalCount
-                        nodes {
-                        isActive
-                        isOneTimePayment
-                        isActive
-                        isOneTimePayment
-                        sponsorEntity {
-                            ... on User {
-                            login
-                            }
-                            ... on Organization {
-                            login
-                            }
-                        }
-                        }
-                        pageInfo {
-                        hasNextPage
-                        endCursor
-                        }
-                    }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(QUERY_RECENT_SPONSORS, variables);
         if (qc.hasErrors() || response == null) {
             return List.of();
         }

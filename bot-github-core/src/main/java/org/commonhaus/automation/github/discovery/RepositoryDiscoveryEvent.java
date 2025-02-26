@@ -1,7 +1,5 @@
 package org.commonhaus.automation.github.discovery;
 
-import java.util.Optional;
-
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
@@ -13,7 +11,6 @@ public record RepositoryDiscoveryEvent(
         DynamicGraphQLClient graphQLClient,
         long installationId,
         GHRepository repository,
-        Optional<?> repoConfig,
         boolean bootstrap) {
 
     public boolean added() {
@@ -26,10 +23,5 @@ public record RepositoryDiscoveryEvent(
 
     public boolean installation() {
         return action.installation();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> Optional<T> getRepositoryConfig() {
-        return (Optional<T>) repoConfig;
     }
 }

@@ -18,7 +18,7 @@ public class DataCommonObject extends DataCommonType {
                 """ + DataActor.ACTOR_FIELDS_MIN + """
             }
             url
-            """;
+            """.stripIndent();
 
     static final String COMMON_OBJECT_FIELDS = """
             id
@@ -29,7 +29,7 @@ public class DataCommonObject extends DataCommonType {
             createdAt
             updatedAt
             url
-                """;
+            """.stripIndent();
 
     public final DataActor author;
 

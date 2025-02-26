@@ -13,7 +13,7 @@ public class DataTier extends DataCommonType {
             monthlyPriceInDollars
             isOneTime
             isCustomAmount
-            """;
+            """.stripIndent();
 
     public final Date createdAt;
     public final Integer monthlyPriceInCents;

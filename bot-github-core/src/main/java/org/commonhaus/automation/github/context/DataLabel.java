@@ -20,25 +20,80 @@ public class DataLabel extends DataCommonType {
     static final String LABEL_FIELDS = """
             id
             name
-            """;
+            """.stripIndent();
+
+    // @formatter:off
     static final String FIRST_10_LABELS = """
             labels(first: 10) {
                 nodes {
-                """ + LABEL_FIELDS + """
-                    }
+                    """ + LABEL_FIELDS + """
                 }
-            """;
+            }
+            """.stripIndent();
     static final String PAGINATED_LABELS = """
             labels(first: 50, after: $after) {
                 nodes {
-                """ + LABEL_FIELDS + """
+                    """ + LABEL_FIELDS + """
                 }
                 pageInfo {
                     hasNextPage
                     endCursor
                 }
             }
-            """;
+            """.stripIndent();
+
+    static final String QUERY_ITEM_LABELS = """
+            query($id: ID!, $after: String) {
+                node(id: $id) {
+                    ... on Labelable {
+                        """ + PAGINATED_LABELS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String QUERY_REPO_LABELS = """
+            query($owner: String!, $name: String!, $after: String) {
+                repository(owner: $owner, name: $name) {
+                    """ + PAGINATED_LABELS + """
+                }
+            }
+            """.stripIndent();
+
+    static final String ADD_LABELS = """
+            mutation AddLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
+                addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
+                    clientMutationId
+                    labelable {
+                        """ + PAGINATED_LABELS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+
+    static final String REMOVE_LABELS = """
+            mutation RemoveLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
+                removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
+                    clientMutationId
+                    labelable {
+                        """ + PAGINATED_LABELS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String CREATE_LABEL = """
+            mutation CreateLabel($name: String!, $repositoryId: ID!, $color: String!) {
+                createLabel(input: { name: $name, repositoryId: $repositoryId, color: $color }) {
+                    clientMutationId
+                    label {
+                        """ + LABEL_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     public final String name;
 
@@ -89,26 +144,12 @@ public class DataLabel extends DataCommonType {
             Log.debugf("[%s] queryLabels for labelable %s; skipping modify (errors)", qc.getLogId(), labeledId);
             return null;
         }
-        String query = """
-                query($id: ID!, $after: String) {
-                    node(id: $id) {
-                        ... on Labelable {
-                        """ + PAGINATED_LABELS + """
-                        }
-                    }
-                }
-                """;
+        String query = QUERY_ITEM_LABELS;
 
         // A Repository has an id, and it has labels, but it is not a Labelable.
         // we need to alter the query to get the labels.
         if (labeledId.equals(qc.getRepositoryId())) {
-            query = """
-                    query($owner: String!, $name: String!, $after: String) {
-                        repository(owner: $owner, name: $name) {
-                            """ + PAGINATED_LABELS + """
-                        }
-                    }
-                    """;
+            query = QUERY_REPO_LABELS;
         }
 
         final var repositoryQuery = query.contains("repository");
@@ -139,18 +180,8 @@ public class DataLabel extends DataCommonType {
         variables.put("labelableId", labeledId);
         variables.put("labelIds", labelIds);
 
-        String query = """
-                mutation AddLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
-                    addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
-                        clientMutationId
-                        labelable {
-                """ + PAGINATED_LABELS + """
-                        }
-                    }
-                }""";
-
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(qc, query, variables, labels,
+        paginateLabels(qc, ADD_LABELS, variables, labels,
                 (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
                         JsonAttribute.addLabelsToLabelable, JsonAttribute.labelable));
 
@@ -171,18 +202,8 @@ public class DataLabel extends DataCommonType {
         variables.put("labelableId", labeledId);
         variables.put("labelIds", labelIds);
 
-        String query = """
-                mutation RemoveLabels($labelableId: ID!, $labelIds: [ID!]!, $after: String) {
-                    removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds}) {
-                        clientMutationId
-                        labelable {
-                """ + PAGINATED_LABELS + """
-                        }
-                    }
-                }""";
-
         Set<DataLabel> labels = new HashSet<>();
-        paginateLabels(qc, query, variables, labels,
+        paginateLabels(qc, REMOVE_LABELS, variables, labels,
                 (obj) -> JsonAttribute.labels.extractObjectFrom(obj,
                         JsonAttribute.removeLabelsFromLabelable, JsonAttribute.labelable));
 
@@ -200,17 +221,8 @@ public class DataLabel extends DataCommonType {
         variables.put("name", name);
         variables.put("repositoryId", repoId);
         variables.put("color", color);
-
-        String query = """
-                mutation CreateLabel($name: String!, $repositoryId: ID!, $color: String!) {
-                    createLabel(input: { name: $name, repositoryId: $repositoryId, color: $color }) {
-                        clientMutationId
-                        label {
-                            """ + LABEL_FIELDS + """
-                        }
-                    }
-                }""";
-        Response response = qc.execRepoQuerySync(query, variables);
+        ;
+        Response response = qc.execRepoQuerySync(CREATE_LABEL, variables);
         if (qc.hasErrors()) {
             qc.clearNotFound();
             return null;
@@ -222,11 +234,11 @@ public class DataLabel extends DataCommonType {
     static void paginateLabels(QueryContext qc, String query,
             Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
-        JsonObject pageInfo;
-        String cursor = null;
+
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
 
         do {
-            variables.put("after", cursor);
+            variables.put("after", pageInfo.cursor());
             Response response = qc.execRepoQuerySync(query, variables);
             if (qc.hasErrors()) {
                 qc.clearNotFound();
@@ -242,8 +254,7 @@ public class DataLabel extends DataCommonType {
                     .map(DataLabel::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(pageLabels);
-            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(pageLabels);
+        } while (pageInfo.hasNextPage());
     }
 }

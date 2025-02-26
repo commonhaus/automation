@@ -13,7 +13,21 @@ public class DataDiscussionCategory {
     static final String DISCUSSION_CATEGORY_FIELDS = """
             id
             name
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String QUERY_DISCUSSION_CATEGORIES = """
+            query($name: String!, $owner: String!) {
+                repository(owner: $owner, name: $name) {
+                    discussionCategories(first: 25) {
+                        nodes {
+                            """ + DISCUSSION_CATEGORY_FIELDS + """
+                            }
+                        }
+                    }
+                }
+            """.stripIndent();
+    // @formatter:on
 
     /**
      * {@literal id} for GraphQL queries or {@literal node_id} for webhook events
@@ -48,17 +62,7 @@ public class DataDiscussionCategory {
         if (qc.hasErrors()) {
             return List.of();
         }
-        Response response = qc.execRepoQuerySync("""
-                query($name: String!, $owner: String!) {
-                    repository(owner: $owner, name: $name) {
-                        discussionCategories(first: 25) {
-                            nodes {
-                                """ + DISCUSSION_CATEGORY_FIELDS + """
-                                }
-                            }
-                        }
-                    }
-                """);
+        Response response = qc.execRepoQuerySync(QUERY_DISCUSSION_CATEGORIES);
         Log.debugf("[%s] discussion categories: %s", qc.getLogId(), response.getData());
         if (qc.hasErrors()) {
             return List.of();

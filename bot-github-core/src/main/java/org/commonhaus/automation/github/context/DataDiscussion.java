@@ -14,6 +14,7 @@ import io.smallrye.graphql.client.Response;
 @TemplateData
 public class DataDiscussion extends DataCommonItem {
 
+    // @formatter:off
     static final String DISCUSSION_FIELDS = ISSUE_FIELDS + """
             category {
                 """ + DataDiscussionCategory.DISCUSSION_CATEGORY_FIELDS + """
@@ -21,7 +22,45 @@ public class DataDiscussion extends DataCommonItem {
             """ + DataLabel.FIRST_10_LABELS + """
             createdAt
             updatedAt
-                """;
+                """.stripIndent();
+
+    private static final String QUERY_DISCUSSIONS_WITH_LABEL = """
+            query($query: String!, $after: String) {
+                search(query: $query, type: DISCUSSION, first: 100, after: $after) {
+                    pageInfo {
+                        endCursor
+                        hasNextPage
+                    }
+                    nodes {
+                        ... on Discussion {
+                            """ + DISCUSSION_FIELDS + """
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+
+    private static final String QUERY_DISCUSSION_BY_ID = """
+            query($id: ID!) {
+                node(id: $id) {
+                    ... on Discussion {
+                        """ + DISCUSSION_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+    private static final String UPDATE_DISCUSSION = """
+            mutation UpdateDiscussion($id: ID!, $body: String!) {
+                updateDiscussion(input: { discussionId: $id, body: $body }) {
+                    clientMutationId
+                    discussion {
+                        """ + DISCUSSION_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     public final DataDiscussionCategory category;
     public final List<DataLabel> labels;
@@ -45,25 +84,10 @@ public class DataDiscussion extends DataCommonItem {
         variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
                 qc.getRepository().getFullName(), labelName));
 
-        JsonObject pageInfo;
-        String cursor = null;
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
         do {
-            variables.put("after", cursor);
-            Response response = qc.execRepoQuerySync("""
-                    query($query: String!, $after: String) {
-                        search(query: $query, type: DISCUSSION, first: 100, after: $after) {
-                            pageInfo {
-                                endCursor
-                                hasNextPage
-                            }
-                            nodes {
-                                ... on Discussion {
-                                    """ + DISCUSSION_FIELDS + """
-                                }
-                            }
-                        }
-                    }
-                        """, variables);
+            variables.put("after", pageInfo.cursor());
+            Response response = qc.execRepoQuerySync(QUERY_DISCUSSIONS_WITH_LABEL, variables);
             if (qc.hasErrors()) {
                 break;
             }
@@ -75,9 +99,8 @@ public class DataDiscussion extends DataCommonItem {
                     .map(DataDiscussion::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(search);
-            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(search);
+        } while (pageInfo.hasNextPage());
         return allDiscussions;
     }
 
@@ -85,15 +108,7 @@ public class DataDiscussion extends DataCommonItem {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
 
-        Response response = qc.execQuerySync("""
-                query($id: ID!) {
-                    node(id: $id) {
-                        ... on Discussion {
-                            """ + DISCUSSION_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(QUERY_DISCUSSION_BY_ID, variables);
         if (qc.hasErrors() || response == null) {
             qc.clearNotFound();
             return null;
@@ -113,17 +128,7 @@ public class DataDiscussion extends DataCommonItem {
         variables.put("id", nodeId);
         variables.put("body", modifiedText);
 
-        Response response = qc.execRepoQuerySync("""
-                mutation UpdateDiscussion($id: ID!, $body: String!) {
-                    updateDiscussion(input: { discussionId: $id, body: $body }) {
-                        clientMutationId
-                        discussion {
-                            """ + DISCUSSION_FIELDS + """
-                        }
-                    }
-                }
-                """,
-                variables);
+        Response response = qc.execRepoQuerySync(UPDATE_DISCUSSION, variables);
         if (qc.hasErrors()) {
             qc.clearNotFound();
             return null;
