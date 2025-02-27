@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.context;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GitHub;
 import org.yaml.snakeyaml.DumperOptions;
@@ -70,9 +71,28 @@ public interface ContextService {
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
 
+    void updateConnection(long installationId, GitHub github);
+
+    void updateConnection(long installationId, DynamicGraphQLClient graphQLClient);
+
+    /**
+     * Log exception and send email
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
     void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 
+    /**
+     * Log exception and send email
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
     void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses);
 
-    void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses);
+    /**
+     * Send email.
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
+    void sendEmail(String logId, String title, String body, String[] addresses);
 }

@@ -69,18 +69,21 @@ public class PeriodicUpdateQueue {
 
     void startup(@Observes StartupEvent startup) {
         int initialDelay = LaunchMode.current() == LaunchMode.TEST
-                ? 0
+                ? 1
                 : 15;
         int period = LaunchMode.current() == LaunchMode.TEST
-                ? 0
+                ? 1
                 : 5;
+        TimeUnit unit = LaunchMode.current() == LaunchMode.TEST
+                ? TimeUnit.MILLISECONDS
+                : TimeUnit.SECONDS;
         // Don't flood. Be leisurely for scheduled/cron queries
         executor.scheduleAtFixedRate(() -> {
             Task task = taskQueue.poll();
             if (task != null) {
                 run(task);
             }
-        }, initialDelay, period, TimeUnit.SECONDS);
+        }, initialDelay, period, unit);
 
         RouteSupplier.registerSupplier("Configuration reconciled", () -> reconciled);
     }
@@ -99,7 +102,7 @@ public class PeriodicUpdateQueue {
     }
 
     public void queueReconciliation(String name, Runnable task) {
-        Log.debugf("QUEUE reconcile task %s", name);
+        Log.debugf("QUEUE task %s", name);
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 
@@ -111,9 +114,9 @@ public class PeriodicUpdateQueue {
             if (next != null && next.name().equals(task.name())) {
                 if (next.type() == TaskType.CHANGE) {
                     taskQueue.add(task); // Re-queue this reconciliation for later
-                    Log.debugf("RECONCILE task %s postponed for same-group changes", task.name());
+                    Log.debugf("RECONCILE %s task postponed for same-group changes", task.name());
                 } else {
-                    Log.debugf("RECONCILE task %s skipped (duplicate next)", task.name());
+                    Log.debugf("RECONCILE %s task skipped (duplicate next)", task.name());
                 }
                 return;
             }

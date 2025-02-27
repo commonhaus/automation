@@ -53,12 +53,17 @@ public abstract class BaseContextService implements ContextService {
             return gh;
         }
         // there is no way to test the graphql client's credentials for validity.
-        // if the GH credentials are invalid, invalidate the GraphQL client, too
+        // if the GH credentials are invalid, invalidate the GraphQL client
+        // so it reconnects next time.
         BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
 
         gh = gitHubClientProvider.getInstallationClient(installationId);
-        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
+        updateConnection(installationId, gh);
         return gh;
+    }
+
+    public void updateConnection(long installationId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
     }
 
     public DynamicGraphQLClient getInstallationGraphQLClient(long installationId) {
@@ -68,8 +73,12 @@ public abstract class BaseContextService implements ContextService {
         }
 
         graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
-        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
+        updateConnection(installationId, graphQLClient);
         return graphQLClient;
+    }
+
+    public void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
+        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
     }
 
     @Override
@@ -88,7 +97,7 @@ public abstract class BaseContextService implements ContextService {
     }
 
     @Override
-    public void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses) {
-        logMailer.sendEmail(logId, title, body, htmlBody, addresses);
+    public void sendEmail(String logId, String title, String body, String[] addresses) {
+        logMailer.sendEmail(logId, title, body, addresses);
     }
 }

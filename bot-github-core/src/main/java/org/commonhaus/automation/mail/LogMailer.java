@@ -4,8 +4,10 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Optional;
 
+import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import io.quarkus.arc.Arc;
@@ -25,6 +27,8 @@ import io.vertx.mutiny.core.eventbus.EventBus;
  */
 @ApplicationScoped
 public class LogMailer {
+    static final String[] EMPTY = new String[0];
+
     @CheckedTemplate
     static class Templates {
         public static native MailTemplateInstance basicEmail(String title, String body, String htmlBody);
@@ -42,32 +46,50 @@ public class LogMailer {
                 : null;
     }
 
+    @Nonnull
     public String[] botErrorEmailAddress() {
-        return errorAddress;
+        return errorAddress == null ? EMPTY : errorAddress;
     }
 
-    public void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses) {
+    /**
+     * Queue an email (EventBus, fire-and-forget).
+     *
+     * @param logId The log identifier
+     * @param title The email title
+     * @param body The email body
+     * @param addresses The email addresses
+     * @see MailEvent
+     * @see MailConsumer
+     */
+    public void sendEmail(@Nonnull String logId, @Nonnull String title, @Nonnull String body, @Nonnull String[] addresses) {
+        String htmlBody = MarkdownConverter.toHtml(body.toString());
         MailEvent event = new MailEvent(logId, Templates.basicEmail(title, body, htmlBody), title, addresses);
         if (event.hasAddresses()) {
             bus.send(MailEvent.ADDRESS, event);
         }
     }
 
+    /**
+     * Log an error and queue an email (EventBus, fire-and-forget).
+     *
+     * @see #logAndSendEmail(String, String, String, Throwable, String[])
+     */
     public void logAndSendEmail(String logId, String title, Throwable t, String[] addresses) {
-        if (t == null) {
-            Log.errorf("[%s] %s", logId, title);
-        } else {
-            Log.errorf(t, "[%s] %s: %s", logId, title, "" + t);
-            if (Log.isDebugEnabled()) {
-                t.printStackTrace();
-            }
-        }
-        MailEvent event = createErrorMailEvent(logId, title, "", t, addresses);
-        if (event.hasAddresses()) {
-            bus.send(MailEvent.ADDRESS, event);
-        }
+        this.logAndSendEmail(logId, title, "", t, addresses);
     }
 
+    /**
+     * Log an error and queue an email (EventBus, fire-and-forget).
+     *
+     * @param logId
+     * @param title
+     * @param body
+     * @param t
+     * @param addresses
+     * @see #createErrorMailEvent(String, String, String, Throwable, String[])
+     * @see MailEvent
+     * @see MailConsumer
+     */
     public void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses) {
         if (t == null) {
             Log.errorf(t, "[%s] %s: %s", logId, title, body);
@@ -83,7 +105,17 @@ public class LogMailer {
         }
     }
 
-    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, String[] addresses) {
+    /**
+     * Create a MailEvent for an error.
+     *
+     * @param logId
+     * @param title
+     * @param body
+     * @param e
+     * @param addresses
+     * @return
+     */
+    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, @Nonnull String[] addresses) {
         // If configured to do so, email the error_email_address
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);

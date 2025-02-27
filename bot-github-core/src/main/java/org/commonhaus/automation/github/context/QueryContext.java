@@ -1,10 +1,8 @@
 package org.commonhaus.automation.github.context;
 
 import static org.commonhaus.automation.github.context.BaseQueryCache.BOT_LOGIN;
-import static org.commonhaus.automation.github.context.BaseQueryCache.COLLABORATORS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
-import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -16,6 +14,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Nonnull;
 import jakarta.json.JsonObject;
 
 import org.kohsuke.github.GHContent;
@@ -24,7 +23,6 @@ import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
@@ -139,6 +137,7 @@ public class QueryContext {
      * @return this context
      */
     public QueryContext withExisting(GitHub github) {
+        ctx.updateConnection(installationId, github);
         this.github = github;
         return this;
     }
@@ -164,6 +163,7 @@ public class QueryContext {
      * @return this context
      */
     public QueryContext withExisting(DynamicGraphQLClient graphQLClient) {
+        ctx.updateConnection(installationId, graphQLClient);
         this.graphQLClient = graphQLClient;
         return this;
     }
@@ -252,11 +252,11 @@ public class QueryContext {
      * @return true if there were any not found exceptions
      */
     public boolean clearNotFound() {
-        if (hasNotFound()) {
-            clearErrors();
-            return true;
-        }
-        return false;
+        int size = exceptions.size() + errors.size();
+        exceptions.removeIf(e -> e instanceof GHFileNotFoundException);
+        errors.removeIf(e -> hasFieldError(e, "NOT_FOUND"));
+        // did we remove anything?
+        return (exceptions.size() + errors.size()) != size;
     }
 
     /**
@@ -419,6 +419,18 @@ public class QueryContext {
         return execQuerySync(query, variables);
     }
 
+    /**
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     * <p>
+     * Note: GitHub caches user lookups
+     *
+     * @param orgName
+     * @return
+     */
     public GHUser getUser(String login) {
         return execGitHubSync((gh, dryRun) -> {
             GHUser user = gh.getUser(login);
@@ -427,6 +439,16 @@ public class QueryContext {
         });
     }
 
+    /**
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     *
+     * @param orgName
+     * @return
+     */
     public GHRepository getRepository(String repoName) {
         return execGitHubSync((gh, dryRun) -> {
             GHRepository repo = gh.getRepository(repoName);
@@ -436,7 +458,13 @@ public class QueryContext {
     }
 
     /**
-     * GitHub caches org lookups
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     * <p>
+     * Note: GitHub caches org lookups
      *
      * @param orgName
      * @return
@@ -459,25 +487,6 @@ public class QueryContext {
             return JsonAttribute.login.stringFrom(viewer);
         });
         return botLogin.equals(login) || botLogin.replace("[bot]", "").equals(login);
-    }
-
-    public boolean isLoginIncluded(String login, List<String> groups) {
-        if (groups == null) {
-            return true;
-        } else if (groups.isEmpty()) {
-            return false;
-        }
-        for (var g : groups) {
-            if (g.startsWith("@")) {
-                TeamList team = getTeamList(g.substring(1));
-                if (team.isEmpty()) {
-                    return false;
-                }
-                return team.members.stream().anyMatch(m -> m.login.equals(login));
-            }
-            return g.equals(login);
-        }
-        return false;
     }
 
     /** Item-scoped comment lookup; doesn't always apply */
@@ -792,135 +801,6 @@ public class QueryContext {
         return DataLabel.createLabel(this, this.getRepositoryId(), labelName, color);
     }
 
-    /**
-     * This is an indirect lookup: list of teams is fetched first,
-     * then the team is found by name.
-     *
-     * @param org GHOrganization
-     * @param relativeName name relative to organization
-     * @return GHTeam or null if not found
-     */
-    public GHTeam getTeam(GHOrganization org, String relativeName) {
-        String fullName = toFullName(org.getLogin(), relativeName);
-        GHTeam team = TEAM_MEMBERS.get("ghTeam-" + fullName);
-        if (team == null) {
-            team = execGitHubSync((gh, dryRun) -> {
-                GHTeam result = org.getTeamByName(relativeName);
-                clearNotFound();
-                return result;
-            });
-            if (team != null) {
-                TEAM_MEMBERS.put("ghTeam-" + fullName, team);
-            }
-        }
-        return team;
-    }
-
-    public boolean isTeamMember(GHUser user, String teamFullName) {
-        Set<GHUser> members = teamMembers(teamFullName);
-        Log.debugf("%s members: %s", teamFullName, members == null ? "[]" : members.stream().map(GHUser::getLogin).toList());
-        return members != null && members.contains(user);
-    }
-
-    public TeamList getTeamList(String teamFullName) {
-        Set<GHUser> members = teamMembers(teamFullName);
-        TeamList teamList = new TeamList(teamFullName, members);
-        Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
-        return teamList;
-    }
-
-    public void updateTeamList(String teamFullName, Set<GHUser> members) {
-        TEAM_MEMBERS.put(teamFullName, members);
-    }
-
-    public void updateTeamList(GHOrganization org, GHTeam ghTeam) {
-        // Normalize team name to include org name
-        String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
-        String teamFullName = org.getLogin() + "/" + relativeName;
-        TEAM_MEMBERS.invalidate("ghTeam-" + teamFullName);
-        TEAM_MEMBERS.invalidate(teamFullName);
-    }
-
-    public Set<GHUser> teamMembers(String teamFullName) {
-        String orgName = toOrganizationName(teamFullName);
-        String relativeName = toRelativeName(orgName, teamFullName);
-
-        GHOrganization org = getOrganization(orgName);
-        Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
-        if (members == null) {
-            members = execGitHubSync((gh, dryRun) -> {
-                GHTeam ghTeam = org.getTeamByName(relativeName);
-                return ghTeam == null ? null : ghTeam.getMembers();
-            });
-            if (hasErrors() || members == null) {
-                clearNotFound();
-                return null;
-            }
-            TEAM_MEMBERS.put(teamFullName, members);
-        }
-        return members;
-    }
-
-    public void addTeamMember(GHUser user, String teamFullName) {
-        if (isDryRun()) {
-            Log.debugf("[%s] addTeamMember would add %s to %s", getLogId(), user.getLogin(), teamFullName);
-            return;
-        }
-        // this will trigger membership change events, which will come back around to update the cache.
-        TEAM_MEMBERS.invalidate(teamFullName);
-
-        String orgName = toOrganizationName(teamFullName);
-        String relativeName = toRelativeName(orgName, teamFullName);
-        GHOrganization org = getOrganization(orgName);
-        execGitHubSync((gh, dryRun) -> {
-            GHTeam ghTeam = org.getTeamByName(relativeName);
-            ghTeam.add(user);
-            return null;
-        });
-        if (hasErrors()) {
-            clearNotFound();
-        }
-    }
-
-    public Set<String> collaborators(String repoFullName) {
-        Set<String> collaborators = COLLABORATORS.get(repoFullName);
-        if (collaborators == null) {
-            collaborators = execGitHubSync((gh, dryRun) -> {
-                GHRepository repo = gh.getRepository(repoFullName);
-                return repo == null
-                        ? null
-                        : repo.getCollaboratorNames();
-            });
-            if (hasErrors() || collaborators == null) {
-                clearNotFound();
-                return null;
-            }
-            Log.debugf("%s members: %s", repoFullName, collaborators);
-            COLLABORATORS.put(repoFullName, collaborators);
-        }
-        return collaborators;
-    }
-
-    public void addCollaborators(GHRepository repo, List<GHUser> user) {
-        if (isDryRun()) {
-            Log.debugf("[%s] addCollaborators would add %s to %s",
-                    getLogId(),
-                    user.stream().map(GHUser::getLogin).toList(),
-                    repo.getFullName());
-            return;
-        }
-        execGitHubSync((gh, dryRun) -> {
-            repo.addCollaborators(user,
-                    GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
-            return null;
-        });
-    }
-
-    public boolean isCollaborator(GHUser user, String repoName) {
-        Set<String> collaborators = collaborators(repoName);
-        return collaborators != null && collaborators.contains(user.getLogin());
-    }
-
     public JsonNode readYamlSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
@@ -969,16 +849,52 @@ public class QueryContext {
         return ctx.writeYamlValue(user);
     }
 
+    @Nonnull
     public String[] getErrorAddresses() {
         return ctx.botErrorEmailAddress();
     }
 
+    /**
+     * Log an error and send an email to the configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, Throwable, String[])
+     */
     public void logAndSendEmail(String title, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, t, getErrorAddresses());
     }
 
+    /**
+     * Log an error and send an email with the specified body to the configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param body
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, String, Throwable, String[])
+     */
     public void logAndSendEmail(String title, String body, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, body, t, getErrorAddresses());
+    }
+
+    /**
+     * Send an email with the specified body to the configured error addresses.
+     * Simple wrapper around ContextService to avoid injected dependencies.
+     *
+     * @param logId
+     * @param title
+     * @param body
+     * @param addresses
+     * @see ContextService#sendEmail(String, String, String, String, String[])
+     */
+    public void sendEmail(String logId, String title, String body, String[] addresses) {
+        ctx.sendEmail(logId, title, body, addresses);
     }
 
     public static String toOrganizationName(String fullName) {

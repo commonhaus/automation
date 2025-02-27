@@ -30,7 +30,7 @@ public class FileWatcher implements Watcher {
                 .add(fileName, new TaskCallback(taskGroupName, callback));
     }
 
-    public void handleEvent(FileEvent fileEvent) {
+    public void handleEvent(FilePushEvent fileEvent) {
         GHRepository repo = fileEvent.repository();
         GHEventPayload.Push pushEvent = fileEvent.pushEvent();
         WatchedFiles watcher = repositoryFiles.get(repo.getFullName());
@@ -74,7 +74,7 @@ public class FileWatcher implements Watcher {
          * @param event FileEvent (PushEvent, GHRepository, GitHub)
          * @param periodicSync Queue for periodic events and updates
          */
-        public void handlePush(FileEvent event, PeriodicUpdateQueue periodicSync) {
+        public void handlePush(FilePushEvent event, PeriodicUpdateQueue periodicSync) {
             for (var entry : filesByPath.entrySet()) {
                 if (commitsContain(event.pushEvent(), entry.getKey())) {
                     FileUpdate update = new FileUpdate(entry.getKey(), event.repository(), event.github());
@@ -131,7 +131,7 @@ public class FileWatcher implements Watcher {
             GitHub github) {
     }
 
-    public static record FileEvent(
+    public static record FilePushEvent(
             GHEventPayload.Push pushEvent,
             GHRepository repository,
             GitHub github) {
