@@ -8,10 +8,12 @@ import static org.commonhaus.automation.github.context.QueryContext.toRelativeNa
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -142,6 +144,17 @@ public class GitHubTeamService {
      * @return
      */
     @Nonnull
+    public Set<String> getTeamLogins(QueryContext qc, String teamFullName) {
+        Set<GHUser> members = getTeamMembers(qc, teamFullName);
+        return members.stream().map(GHUser::getLogin).collect(Collectors.toSet());
+    }
+
+    /**
+     * @param qc QueryContext
+     * @param teamFullName
+     * @return
+     */
+    @Nonnull
     public TeamList getTeamList(QueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
@@ -222,13 +235,27 @@ public class GitHubTeamService {
      */
     @Nonnull
     public Set<String> getCollaborators(QueryContext qc, String repoFullName) {
+        GHRepository repo = qc.getRepository(repoFullName);
+        return repo == null ? Set.of() : getCollaborators(qc, repo);
+    }
+
+    /**
+     * Get repository collaborators.
+     *
+     * @param qc QueryContext
+     * @param repoFullName full repository name
+     * @return set of collaborator logins or null if repository not found
+     */
+    @Nonnull
+    public Set<String> getCollaborators(QueryContext qc, GHRepository repository) {
+        if (repository == null) {
+            return Set.of();
+        }
+        String repoFullName = repository.getFullName();
         Set<String> collaborators = COLLABORATORS.get(repoFullName);
         if (collaborators == null) {
             collaborators = qc.execGitHubSync((gh, dryRun) -> {
-                GHRepository repo = gh.getRepository(repoFullName);
-                return repo == null
-                        ? null
-                        : repo.getCollaboratorNames();
+                return repository.getCollaboratorNames();
             });
             if (qc.hasErrors() || collaborators == null) {
                 qc.clearNotFound();
@@ -274,6 +301,102 @@ public class GitHubTeamService {
     }
 
     /**
+     * Synchronize repository collaborators from a set of expected logins.
+     *
+     * @param qc QueryContext
+     * @param repository The repository to update collaborators for
+     * @param expectedLogins Set of logins that should be collaborators
+     * @param ignoreUsers List of users to ignore (not add or remove)
+     * @param isDryRun Whether to perform actions or just report what would happen
+     * @param addresses Email notification addresses
+     */
+    public void syncCollaborators(QueryContext qc, GHRepository repository,
+            Set<String> expectedLogins, List<String> ignoreUsers,
+            boolean isDryRun, EmailNotification addresses) {
+
+        String repoFullName = repository.getFullName();
+        Set<String> currentLogins = getCollaborators(qc, repository);
+
+        // Determine logins to add and remove
+        MembershipChanges changes = computeMemberChanges(true,
+                repoFullName, currentLogins, expectedLogins, ignoreUsers);
+
+        if (changes.toAdd().isEmpty() && changes.toRemove().isEmpty()) {
+            Log.debugf("[%s] syncCollaborators: No changes needed for repository %s",
+                    qc.getLogId(), repository.getFullName());
+            return;
+        }
+
+        if (isDryRun) {
+            sendNotificationEmail(qc, changes, true, Collections.emptySet(), addresses);
+        } else {
+            final Set<String> errors = new HashSet<>();
+
+            // Execute changes to team
+            qc.execGitHubSync((gh, globalDryRunMode) -> {
+                if (globalDryRunMode || isDryRun) {
+                    return null;
+                }
+
+                if (!changes.toRemove().isEmpty()) {
+                    List<GHUser> toRemove = new ArrayList<>();
+                    // Process removals first
+                    for (String login : changes.toRemove()) {
+                        try {
+                            toRemove.add(gh.getUser(login));
+                        } catch (IOException e) {
+                            String errorMsg = String.format("Failed to find collaborator %s: %s", login, e.getMessage());
+                            Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
+                            errors.add(errorMsg);
+                        }
+                    }
+
+                    try {
+                        repository.removeCollaborators(toRemove);
+                    } catch (IOException e) {
+                        String errorMsg = String.format("Failed to remove collaborators: %s", e.getMessage());
+                        Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
+                        errors.add(errorMsg);
+                    }
+                }
+
+                if (!changes.toAdd().isEmpty()) {
+                    List<GHUser> toAdd = new ArrayList<>();
+                    for (String login : changes.toAdd()) {
+                        try {
+                            toAdd.add(gh.getUser(login));
+                        } catch (IOException e) {
+                            String errorMsg = String.format("Failed to find collaborator %s: %s", login, e.getMessage());
+                            Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
+                            errors.add(errorMsg);
+                        }
+                    }
+
+                    try {
+                        repository.addCollaborators(toAdd,
+                                GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
+                    } catch (IOException e) {
+                        String errorMsg = String.format("Failed to add collaborators: %s", e.getMessage());
+                        Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
+                        errors.add(errorMsg);
+                    }
+                }
+
+                return null;
+            });
+
+            // invalidate cache to force refresh/re-fetch
+            COLLABORATORS.invalidate(repoFullName);
+
+            // Send notification with results
+            sendNotificationEmail(qc, changes, false, errors, addresses);
+        }
+
+        Log.infof("[%s] syncCollaborators: finished syncing %s; %s added; %s removed",
+                qc.getLogId(), repoFullName, changes.toAdd().size(), changes.toRemove().size());
+    }
+
+    /**
      * Core method to synchronize team members across GitHub teams.
      * Used by both organization-centric and project-centric implementations.
      *
@@ -294,12 +417,12 @@ public class GitHubTeamService {
         // Get the org and team
         GHOrganization org = qc.getOrganization(teamOrgName);
         if (org == null) {
-            Log.warnf("[%s] syncTeamMembers: organization %s not found", qc.getLogId(), teamOrgName);
+            Log.warnf("[%s] syncMembers: organization %s not found", qc.getLogId(), teamOrgName);
             return;
         }
         GHTeam team = getTeam(qc, org, relativeTeamName);
         if (team == null) {
-            Log.warnf("[%s] syncTeamMembers: team %s not found in %s", qc.getLogId(), relativeTeamName, teamOrgName);
+            Log.warnf("[%s] syncMembers: team %s not found in %s", qc.getLogId(), relativeTeamName, teamOrgName);
             return;
         }
 
@@ -307,30 +430,13 @@ public class GitHubTeamService {
         List<String> currentLogins = DataTeam.queryImmediateTeamMemberLogin(qc,
                 teamOrgName, relativeTeamName);
 
-        Set<String> toAdd = new HashSet<>(expectedLogins);
-        toAdd.removeAll(currentLogins);
-        toAdd.removeAll(ignoreUsers);
+        MembershipChanges changes = computeMemberChanges(false,
+                targetTeam, new HashSet<>(currentLogins), expectedLogins, ignoreUsers);
 
-        Set<String> toRemove = new HashSet<>(currentLogins);
-        toRemove.removeAll(expectedLogins);
-        toRemove.removeAll(ignoreUsers);
-
-        Set<String> finalLogins = new HashSet<>(currentLogins);
-        finalLogins.addAll(toAdd);
-        finalLogins.removeAll(toRemove);
-
-        if (toAdd.isEmpty() && toRemove.isEmpty()) {
-            Log.debugf("[%s] syncTeamMembers: No changes needed for team %s", qc.getLogId(), targetTeam);
+        if (changes.toAdd().isEmpty() && changes.toRemove().isEmpty()) {
+            Log.debugf("[%s] syncMembers: No changes needed for team %s", qc.getLogId(), targetTeam);
             return;
         }
-
-        // Create a record of changes
-        TeamChanges changes = new TeamChanges(
-                targetTeam,
-                new ArrayList<>(currentLogins),
-                new ArrayList<>(toAdd),
-                new ArrayList<>(toRemove),
-                new ArrayList<>(finalLogins));
 
         if (isDryRun) {
             sendNotificationEmail(qc, changes, true, Collections.emptySet(), addresses);
@@ -344,27 +450,27 @@ public class GitHubTeamService {
                 }
 
                 // Process removals first
-                for (String login : toRemove) {
+                for (String login : changes.toRemove()) {
                     try {
                         GHUser user = gh.getUser(login);
                         team.remove(user);
-                        Log.infof("[%s] syncTeamMembers: removed %s from %s", qc.getLogId(), login, targetTeam);
+                        Log.infof("[%s] syncMembers: removed %s from %s", qc.getLogId(), login, targetTeam);
                     } catch (IOException e) {
                         String errorMsg = String.format("Failed to remove user %s: %s", login, e.getMessage());
-                        Log.errorf(e, "[%s] syncTeamMembers: %s", qc.getLogId(), errorMsg);
+                        Log.errorf(e, "[%s] syncMembers: %s", qc.getLogId(), errorMsg);
                         errors.add(errorMsg);
                     }
                 }
 
                 // Then handle additions
-                for (String login : toAdd) {
+                for (String login : changes.toAdd()) {
                     try {
                         GHUser user = gh.getUser(login);
                         team.add(user);
-                        Log.infof("[%s] syncTeamMembers: added %s to %s", qc.getLogId(), login, targetTeam);
+                        Log.infof("[%s] syncMembers: added %s to %s", qc.getLogId(), login, targetTeam);
                     } catch (IOException e) {
                         String errorMsg = String.format("Failed to add user %s: %s", login, e.getMessage());
-                        Log.errorf(e, "[%s] syncTeamMembers: %s", qc.getLogId(), errorMsg);
+                        Log.errorf(e, "[%s] syncMembers: %s", qc.getLogId(), errorMsg);
                         errors.add(errorMsg);
                     }
                 }
@@ -378,42 +484,70 @@ public class GitHubTeamService {
             sendNotificationEmail(qc, changes, false, errors, addresses);
         }
 
-        Log.infof("[%s] syncTeamMembers: finished syncing %s; %s added; %s removed",
-                qc.getLogId(), targetTeam, toAdd.size(), toRemove.size());
+        Log.infof("[%s] syncMembers: finished syncing %s; %s added; %s removed",
+                qc.getLogId(), targetTeam, changes.toAdd().size(), changes.toRemove().size());
+    }
+
+    private MembershipChanges computeMemberChanges(boolean collaborators, String resourceName,
+            Set<String> currentLogins, Set<String> expectedLogins, List<String> ignoreUsers) {
+        Set<String> toAdd = new HashSet<>(expectedLogins);
+        toAdd.removeAll(currentLogins);
+        toAdd.removeAll(ignoreUsers);
+
+        Set<String> toRemove = new HashSet<>(currentLogins);
+        toRemove.removeAll(expectedLogins);
+        toRemove.removeAll(ignoreUsers);
+
+        Set<String> finalLogins = new HashSet<>(currentLogins);
+        finalLogins.addAll(toAdd);
+        finalLogins.removeAll(toRemove);
+
+        return new MembershipChanges(collaborators, resourceName, currentLogins, toAdd, toRemove, finalLogins);
     }
 
     // Record for team changes
-    public record TeamChanges(
-            String teamName,
-            List<String> previousMembers,
-            List<String> addedMembers,
-            List<String> removedMembers,
-            List<String> finalMembers) {
+    public record MembershipChanges(
+            boolean collaborators,
+            String fullName,
+            Set<String> previousMembers,
+            Set<String> addedMembers,
+            Set<String> removedMembers,
+            Set<String> finalMembers) {
+
+        public Set<String> toAdd() {
+            return addedMembers;
+        }
+
+        public Set<String> toRemove() {
+            return removedMembers;
+        }
     }
 
     // Send notification email (works for both dry run and audit)
-    private void sendNotificationEmail(QueryContext qc, TeamChanges changes,
-            boolean isDryRun, Set<String> errors,
-            EmailNotification addresses) {
+    private void sendNotificationEmail(QueryContext qc, MembershipChanges changes,
+            boolean isDryRun, Set<String> errors, EmailNotification addresses) {
 
         String[] recipients = isDryRun ? addresses.dryRun() : addresses.audit();
 
         if (recipients == null || recipients.length == 0) {
             Log.infof("[%s] sendNotificationEmail: No recipients configured. Changes for %s: Add=%s, Remove=%s",
-                    qc.getLogId(), changes.teamName(), changes.addedMembers(), changes.removedMembers());
+                    qc.getLogId(), changes.fullName(), changes.addedMembers(), changes.removedMembers());
             return;
         }
 
-        String actionPrefix = isDryRun ? "Dry Run" : "Audit";
-        String statusIndicator = (!isDryRun && !errors.isEmpty()) ? "⚠️" : "✅";
-        String title = String.format("%s %s: Team Member Sync for %s",
-                statusIndicator, actionPrefix, changes.teamName());
+        String unit = changes.collaborators() ? "Outside collaborators for repository" : "Team";
+
+        String title = String.format("%s %s changes for %s (%s)",
+                errors.isEmpty() ? "✅" : "⚠️",
+                changes.collaborators() ? "Outside collaborator" : "Team membership",
+                changes.fullName(),
+                isDryRun ? "Dry Run" : "Audit");
 
         StringBuilder txtBody = new StringBuilder();
         if (isDryRun) {
-            txtBody.append(String.format("Team %s would have the following changes:\n\n", changes.teamName()));
+            txtBody.append(String.format("%s %s would have the following changes:\n\n", unit, changes.fullName()));
         } else {
-            txtBody.append(String.format("Team %s has been updated with the following changes:\n\n", changes.teamName()));
+            txtBody.append(String.format("%s %s has been updated with the following changes:\n\n", unit, changes.fullName()));
         }
 
         txtBody.append(String.format("""
@@ -445,8 +579,7 @@ public class GitHubTeamService {
                 changes.finalMembers().size(),
                 formatMembers(changes.finalMembers())));
 
-        String emailType = isDryRun ? "TeamSync|DryRun" : "TeamSync|Audit";
-        qc.sendEmail(emailType, title, txtBody.toString(), recipients);
+        qc.sendEmail(qc.getLogId(), title, txtBody.toString(), recipients);
 
         if (!errors.isEmpty()) {
             txtBody.append("\nErrors encountered during sync:\n");
@@ -455,7 +588,7 @@ public class GitHubTeamService {
             }
 
             // Note the scope for this error report: team sync scope first.
-            qc.sendEmail(emailType, title + " finished with errors", txtBody.toString(),
+            qc.sendEmail(qc.getLogId(), title + " finished with errors", txtBody.toString(),
                     getErrorAddresses(addresses, qc));
         }
     }
@@ -470,7 +603,7 @@ public class GitHubTeamService {
     }
 
     // Format a list of members for email display
-    private String formatMembers(List<String> members) {
+    private String formatMembers(Collection<String> members) {
         if (members == null || members.isEmpty()) {
             return "None";
         }

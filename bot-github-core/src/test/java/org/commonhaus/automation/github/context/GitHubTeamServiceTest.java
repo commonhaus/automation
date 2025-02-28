@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,6 +27,8 @@ import org.commonhaus.automation.github.context.QueryContext.GitHubParameterApiC
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHOrganization;
+import org.kohsuke.github.GHOrganization.RepositoryRole;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -58,11 +61,13 @@ public class GitHubTeamServiceTest {
 
     private static final long INSTALL_ID = 46053716;
     private static final long ORG_ID = 144493209;
-    private static final String TEAM_FULL_NAME = "test-org/test-team";
     private static final String ORG_NAME = "test-org";
+    private static final String REPO_FULL_NAME = "test-org/test-repo";
     private static final String TEAM_NAME = "test-team";
+    private static final String TEAM_FULL_NAME = "test-org/test-team";
 
     private GHOrganization organization;
+    private GHRepository repository;
     private GHTeam team;
     private GitHub github;
     private DynamicGraphQLClient dql;
@@ -87,6 +92,7 @@ public class GitHubTeamServiceTest {
         dql = mocks.installationGraphQLClient(INSTALL_ID);
 
         organization = mocks.ghObject(GHOrganization.class, ORG_ID);
+        repository = mocks.repository(REPO_FULL_NAME);
         team = mock(GHTeam.class);
 
         // Setup basic relationships
@@ -94,12 +100,15 @@ public class GitHubTeamServiceTest {
         when(organization.getTeamByName(TEAM_NAME)).thenReturn(team);
         when(team.getName()).thenReturn(TEAM_NAME);
 
-        // Setup query context behavior
-        when(queryContext.getOrganization(ORG_NAME)).thenReturn(organization);
-        when(queryContext.getLogId()).thenReturn("TEST");
+        when(repository.getFullName()).thenReturn(REPO_FULL_NAME);
 
+        // Setup query context behavior
         when(queryContext.getGitHub()).thenReturn(github);
         when(queryContext.getGraphQLClient()).thenReturn(dql);
+        when(queryContext.getOrganization(ORG_NAME)).thenReturn(organization);
+        when(queryContext.getRepository(REPO_FULL_NAME)).thenReturn(repository);
+
+        when(queryContext.getLogId()).thenReturn("TEST");
         when(queryContext.isDryRun()).thenReturn(defaultDryRun);
         when(queryContext.getErrorAddresses()).thenReturn(new String[] { "bot-error@example.com" });
 
@@ -223,7 +232,7 @@ public class GitHubTeamServiceTest {
 
         // Verify an audit email was sent
         verify(queryContext).sendEmail(
-                eq(defaultDryRun ? "TeamSync|DryRun" : "TeamSync|Audit"),
+                anyString(),
                 anyString(),
                 anyString(),
                 eq(defaultDryRun ? emailNotification.dryRun() : emailNotification.audit()));
@@ -333,7 +342,7 @@ public class GitHubTeamServiceTest {
         GHUser user3 = mockUser("user3");
         mockUser("user4");
         mockUser("user5");
-        when(github.getUser("errorUser")).thenThrow(new IOException("User not found"));
+        when(github.getUser("errorUser")).thenThrow(new TestIOException("Test user not found"));
 
         // Setup current team members
         Set<String> currentLogins = Set.of("user1", "user2", "user3");
@@ -348,7 +357,7 @@ public class GitHubTeamServiceTest {
         doAnswer(invocation -> {
             GHUser user = invocation.getArgument(0);
             if (user.getLogin().equals("user3")) {
-                throw new IOException("Error removing user3");
+                throw new TestIOException("Test error removing user3");
             }
             return null;
         }).when(team).remove(user3);
@@ -363,17 +372,76 @@ public class GitHubTeamServiceTest {
 
         // Verify error emails were sent
         verify(queryContext).sendEmail(
-                eq("TeamSync|Audit"),
+                anyString(),
                 anyString(),
                 anyString(),
                 eq(emailNotification.audit()));
 
         verify(queryContext).sendEmail(
-                eq("TeamSync|Audit"),
+                anyString(),
                 anyString(),
                 anyString(),
                 argThat(array -> array != null &&
                         Arrays.asList(array).containsAll(List.of("team-error@example.com", "bot-error@example.com"))));
+    }
+
+    @Test
+    void testSyncCollaborators() throws IOException {
+        // Mock repository and users
+        mockUser("user1");
+        mockUser("user2");
+        mockUser("user3");
+        mockUser("user4");
+        mockUser("user5");
+
+        // Setup current collaborators
+        Set<String> currentCollaborators = Set.of("user1", "user2", "user3");
+        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4 and user5 should be added)
+        Set<String> expectedLogins = Set.of("user2", "user4", "user5");
+
+        when(repository.getCollaboratorNames()).thenReturn(currentCollaborators);
+
+        // Test syncing collaborators
+        teamService.syncCollaborators(queryContext, repository, expectedLogins, List.of(),
+                defaultDryRun, emailNotification);
+
+       if (defaultDryRun) {
+            // Verify no changes were made
+            verify(repository, times(0)).removeCollaborators(anyList());
+            verify(repository, times(0)).addCollaborators(anyList(), any(RepositoryRole.class));
+        } else {
+            // Verify users were added and removed correctly
+
+            // Capture removed users
+            ArgumentCaptor<List<GHUser>> removeCaptor = ArgumentCaptor.captor();
+            verify(repository, times(1)).removeCollaborators(removeCaptor.capture());
+
+            // Capture added users
+            ArgumentCaptor<List<GHUser>> addCaptor = ArgumentCaptor.captor();
+            verify(repository, times(1)).addCollaborators(addCaptor.capture(), any(RepositoryRole.class));
+
+            // Check the right users were added and removed
+            List<GHUser> addedUsers = addCaptor.getValue();
+            List<GHUser> removedUsers = removeCaptor.getValue();
+
+            assertThat(addedUsers.stream().map(GHUser::getLogin))
+                    .containsExactlyInAnyOrder("user4", "user5");
+            assertThat(removedUsers.stream().map(GHUser::getLogin))
+                    .containsExactlyInAnyOrder("user1", "user3");
+        }
+
+        // Verify an audit email was sent
+        verify(queryContext).sendEmail(
+                anyString(),
+                anyString(),
+                anyString(),
+                eq(defaultDryRun ? emailNotification.dryRun() : emailNotification.audit()));
+    }
+
+    @Test
+    void testSyncCollaboratorsDryRun() throws IOException {
+        defaultDryRun = true;
+        testSyncCollaborators();
     }
 
     // Helper methods

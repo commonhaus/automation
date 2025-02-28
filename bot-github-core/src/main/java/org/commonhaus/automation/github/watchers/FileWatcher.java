@@ -6,11 +6,15 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
+
+import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class FileWatcher implements Watcher {
@@ -24,6 +28,20 @@ public class FileWatcher implements Watcher {
         this.periodicSync = periodicSync;
     }
 
+    /**
+     * Create a new file watcher for the specified repository and file.
+     * When the file is updated, the callback will be invoked.
+     * <p>
+     * Registered watchers will be automatically cleaned up if app loses visiblity to the
+     * repository or organization (DiscoveryAction: REMOVED, INSTALL_REMOVED)
+     *
+     *
+     * @param taskGroupName Name of the task group to use for periodic updates
+     * @param installationId Installation ID for the repository
+     * @param repoName Name of the repository
+     * @param fileName Name of the file to watch
+     * @param callback Callback function to invoke when the file is updated (with FileUpdate object)
+     */
     public void watchFile(String taskGroupName, long installationId, String repoName, String fileName,
             Consumer<FileUpdate> callback) {
         repositoryFiles.computeIfAbsent(repoName, k -> new WatchedFiles(repoName, installationId))
@@ -43,8 +61,34 @@ public class FileWatcher implements Watcher {
         watcher.handlePush(fileEvent, periodicSync);
     }
 
+    /**
+     * Refresh all watched files (periodic update)
+     */
     public void refresh() {
         // TODO: revisit all watched files and drive associated callbacks
+    }
+
+    /**
+     * Watch for repository discovery events and clean up watchers
+     * if repositories or installations (association between GH App and an Organization)
+     * are removed
+     *
+     * @param repoEvent
+     */
+    protected void onRepositoryDiscovery(@Observes RepositoryDiscoveryEvent repoEvent) {
+        if (repoEvent.removed()) {
+            if (repoEvent.installation()) {
+                // If an entire installation is removed, clean up all watchers for that installation
+                long installationId = repoEvent.installationId();
+                repositoryFiles.entrySet().removeIf(entry -> entry.getValue().installationId == installationId);
+                Log.debugf("%s: cleared watchers for installation %d", me, installationId);
+            } else {
+                // Otherwise just remove watchers for the specific repository
+                String repoFullName = repoEvent.repository().getFullName();
+                repositoryFiles.remove(repoFullName);
+                Log.debugf("%s: cleared watchers for repository %s", me, repoFullName);
+            }
+        }
     }
 
     static class WatchedFiles {
