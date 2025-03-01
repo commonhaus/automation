@@ -140,6 +140,12 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     reactableId,
     reactions,
 
+    // Team, Collaborator, and membership events
+    member,
+    privacy,
+    slug,
+    team,
+
     // GraphQL Query attributes
     endCursor,
     hasNextPage,
@@ -301,6 +307,14 @@ public enum JsonAttribute implements JsonAttributeAccessor {
         return field == null
                 ? new DataPageInfo(null, false)
                 : new DataPageInfo(object);
+    }
+
+    /**
+     * @return DataTier constructed from nodeName (or name()) attribute of object
+     */
+    public DataTeam teamFrom(JsonObject object) {
+        JsonObject field = jsonObjectFrom(object);
+        return field == null ? null : new DataTeam(field);
     }
 
     /**

@@ -20,6 +20,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.kohsuke.github.GHOrganization;
+import org.kohsuke.github.GHOrganization.RepositoryRole;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
@@ -59,18 +60,19 @@ public class GitHubTeamService {
         TEAM_MEMBERS.invalidate(teamFullName);
     }
 
-    /**
-     * Invalidate the cache for the specified team to force
-     * a refresh on the next access.
-     *
-     * @param org
-     * @param ghTeam
-     */
-    public void refreshTeam(GHOrganization org, GHTeam ghTeam) {
-        // Normalize team name to include org name
-        String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
-        String teamFullName = org.getLogin() + "/" + relativeName;
-        refreshTeam(org, teamFullName);
+    Set<String> getCachedCollaborators(String repoFullName) {
+        return COLLABORATORS.get(repoFullName);
+    }
+
+    Set<String> putCachedCollaborators(String repoFullName, Set<String> members) {
+        if (members != null) {
+            COLLABORATORS.put(repoFullName, members);
+        }
+        return members;
+    }
+
+    public void refreshCollaborators(String repoFullName) {
+        COLLABORATORS.invalidate(repoFullName);
     }
 
     /**
@@ -80,9 +82,27 @@ public class GitHubTeamService {
      * @param org
      * @param ghTeam
      */
-    public void refreshTeam(GHOrganization org, String teamFullName) {
+    public void refreshTeam(GHOrganization org, GHTeam ghTeam) {
+        // Normalize team name to include org name
+        String teamFullName = getFullTeamName(org, ghTeam);
+        refreshTeam(teamFullName);
+    }
+
+    /**
+     * Invalidate the cache for the specified team to force
+     * a refresh on the next access.
+     *
+     * @param org
+     * @param ghTeam
+     */
+    public void refreshTeam(String teamFullName) {
         resetCachedTeam(teamFullName);
         resetCachedTeamMembers(teamFullName);
+    }
+
+    public String getFullTeamName(GHOrganization org, GHTeam ghTeam) {
+        String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
+        return org.getLogin() + "/" + relativeName;
     }
 
     /**
@@ -223,7 +243,7 @@ public class GitHubTeamService {
             return null;
         });
         qc.clearNotFound();
-        refreshTeam(org, teamFullName);
+        refreshTeam(teamFullName);
     }
 
     /**
@@ -252,7 +272,7 @@ public class GitHubTeamService {
             return Set.of();
         }
         String repoFullName = repository.getFullName();
-        Set<String> collaborators = COLLABORATORS.get(repoFullName);
+        Set<String> collaborators = getCachedCollaborators(repoFullName);
         if (collaborators == null) {
             collaborators = qc.execGitHubSync((gh, dryRun) -> {
                 return repository.getCollaboratorNames();
@@ -262,7 +282,7 @@ public class GitHubTeamService {
                 collaborators = Set.of();
             }
             Log.debugf("%s members: %s", repoFullName, collaborators);
-            COLLABORATORS.put(repoFullName, collaborators);
+            putCachedCollaborators(repoFullName, collaborators);
         }
         return collaborators;
     }
@@ -286,7 +306,7 @@ public class GitHubTeamService {
             return null;
         });
         qc.clearNotFound();
-        COLLABORATORS.invalidate(repo.getFullName());
+        refreshCollaborators(repo.getFullName());
     }
 
     /**
@@ -305,12 +325,13 @@ public class GitHubTeamService {
      *
      * @param qc QueryContext
      * @param repository The repository to update collaborators for
+     * @param role The role to assign to new collaborators
      * @param expectedLogins Set of logins that should be collaborators
      * @param ignoreUsers List of users to ignore (not add or remove)
      * @param isDryRun Whether to perform actions or just report what would happen
      * @param addresses Email notification addresses
      */
-    public void syncCollaborators(QueryContext qc, GHRepository repository,
+    public void syncCollaborators(QueryContext qc, GHRepository repository, RepositoryRole role,
             Set<String> expectedLogins, List<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
 
@@ -373,8 +394,7 @@ public class GitHubTeamService {
                     }
 
                     try {
-                        repository.addCollaborators(toAdd,
-                                GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
+                        repository.addCollaborators(toAdd, role);
                     } catch (IOException e) {
                         String errorMsg = String.format("Failed to add collaborators: %s", e.getMessage());
                         Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
@@ -386,7 +406,7 @@ public class GitHubTeamService {
             });
 
             // invalidate cache to force refresh/re-fetch
-            COLLABORATORS.invalidate(repoFullName);
+            refreshCollaborators(repoFullName);
 
             // Send notification with results
             sendNotificationEmail(qc, changes, false, errors, addresses);
@@ -478,7 +498,7 @@ public class GitHubTeamService {
             });
 
             // invalidate cache to force refresh/re-fetch
-            refreshTeam(org, targetTeam);
+            refreshTeam(targetTeam);
 
             // Send notification with results
             sendNotificationEmail(qc, changes, false, errors, addresses);

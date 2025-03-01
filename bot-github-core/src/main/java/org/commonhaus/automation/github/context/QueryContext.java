@@ -137,7 +137,6 @@ public class QueryContext {
      * @return this context
      */
     public QueryContext withExisting(GitHub github) {
-        ctx.updateConnection(installationId, github);
         this.github = github;
         return this;
     }
@@ -163,7 +162,6 @@ public class QueryContext {
      * @return this context
      */
     public QueryContext withExisting(DynamicGraphQLClient graphQLClient) {
-        ctx.updateConnection(installationId, graphQLClient);
         this.graphQLClient = graphQLClient;
         return this;
     }

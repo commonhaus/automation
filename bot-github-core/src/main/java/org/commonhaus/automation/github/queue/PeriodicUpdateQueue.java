@@ -122,8 +122,14 @@ public class PeriodicUpdateQueue {
             }
         }
 
-        // Execute the main task
-        task.task().run();
+        try {
+            // Execute the main task
+            task.task().run();
+        } catch (Exception e) {
+            logMailer.logAndSendEmail("queue",
+                    "Error running %s %s task".formatted(task.type(), task.name()),
+                    e, logMailer.botErrorEmailAddress());
+        }
 
         Log.debugf("%s %s task completed; %s remaining", task.type(), task.name(), taskQueue.size());
     }

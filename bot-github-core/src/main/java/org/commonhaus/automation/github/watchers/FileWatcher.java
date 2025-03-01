@@ -1,8 +1,10 @@
 package org.commonhaus.automation.github.watchers;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,7 +19,7 @@ import org.kohsuke.github.GitHub;
 import io.quarkus.logging.Log;
 
 @ApplicationScoped
-public class FileWatcher implements Watcher {
+public class FileWatcher {
     static final String me = "fileWatcher";
 
     final Map<String, WatchedFiles> repositoryFiles = new HashMap<>();
@@ -26,46 +28,6 @@ public class FileWatcher implements Watcher {
 
     public FileWatcher(PeriodicUpdateQueue periodicSync) {
         this.periodicSync = periodicSync;
-    }
-
-    /**
-     * Create a new file watcher for the specified repository and file.
-     * When the file is updated, the callback will be invoked.
-     * <p>
-     * Registered watchers will be automatically cleaned up if app loses visiblity to the
-     * repository or organization (DiscoveryAction: REMOVED, INSTALL_REMOVED)
-     *
-     *
-     * @param taskGroupName Name of the task group to use for periodic updates
-     * @param installationId Installation ID for the repository
-     * @param repoName Name of the repository
-     * @param fileName Name of the file to watch
-     * @param callback Callback function to invoke when the file is updated (with FileUpdate object)
-     */
-    public void watchFile(String taskGroupName, long installationId, String repoName, String fileName,
-            Consumer<FileUpdate> callback) {
-        repositoryFiles.computeIfAbsent(repoName, k -> new WatchedFiles(repoName, installationId))
-                .add(fileName, new TaskCallback(taskGroupName, callback));
-    }
-
-    public void handleEvent(FilePushEvent fileEvent) {
-        GHRepository repo = fileEvent.repository();
-        GHEventPayload.Push pushEvent = fileEvent.pushEvent();
-        WatchedFiles watcher = repositoryFiles.get(repo.getFullName());
-
-        // Only watch the main branch of repositories we are monitoring
-        if (watcher == null || !pushEvent.getRef().equals("refs/heads/main")) {
-            return;
-        }
-
-        watcher.handlePush(fileEvent, periodicSync);
-    }
-
-    /**
-     * Refresh all watched files (periodic update)
-     */
-    public void refresh() {
-        // TODO: revisit all watched files and drive associated callbacks
     }
 
     /**
@@ -91,10 +53,43 @@ public class FileWatcher implements Watcher {
         }
     }
 
+    /**
+     * Create a new file watcher for the specified repository and file.
+     * When the file is updated, the callback will be invoked.
+     * <p>
+     * Registered watchers will be automatically cleaned up if app loses visiblity to the
+     * repository or organization (DiscoveryAction: REMOVED, INSTALL_REMOVED)
+     *
+     *
+     * @param taskGroupName Name of the task group to use for periodic updates
+     * @param installationId Installation ID for the repository
+     * @param repoName Name of the repository
+     * @param fileName Name of the file to watch
+     * @param callback Callback function to invoke when the file is updated (with FileUpdate object)
+     */
+    public void watchFile(String taskGroupName, long installationId, String repoName, String fileName,
+            Consumer<FileUpdate> callback) {
+        repositoryFiles.computeIfAbsent(repoName, k -> new WatchedFiles(repoName, installationId))
+                .add(fileName, new TaskCallback<FileUpdate>(taskGroupName, callback));
+    }
+
+    public void handleEvent(FilePushEvent fileEvent) {
+        GHRepository repo = fileEvent.repository();
+        GHEventPayload.Push pushEvent = fileEvent.pushEvent();
+        WatchedFiles watcher = repositoryFiles.get(repo.getFullName());
+
+        // Only watch the main branch of repositories we are monitoring
+        if (watcher == null || !pushEvent.getRef().equals("refs/heads/main")) {
+            return;
+        }
+
+        watcher.handlePush(fileEvent, periodicSync);
+    }
+
     static class WatchedFiles {
         final String repoFullName;
         final long installationId;
-        final Map<String, TaskCallback> filesByPath = new HashMap<>();
+        final Map<String, Set<TaskCallback<FileUpdate>>> filesByPath = new HashMap<>();
 
         public WatchedFiles(String repoFullName, long installationId) {
             this.repoFullName = repoFullName;
@@ -107,8 +102,9 @@ public class FileWatcher implements Watcher {
          * @param filePath Path of file to watch
          * @param callback Callback to invoke if this file is changed
          */
-        public void add(String fileName, TaskCallback callback) {
-            filesByPath.put(fileName, callback);
+        public void add(String filePath, TaskCallback<FileUpdate> callback) {
+            filesByPath.computeIfAbsent(filePath, k -> new HashSet<>())
+                    .add(callback);
         }
 
         /**
@@ -120,13 +116,15 @@ public class FileWatcher implements Watcher {
          */
         public void handlePush(FilePushEvent event, PeriodicUpdateQueue periodicSync) {
             for (var entry : filesByPath.entrySet()) {
-                if (commitsContain(event.pushEvent(), entry.getKey())) {
-                    FileUpdate update = new FileUpdate(entry.getKey(), event.repository(), event.github());
-                    TaskCallback worker = entry.getValue();
-
-                    // Found an interesting file in the push event, queue an update
-                    periodicSync.queue(worker.taskGroupName(),
-                            () -> worker.run(update));
+                Set<TaskCallback<FileUpdate>> callbacks = entry.getValue();
+                FileUpdateType updateType = commitsContain(event.pushEvent(), entry.getKey());
+                if (updateType != null) {
+                    FileUpdate update = new FileUpdate(entry.getKey(), updateType, event);
+                    for (var callback : callbacks) {
+                        // Found an interesting file in the push event, queue an update
+                        periodicSync.queue(callback.taskGroupName(),
+                                () -> callback.run(update));
+                    }
                     break;
                 }
             }
@@ -139,10 +137,19 @@ public class FileWatcher implements Watcher {
          * @param path the path to check
          * @return true if the push event contains changes to the path
          */
-        boolean commitsContain(GHEventPayload.Push pushEvent, String path) {
-            return pushEvent.getCommits().stream()
-                    .anyMatch(commit -> commit.getAdded().contains(path)
-                            || commit.getModified().contains(path));
+        FileUpdateType commitsContain(GHEventPayload.Push pushEvent, String path) {
+            FileUpdateType updateType = null;
+            for (var commit : pushEvent.getCommits()) {
+                // Last one wins.
+                if (commit.getAdded().contains(path)) {
+                    updateType = FileUpdateType.ADDED;
+                } else if (commit.getRemoved().contains(path)) {
+                    updateType = FileUpdateType.REMOVED;
+                } else if (commit.getModified().contains(path)) {
+                    updateType = FileUpdateType.MODIFIED;
+                }
+            }
+            return updateType;
         }
 
         @Override
@@ -160,23 +167,27 @@ public class FileWatcher implements Watcher {
         }
     }
 
-    public static record TaskCallback(
-            String taskGroupName,
-            Consumer<FileUpdate> callback) {
-
-        public void run(FileUpdate update) {
-            callback.accept(update);
-        }
+    public enum FileUpdateType {
+        ADDED,
+        MODIFIED,
+        REMOVED
     }
 
     public static record FileUpdate(
             String filePath,
+            FileUpdateType updateType,
+            long installationId,
             GHRepository repository,
             GitHub github) {
+
+        public FileUpdate(String filePath, FileUpdateType updateType, FilePushEvent pushEvent) {
+            this(filePath, updateType, pushEvent.installationId(), pushEvent.repository(), pushEvent.github());
+        }
     }
 
     public static record FilePushEvent(
             GHEventPayload.Push pushEvent,
+            long installationId,
             GHRepository repository,
             GitHub github) {
     }

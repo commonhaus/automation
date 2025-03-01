@@ -8,8 +8,11 @@ import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.config.BotConfig;
+import org.commonhaus.automation.github.context.JsonAttribute;
+import org.commonhaus.automation.github.context.JsonAttributeAccessor;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHAppInstallation;
@@ -47,9 +50,6 @@ public class RepositoryDiscovery {
     @Inject
     Event<BootstrapDiscoveryEvent> postBootstrapDiscovery;
 
-    @Inject
-    Event<ConnectionEvent> connectionEvent;
-
     // discoverRepositories is/was being called twice. Avoid double discovery
     static final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -74,21 +74,77 @@ public class RepositoryDiscovery {
     }
 
     /**
-     * Fire event to refresh connections for installations when a
-     * GitHub event for an installation is received.
-     *
-     * @param event
-     * @param github
-     * @param graphQLClient
+     * Respond to installation changes
      */
-    void onEvent(@RawEvent GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient) {
-        if (event == null || event.getInstallationId() == null) {
-            return;
-        }
+    void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent,
+            GitHub github, DynamicGraphQLClient graphQLClient) {
 
-        connectionEvent.fire(new ConnectionEvent(event.getInstallationId(), github, graphQLClient));
+        String action = gitHubEvent.getAction();
+        JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
+        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+        long installationId = JsonAttribute.id.longFrom(installation);
+
+        List<GHRepository> repositories = JsonAttribute.repositories.repositoriesFrom(payload);
+
+        switch (action) {
+            case "created", "unsuspend" -> {
+                for (GHRepository repo : repositories) {
+                    repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                            DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
+                            repo, false));
+                }
+            }
+            case "deleted", "suspend" -> {
+                for (GHRepository repo : repositories) {
+                    repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                            DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
+                            repo, false));
+                }
+            }
+            default -> {
+            }
+        }
     }
 
+    /**
+     * Respond to App Installation repository changes.
+     *
+     * Sender may be null if the event is from a webhook, which is not handled
+     * by the GitHub API.
+     */
+    void onInstallationRepositoryChange(@RawEvent(event = "installation_repositories") GitHubEvent gitHubEvent,
+            GitHub github, DynamicGraphQLClient graphQLClient) {
+
+        JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
+        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+        long installationId = JsonAttribute.id.longFrom(installation);
+
+        List<GHRepository> added = JsonAttribute.repositoriesAdded.repositoriesFrom(payload);
+        List<GHRepository> removed = JsonAttribute.repositoriesRemoved.repositoriesFrom(payload);
+
+        handleRepositoryChanges(github, graphQLClient, installationId,
+                added == null ? List.of() : added,
+                removed == null ? List.of() : removed);
+    }
+
+    protected void handleRepositoryChanges(GitHub github, DynamicGraphQLClient graphQLClient, long installationId,
+            List<GHRepository> added, List<GHRepository> removed) {
+        for (GHRepository repo : added) {
+            repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                    DiscoveryAction.ADDED, github, graphQLClient, installationId,
+                    repo, false));
+        }
+
+        for (GHRepository repo : removed) {
+            repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                    DiscoveryAction.REMOVED, github, graphQLClient, installationId,
+                    repo, false));
+        }
+    }
+
+    /**
+     * Discover repositories for all installations.
+     */
     void discoverRepositories() {
         LogMailer mailer = Arc.container().instance(LogMailer.class).orElse(new LogMailer());
 

@@ -401,11 +401,12 @@ public class GitHubTeamServiceTest {
 
         when(repository.getCollaboratorNames()).thenReturn(currentCollaborators);
 
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole.from(GHOrganization.Permission.PUSH);
         // Test syncing collaborators
-        teamService.syncCollaborators(queryContext, repository, expectedLogins, List.of(),
-                defaultDryRun, emailNotification);
+        teamService.syncCollaborators(queryContext, repository, collaboratorRole,
+                expectedLogins, List.of(), defaultDryRun, emailNotification);
 
-       if (defaultDryRun) {
+        if (defaultDryRun) {
             // Verify no changes were made
             verify(repository, times(0)).removeCollaborators(anyList());
             verify(repository, times(0)).addCollaborators(anyList(), any(RepositoryRole.class));
