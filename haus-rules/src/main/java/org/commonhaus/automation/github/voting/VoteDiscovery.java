@@ -18,7 +18,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.RepositoryConfigFile;
-import org.commonhaus.automation.Routes;
+import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.AppContextService;
 import org.commonhaus.automation.github.ScheduledQueryContext;
 import org.commonhaus.automation.github.ScheduledQueryContext.ScheduledItemQueryContext;
@@ -66,7 +66,7 @@ public class VoteDiscovery {
             }
         }, 0, 10, TimeUnit.SECONDS);
 
-        Routes.registerSupplier("VoteDiscovery", () -> lastRun);
+        RouteSupplier.registerSupplier("VoteDiscovery", () -> lastRun);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -135,7 +135,7 @@ public class VoteDiscovery {
         Log.infof("discoverVotes: queue repository %s", ghRepository.getFullName());
         taskQueue.add(() -> {
             ScheduledQueryContext qc = ctx.newScheduledQueryContext(ghRepository, installationId)
-                    .addExisting(github);
+                    .withExisting(github);
             queryRepository(qc, voteConfig);
         });
     }

@@ -71,13 +71,13 @@ public class ScheduledQueryContext extends QueryContext {
         return ActionType.bot;
     }
 
-    public ScheduledQueryContext addExisting(GitHub github) {
-        super.addExisting(github);
+    public ScheduledQueryContext withExisting(GitHub github) {
+        super.withExisting(github);
         return this;
     }
 
-    public ScheduledQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
-        super.addExisting(graphQLClient);
+    public ScheduledQueryContext withExisting(DynamicGraphQLClient graphQLClient) {
+        super.withExisting(graphQLClient);
         return this;
     }
 
