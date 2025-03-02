@@ -3,7 +3,7 @@ package org.commonhaus.automation;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.hm.AppContextService;
+import org.commonhaus.automation.config.BotConfig;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Quarkus;
@@ -20,18 +20,16 @@ public class Main {
     }
 
     public static class ApplicationRoot implements QuarkusApplication {
-
         @Inject
-        AppContextService ctx;
+        BotConfig botConfig;
 
         @Override
         public int run(String... args) {
-            java.security.Security.setProperty("networkaddress.cache.ttl", "0");
             java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0");
 
-            System.out.println("discoveryEnabled=" + ctx.isDiscoveryEnabled());
-            System.out.println("dryRun=" + ctx.isDryRun());
-            System.out.println("replyTo=" + ctx.replyTo().orElse("N/A"));
+            System.out.println("discoveryEnabled=" + botConfig.isDiscoveryEnabled());
+            System.out.println("dryRun=" + botConfig.isDryRun());
+            System.out.println("replyTo=" + botConfig.replyTo().orElse("N/A"));
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()
             Quarkus.waitForExit();
@@ -39,11 +37,11 @@ public class Main {
         }
 
         void onStart(@Observes StartupEvent ev) {
-            Log.infof("Bot started. dryRun=%s", ctx.isDryRun());
+            Log.infof("Bot started. dryRun=%s", botConfig.isDryRun());
         }
 
         void onStop(@Observes ShutdownEvent ev) {
-            Log.infof("Bot stopping. dryRun=%s", ctx.isDryRun());
+            Log.infof("Bot stopping. dryRun=%s", botConfig.isDryRun());
         }
     }
 }

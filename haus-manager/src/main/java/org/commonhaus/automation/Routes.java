@@ -2,10 +2,8 @@ package org.commonhaus.automation;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
+
+import org.commonhaus.automation.config.RouteSupplier;
 
 import io.quarkus.qute.Engine;
 import io.quarkus.vertx.web.Route;
@@ -15,12 +13,6 @@ import io.vertx.ext.web.RoutingContext;
 
 public class Routes {
 
-    private static final Map<String, Supplier<String>> suppliers = new HashMap<>();
-
-    public static void registerSupplier(String key, Supplier<String> supplier) {
-        suppliers.put(key, supplier);
-    }
-
     private final Engine engine;
 
     Routes(Engine engine) {
@@ -29,14 +21,11 @@ public class Routes {
 
     @Route(path = "/", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void handleRootRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
-        Map<String, String> result = suppliers.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
-
         routingExchange
                 .ok()
                 .putHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex")
                 .end(engine.getTemplate("index.html")
-                        .data("items", result)
+                        .data("items", RouteSupplier.attributes())
                         .data("now", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
                         .render());
     }
