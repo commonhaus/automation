@@ -73,6 +73,16 @@ public class FileWatcher {
                 .add(fileName, new TaskCallback<FileUpdate>(taskGroupName, callback));
     }
 
+    public void unwatchAll(String taskGroup) {
+        for (var entry : repositoryFiles.entrySet()) {
+            entry.getValue().filesByPath.values().removeIf(callbacks -> {
+                callbacks.removeIf(callback -> callback.taskGroupName().equals(taskGroup));
+                return callbacks.isEmpty();
+            });
+        }
+        repositoryFiles.values().removeIf(x -> x.filesByPath.isEmpty());
+    }
+
     public void handleEvent(FilePushEvent fileEvent) {
         GHRepository repo = fileEvent.repository();
         GHEventPayload.Push pushEvent = fileEvent.pushEvent();

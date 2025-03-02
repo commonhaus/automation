@@ -1,5 +1,8 @@
 package org.commonhaus.automation.github.watchers;
 
+import static org.commonhaus.automation.github.context.GitHubTeamService.getFullTeamName;
+import static org.commonhaus.automation.github.context.GitHubTeamService.refreshCollaborators;
+import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
 import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
 
@@ -109,6 +112,16 @@ public class MembershipWatcher {
         }
     }
 
+    public void unwatchAll(String taskGroup) {
+        for (var entry : orgWatchers.entrySet()) {
+            entry.getValue().watchedResources.values().removeIf(callbacks -> {
+                callbacks.removeIf(callback -> callback.taskGroupName().equals(taskGroup));
+                return callbacks.isEmpty();
+            });
+        }
+        orgWatchers.values().removeIf(x -> x.watchedResources.isEmpty());
+    }
+
     /**
      * An event fired due to activity relating to a team
      * <p>
@@ -120,14 +133,14 @@ public class MembershipWatcher {
      */
     public void handleTeamEvent(TeamEvent teamEvent) {
         String orgName = teamEvent.organization().getLogin();
-        String teamFullName = teamService.getFullTeamName(
+        String teamFullName = getFullTeamName(
                 teamEvent.organization(), teamEvent.team());
 
         Log.debugf("[%s-%s] team membership change in %s for %s", ME,
                 teamEvent.installationId(), orgName, teamFullName);
 
         // Always clear cache for modified team
-        teamService.refreshTeam(teamFullName);
+        refreshTeam(teamFullName);
 
         WatchedTeams watcher = orgWatchers.get(orgName);
         if (watcher == null) {
@@ -160,7 +173,7 @@ public class MembershipWatcher {
         Log.debugf("[%s] collaborator change in %s", ME, repoFullName);
 
         // Always clear cache for modified collaborators
-        teamService.refreshCollaborators(repoFullName);
+        refreshCollaborators(repoFullName);
 
         WatchedTeams watcher = orgWatchers.get(orgName);
         if (watcher == null) {

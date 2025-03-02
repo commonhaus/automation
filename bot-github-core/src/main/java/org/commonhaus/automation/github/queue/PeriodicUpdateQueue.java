@@ -68,6 +68,7 @@ public class PeriodicUpdateQueue {
     private static volatile String reconciled = "never";
 
     void startup(@Observes StartupEvent startup) {
+        Log.debugf("Starting PeriodicUpdateQueue");
         int initialDelay = LaunchMode.current() == LaunchMode.TEST
                 ? 1
                 : 15;

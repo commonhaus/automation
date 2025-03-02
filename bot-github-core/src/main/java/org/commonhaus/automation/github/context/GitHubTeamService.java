@@ -30,48 +30,48 @@ import io.quarkus.logging.Log;
 @ApplicationScoped
 public class GitHubTeamService {
 
-    GHTeam getCachedTeam(String teamFullName) {
+    static GHTeam getCachedTeam(String teamFullName) {
         return TEAM_MEMBERS.get("ghTeam-" + teamFullName);
     }
 
-    GHTeam putCachedTeam(GHTeam team, String teamFullName) {
+    static GHTeam putCachedTeam(String teamFullName, GHTeam team) {
         if (team != null) {
             TEAM_MEMBERS.put("ghTeam-" + teamFullName, team);
         }
         return team;
     }
 
-    void resetCachedTeam(String teamFullName) {
+    static void resetCachedTeam(String teamFullName) {
         TEAM_MEMBERS.invalidate("ghTeam-" + teamFullName);
     }
 
-    Set<GHUser> getCachedTeamMembers(String teamFullName) {
+    static Set<GHUser> getCachedTeamMembers(String teamFullName) {
         return TEAM_MEMBERS.get(teamFullName);
     }
 
-    Set<GHUser> putCachedTeamMembers(String teamFullName, Set<GHUser> members) {
+    static Set<GHUser> putCachedTeamMembers(String teamFullName, Set<GHUser> members) {
         if (members != null) {
             TEAM_MEMBERS.put(teamFullName, members);
         }
         return members;
     }
 
-    void resetCachedTeamMembers(String teamFullName) {
+    static void resetCachedTeamMembers(String teamFullName) {
         TEAM_MEMBERS.invalidate(teamFullName);
     }
 
-    Set<String> getCachedCollaborators(String repoFullName) {
+    static Set<String> getCachedCollaborators(String repoFullName) {
         return COLLABORATORS.get(repoFullName);
     }
 
-    Set<String> putCachedCollaborators(String repoFullName, Set<String> members) {
+    static Set<String> putCachedCollaborators(String repoFullName, Set<String> members) {
         if (members != null) {
             COLLABORATORS.put(repoFullName, members);
         }
         return members;
     }
 
-    public void refreshCollaborators(String repoFullName) {
+    public static void refreshCollaborators(String repoFullName) {
         COLLABORATORS.invalidate(repoFullName);
     }
 
@@ -82,7 +82,7 @@ public class GitHubTeamService {
      * @param org
      * @param ghTeam
      */
-    public void refreshTeam(GHOrganization org, GHTeam ghTeam) {
+    public static void refreshTeam(GHOrganization org, GHTeam ghTeam) {
         // Normalize team name to include org name
         String teamFullName = getFullTeamName(org, ghTeam);
         refreshTeam(teamFullName);
@@ -95,12 +95,12 @@ public class GitHubTeamService {
      * @param org
      * @param ghTeam
      */
-    public void refreshTeam(String teamFullName) {
+    public static void refreshTeam(String teamFullName) {
         resetCachedTeam(teamFullName);
         resetCachedTeamMembers(teamFullName);
     }
 
-    public String getFullTeamName(GHOrganization org, GHTeam ghTeam) {
+    public static String getFullTeamName(GHOrganization org, GHTeam ghTeam) {
         String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
         return org.getLogin() + "/" + relativeName;
     }
@@ -123,7 +123,7 @@ public class GitHubTeamService {
                 return result;
             });
             qc.clearNotFound();
-            team = putCachedTeam(team, fullName);
+            team = putCachedTeam(fullName, team);
         }
         return team;
     }

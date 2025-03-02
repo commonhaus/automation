@@ -1,13 +1,14 @@
 package org.commonhaus.automation.github.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.commonhaus.automation.github.context.GitHubTeamService.getCachedTeam;
+import static org.commonhaus.automation.github.context.GitHubTeamService.getCachedTeamMembers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,104 +19,50 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.config.EmailNotification;
-import org.commonhaus.automation.github.context.QueryContext.GitHubParameterApiCall;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHOrganization.RepositoryRole;
-import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
-import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
-import io.quarkiverse.githubapp.testing.internal.GitHubAppTestingContext;
-import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.graphql.client.Response;
-import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @QuarkusTest
 @GitHubAppTest
-public class GitHubTeamServiceTest {
-
-    // Setup email notification addresses
-    private static EmailNotification emailNotification = new EmailNotification(
-            new String[] { "team-error@example.com" },
-            new String[] { "dry-run@example.com" },
-            new String[] { "audit@example.com" });
+public class GitHubTeamServiceTest extends ContextHelper {
 
     @Inject
     GitHubTeamService teamService;
 
-    @Inject
-    MockMailbox mailbox;
+    final DefaultValues defaultValues = new DefaultValues(
+            46053716,
+            144493209,
+            "test-org",
+            "test-org/test-repo");
 
-    private static final long INSTALL_ID = 46053716;
-    private static final long ORG_ID = 144493209;
-    private static final String ORG_NAME = "test-org";
-    private static final String REPO_FULL_NAME = "test-org/test-repo";
     private static final String TEAM_NAME = "test-team";
     private static final String TEAM_FULL_NAME = "test-org/test-team";
 
-    private GHOrganization organization;
-    private GHRepository repository;
-    private GHTeam team;
-    private GitHub github;
-    private DynamicGraphQLClient dql;
-    private QueryContext queryContext;
-
-    GitHubMockSetupContext mocks;
-    boolean defaultDryRun = false;
+    final Set<GHUser> users = new HashSet<>();
+    GHTeam team;
 
     @BeforeEach
     void setup() throws IOException {
-        // reset email
-        mailbox.clear();
+        users.clear();
+        setupCommonMocks(defaultValues);
 
-        // Reset cache for each test
-        BaseQueryCache.TEAM_MEMBERS.invalidateAll();
-
-        queryContext = mock(QueryContext.class);
-
-        // Create mock GitHub objects
-        mocks = GitHubAppTestingContext.get().mocks;
-        github = mocks.installationClient(INSTALL_ID);
-        dql = mocks.installationGraphQLClient(INSTALL_ID);
-
-        organization = mocks.ghObject(GHOrganization.class, ORG_ID);
-        repository = mocks.repository(REPO_FULL_NAME);
-        team = mock(GHTeam.class);
-
-        // Setup basic relationships
-        when(organization.getLogin()).thenReturn(ORG_NAME);
-        when(organization.getTeamByName(TEAM_NAME)).thenReturn(team);
-        when(team.getName()).thenReturn(TEAM_NAME);
-
-        when(repository.getFullName()).thenReturn(REPO_FULL_NAME);
-
-        // Setup query context behavior
-        when(queryContext.getGitHub()).thenReturn(github);
-        when(queryContext.getGraphQLClient()).thenReturn(dql);
-        when(queryContext.getOrganization(ORG_NAME)).thenReturn(organization);
-        when(queryContext.getRepository(REPO_FULL_NAME)).thenReturn(repository);
-
-        when(queryContext.getLogId()).thenReturn("TEST");
-        when(queryContext.isDryRun()).thenReturn(defaultDryRun);
-        when(queryContext.getErrorAddresses()).thenReturn(new String[] { "bot-error@example.com" });
-
-        Mockito.doAnswer(invocation -> {
-            GitHubParameterApiCall<GHTeam> function = invocation.getArgument(0);
-            return function.apply(github, defaultDryRun);
-        }).when(queryContext).execGitHubSync(Mockito.any());
+        // do not pre-cache team members
+        team = setupMockTeam(TEAM_FULL_NAME, users, github, false);
     }
 
     @Test
@@ -134,16 +81,13 @@ public class GitHubTeamServiceTest {
     @Test
     void testGetTeamMembers() throws IOException {
         // Setup team members
-        Set<GHUser> teamMembers = new HashSet<>();
-        teamMembers.add(mockUser("user1"));
-        teamMembers.add(mockUser("user2"));
-
-        when(team.getMembers()).thenReturn(teamMembers);
+        users.add(setupMockUser("user1", github));
+        users.add(setupMockUser("user2", github));
 
         // Test getting team members
         Set<GHUser> result = teamService.getTeamMembers(queryContext, TEAM_FULL_NAME);
 
-        assertThat(result).containsExactlyInAnyOrderElementsOf(teamMembers);
+        assertThat(result).containsExactlyInAnyOrderElementsOf(users);
         verify(team).getMembers();
 
         // Second call should use cached value
@@ -154,15 +98,12 @@ public class GitHubTeamServiceTest {
     @Test
     void testIsTeamMember() throws IOException {
         // Setup team members
-        GHUser user1 = mockUser("user1");
-        GHUser user2 = mockUser("user2");
-        GHUser user3 = mockUser("user3");
+        GHUser user1 = setupMockUser("user1", github);
+        GHUser user2 = setupMockUser("user1", github);
+        GHUser user3 = setupMockUser("user1", github);
 
-        Set<GHUser> teamMembers = new HashSet<>();
-        teamMembers.add(user1);
-        teamMembers.add(user2);
-
-        when(team.getMembers()).thenReturn(teamMembers);
+        users.add(user1);
+        users.add(user2);
 
         // Test membership checks
         boolean isMember1 = teamService.isTeamMember(queryContext, user1, TEAM_FULL_NAME);
@@ -175,8 +116,7 @@ public class GitHubTeamServiceTest {
     @Test
     void testAddTeamMember() throws IOException {
         // Setup mocks
-        GHUser user = mockUser("newUser");
-        when(github.getUser("newUser")).thenReturn(user);
+        GHUser user = setupMockUser("newUser", github);
 
         // Test adding a team member
         teamService.addTeamMember(queryContext, user, TEAM_FULL_NAME);
@@ -184,17 +124,17 @@ public class GitHubTeamServiceTest {
         verify(team).add(user);
 
         // Cache should be invalidated
-        assertThat(teamService.getCachedTeam(TEAM_FULL_NAME)).isNull();
-        assertThat(teamService.getCachedTeamMembers(TEAM_FULL_NAME)).isNull();
+        assertThat(getCachedTeam(TEAM_FULL_NAME)).isNull();
+        assertThat(getCachedTeamMembers(TEAM_FULL_NAME)).isNull();
     }
 
     @Test
     void testSyncMembers() throws IOException {
-        mockUser("user1");
-        mockUser("user2");
-        mockUser("user3");
-        mockUser("user4");
-        mockUser("user5");
+        setupMockUser("user1", github);
+        setupMockUser("user2", github);
+        setupMockUser("user3", github);
+        setupMockUser("user4", github);
+        setupMockUser("user5", github);
 
         // Setup current team members
         Set<String> currentLogins = Set.of("user1", "user2", "user3");
@@ -246,12 +186,12 @@ public class GitHubTeamServiceTest {
 
     @Test
     void testSyncMembersWithIgnoreList() throws IOException {
-        mockUser("user1");
-        mockUser("user2");
-        mockUser("user3");
-        mockUser("user4");
-        mockUser("user5");
-        mockUser("ignore1");
+        setupMockUser("user1", github);
+        setupMockUser("user2", github);
+        setupMockUser("user3", github);
+        setupMockUser("user4", github);
+        setupMockUser("user5", github);
+        setupMockUser("ignore1", github);
 
         // Setup current team members
         Set<String> currentLogins = Set.of("user1", "user2", "user3", "ignore1");
@@ -286,8 +226,8 @@ public class GitHubTeamServiceTest {
 
     @Test
     void testSyncMembersWithEmptyTeam() throws IOException {
-        mockUser("user1");
-        mockUser("user2");
+        setupMockUser("user1", github);
+        setupMockUser("user2", github);
 
         // Setup current team members
         Set<String> currentLogins = Set.of();
@@ -337,11 +277,11 @@ public class GitHubTeamServiceTest {
 
     @Test
     void testSyncMembersHandlesErrors() throws IOException {
-        mockUser("user1");
-        mockUser("user2");
-        GHUser user3 = mockUser("user3");
-        mockUser("user4");
-        mockUser("user5");
+        setupMockUser("user1", github);
+        setupMockUser("user2", github);
+        GHUser user3 = setupMockUser("user3", github);
+        setupMockUser("user4", github);
+        setupMockUser("user5", github);
         when(github.getUser("errorUser")).thenThrow(new TestIOException("Test user not found"));
 
         // Setup current team members
@@ -388,11 +328,11 @@ public class GitHubTeamServiceTest {
     @Test
     void testSyncCollaborators() throws IOException {
         // Mock repository and users
-        mockUser("user1");
-        mockUser("user2");
-        mockUser("user3");
-        mockUser("user4");
-        mockUser("user5");
+        setupMockUser("user1", github);
+        setupMockUser("user2", github);
+        setupMockUser("user3", github);
+        setupMockUser("user4", github);
+        setupMockUser("user5", github);
 
         // Setup current collaborators
         Set<String> currentCollaborators = Set.of("user1", "user2", "user3");
@@ -447,13 +387,6 @@ public class GitHubTeamServiceTest {
 
     // Helper methods
 
-    private GHUser mockUser(String login) throws IOException {
-        GHUser user = mock(GHUser.class);
-        when(user.getLogin()).thenReturn(login);
-        when(github.getUser(login)).thenReturn(user);
-        return user;
-    }
-
     private void mockDataTeamQueryResponse(Set<String> logins) {
         JsonObject jsonObject = Json.createObjectBuilder()
                 .add("organization", Json.createObjectBuilder()
@@ -473,5 +406,15 @@ public class GitHubTeamServiceTest {
 
         when(queryContext.execQuerySync(Mockito.anyString(), Mockito.anyMap()))
                 .thenReturn(mockResponse);
+    }
+
+    final static class MockContextService {
+
+        final ContextService ctx = Mockito.mock(ContextService.class);
+
+        @Produces
+        ContextService produceContextService() {
+            return ctx;
+        }
     }
 }
