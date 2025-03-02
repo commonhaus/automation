@@ -34,13 +34,13 @@ public class DatastoreQueryContext extends QueryContext {
         return repoFullName;
     }
 
-    public DatastoreQueryContext addExisting(GitHub github) {
-        super.addExisting(github);
+    public DatastoreQueryContext withExisting(GitHub github) {
+        super.withExisting(github);
         return this;
     }
 
-    public DatastoreQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
-        super.addExisting(graphQLClient);
+    public DatastoreQueryContext withExisting(DynamicGraphQLClient graphQLClient) {
+        super.withExisting(graphQLClient);
         return this;
     }
 

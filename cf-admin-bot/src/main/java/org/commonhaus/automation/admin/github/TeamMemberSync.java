@@ -23,7 +23,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.admin.Routes;
 import org.commonhaus.automation.admin.api.CouncilResource.TeamSyncTriggerEvent;
 import org.commonhaus.automation.admin.config.AdminConfigFile;
 import org.commonhaus.automation.admin.config.SponsorsConfig;
@@ -31,6 +30,7 @@ import org.commonhaus.automation.admin.config.TeamManagementConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.Defaults;
 import org.commonhaus.automation.admin.config.TeamSourceConfig.SyncToTeams;
+import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.DataSponsorship;
 import org.commonhaus.automation.github.context.DataTeam;
 import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
@@ -85,7 +85,7 @@ public class TeamMemberSync {
             }
         }, initialDelay, 10, unit);
 
-        Routes.registerSupplier("TeamMemberSync", () -> lastRun);
+        RouteSupplier.registerSupplier("TeamMemberSync", () -> lastRun);
     }
 
     public void shutdown(@Observes ShutdownEvent shutdown) {
@@ -137,7 +137,7 @@ public class TeamMemberSync {
 
         GHRepository repo = pushEvent.getRepository();
         ctx.refreshScopedQueryContext(event.getInstallationId(), repo)
-                .addExisting(github).addExisting(graphQLClient);
+                .withExisting(github).withExisting(graphQLClient);
 
         Log.debugf("updateTeamMembers (push): %s", repo.getFullName());
 
@@ -208,7 +208,7 @@ public class TeamMemberSync {
                     repoCfg.repoFullName());
             return;
         }
-        qc.addExisting(github).addExisting(repoCfg);
+        qc.withExisting(github).addExisting(repoCfg);
 
         for (TeamSourceConfig source : repoCfg.sourceConfig) {
             if (source.performSync()) {

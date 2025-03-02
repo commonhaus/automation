@@ -70,10 +70,9 @@ public class MemberApplicationProcess {
             String notificationEmail = getNotificationEmail(issue);
             if (isValid(notificationEmail)) {
                 String body = Templates.applicationUpdated(comment.body.replaceAll("\\s*::response::\\s*", "")).render();
-                String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(dqc.getLogId(),
                         "Commonhaus Foundation Membership Application",
-                        body, htmlBody, new String[] { notificationEmail });
+                        body, new String[] { notificationEmail });
             }
         } else {
             Log.debugf("[%s] updateApplicationComments: #%s - not user feedback", dqc.getLogId(), issue.number);
@@ -134,10 +133,9 @@ public class MemberApplicationProcess {
                     && ctx.addTeamMember(applicant, teamFullName)
                     && isValid(notificationEmail)) {
                 String body = Templates.applicationAccepted().render();
-                String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(dqc.getLogId(),
                         "Welcome to the Commonhaus Foundation!",
-                        body, htmlBody, new String[] { notificationEmail });
+                        body, new String[] { notificationEmail });
             }
         } else if (user.isMemberUndefined() && isDeclined(label)) {
             datastore.setCommonhausUser(new UpdateEvent(user,
@@ -154,10 +152,9 @@ public class MemberApplicationProcess {
 
             if (!dqc.hasErrors() && isValid(notificationEmail)) {
                 String body = Templates.applicationDeclined().render();
-                String htmlBody = MarkdownConverter.toHtml(body);
                 ctx.sendEmail(dqc.getLogId(),
                         "Commonhaus Foundation Membership Application",
-                        body, htmlBody, new String[] { notificationEmail });
+                        body, new String[] { notificationEmail });
             }
         }
 

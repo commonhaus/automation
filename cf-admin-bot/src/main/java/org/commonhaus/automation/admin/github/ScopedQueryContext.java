@@ -81,13 +81,13 @@ public class ScopedQueryContext extends QueryContext {
         return ActionType.bot;
     }
 
-    public ScopedQueryContext addExisting(GitHub github) {
-        super.addExisting(github);
+    public ScopedQueryContext withExisting(GitHub github) {
+        super.withExisting(github);
         return this;
     }
 
-    public ScopedQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
-        super.addExisting(graphQLClient);
+    public ScopedQueryContext withExisting(DynamicGraphQLClient graphQLClient) {
+        super.withExisting(graphQLClient);
         return this;
     }
 

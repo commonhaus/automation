@@ -29,6 +29,7 @@ import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -37,7 +38,6 @@ import org.kohsuke.github.GHUser;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
-import io.quarkiverse.githubapp.GitHubConfigFileProvider;
 import io.quarkiverse.githubapp.TokenGitHubClients;
 import io.quarkus.logging.Log;
 import io.vertx.mutiny.core.eventbus.EventBus;
@@ -65,8 +65,8 @@ public class AppContextService extends BaseContextService {
 
     public AppContextService(BotConfig data, AdminConfig adminData,
             GitHubClientProvider gitHubClientProvider,
-            GitHubConfigFileProvider configProvider, EventBus bus) {
-        super(data, gitHubClientProvider, configProvider, bus);
+            EventBus bus, LogMailer logMailer) {
+        super(data, gitHubClientProvider, bus, logMailer);
         this.adminData = adminData;
     }
 

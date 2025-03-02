@@ -11,6 +11,7 @@ import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.JsonAttribute;
+import org.commonhaus.automation.github.context.JsonAttributeAccessor;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -44,7 +45,7 @@ public class MembershipGithubEvents {
                 installationId, repoFullName);
 
         ActionType actionType = ActionType.fromString(event.getAction());
-        JsonObject data = JsonAttribute.unpack(event.getPayload());
+        JsonObject data = JsonAttributeAccessor.unpack(event.getPayload());
         DataCommonItem issue = JsonAttribute.issue.commonItemFrom(data);
         DataLabel label = JsonAttribute.label.labelFrom(data);
 
@@ -83,7 +84,7 @@ public class MembershipGithubEvents {
         Log.debugf("[%s] updateApplicationComments: %s",
                 installationId, repoFullName);
 
-        JsonObject data = JsonAttribute.unpack(event.getPayload());
+        JsonObject data = JsonAttributeAccessor.unpack(event.getPayload());
         DataCommonItem issue = JsonAttribute.issue.commonItemFrom(data);
 
         // ignore if it isn't an issue in the datastore repository

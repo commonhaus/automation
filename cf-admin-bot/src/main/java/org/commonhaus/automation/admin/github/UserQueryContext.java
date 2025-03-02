@@ -13,7 +13,7 @@ public class UserQueryContext extends QueryContext {
 
     protected UserQueryContext(AppContextService ctx, MemberSession session) {
         super(ctx, -1);
-        addExisting(session.connection());
+        withExisting(session.connection());
         this.session = session;
         this.ctx = ctx;
     }
@@ -23,13 +23,13 @@ public class UserQueryContext extends QueryContext {
         return "user:" + session.login();
     }
 
-    public UserQueryContext addExisting(GitHub github) {
-        super.addExisting(github);
+    public UserQueryContext withExisting(GitHub github) {
+        super.withExisting(github);
         return this;
     }
 
-    public UserQueryContext addExisting(DynamicGraphQLClient graphQLClient) {
-        super.addExisting(graphQLClient);
+    public UserQueryContext withExisting(DynamicGraphQLClient graphQLClient) {
+        super.withExisting(graphQLClient);
         return this;
     }
 

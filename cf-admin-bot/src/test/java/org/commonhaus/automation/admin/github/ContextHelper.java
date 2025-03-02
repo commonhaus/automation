@@ -111,7 +111,6 @@ public class ContextHelper extends QueryContext {
                 mocks.installationGraphQLClient(sponsorsInstallationId),
                 sponsorsInstallationId,
                 repo,
-                Optional.ofNullable(null),
                 false);
 
         ctx.repositoryDiscovered(repoEvent);
@@ -133,7 +132,6 @@ public class ContextHelper extends QueryContext {
                 mocks.installationGraphQLClient(datastoreInstallationId),
                 datastoreInstallationId,
                 repo,
-                Optional.ofNullable(null),
                 false);
         ctx.repositoryDiscovered(repoEvent);
         ctx.writeToInstallId.put(datastoreOrgName, datastoreInstallationId);

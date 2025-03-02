@@ -47,7 +47,7 @@ public class AdminGitHubEvents {
                         "updateAttestationList: Unable to get query context for " + repoFullName, null, null);
                 return;
             }
-            qc.addExisting(github).addExisting(graphQLClient);
+            qc.withExisting(github).withExisting(graphQLClient);
             ctx.updateValidAttestations(qc);
         }
     }
@@ -72,7 +72,7 @@ public class AdminGitHubEvents {
                     "updateMembership: Unable to get query context for " + scope, null, null);
             return;
         }
-        qc.addExisting(github).addExisting(graphQLClient);
+        qc.withExisting(github).withExisting(graphQLClient);
         qc.updateTeamList(eventPayload.getOrganization(), eventPayload.getTeam());
     }
 
@@ -99,8 +99,8 @@ public class AdminGitHubEvents {
         ScopedQueryContext qc = ctx.refreshScopedQueryContext(
                 eventPayload.getInstallation().getId(),
                 eventPayload.getRepository())
-                .addExisting(github)
-                .addExisting(graphQLClient);
+                .withExisting(github)
+                .withExisting(graphQLClient);
 
         DataLabel label = new DataLabel(eventPayload.getLabel());
         String cacheId = eventPayload.getRepository().getNodeId();
