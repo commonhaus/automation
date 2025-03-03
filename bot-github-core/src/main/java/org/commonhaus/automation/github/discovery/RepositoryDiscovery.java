@@ -2,7 +2,6 @@ package org.commonhaus.automation.github.discovery;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
@@ -42,16 +41,13 @@ public class RepositoryDiscovery {
     GitHubClientProvider gitHubService;
 
     @Inject
-    Event<RepositoryDiscoveryEvent> repositoryDiscoveryEvent;
+    Event<RepositoryDiscoveryEvent> fireRepositoryDiscoveryEvent;
 
     @Inject
-    Event<InstallationDiscoveryEvent> postInstallationDiscovery;
+    Event<InstallationDiscoveryEvent> fireInstallationDiscoveryEvent;
 
     @Inject
     Event<BootstrapDiscoveryEvent> postBootstrapDiscovery;
-
-    // discoverRepositories is/was being called twice. Avoid double discovery
-    static final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
      * On startup, discover installations and repositories
@@ -60,10 +56,6 @@ public class RepositoryDiscovery {
      * @param ev
      */
     void discoverRepositories(@Observes StartupEvent ev) {
-        if (!started.compareAndSet(false, true)) {
-            return;
-        }
-
         Log.info("Repository discovery is " + (botConfig.isDiscoveryEnabled() ? "enabled" : "disabled"));
         if (!botConfig.isDiscoveryEnabled()) {
             return;
@@ -73,70 +65,16 @@ public class RepositoryDiscovery {
         periodicUpdateQueue.queue(this::discoverRepositories);
     }
 
-    /**
-     * Respond to installation changes
-     */
-    void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent,
-            GitHub github, DynamicGraphQLClient graphQLClient) {
-
-        String action = gitHubEvent.getAction();
-        JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
-        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
-        long installationId = JsonAttribute.id.longFrom(installation);
-
-        List<GHRepository> repositories = JsonAttribute.repositories.repositoriesFrom(payload);
-
-        switch (action) {
-            case "created", "unsuspend" -> {
-                for (GHRepository repo : repositories) {
-                    repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
-                            repo, false));
-                }
-            }
-            case "deleted", "suspend" -> {
-                for (GHRepository repo : repositories) {
-                    repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                            DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
-                            repo, false));
-                }
-            }
-            default -> {
-            }
-        }
-    }
-
-    /**
-     * Respond to App Installation repository changes.
-     *
-     * Sender may be null if the event is from a webhook, which is not handled
-     * by the GitHub API.
-     */
-    void onInstallationRepositoryChange(@RawEvent(event = "installation_repositories") GitHubEvent gitHubEvent,
-            GitHub github, DynamicGraphQLClient graphQLClient) {
-
-        JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
-        JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
-        long installationId = JsonAttribute.id.longFrom(installation);
-
-        List<GHRepository> added = JsonAttribute.repositoriesAdded.repositoriesFrom(payload);
-        List<GHRepository> removed = JsonAttribute.repositoriesRemoved.repositoriesFrom(payload);
-
-        handleRepositoryChanges(github, graphQLClient, installationId,
-                added == null ? List.of() : added,
-                removed == null ? List.of() : removed);
-    }
-
     protected void handleRepositoryChanges(GitHub github, DynamicGraphQLClient graphQLClient, long installationId,
             List<GHRepository> added, List<GHRepository> removed) {
         for (GHRepository repo : added) {
-            repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+            fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                     DiscoveryAction.ADDED, github, graphQLClient, installationId,
                     repo, false));
         }
 
         for (GHRepository repo : removed) {
-            repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+            fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                     DiscoveryAction.REMOVED, github, graphQLClient, installationId,
                     repo, false));
         }
@@ -161,12 +99,13 @@ public class RepositoryDiscovery {
 
                 Log.debugf("[%s] Fire initial discovery events", ghiId);
                 for (GHRepository repo : ghai.listRepositories()) {
-                    repositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                    fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                             DiscoveryAction.ADDED, github, graphQLClient, ghiId,
                             repo, true));
                 }
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
-                postInstallationDiscovery.fire(new InstallationDiscoveryEvent(ghiId, github, graphQLClient));
+                fireInstallationDiscoveryEvent.fire(
+                        new InstallationDiscoveryEvent(DiscoveryAction.ADDED, ghiId, github, graphQLClient));
                 installations.add(ghiId);
             }
         } catch (GHIOException e) {
@@ -185,4 +124,75 @@ public class RepositoryDiscovery {
             postBootstrapDiscovery.fire(new BootstrapDiscoveryEvent(installations));
         }
     }
+
+    /**
+     * Parter to Repository Discovery:
+     * This is converted into a multiplexer to handle github events.
+     */
+    public static class GitHubEventHandler {
+
+        @Inject
+        RepositoryDiscovery repositoryDiscovery;
+
+        /**
+         * Respond to installation changes
+         */
+        void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent,
+                GitHub github, DynamicGraphQLClient graphQLClient) {
+
+            String action = gitHubEvent.getAction();
+            JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
+            JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+            long installationId = JsonAttribute.id.longFrom(installation);
+
+            List<GHRepository> repositories = JsonAttribute.repositories.repositoriesFrom(payload);
+
+            switch (action) {
+                case "created", "unsuspend" -> {
+                    for (GHRepository repo : repositories) {
+                        repositoryDiscovery.fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                                DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
+                                repo, false));
+                    }
+                    repositoryDiscovery.fireInstallationDiscoveryEvent
+                            .fire(new InstallationDiscoveryEvent(DiscoveryAction.INSTALL_ADDED,
+                                    installationId, github, graphQLClient));
+                }
+                case "deleted", "suspend" -> {
+                    for (GHRepository repo : repositories) {
+                        repositoryDiscovery.fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                                DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
+                                repo, false));
+                    }
+                    repositoryDiscovery.fireInstallationDiscoveryEvent
+                            .fire(new InstallationDiscoveryEvent(DiscoveryAction.INSTALL_REMOVED,
+                                    installationId, github, graphQLClient));
+                }
+                default -> {
+                }
+            }
+        }
+
+        /**
+         * Respond to App Installation repository changes.
+         *
+         * Sender may be null if the event is from a webhook, which is not handled
+         * by the GitHub API.
+         */
+        void onInstallationRepositoryChange(@RawEvent(event = "installation_repositories") GitHubEvent gitHubEvent,
+                GitHub github, DynamicGraphQLClient graphQLClient) {
+
+            JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
+            JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
+            long installationId = JsonAttribute.id.longFrom(installation);
+
+            List<GHRepository> added = JsonAttribute.repositoriesAdded.repositoriesFrom(payload);
+            List<GHRepository> removed = JsonAttribute.repositoriesRemoved.repositoriesFrom(payload);
+
+            repositoryDiscovery.handleRepositoryChanges(github, graphQLClient, installationId,
+                    added == null ? List.of() : added,
+                    removed == null ? List.of() : removed);
+        }
+    }
+
 }

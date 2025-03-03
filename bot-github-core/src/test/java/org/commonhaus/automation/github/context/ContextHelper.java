@@ -13,6 +13,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -34,6 +35,9 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.PagedIterable;
+import org.kohsuke.github.PagedIterator;
+import org.kohsuke.github.PagedSearchIterable;
 import org.mockito.Mockito;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
@@ -52,7 +56,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 public class ContextHelper {
 
     // Setup email notification addresses
-    static EmailNotification emailNotification = new EmailNotification(
+    public static EmailNotification emailNotification = new EmailNotification(
             new String[] { "team-error@example.com" },
             new String[] { "dry-run@example.com" },
             new String[] { "audit@example.com" });
@@ -85,31 +89,39 @@ public class ContextHelper {
     }
 
     @Inject
-    Event<RepositoryDiscoveryEvent> repositoryDiscoveryEvent;
+    public Event<RepositoryDiscoveryEvent> fireRepositoryDiscoveryEvent;
 
     @Inject
-    protected ContextService ctx;
+    public ContextService ctx;
 
     @Inject
-    protected PeriodicUpdateQueue periodicUpdateQueue;
+    public PeriodicUpdateQueue periodicQueue;
 
     @Inject
-    MockMailbox mailbox;
+    public MockMailbox mailbox;
 
-    GitHubMockSetupContext mocks;
-    GitHub github;
-    DynamicGraphQLClient dql;
+    public GitHubMockSetupContext mocks;
+    public GitHub github;
+    public DynamicGraphQLClient dql;
 
-    GHOrganization organization;
-    GHRepository repository;
-    QueryContext queryContext;
+    public GHOrganization organization;
+    public GHRepository repository;
+    public QueryContext queryContext;
 
     // Not part of defaults. This is fluid and can be changed.
-    boolean defaultDryRun = false;
+    public boolean defaultDryRun = false;
 
-    public MockInstallation setupCommonMocks(DefaultValues defaults) throws IOException {
+    public void reset() {
         mailbox.clear();
         Stream.of(BaseQueryCache.values()).forEach(v -> v.invalidateAll());
+    }
+
+    public void setupGivenMocks(GitHubMockSetupContext mocks, DefaultValues defaultValues) {
+        this.mocks = mocks;
+    }
+
+    public MockInstallation setupCommonMocks(DefaultValues defaults) throws IOException {
+        reset();
         mocks = GitHubAppTestingContext.get().mocks;
 
         MockInstallation result = setupAlternateMocks(defaults);
@@ -230,32 +242,6 @@ public class ContextHelper {
         return team;
     }
 
-    public void triggerRepositoryDiscovery(
-            DiscoveryAction action,
-            MockInstallation mockInstallation,
-            boolean bootstrap) {
-        triggerRepositoryDiscovery(action,
-                mockInstallation,
-                mockInstallation.repository(),
-                bootstrap);
-    }
-
-    public void triggerRepositoryDiscovery(
-            DiscoveryAction action,
-            MockInstallation mockInstallation,
-            GHRepository repo,
-            boolean bootstrap) {
-
-        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
-                action,
-                mockInstallation.github(),
-                mockInstallation.dql(),
-                mockInstallation.installationId(),
-                repo,
-                bootstrap);
-        repositoryDiscoveryEvent.fire(repoEvent);
-    }
-
     public Response setupMockResponse(String filename) {
         try {
             JsonObject jsonObject = Json.createReader(Files.newInputStream(Path.of(filename))).readObject();
@@ -286,6 +272,75 @@ public class ContextHelper {
 
     public void setLabels(String id, Set<DataLabel> labels) {
         BaseQueryCache.LABELS.computeIfAbsent(id, (k) -> new HashSet<>()).addAll(labels);
+    }
+
+    @SafeVarargs
+    @SuppressWarnings("unchecked")
+    public static <T> PagedIterable<T> mockPagedIterable(T... contentMocks) {
+        PagedIterable<T> iterableMock = mock(PagedIterable.class);
+        try {
+            lenient().when(iterableMock.toList()).thenAnswer(ignored2 -> List.of(contentMocks));
+        } catch (IOException e) {
+            // This should never happen
+            // That's a classic unwise comment, but it's a mock, so surely we're safe? :)
+            throw new TestRuntimeException("Error with mockPagedIterable", e);
+        }
+        lenient().when(iterableMock.iterator()).thenAnswer(ignored -> {
+            PagedIterator<T> iteratorMock = mock(PagedIterator.class);
+            Iterator<T> actualIterator = List.of(contentMocks).iterator();
+            when(iteratorMock.next()).thenAnswer(ignored2 -> actualIterator.next());
+            lenient().when(iteratorMock.hasNext()).thenAnswer(ignored2 -> actualIterator.hasNext());
+
+            return iteratorMock;
+        });
+        return iterableMock;
+    }
+
+    @SafeVarargs
+    @SuppressWarnings("unchecked")
+    public static <T> PagedSearchIterable<T> mockPagedSearchIterable(T... contentMocks) {
+        PagedSearchIterable<T> iterableMock = mock(PagedSearchIterable.class);
+        try {
+            lenient().when(iterableMock.toList()).thenAnswer(ignored2 -> List.of(contentMocks));
+        } catch (IOException e) {
+            // This should never happen
+            throw new TestRuntimeException("Error with mockPagedSearchIterable", e);
+        }
+        lenient().when(iterableMock.iterator()).thenAnswer(ignored -> {
+            PagedIterator<T> iteratorMock = mock(PagedIterator.class);
+            Iterator<T> actualIterator = List.of(contentMocks).iterator();
+            when(iteratorMock.next()).thenAnswer(ignored2 -> actualIterator.next());
+            lenient().when(iteratorMock.hasNext()).thenAnswer(ignored2 -> actualIterator.hasNext());
+
+            return iteratorMock;
+        });
+        return iterableMock;
+    }
+
+    public void triggerRepositoryDiscovery(
+            DiscoveryAction action,
+            MockInstallation mockInstallation,
+            boolean bootstrap) {
+        triggerRepositoryDiscovery(action,
+                mockInstallation,
+                mockInstallation.repository(),
+                bootstrap);
+    }
+
+    public void triggerRepositoryDiscovery(
+            DiscoveryAction action,
+            MockInstallation mockInstallation,
+            GHRepository repo,
+            boolean bootstrap) {
+
+        RepositoryDiscoveryEvent repoEvent = new RepositoryDiscoveryEvent(
+                action,
+                mockInstallation.github(),
+                mockInstallation.dql(),
+                mockInstallation.installationId(),
+                repo,
+                bootstrap);
+        fireRepositoryDiscoveryEvent.fire(repoEvent);
     }
 
     // Helper method to load test YAML files

@@ -103,7 +103,7 @@ public class PeriodicUpdateQueue {
     }
 
     public void queueReconciliation(String name, Runnable task) {
-        Log.debugf("QUEUE task %s", name);
+        Log.debugf("QUEUE reconciliation %s", name);
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 

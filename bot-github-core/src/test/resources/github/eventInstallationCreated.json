@@ -1,0 +1,121 @@
+{
+  "action": "created",
+  "installation": {
+    "id": 50263360,
+    "client_id": "Iv1.1234567",
+    "account": {
+      "login": "commonhaus-test",
+      "id": 168673220,
+      "node_id": "O_kgDOCg2_xA",
+      "avatar_url": "https://avatars.githubusercontent.com/u/168673220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/commonhaus-test",
+      "html_url": "https://github.com/commonhaus-test",
+      "followers_url": "https://api.github.com/users/commonhaus-test/followers",
+      "following_url": "https://api.github.com/users/commonhaus-test/following{/other_user}",
+      "gists_url": "https://api.github.com/users/commonhaus-test/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/commonhaus-test/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/commonhaus-test/subscriptions",
+      "organizations_url": "https://api.github.com/users/commonhaus-test/orgs",
+      "repos_url": "https://api.github.com/users/commonhaus-test/repos",
+      "events_url": "https://api.github.com/users/commonhaus-test/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/commonhaus-test/received_events",
+      "type": "Organization",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "repository_selection": "all",
+    "access_tokens_url": "https://api.github.com/app/installations/62004012/access_tokens",
+    "repositories_url": "https://api.github.com/installation/repositories",
+    "html_url": "https://github.com/organizations/commonhaus-test/settings/installations/62004012",
+    "app_id": 794963,
+    "app_slug": "commonhaus-test-bot",
+    "target_id": 168673220,
+    "target_type": "Organization",
+    "permissions": {
+      "members": "write",
+      "organization_administration": "read",
+      "actions": "write",
+      "administration": "read",
+      "contents": "write",
+      "discussions": "write",
+      "issues": "write",
+      "metadata": "read",
+      "pull_requests": "write",
+      "repository_projects": "write"
+    },
+    "events": [
+      "discussion",
+      "discussion_comment",
+      "issues",
+      "issue_comment",
+      "label",
+      "member",
+      "membership",
+      "organization",
+      "project",
+      "project_column",
+      "pull_request",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "pull_request_review_thread",
+      "push",
+      "team",
+      "team_add"
+    ],
+    "created_at": "2025-03-03T12:29:39.000-05:00",
+    "updated_at": "2025-03-03T12:29:40.000-05:00",
+    "single_file_name": null,
+    "has_multiple_single_files": false,
+    "single_file_paths": [
+
+    ],
+    "suspended_by": null,
+    "suspended_at": null
+  },
+  "repositories": [
+    {
+      "id": 742099370,
+      "node_id": "R_kgDOLDuJqg",
+      "name": "automation-test",
+      "full_name": "commonhaus-test/automation-test",
+      "private": false
+    },
+    {
+      "id": 795241396,
+      "node_id": "R_kgDOL2ZrtA",
+      "name": "sponsors-test",
+      "full_name": "commonhaus-test/sponsors-test",
+      "private": true
+    },
+    {
+      "id": 801851090,
+      "node_id": "R_kgDOL8tG0g",
+      "name": "ops-test",
+      "full_name": "commonhaus-test/ops-test",
+      "private": true
+    }
+  ],
+  "requester": null,
+  "sender": {
+    "login": "commonhaus-bot",
+    "id": 156364140,
+    "node_id": "U_kgDOCVHtbA",
+    "avatar_url": "https://avatars.githubusercontent.com/u/156364140?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/commonhaus-bot",
+    "html_url": "https://github.com/commonhaus-bot",
+    "followers_url": "https://api.github.com/users/commonhaus-bot/followers",
+    "following_url": "https://api.github.com/users/commonhaus-bot/following{/other_user}",
+    "gists_url": "https://api.github.com/users/commonhaus-bot/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/commonhaus-bot/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/commonhaus-bot/subscriptions",
+    "organizations_url": "https://api.github.com/users/commonhaus-bot/orgs",
+    "repos_url": "https://api.github.com/users/commonhaus-bot/repos",
+    "events_url": "https://api.github.com/users/commonhaus-bot/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/commonhaus-bot/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  }
+}
