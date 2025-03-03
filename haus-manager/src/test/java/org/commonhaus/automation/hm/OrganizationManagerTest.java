@@ -6,16 +6,11 @@ import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Optional;
 
-import jakarta.annotation.Priority;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
-import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,30 +80,5 @@ public class OrganizationManagerTest extends ContextHelper {
     void testNext() throws IOException {
         System.out.println(organizationManager.toString());
 
-    }
-
-    @ApplicationScoped
-    @Alternative
-    @Priority(1)
-    static class TestManagerBotConfig implements ManagerBotConfig {
-        @Override
-        public String configOrganization() {
-            return PRIMARY.orgName();
-        }
-
-        @Override
-        public String mainRepository() {
-            return PRIMARY.repoFullName();
-        }
-
-        @Override
-        public Optional<String> sponsorCron() {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<String> cron() {
-            return Optional.empty();
-        }
     }
 }
