@@ -198,12 +198,18 @@ public class CommonhausUser {
         return DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.MINUTES));
     }
 
-    public static CommonhausUser parseFile(DatastoreQueryContext dqc, GHContent content) throws IOException {
-        CommonhausUser user = dqc.parseYamlFile(content, CommonhausUser.class);
-        if (user != null) {
-            user.sha = content.getSha();
+    public static CommonhausUser parseFile(DatastoreQueryContext dqc, GHContent content) {
+        try {
+            CommonhausUser user = dqc.parseYamlFile(content, CommonhausUser.class);
+            if (user != null) {
+                user.sha = content.getSha();
+            }
+            return user;
+        } catch (IOException e) {
+            dqc.logAndSendEmail("Unable to parse " + content.getHtmlUrl(), e);
+            dqc.addException(e);
+            return null;
         }
-        return user;
     }
 
     public static CommonhausUser create(String login, long id) {

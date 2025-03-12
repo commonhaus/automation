@@ -278,7 +278,7 @@ public class CommonhausDatastore {
             }
         } else if (!dqc.hasErrors()) {
             GHContent responseContent = response.getContent();
-            user = parseUser(dqc, responseContent);
+            user = CommonhausUser.parseFile(dqc, responseContent);
             if (user != null) {
                 AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(user));
             }
@@ -293,6 +293,7 @@ public class CommonhausDatastore {
 
         CommonhausUser response = dqc.execGitHubSync((gh, dryRun) -> {
             GHContent content = repo.getFileContent(dataPath(event.id()));
+            // parse file could throw -- captured/recorded in the query context
             return content == null
                     ? null
                     : CommonhausUser.parseFile(dqc, content);
@@ -325,15 +326,6 @@ public class CommonhausDatastore {
             ctx.logAndSendEmail("CommonhausDatastore.deepCopy", "Unable to copy Commonbaus user", e, null);
         }
         return user;
-    }
-
-    private CommonhausUser parseUser(DatastoreQueryContext dqc, GHContent responseContent) {
-        try {
-            return CommonhausUser.parseFile(dqc, responseContent);
-        } catch (IOException e) {
-            dqc.addException(e);
-            return null;
-        }
     }
 
     private String writeUser(DatastoreQueryContext dqc, CommonhausUser input) {
