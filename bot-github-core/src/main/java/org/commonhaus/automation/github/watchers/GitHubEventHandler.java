@@ -51,9 +51,8 @@ public class GitHubEventHandler {
         FilePushEvent fileEvent = new FileWatcher.FilePushEvent(
                 pushEvent,
                 event.getInstallationId(),
-                event.getEvent(),
-                event.getAction(),
                 repo,
+                pushEvent.getSender(),
                 github);
         fileWatcher.handleEvent(fileEvent);
     }
@@ -79,6 +78,7 @@ public class GitHubEventHandler {
                 installationId,
                 payload.getOrganization(),
                 payload.getTeam(),
+                payload.getSender(),
                 ActionType.fromString(event.getAction()),
                 EventType.fromString(event.getEvent()));
         membershipWatcher.handleTeamEvent(teamEvent);
@@ -103,6 +103,7 @@ public class GitHubEventHandler {
                 installationId,
                 payload.getOrganization(),
                 payload.getRepository(),
+                payload.getSender(),
                 ActionType.fromString(event.getAction()),
                 EventType.fromString(event.getEvent()));
         membershipWatcher.handleCollaboratorEvent(repositoryEvent);
@@ -130,6 +131,7 @@ public class GitHubEventHandler {
                 installationId,
                 payload.getOrganization(),
                 payload.getTeam(),
+                payload.getSender(),
                 ActionType.fromString(event.getAction()),
                 EventType.fromString(event.getEvent()));
         membershipWatcher.handleTeamEvent(teamEvent);

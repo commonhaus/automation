@@ -130,7 +130,7 @@ public class FileWatcherTest extends ContextHelper {
         // each file is changed several times.
         // The last time should be the one that is recorded, and it should
         // match the update type
-        for(var update : updateRef) {
+        for (var update : updateRef) {
             if (update.filePath().equals("added.md")) {
                 // if both added and modified, modified should be the last one
                 assertThat(update.updateType()).isEqualTo(FileUpdateType.MODIFIED);

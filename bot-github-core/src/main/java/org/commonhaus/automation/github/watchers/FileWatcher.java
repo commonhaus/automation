@@ -18,6 +18,7 @@ import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHEventPayload.Push.PushCommit;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
@@ -94,8 +95,8 @@ public class FileWatcher {
             return;
         }
 
-        Log.debugf("[%s-%s] %s event in %s; %s commit(s)", ME,
-                fileEvent.installationId(), fileEvent.event(), repo.getFullName(), pushEvent.getCommits().size());
+        Log.debugf("[%s-%s] push event in %s; %s commit(s)", ME,
+                fileEvent.installationId(), repo.getFullName(), pushEvent.getCommits().size());
 
         watcher.handlePush(fileEvent, updateQueue);
     }
@@ -206,9 +207,8 @@ public class FileWatcher {
     public static record FilePushEvent(
             GHEventPayload.Push pushEvent,
             long installationId,
-            String event,
-            String action,
             GHRepository repository,
+            GHUser sender,
             GitHub github) {
     }
 }

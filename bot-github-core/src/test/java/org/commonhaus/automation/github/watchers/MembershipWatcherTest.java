@@ -105,7 +105,7 @@ public class MembershipWatcherTest extends ContextHelper {
         assertThat(updateCollaborators.get()).isEqualTo(1);
     }
 
-        @Test
+    @Test
     void testWatcherCleanup() throws IOException {
         AtomicInteger callbackCounter = new AtomicInteger();
         MockInstallation myMocks = setupDefaultMocks(defaultValues);

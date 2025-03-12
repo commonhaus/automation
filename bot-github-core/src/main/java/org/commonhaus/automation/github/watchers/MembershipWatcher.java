@@ -24,6 +24,7 @@ import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
@@ -254,6 +255,8 @@ public class MembershipWatcher {
 
         GHOrganization organization();
 
+        GHUser sender();
+
         ActionType actionType();
 
         EventType eventType();
@@ -264,6 +267,7 @@ public class MembershipWatcher {
             long installationId,
             GHOrganization organization,
             GHRepository repository,
+            GHUser sender,
             ActionType actionType,
             EventType eventType) implements MembershipEvent {
     }
@@ -273,6 +277,7 @@ public class MembershipWatcher {
             long installationId,
             GHOrganization organization,
             GHTeam team,
+            GHUser sender,
             ActionType actionType,
             EventType eventType) implements MembershipEvent {
     }

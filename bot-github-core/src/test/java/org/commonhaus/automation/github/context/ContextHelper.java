@@ -66,6 +66,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * Common test context setup and helper methods for GitHub App testing.
  * <p>
  * Your GitHubApp test should extend this class:
+ *
  * <pre>
  * {@literal @}QuarkusTest
  * {@literal @}GitHubAppTest
@@ -74,13 +75,18 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * }
  * </pre>
  * <p>
- * Use {@link #setupDefaultMocks(DefaultValues)}, {@link #setupCommonMocks(DefaultValues)}, {@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)},
- * or {@link #setupInstallationMocks(DefaultValues)} to create a {@link MockInstallation} with a GitHub client, GraphQL client, organization,
- * and repository that all correctly reference each other. A generic {@link QueryContext} can also be mocked and associated with the installation.
+ * Use {@link #setupDefaultMocks(DefaultValues)}, {@link #setupCommonMocks(DefaultValues)},
+ * {@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)},
+ * or {@link #setupInstallationMocks(DefaultValues)} to create a {@link MockInstallation} with a GitHub client, GraphQL client,
+ * organization,
+ * and repository that all correctly reference each other. A generic {@link QueryContext} can also be mocked and associated with
+ * the installation.
  * <ul>
- * <li>{@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)} will set the {@link #mocks} field with the provided mocks (use with {@link GitHubAppTesting#given()}).
+ * <li>{@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)} will set the {@link #mocks} field with the provided mocks
+ * (use with {@link GitHubAppTesting#given()}).
  * <li>{@link #setupDefaultMocks(DefaultValues)} will set the {@link #hausMocks} field with the created mocks.
- * <li>{@link #setupCommonMocks(DefaultValues)} will set the {@link #mocks} field with the common mocks from the {@link GitHubAppTestingContext}
+ * <li>{@link #setupCommonMocks(DefaultValues)} will set the {@link #mocks} field with the common mocks from the
+ * {@link GitHubAppTestingContext}
  * </ul>
  * <p>
  * Note that when running the bot live, each GitHub organization (roughly) corresponds to a unique installation ID.
@@ -93,7 +99,8 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * <li>{@link #mockTeam(String, Set)} or {@link #mockTeam(MockInstallation, String, Set)} to create mock teams.
  * <li>{@link #getTeam(String)} to get a mock team.
  * <li>{@link #appendCachedTeam(String, GHUser)} to append a user to a cached team.
- * <li>{@link #mockFileContent(GHRepository, String, Path)} or {@link #mockFileContent(MockInstallation, String, Path)} to mock file content.
+ * <li>{@link #mockFileContent(GHRepository, String, Path)} or {@link #mockFileContent(MockInstallation, String, Path)} to mock
+ * file content.
  * <li>{@link #loadYamlResource(String, Class)} to load test YAML files.
  * <li>{@link #setLabels(String, DataLabel...)} to set labels for a resource.
  * <li>{@link #createBotComment(String, DataCommonComment)} to create a bot comment.
@@ -114,22 +121,27 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * To simplify verification of GraphQL methods:
  * <ul>
  * <li>Implement the {@link MockResponse} interface with a cue, path, and installation ID.
- * <li>Use {@link #setupGraphQLProcessing(GitHubMockSetupContext, MockResponse...)} or {@link #setupGraphQLProcessing(MockInstallation, MockResponse...)} to setup GraphQL processing.
- *   <pre>
- *      // in this example, we're using an enum to implement MockResponse
- *      setupGraphQLProcessing(mocks,
- *          MockResponseImpl.REMOVE_LABELS,
- *          MockResponseImpl.UPDATE_ISSUE);
- *   </pre>
+ * <li>Use {@link #setupGraphQLProcessing(GitHubMockSetupContext, MockResponse...)} or
+ * {@link #setupGraphQLProcessing(MockInstallation, MockResponse...)} to setup GraphQL processing.
+ *
+ * <pre>
+ * // in this example, we're using an enum to implement MockResponse
+ * setupGraphQLProcessing(mocks,
+ *         MockResponseImpl.REMOVE_LABELS,
+ *         MockResponseImpl.UPDATE_ISSUE);
+ * </pre>
+ *
  * <li>{@link #graphQueries} will contain the cues that will match each GraphQL invocation.
  * <li>Verify that graphQL methods were called based on the cues stored in {@link #graphQueries}.
- *   <pre>
- *   for (String cue : graphQueries) {
- *       verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
- *               .executeSync(contains(cue), anyMap());
- *   }
- *   verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
- *   </pre>
+ *
+ * <pre>
+ * for (String cue : graphQueries) {
+ *     verify(mocks.installationGraphQLClient(datastoreInstallationId), timeout(500))
+ *             .executeSync(contains(cue), anyMap());
+ * }
+ * verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
+ * </pre>
+ *
  * </li>
  * </ul>
  */
@@ -318,6 +330,7 @@ public class ContextHelper {
 
     /**
      * Create a mock GraphQL client for an installation.
+     *
      * @param installationId
      * @return
      */
@@ -329,6 +342,7 @@ public class ContextHelper {
 
     /**
      * Uses the repository name from DefaultValues and GitHub client
+     *
      * @see #mockRepository(String, String, GitHub)
      */
     public GHRepository mockRepository(DefaultValues defaults, GitHub gh) throws IOException {
@@ -337,6 +351,7 @@ public class ContextHelper {
 
     /**
      * Uses the provided repository name and GitHub client
+     *
      * @see #mockRepository(String, String, GitHub)
      */
     public GHRepository mockRepository(String repoFullName, GitHub gh) throws IOException {
@@ -345,6 +360,7 @@ public class ContextHelper {
 
     /**
      * Create a mock repository
+     *
      * @param repoFullName Repository full name (required)
      * @param nodeId Repository node_id (optional; computed from repoFullName if not provided)
      * @param gh GitHub client
@@ -373,6 +389,7 @@ public class ContextHelper {
 
     /**
      * Uses the organization name, id, and node_id from provided default values
+     *
      * @see #mockOrganization(String, long, String, GitHub)
      */
     public GHOrganization mockOrganization(DefaultValues defaults, GitHub gh) throws IOException {
@@ -381,6 +398,7 @@ public class ContextHelper {
 
     /**
      * Uses the provded orgName, and the GitHub client from the installation.
+     *
      * @see #mockOrganization(String, long, String, GitHub)
      */
     public GHOrganization mockOrganization(MockInstallation install, String orgName) throws IOException {
@@ -389,6 +407,7 @@ public class ContextHelper {
 
     /**
      * Uses the provded orgName and github client.
+     *
      * @see #mockOrganization(String, long, String, GitHub)
      */
     public GHOrganization mockOrganization(String orgName, GitHub gh) throws IOException {
@@ -397,6 +416,7 @@ public class ContextHelper {
 
     /**
      * Uses the provded orgName, orgId, and GitHub client
+     *
      * @see #mockOrganization(String, long, String, GitHub)
      */
     public GHOrganization mockOrganization(String orgName, long orgId, GitHub gh) throws IOException {
@@ -405,6 +425,7 @@ public class ContextHelper {
 
     /**
      * Create a mock organization.
+     *
      * @param orgName Organization name (required)
      * @param orgId Organization id (optional; computed from orgName if not provided)
      * @param nodeId Organization node_id (optional; computed from orgName if not provided)
@@ -436,6 +457,7 @@ public class ContextHelper {
     /**
      * Mock a user.
      * Uses the {@link #hausMocks} GitHub client.
+     *
      * @see #mockUser(String, GitHub)
      */
     public GHUser mockUser(String login) throws IOException {
@@ -445,6 +467,7 @@ public class ContextHelper {
     /**
      * Mock a user.
      * (login, id, node_id, html_url, url, avatar_url)
+     *
      * @param login
      * @param gh
      * @return
@@ -471,6 +494,7 @@ public class ContextHelper {
     /**
      * Mock a team with a set of users.
      * Uses the {@link #hausMocks} GitHub client.
+     *
      * @see #mockTeam(String, Set, GitHub, boolean)
      */
     public GHTeam mockTeam(String fullName, Set<GHUser> userSet) throws IOException {
@@ -480,6 +504,7 @@ public class ContextHelper {
     /**
      * Mock a team with a set of users.
      * Uses the GitHub client from the installation.
+     *
      * @see #mockTeam(String, Set, GitHub, boolean)
      */
     public GHTeam mockTeam(MockInstallation installation, String fullName, Set<GHUser> userSet) throws IOException {
@@ -489,6 +514,7 @@ public class ContextHelper {
     /**
      * Mock a team with a set of users.
      * If cache is true, the team and members will be added to the cache.
+     *
      * @param fullName
      * @param userSet
      * @param gh
@@ -533,6 +559,7 @@ public class ContextHelper {
 
     /**
      * Append a mock user to a pre-cached team.
+     *
      * @param fullTeamName
      * @param user
      */
@@ -550,6 +577,7 @@ public class ContextHelper {
 
     /**
      * Create a mock GraphQL response from a file.
+     *
      * @param filePath
      * @return
      */
@@ -568,6 +596,7 @@ public class ContextHelper {
 
     /**
      * Mock file content for a repository.
+     *
      * @see #mockFileContent(MockInstallation, String, Path)
      */
     public void mockFileContent(MockInstallation mockInstallation,
@@ -578,6 +607,7 @@ public class ContextHelper {
     /**
      * Mock file content for a repository.
      * The repository is assumed to be the repository associated with the installation.
+     *
      * @see #mockFileContent(GHRepository, String, Path)
      */
     public void mockFileContent(MockInstallation mockInstallation,
@@ -587,6 +617,7 @@ public class ContextHelper {
 
     /**
      * Mock file content for a repository.
+     *
      * @see #mockFileContent(GHRepository, String, Path)
      */
     public void mockFileContent(GHRepository repo, String repoPath, String contentFilePath) throws IOException {
@@ -597,6 +628,7 @@ public class ContextHelper {
      * Mock file content for a repository:
      * Mocks GHContent.read() to return the file content.
      * repo.getFileContent(repoPath) will return the GHContent.
+     *
      * @param repo Mock GHRepository
      * @param repoPath Path to file in repository
      * @param contentFilePath Path to local file content
@@ -610,6 +642,7 @@ public class ContextHelper {
 
     /**
      * Mock a pull request file detail.
+     *
      * @param filename
      * @return
      */
@@ -621,6 +654,7 @@ public class ContextHelper {
 
     /**
      * Pre-set labels into the cache
+     *
      * @param id
      * @param labels
      */
@@ -630,6 +664,7 @@ public class ContextHelper {
 
     /**
      * Pre-set labels into the cache
+     *
      * @param id
      * @param labels
      */
@@ -688,6 +723,7 @@ public class ContextHelper {
 
     /**
      * Trigger a repository discovery event.
+     *
      * @param action
      * @param mockInstallation
      * @param bootstrap
@@ -704,6 +740,7 @@ public class ContextHelper {
 
     /**
      * Trigger a repository discovery event.
+     *
      * @param action
      * @param mockInstallation
      * @param repo
@@ -727,6 +764,7 @@ public class ContextHelper {
 
     /**
      * Load a YAML resource.
+     *
      * @param <T>
      * @param path
      * @param type
@@ -754,6 +792,7 @@ public class ContextHelper {
 
     /**
      * Setup GraphQL processing for a list of responses.
+     *
      * @param mocks the GitHubMockSetupContext; the GraphQL will be looked up using the installation ID of the response
      * @param responses the list of responses
      * @throws Exception
@@ -774,6 +813,7 @@ public class ContextHelper {
 
     /**
      * Setup GraphQL processing for a list of responses.
+     *
      * @param mocks the MockInstallation (the GraphQL from this installation will be used)
      * @param responses the list of responses
      * @throws Exception
