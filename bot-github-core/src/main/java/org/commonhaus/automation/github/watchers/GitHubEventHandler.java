@@ -51,6 +51,8 @@ public class GitHubEventHandler {
         FilePushEvent fileEvent = new FileWatcher.FilePushEvent(
                 pushEvent,
                 event.getInstallationId(),
+                event.getEvent(),
+                event.getAction(),
                 repo,
                 github);
         fileWatcher.handleEvent(fileEvent);

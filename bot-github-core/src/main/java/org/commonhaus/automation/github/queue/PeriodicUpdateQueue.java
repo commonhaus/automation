@@ -6,9 +6,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.mail.LogMailer;
 
@@ -23,7 +23,7 @@ import io.quarkus.runtime.StartupEvent;
  * This queue can be used to interleave events received from the GitHub API with
  * periodic/scheduled queries.
  */
-@ApplicationScoped
+@Singleton
 public class PeriodicUpdateQueue {
 
     public static final Runnable NOOP = () -> {
@@ -128,5 +128,13 @@ public class PeriodicUpdateQueue {
         }
 
         Log.debugf("%s %s task completed; %s remaining", task.type(), task.name(), taskQueue.size());
+    }
+
+    public boolean isEmpty() {
+        return taskQueue.isEmpty();
+    }
+
+    public String toString() {
+        return "PeriodicUpdateQueue(%s)".formatted(taskQueue.size());
     }
 }

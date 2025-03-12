@@ -12,9 +12,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
@@ -28,20 +28,17 @@ import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
 
-@ApplicationScoped
+@Singleton
 public class MembershipWatcher {
     static final String ME = "membershipWatcher";
 
     final Map<String, WatchedTeams> orgWatchers = new HashMap<>();
 
-    final PeriodicUpdateQueue periodicSync;
-
     @Inject
     GitHubTeamService teamService;
 
-    public MembershipWatcher(PeriodicUpdateQueue periodicSync) {
-        this.periodicSync = periodicSync;
-    }
+    @Inject
+    PeriodicUpdateQueue periodicSync;
 
     /**
      * Watch for repository discovery events and clean up watchers

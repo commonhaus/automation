@@ -1,6 +1,24 @@
 package org.commonhaus.automation.github.watchers;
 
+import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import jakarta.inject.Inject;
+
 import org.commonhaus.automation.github.context.ContextHelper;
+import org.commonhaus.automation.github.discovery.DiscoveryAction;
+import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
+import org.commonhaus.automation.github.watchers.MembershipWatcher.WatchedTeams;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHEvent;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.junit.QuarkusTest;
@@ -9,37 +27,136 @@ import io.quarkus.test.junit.QuarkusTest;
 @GitHubAppTest
 public class MembershipWatcherTest extends ContextHelper {
 
-    // // Team Membership Changes: Test that watchers are notified of team changes
-    // // Collaborator Changes: Test that repository collaborator changes trigger notifications
-    // // Cleanup: Test that watchers are properly cleaned up when teams or repositories are removed
+    // Team Membership Changes: Test that watchers are notified of team changes
+    // Collaborator Changes: Test that repository collaborator changes trigger notifications
+    // Cleanup: Test that watchers are properly cleaned up when teams or repositories are removed
 
-    // @Test
-    // void testTeamMembershipNotification() throws IOException {
-    //     // Set up test repository, organization and team
-    //     MockInstallation mockInstall = setupCommonMocks(defaultValues);
-    //     String teamFullName = "test-org/test-team";
+    @Inject
+    MembershipWatcher membershipWatcher;
 
-    //     // Create a callback counter
-    //     AtomicInteger callbackCounter = new AtomicInteger(0);
-    //     AtomicReference<MembershipUpdateType> updateTypeRef = new AtomicReference<>();
+    @Inject
+    PeriodicUpdateQueue updateQueue;
 
-    //     // Register membership watcher
-    //     membershipWatcher.watchMembers("testGroup", mockInstall.installationId(),
-    //             MembershipUpdateType.TEAM, teamFullName,
-    //             update -> {
-    //                 callbackCounter.incrementAndGet();
-    //                 updateTypeRef.set(update.type());
-    //             });
+    final DefaultValues defaultValues = new DefaultValues(
+            51110255,
+            new Resource(144493209, "O_kgDOCJzKmQ", "test-org"),
+            new Resource(941352036, "R_kgDOOBvkZA", "test-org/project-teamA"));
 
-    //     // Create a team event
-    //     TeamEvent teamEvent = createMockTeamEvent(mockInstall, ActionType.added);
+    @BeforeEach
+    void setup() throws IOException {
+        reset();
+        membershipWatcher.orgWatchers.clear();
+    }
 
-    //     // Trigger the event
-    //     membershipWatcher.handleTeamEvent(teamEvent);
+    @AfterEach
+    void cleanup() {
+        dumpWatcherState();
+        System.out.println(updateQueue);
+        await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+    }
 
-    //     // Wait and verify
-    //     await().atMost(5, SECONDS).until(() -> callbackCounter.get() > 0);
-    //     assertThat(callbackCounter.get()).isEqualTo(1);
-    //     assertThat(updateTypeRef.get()).isEqualTo(MembershipUpdateType.TEAM);
-    // }
+    @Test
+    void testAddTeamMembership() throws IOException {
+        AtomicInteger updateTeam = new AtomicInteger(0);
+
+        given()
+                .github(mocks -> {
+                    MockInstallation myMocks = setupGivenMocks(mocks, defaultValues);
+
+                    // Register team watcher (member)
+                    membershipWatcher.watchMembers("taskGroup", myMocks.installationId(),
+                            MembershipUpdateType.TEAM, "test-org/teamA",
+                            (event) -> updateTeam.incrementAndGet());
+                })
+                .when()
+                .payloadFromClasspath("/github/eventMembershipAdded.json")
+                .event(GHEvent.MEMBERSHIP)
+                .then()
+                .github(mocks -> {
+
+                });
+
+        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        assertThat(updateTeam.get()).isEqualTo(1);
+    }
+
+    @Test
+    void testAddCollaborator() throws IOException {
+        AtomicInteger updateCollaborators = new AtomicInteger(0);
+
+        given()
+                .github(mocks -> {
+                    MockInstallation myMocks = setupGivenMocks(mocks, defaultValues);
+
+                    // Register repository watcher (collaborator)
+                    membershipWatcher.watchMembers("taskGroup", myMocks.installationId(),
+                            MembershipUpdateType.COLLABORATOR, "test-org/project-teamA",
+                            (event) -> updateCollaborators.incrementAndGet());
+                })
+                .when()
+                .payloadFromClasspath("/github/eventMemberAdded.json")
+                .event(GHEvent.MEMBER)
+                .then()
+                .github(mocks -> {
+
+                });
+
+        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        assertThat(updateCollaborators.get()).isEqualTo(1);
+    }
+
+        @Test
+    void testWatcherCleanup() throws IOException {
+        AtomicInteger callbackCounter = new AtomicInteger();
+        MockInstallation myMocks = setupDefaultMocks(defaultValues);
+
+        WatchedTeams watchers;
+
+        membershipWatcher.watchMembers("taskGroup", myMocks.installationId(),
+                MembershipUpdateType.COLLABORATOR, "test-org/project-teamA",
+                (event) -> callbackCounter.incrementAndGet());
+
+        watchers = membershipWatcher.orgWatchers.get("test-org");
+        assertThat(watchers).isNotNull();
+
+        // Trigger repository removal
+        triggerRepositoryDiscovery(DiscoveryAction.INSTALL_REMOVED, myMocks, false);
+
+        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        assertThat(callbackCounter.get()).isEqualTo(0);
+
+        watchers = membershipWatcher.orgWatchers.get("test-org");
+        assertThat(watchers).isNull();
+    }
+
+    @Test
+    void testUnwatchAll() throws IOException {
+        AtomicInteger callbackCounter = new AtomicInteger();
+        MockInstallation myMocks = setupDefaultMocks(defaultValues);
+
+        membershipWatcher.watchMembers("taskGroup", myMocks.installationId(),
+                MembershipUpdateType.COLLABORATOR, "test-org/project-teamA",
+                (event) -> callbackCounter.incrementAndGet());
+
+        membershipWatcher.unwatchAll("taskGroup");
+
+        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        assertThat(membershipWatcher.orgWatchers).isEmpty();
+    }
+
+    public void dumpWatcherState() {
+        System.out.println("--------- FileWatcher state ---------");
+        for (var entry : membershipWatcher.orgWatchers.entrySet()) {
+            String orgName = entry.getKey();
+            System.out.println("Org: " + orgName);
+            var watcher = entry.getValue();
+            System.out.println("  Watched resources:");
+            for (var resourceEntry : watcher.watchedResources.entrySet()) {
+                String name = resourceEntry.getKey();
+                int callbackCount = resourceEntry.getValue().size();
+                System.out.println("    " + name + " - " + callbackCount + " callbacks");
+            }
+        }
+        System.out.println("------------------------------------");
+    }
 }

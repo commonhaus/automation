@@ -16,6 +16,7 @@ public enum EventType {
     issues,
     issue_comment,
     label,
+    member,
     membership,
     pull_request,
     pull_request_review,

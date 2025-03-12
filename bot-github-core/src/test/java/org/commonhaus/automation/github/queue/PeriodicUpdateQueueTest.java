@@ -29,16 +29,16 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         AtomicInteger otherChange = new AtomicInteger(0);
         AtomicInteger otherReconcile = new AtomicInteger(0);
 
-        periodicQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
-        periodicQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
-        periodicQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
-        periodicQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
-        periodicQueue.queue("otherChange", () -> this.doStuff("otherChange", otherChange));
-        periodicQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
-        periodicQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
-        periodicQueue.queue("otherChange", () -> {
+        updateQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
+        updateQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
+        updateQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
+        updateQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
+        updateQueue.queue("otherChange", () -> this.doStuff("otherChange", otherChange));
+        updateQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
+        updateQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
+        updateQueue.queue("otherChange", () -> {
             otherChange.incrementAndGet();
-            periodicQueue.queueReconciliation("otherChange", () -> this.doStuff("otherChange", otherReconcile));
+            updateQueue.queueReconciliation("otherChange", () -> this.doStuff("otherChange", otherReconcile));
         });
 
         // Wait for processing to complete
@@ -57,12 +57,12 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         AtomicInteger quietGroupReconcile = new AtomicInteger(0);
 
         // Queue a reconciliation task for the quiet group
-        periodicQueue.queueReconciliation("quietGroup", quietGroupReconcile::incrementAndGet);
+        updateQueue.queueReconciliation("quietGroup", quietGroupReconcile::incrementAndGet);
 
         // Keep adding changes to the busy group in a separate thread
         Thread changeAdder = new Thread(() -> {
             for (int i = 0; i < 20; i++) {
-                periodicQueue.queue("busyGroup", busyGroupChanges::incrementAndGet);
+                updateQueue.queue("busyGroup", busyGroupChanges::incrementAndGet);
                 try {
                     Thread.sleep(50); // Slight delay to ensure tasks get queued
                 } catch (InterruptedException e) {
@@ -90,17 +90,17 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         AtomicInteger tasksAfterFailure = new AtomicInteger(0);
 
         // Queue a normal task before the bad one
-        periodicQueue.queue("goodGroup", goodTaskCounter::incrementAndGet);
+        updateQueue.queue("goodGroup", goodTaskCounter::incrementAndGet);
 
         // Queue a task that will throw an exception
-        periodicQueue.queue("badGroup", () -> {
+        updateQueue.queue("badGroup", () -> {
             badTaskExceptions.incrementAndGet();
             throw new TestRuntimeException("Deliberately failing task");
         });
 
         // Queue some tasks after the bad one
         for (int i = 0; i < 3; i++) {
-            periodicQueue.queue("afterFailure", tasksAfterFailure::incrementAndGet);
+            updateQueue.queue("afterFailure", tasksAfterFailure::incrementAndGet);
         }
 
         // Set up an error handler that counts exceptions

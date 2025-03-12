@@ -1,34 +1,35 @@
 package org.commonhaus.automation.github.watchers;
 
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHEventPayload.Push.PushCommit;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
 
-@ApplicationScoped
+@Singleton
 public class FileWatcher {
-    static final String me = "fileWatcher";
+    static final String ME = "fileWatcher";
 
-    final Map<String, WatchedFiles> repositoryFiles = new HashMap<>();
+    final Map<String, WatchedFiles> repositoryFiles = new ConcurrentHashMap<>();
 
-    final PeriodicUpdateQueue periodicSync;
-
-    public FileWatcher(PeriodicUpdateQueue periodicSync) {
-        this.periodicSync = periodicSync;
-    }
+    @Inject
+    PeriodicUpdateQueue updateQueue;
 
     /**
      * Watch for repository discovery events and clean up watchers
@@ -43,12 +44,12 @@ public class FileWatcher {
                 // If an entire installation is removed, clean up all watchers for that installation
                 long installationId = repoEvent.installationId();
                 repositoryFiles.entrySet().removeIf(entry -> entry.getValue().installationId == installationId);
-                Log.debugf("%s: cleared watchers for installation %d", me, installationId);
+                Log.debugf("%s: cleared watchers for installation %d", ME, installationId);
             } else {
                 // Otherwise just remove watchers for the specific repository
                 String repoFullName = repoEvent.repository().getFullName();
                 repositoryFiles.remove(repoFullName);
-                Log.debugf("%s: cleared watchers for repository %s", me, repoFullName);
+                Log.debugf("%s: cleared watchers for repository %s", ME, repoFullName);
             }
         }
     }
@@ -93,13 +94,16 @@ public class FileWatcher {
             return;
         }
 
-        watcher.handlePush(fileEvent, periodicSync);
+        Log.debugf("[%s-%s] %s event in %s; %s commit(s)", ME,
+                fileEvent.installationId(), fileEvent.event(), repo.getFullName(), pushEvent.getCommits().size());
+
+        watcher.handlePush(fileEvent, updateQueue);
     }
 
     static class WatchedFiles {
         final String repoFullName;
         final long installationId;
-        final Map<String, Set<TaskCallback<FileUpdate>>> filesByPath = new HashMap<>();
+        final Map<String, Set<TaskCallback<FileUpdate>>> filesByPath = new ConcurrentHashMap<>();
 
         public WatchedFiles(String repoFullName, long installationId) {
             this.repoFullName = repoFullName;
@@ -113,7 +117,7 @@ public class FileWatcher {
          * @param callback Callback to invoke if this file is changed
          */
         public void add(String filePath, TaskCallback<FileUpdate> callback) {
-            filesByPath.computeIfAbsent(filePath, k -> new HashSet<>())
+            filesByPath.computeIfAbsent(filePath, k -> ConcurrentHashMap.newKeySet())
                     .add(callback);
         }
 
@@ -125,9 +129,14 @@ public class FileWatcher {
          * @param periodicSync Queue for periodic events and updates
          */
         public void handlePush(FilePushEvent event, PeriodicUpdateQueue periodicSync) {
+            // Sort by timestamp ascending (oldest first)
+            var pushEvent = event.pushEvent();
+            var commits = new ArrayList<>(pushEvent.getCommits());
+            commits.sort(Comparator.comparing(commit -> commit.getTimestamp()));
+
             for (var entry : filesByPath.entrySet()) {
                 Set<TaskCallback<FileUpdate>> callbacks = entry.getValue();
-                FileUpdateType updateType = commitsContain(event.pushEvent(), entry.getKey());
+                FileUpdateType updateType = commitsContain(commits, entry.getKey());
                 if (updateType != null) {
                     FileUpdate update = new FileUpdate(entry.getKey(), updateType, event);
                     for (var callback : callbacks) {
@@ -135,7 +144,6 @@ public class FileWatcher {
                         periodicSync.queue(callback.taskGroupName(),
                                 () -> callback.run(update));
                     }
-                    break;
                 }
             }
         }
@@ -147,9 +155,9 @@ public class FileWatcher {
          * @param path the path to check
          * @return true if the push event contains changes to the path
          */
-        FileUpdateType commitsContain(GHEventPayload.Push pushEvent, String path) {
+        FileUpdateType commitsContain(List<PushCommit> commits, String path) {
             FileUpdateType updateType = null;
-            for (var commit : pushEvent.getCommits()) {
+            for (var commit : commits) {
                 // Last one wins.
                 if (commit.getAdded().contains(path)) {
                     updateType = FileUpdateType.ADDED;
@@ -198,6 +206,8 @@ public class FileWatcher {
     public static record FilePushEvent(
             GHEventPayload.Push pushEvent,
             long installationId,
+            String event,
+            String action,
             GHRepository repository,
             GitHub github) {
     }
