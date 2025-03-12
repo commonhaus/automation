@@ -335,6 +335,8 @@ public class GitHubTeamService {
             Set<String> expectedLogins, List<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
 
+        Log.debugf("[%s] syncCollaborators: syncing collaborators for repository %s", qc.getLogId(), repository.getFullName());
+
         String repoFullName = repository.getFullName();
         Set<String> currentLogins = getCollaborators(qc, repository);
 
@@ -430,6 +432,8 @@ public class GitHubTeamService {
     public void syncMembers(QueryContext qc, String targetTeam,
             Set<String> expectedLogins, List<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
+
+        Log.debugf("[%s] syncMembers: syncing members of team %s", qc.getLogId(), targetTeam);
 
         String teamOrgName = QueryContext.toOrganizationName(targetTeam);
         String relativeTeamName = QueryContext.toRelativeName(teamOrgName, targetTeam);

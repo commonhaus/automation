@@ -1,5 +1,7 @@
 package org.commonhaus.automation.config;
 
+import java.util.Arrays;
+
 import jakarta.annotation.Nonnull;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -37,6 +39,8 @@ public record EmailNotification(
     @Override
     public String toString() {
         return "EmailNotificationConfig{errors='%s', dryRun='%s', audit='%s'}"
-                .formatted(errors(), dryRun(), audit());
+                .formatted(Arrays.toString(errors()), Arrays.toString(dryRun()), Arrays.toString(audit()));
     }
+
+
 }

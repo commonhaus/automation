@@ -17,7 +17,6 @@ import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
-import org.commonhaus.automation.github.watchers.FileWatcher.WatchedFiles;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,12 +46,12 @@ public class FileWatcherTest extends ContextHelper {
     void setup() throws IOException {
         reset();
         updateRef.clear();
-        fileWatcher.repositoryFiles.clear();
+        fileWatcher.reset();
     }
 
     @AfterEach
     void cleanup() {
-        dumpWatcherState();
+        fileWatcher.dumpWatcherState();
         System.out.println(updateQueue);
         await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
     }
@@ -100,7 +99,6 @@ public class FileWatcherTest extends ContextHelper {
 
     @Test
     void testFileWatcherMultipleCommits() throws Exception {
-        dumpWatcherState();
         given()
                 .github(mocks -> {
                     MockInstallation myMocks = setupGivenMocks(mocks, defaultValues);
@@ -170,15 +168,13 @@ public class FileWatcherTest extends ContextHelper {
     void testWatcherCleanup() throws IOException {
         AtomicInteger callbackCounter = new AtomicInteger();
         MockInstallation myMocks = setupDefaultMocks(defaultValues);
-        WatchedFiles watchedFiles;
 
         // Register file watcher
         fileWatcher.watchFile("testGroup", myMocks.installationId(),
                 myMocks.repository().getFullName(), "added.md",
                 update -> callbackCounter.incrementAndGet());
 
-        watchedFiles = fileWatcher.repositoryFiles.get(myMocks.repository().getFullName());
-        assertThat(watchedFiles).isNotNull();
+        assertThat(fileWatcher.isWatching(defaultValues.repoFullName())).isTrue();
 
         // Trigger repository removal
         triggerRepositoryDiscovery(DiscoveryAction.REMOVED, myMocks, false);
@@ -186,8 +182,7 @@ public class FileWatcherTest extends ContextHelper {
         await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
         assertThat(callbackCounter.get()).isEqualTo(0);
 
-        watchedFiles = fileWatcher.repositoryFiles.get(myMocks.repository().getFullName());
-        assertThat(watchedFiles).isNull();
+        assertThat(fileWatcher.isWatching(defaultValues.repoFullName())).isFalse();
     }
 
     @Test
@@ -204,21 +199,5 @@ public class FileWatcherTest extends ContextHelper {
 
         await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
         assertThat(fileWatcher.repositoryFiles).isEmpty();
-    }
-
-    public void dumpWatcherState() {
-        System.out.println("--------- FileWatcher state ---------");
-        for (var entry : fileWatcher.repositoryFiles.entrySet()) {
-            String repoName = entry.getKey();
-            System.out.println("Repo: " + repoName);
-            var watcher = entry.getValue();
-            System.out.println("  Files watching:");
-            for (var fileEntry : watcher.filesByPath.entrySet()) {
-                String filePath = fileEntry.getKey();
-                int callbackCount = fileEntry.getValue().size();
-                System.out.println("    " + filePath + " - " + callbackCount + " callbacks");
-            }
-        }
-        System.out.println("------------------------------------");
     }
 }

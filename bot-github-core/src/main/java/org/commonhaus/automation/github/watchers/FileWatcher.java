@@ -9,9 +9,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
@@ -23,7 +23,7 @@ import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
 
-@Singleton
+@ApplicationScoped
 public class FileWatcher {
     static final String ME = "fileWatcher";
 
@@ -184,6 +184,34 @@ public class FileWatcher {
         public int hashCode() {
             return Objects.hash(repoFullName, installationId);
         }
+    }
+
+    public boolean isWatching(String repoName) {
+        return repositoryFiles.containsKey(repoName);
+    }
+
+    /**
+     * Hard-reset of the file watcher.
+     * This is useful for testing.
+     */
+    protected void reset() {
+        repositoryFiles.clear();
+    }
+
+    void dumpWatcherState() {
+        System.out.println("--------- FileWatcher state ---------");
+        for (var entry : repositoryFiles.entrySet()) {
+            String repoName = entry.getKey();
+            System.out.println("Repo: " + repoName);
+            var watcher = entry.getValue();
+            System.out.println("  Files watching:");
+            for (var fileEntry : watcher.filesByPath.entrySet()) {
+                String filePath = fileEntry.getKey();
+                int callbackCount = fileEntry.getValue().size();
+                System.out.println("    " + filePath + " - " + callbackCount + " callbacks");
+            }
+        }
+        System.out.println("------------------------------------");
     }
 
     public enum FileUpdateType {

@@ -12,9 +12,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
@@ -29,7 +29,7 @@ import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
 
-@Singleton
+@ApplicationScoped
 public class MembershipWatcher {
     static final String ME = "membershipWatcher";
 
@@ -221,6 +221,34 @@ public class MembershipWatcher {
                         () -> callback.run(update));
             }
         }
+    }
+
+    /**
+     * Hard-reset of the membership watcher.
+     * This is useful for testing.
+     */
+    protected void reset() {
+        orgWatchers.clear();
+    }
+
+    public boolean isWatching(String orgName) {
+        return orgWatchers.containsKey(orgName);
+    }
+
+    void dumpWatcherState() {
+        System.out.println("--------- MembershipWatcher state ---------");
+        for (var entry : orgWatchers.entrySet()) {
+            String repoName = entry.getKey();
+            System.out.println("Repo: " + repoName);
+            var watcher = entry.getValue();
+            System.out.println("  Files watching:");
+            for (var resource : watcher.watchedResources.entrySet()) {
+                String name = resource.getKey();
+                int callbackCount = resource.getValue().size();
+                System.out.println("    " + name + " - " + callbackCount + " callbacks");
+            }
+        }
+        System.out.println("------------------------------------");
     }
 
     public enum MembershipUpdateType {

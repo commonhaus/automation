@@ -14,7 +14,6 @@ import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
-import org.commonhaus.automation.github.watchers.MembershipWatcher.WatchedTeams;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,12 +44,12 @@ public class MembershipWatcherTest extends ContextHelper {
     @BeforeEach
     void setup() throws IOException {
         reset();
-        membershipWatcher.orgWatchers.clear();
+        membershipWatcher.reset();
     }
 
     @AfterEach
     void cleanup() {
-        dumpWatcherState();
+        membershipWatcher.dumpWatcherState();
         System.out.println(updateQueue);
         await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
     }
@@ -110,14 +109,11 @@ public class MembershipWatcherTest extends ContextHelper {
         AtomicInteger callbackCounter = new AtomicInteger();
         MockInstallation myMocks = setupDefaultMocks(defaultValues);
 
-        WatchedTeams watchers;
-
         membershipWatcher.watchMembers("taskGroup", myMocks.installationId(),
                 MembershipUpdateType.COLLABORATOR, "test-org/project-teamA",
                 (event) -> callbackCounter.incrementAndGet());
 
-        watchers = membershipWatcher.orgWatchers.get("test-org");
-        assertThat(watchers).isNotNull();
+        assertThat(membershipWatcher.isWatching("test-org")).isTrue();
 
         // Trigger repository removal
         triggerRepositoryDiscovery(DiscoveryAction.INSTALL_REMOVED, myMocks, false);
@@ -125,8 +121,7 @@ public class MembershipWatcherTest extends ContextHelper {
         await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
         assertThat(callbackCounter.get()).isEqualTo(0);
 
-        watchers = membershipWatcher.orgWatchers.get("test-org");
-        assertThat(watchers).isNull();
+        assertThat(membershipWatcher.isWatching("test-org")).isFalse();
     }
 
     @Test
@@ -142,21 +137,5 @@ public class MembershipWatcherTest extends ContextHelper {
 
         await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
         assertThat(membershipWatcher.orgWatchers).isEmpty();
-    }
-
-    public void dumpWatcherState() {
-        System.out.println("--------- FileWatcher state ---------");
-        for (var entry : membershipWatcher.orgWatchers.entrySet()) {
-            String orgName = entry.getKey();
-            System.out.println("Org: " + orgName);
-            var watcher = entry.getValue();
-            System.out.println("  Watched resources:");
-            for (var resourceEntry : watcher.watchedResources.entrySet()) {
-                String name = resourceEntry.getKey();
-                int callbackCount = resourceEntry.getValue().size();
-                System.out.println("    " + name + " - " + callbackCount + " callbacks");
-            }
-        }
-        System.out.println("------------------------------------");
     }
 }
