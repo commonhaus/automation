@@ -3,6 +3,7 @@ package org.commonhaus.automation.config;
 import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
+import io.smallrye.config.WithDefault;
 
 /**
  * Configuration for the bot.
@@ -32,13 +33,34 @@ public interface BotConfig {
      */
     Optional<String> errorEmailAddress();
 
+    /**
+     * @return the database ID and node ID for the bot user in dry run mode
+     */
+    DryRunBotConfig dryRunBot();
+
+    /**
+     * @return true if discoveryEnabled is unset or is set to true
+     */
     default boolean isDiscoveryEnabled() {
-        Optional<Boolean> discoveryEnabled = discoveryEnabled();
-        return discoveryEnabled.isEmpty() || discoveryEnabled.get();
+        return discoveryEnabled().orElse(true);
     }
 
+    /**
+     * @return true if dryRun is set to true, false otherwise (including when unset)
+     */
     default boolean isDryRun() {
-        Optional<Boolean> dryRun = dryRun();
-        return dryRun.isPresent() && dryRun.get();
+        return dryRun().orElse(false);
+    }
+
+    @ConfigMapping(prefix = "automation.dryRunBot")
+    interface DryRunBotConfig {
+        @WithDefault("12345")
+        int databaseId();
+
+        @WithDefault("D_FAKE_ID")
+        String nodeId();
+
+        @WithDefault("https://example.com")
+        String url();
     }
 }

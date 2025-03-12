@@ -69,4 +69,24 @@ public class TestBotConfig implements BotConfig {
     public void setErrorEmail(String errorEmail) {
         this.errorEmail = errorEmail;
     }
+
+    @Override
+    public DryRunBotConfig dryRunBot() {
+        return new DryRunBotConfig() {
+            @Override
+            public int databaseId() {
+                return 12345;
+            }
+
+            @Override
+            public String nodeId() {
+                return "MDQ6VXNlcjE=";
+            }
+
+            @Override
+            public String url() {
+                return "https://example.com";
+            }
+        };
+    }
 }

@@ -3,7 +3,12 @@ package org.commonhaus.automation.github.context;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.commonhaus.automation.config.BotConfig;
+import org.eclipse.microprofile.config.ConfigProvider;
+
 public class BotComment {
+    static BotConfig.DryRunBotConfig dryRunBotConfig;
+
     private final String itemId;
     private final String id;
     private final int databaseId;
@@ -21,11 +26,15 @@ public class BotComment {
     // For dry run: this comment exists (in test repo), but probably not on the
     // original item
     BotComment(String itemId) {
+        if (dryRunBotConfig == null) {
+            dryRunBotConfig = ConfigProvider.getConfig().getValue("automation.dryRunBot", BotConfig.DryRunBotConfig.class);
+        }
+
         this.bodyString = "";
-        this.databaseId = 8164728;
-        this.id = "DC_kwDOLDuJqs4AfJV4";
         this.itemId = itemId;
-        this.url = "https://github.com/commonhaus/automation-test/discussions/6#discussioncomment-8164728";
+        this.databaseId = dryRunBotConfig.databaseId();
+        this.id = dryRunBotConfig.nodeId();
+        this.url = dryRunBotConfig.url();
     }
 
     public String getItemId() {
