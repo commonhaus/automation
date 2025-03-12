@@ -8,7 +8,7 @@ gitHubResources: github-resources.yml
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
 teamAccess:
-  source: orgA/teamA
+  source: other-org/teamA
   # ignore the presence/absence of these logins
   ignoreUsers:
     - botLogin

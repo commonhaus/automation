@@ -79,15 +79,13 @@ public class OrganizationManager implements LatestOrgConfig {
         String orgName = toOrganizationName(repoFullName);
         long installationId = repoEvent.installationId();
 
-        Log.debugf("%s/repoDiscovered: %s", ME, repoFullName);
-
         // We only read configuration files from repositories in the configured organization
         if (action.repository()
                 && orgName.equals(mgrBotConfig.configOrganization())
                 && repo.getFullName().equals(mgrBotConfig.mainRepository())) {
             if (action.added()) {
                 // main repository for configuration
-                Log.debugf("%s/repoDiscovered (added): %s", ME, repoFullName);
+                Log.debugf("%s/repoDiscovered: added main=%s", ME, repoFullName);
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
@@ -236,21 +234,21 @@ public class OrganizationManager implements LatestOrgConfig {
             SyncToTeams sync = entry.getValue();
             String field = sync.field(defaults);
 
-            JsonNode sourceTeam = sourceData.get(groupName);
-            if (sourceTeam != null && sourceTeam.isArray()) {
+            JsonNode sourceTeamMemberList = sourceData.get(groupName);
+            if (sourceTeamMemberList != null && sourceTeamMemberList.isArray()) {
                 Log.debugf("%s/reconcile: field %s from %s to %s", ME, field, groupName, sync.teams());
 
                 // Populate list of expected logins with those we intend to preserve
                 Set<String> expectedLogins = new HashSet<>(sync.preserveUsers(defaults));
                 // Find the users listed in the source data
-                for (JsonNode member : sourceTeam) {
+                for (JsonNode member : sourceTeamMemberList) {
                     String login = member.get(field).asText();
                     if (login != null && login.matches("^[a-zA-Z0-9-]+$")) {
                         expectedLogins.add(login);
                     }
                 }
 
-                for (String targetTeam : configState.teams()) {
+                for (String targetTeam : sync.teams()) {
                     try {
                         doSyncTeamMembers(sourceQc, targetTeam, expectedLogins, sync.ignoreUsers(),
                                 isDryRun, configState.emailNotifications());

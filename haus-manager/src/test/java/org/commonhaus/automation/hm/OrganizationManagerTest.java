@@ -1,20 +1,26 @@
 package org.commonhaus.automation.hm;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
-import java.nio.file.Path;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
+import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
+import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.logging.Log;
@@ -22,61 +28,86 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @GitHubAppTest
-public class OrganizationManagerTest extends ContextHelper {
-
-    static final DefaultValues PRIMARY = new DefaultValues(
-            46053716,
-            new Resource(144493209, "test-org"),
-            new Resource("test-org/test-repo"));
-
-    static final DefaultValues SECONDARY = new DefaultValues(
-            46053716,
-            new Resource(144493209, "other-org"),
-            new Resource("other-org/other-repo"));
-
-    @Inject
-    TestManagerBotConfig configProducer;
-
-    @Inject
-    AppContextService appContextService;
+public class OrganizationManagerTest extends HausManagerTestBase {
 
     @Inject
     OrganizationManager organizationManager;
 
-    MockInstallation primary;
-    MockInstallation secondary;
+    GHRepository contactRepo;
 
     @BeforeEach
+    @Override
     void setup() throws IOException {
-        primary = setupCommonMocks(PRIMARY);
-        secondary = setupCommonMocks(SECONDARY);
+        super.setup();
+        Log.info("START: OrganizationManagerTest.setup()");
+
+        // Mock the file content for organization config in primary repo
+        mockFileContent(hausMocks, OrganizationConfig.PATH,
+                "src/test/resources/cf-haus-organization.yml");
+
+        // Mock the file content for CONTACTS.yaml in alt repo (public content)
+        contactRepo = mockRepository("public-org/source", hausMocks.github());
+        mockFileContent(contactRepo, "CONTACTS.yaml",
+                "src/test/resources/test-contacts.yml");
+
+        mockTeam("test-org/cf-council", null);
+        mockTeam("test-org/admin", null);
+        mockTeam("test-org/team-quorum", null);
     }
 
     @AfterEach
-    void cleanup() {
+    void cleaup() {
         // Reset/cleanup the organization manager
         organizationManager.reset();
-        Log.info("DONE: OrganizationManagerTest.cleanup()");
     }
 
     @Test
-    void testConfigurationReading() throws IOException {
-        // Setup mock repository with config file
-        mockFileContent(primary, OrganizationConfig.PATH, Path.of("src/test/resources/cf-haus-organization.yml"));
-
+    void testRepositoryEvents() throws IOException {
         // Trigger discovery to initialize manager
-        triggerRepositoryDiscovery(DiscoveryAction.ADDED, primary, true);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
 
-        // Verify config was read
-        await().atMost(5, SECONDS).until(() -> organizationManager.getConfig() != null);
+        waitForQueue();
+
         OrganizationConfig config = organizationManager.getConfig();
         assertThat(config).isNotNull();
+        System.out.println("Config teams: " + config.teamMembership().sync().keySet());
         assertThat(config.teamMembership().sync()).isNotEmpty();
+
+        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, true);
+
+        waitForQueue();
+
+        assertThat(organizationManager.getConfig()).isNull();
+
+        // Verify team cache was refreshed
+        verify(contactRepo, times(1)).getFileContent(anyString());
+
+        // Verify team sync was called for each target team
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
     }
 
     @Test
-    void testNext() throws IOException {
-        System.out.println(organizationManager.toString());
+    void testConfigurationUpdated() throws IOException {
+        organizationManager.processFileUpdate(new FileUpdate(
+                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+                hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
 
+        // Verify config was read
+        waitForQueue();
+
+        OrganizationConfig config = organizationManager.getConfig();
+        assertThat(config).isNotNull();
+        System.out.println("Config teams: " + config.teamMembership().sync().keySet());
+        assertThat(config.teamMembership().sync()).isNotEmpty();
+
+        // Verify team cache was refreshed
+        verify(contactRepo, timeout(1000)).getFileContent(anyString());
+
+        // Verify team sync was called for each target team
+        verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
     }
 }

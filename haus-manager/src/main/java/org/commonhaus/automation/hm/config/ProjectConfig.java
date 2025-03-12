@@ -55,8 +55,8 @@ public class ProjectConfig {
 
     @Override
     public String toString() {
-        return "ProjectConfigFile{dryRun=%s, enabled='%s', emailNotifications='%s', teamAccess=%s}"
-                .formatted(dryRun(), enabled(), emailNotifications, teamAccess);
+        return "ProjectConfigFile{dryRun=%s, enabled='%s', %s, %s}"
+                .formatted(dryRun(), enabled(), emailNotifications(), teamAccess());
     }
 
     /**

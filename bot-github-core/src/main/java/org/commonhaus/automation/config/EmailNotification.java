@@ -42,5 +42,4 @@ public record EmailNotification(
                 .formatted(Arrays.toString(errors()), Arrays.toString(dryRun()), Arrays.toString(audit()));
     }
 
-
 }

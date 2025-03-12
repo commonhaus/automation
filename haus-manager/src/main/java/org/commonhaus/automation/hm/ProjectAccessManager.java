@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.GitHubTeamService;
@@ -41,28 +42,28 @@ public class ProjectAccessManager {
 
     private static volatile String lastRun = "never";
 
+    @Inject
+    AppContextService ctx;
+
+    @Inject
+    FileWatcher fileEvents;
+
+    @Inject
+    MembershipWatcher membershipEvents;
+
+    @Inject
+    ManagerBotConfig mgrBotConfig;
+
+    @Inject
+    PeriodicUpdateQueue periodicSync;
+
+    @Inject
+    GitHubTeamService teamSyncService;
+
     // flat map of tracked resources to the task group that manages them
     final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
     // flat map of task group to its current state
     final Map<String, ProjectConfigState> taskGroupToState = new ConcurrentHashMap<>();
-
-    final AppContextService ctx;
-    final FileWatcher fileEvents;
-    final MembershipWatcher membershipEvents;
-    final ManagerBotConfig mgrBotConfig;
-    final PeriodicUpdateQueue periodicSync;
-    final GitHubTeamService teamSyncService;
-
-    public ProjectAccessManager(AppContextService appContext, ManagerBotConfig mgrBotConfig,
-            FileWatcher fileEvents, MembershipWatcher membershipEvents,
-            PeriodicUpdateQueue periodicSync, GitHubTeamService teamSyncService) {
-        this.ctx = appContext;
-        this.fileEvents = fileEvents;
-        this.membershipEvents = membershipEvents;
-        this.mgrBotConfig = mgrBotConfig;
-        this.periodicSync = periodicSync;
-        this.teamSyncService = teamSyncService;
-    }
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Project access refreshed", () -> lastRun);
@@ -150,6 +151,12 @@ public class ProjectAccessManager {
      * Queue a reconcilation. No-need to re-read config
      */
     protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
+        Log.debugf("%s/processMembershipUpdate: %s", ME, update);
+        ProjectConfigState newState = taskGroupToState.get(taskGroup);
+        if (newState == null) {
+            Log.warnf("%s/processMembershipUpdate: no state for %s", ME, taskGroup);
+            return;
+        }
         // queue reconcile action: deal with bursty config updates
         periodicSync.queueReconciliation(ME, () -> reconcile(taskGroup));
     }
@@ -183,10 +190,10 @@ public class ProjectAccessManager {
      * @param github
      */
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc) {
-        // The repository containing the (added/modified) file must be present in the service context
+        // The repository containing the (added/modified) file must be present in the query context
         GHRepository repo = qc.getRepository();
         if (repo == null) {
-            Log.warnf("%s/readProjectConfig: repository not set in QueryCOntext", taskGroup);
+            Log.warnf("%s/readProjectConfig: repository not set in QueryContext", taskGroup);
             return;
         }
         ProjectConfig projectConfig = qc.readYamlSourceFile(repo, ProjectConfig.PATH, ProjectConfig.class);
@@ -221,7 +228,7 @@ public class ProjectAccessManager {
      */
     public void reconcile(String taskGroup) {
         ProjectConfigState newState = taskGroupToState.get(taskGroup);
-        Log.debugf("%s/reconcile: team membership sync: %s", newState.taskGroup(), newState.projectConfig());
+        Log.debugf("%s/reconcile: team membership sync; %s", newState.taskGroup(), newState.projectConfig());
 
         ProjectConfig projectConfig = newState.projectConfig();
         if (!projectConfig.enabled() || projectConfig.teamAccess() == null) {
@@ -303,5 +310,16 @@ public class ProjectAccessManager {
         public String[] errors() {
             return projectConfig().emailNotifications().errors();
         }
+    }
+
+    /**
+     * Hard-reset of the organization manager.
+     * This is useful for testing.
+     */
+    protected void reset() {
+        fileEvents.unwatchAll(ME);
+        membershipEvents.unwatchAll(ME);
+        resourceToTaskGroup.clear();
+        taskGroupToState.clear();
     }
 }

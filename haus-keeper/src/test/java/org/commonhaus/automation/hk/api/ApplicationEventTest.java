@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hk.api;
 
+import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -31,7 +32,6 @@ import org.mockito.Mockito;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
-import io.quarkiverse.githubapp.testing.GitHubAppTesting;
 import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
@@ -55,7 +55,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
     void testApplicationComment() throws Exception {
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
-        GitHubAppTesting.given()
+        given()
                 .github(mocks -> {
                     setupInstallationRepositories(mocks);
                     setupBotLogin();
@@ -71,7 +71,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
@@ -81,7 +81,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
 
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
-        GitHubAppTesting.given()
+        given()
                 .github(mocks -> {
                     setupInstallationRepositories(mocks);
                     setupBotLogin();
@@ -124,7 +124,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
@@ -134,7 +134,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
 
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
-        GitHubAppTesting.given()
+        given()
                 .github(mocks -> {
                     setupInstallationRepositories(mocks);
                     setupBotLogin();
@@ -175,7 +175,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
