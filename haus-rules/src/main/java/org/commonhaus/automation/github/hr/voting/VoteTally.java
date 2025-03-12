@@ -133,12 +133,13 @@ public class VoteTally {
 
         groupVotes = categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey()))
-                .mapToInt(e -> e.getValue().teamTotal).sum();
+                .mapToInt(e -> e.getValue().getTeamTotal()).sum();
         countedVotes = categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey()))
-                .mapToInt(e -> e.getValue().total).sum();
+                .mapToInt(e -> e.getValue().getTotal()).sum();
         otherVotes.addAll(categories.values().stream()
                 .flatMap(c -> c.otherVotes.stream())
+                .filter(x -> !x.isAlternate())
                 .toList());
         hasQuorum = groupVotes >= votingThreshold.requiredVotes(groupSize);
 
@@ -184,9 +185,8 @@ public class VoteTally {
                         new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
                 case "CHANGES_REQUESTED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
-                case "COMMENTED" ->
-                    reactions.add(
-                            new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
+                case "COMMENTED" -> reactions.add(
+                        new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
             }
         }
         votes.addAll(0, reactions);
@@ -194,7 +194,7 @@ public class VoteTally {
 
     private void countComments(Collection<DataCommonComment> comments,
             Set<DataActor> seenLogins, Map<String, DataActor> teamLogins) {
-        Category c = categories.computeIfAbsent("comment", k -> new Category());
+        Category c = categories.computeIfAbsent("comment", k -> new Category(k));
 
         for (DataCommonComment comment : comments) {
             if (seenLogins.add(comment.author)) {
@@ -214,23 +214,12 @@ public class VoteTally {
         for (DataReaction reaction : votes) {
             DataActor user = reaction.user;
 
-            final Category c;
-            if (notMarthasMethod) {
-                c = categories.computeIfAbsent(DataReaction.toEmoji(reaction.reactionContent), k -> new Category());
-            } else if (info.approve.contains(reaction.reactionContent)) {
-                c = categories.computeIfAbsent("approve", k -> new Category());
-            } else if (info.ok.contains(reaction.reactionContent)) {
-                c = categories.computeIfAbsent("ok", k -> new Category());
-            } else if (info.revise.contains(reaction.reactionContent)) {
-                c = categories.computeIfAbsent("revise", k -> new Category());
-            } else {
+            final Category c = determineCategory(reaction, info);
+            if (c.name.equals("ignored")) {
                 // This does not count against other votes
-                c = categories.computeIfAbsent("ignored", k -> new Category());
                 c.add(reaction, teamLogins);
                 continue;
-            }
-
-            if (seenLogins.add(user)) {
+            } else if (seenLogins.add(user)) {
                 c.add(reaction, teamLogins);
             } else {
                 duplicates.add(new VoteRecord(reaction));
@@ -244,8 +233,34 @@ public class VoteTally {
         if (missingGroupActors.isEmpty() || alternates == null || alternates.isEmpty()) {
             return;
         }
-        for (Category c : categories.values()) {
-            c.countAlternates(missingGroupActors, alternates);
+
+        for (DataActor missingActor : missingGroupActors) {
+            DataActor alternate = alternates.get(missingActor.login);
+            if (alternate == null) {
+                continue;
+            }
+
+            for (Category c : categories.values()) {
+                if (c.promoteAlternate(alternate)) {
+                    break;
+                }
+            }
+        }
+    }
+
+    Category determineCategory(DataReaction reaction, VoteInformation info) {
+        if (notMarthasMethod) {
+            return categories.computeIfAbsent(DataReaction.toEmoji(reaction.reactionContent), k -> new Category(k));
+        }
+
+        if (info.approve.contains(reaction.reactionContent)) {
+            return categories.computeIfAbsent("approve", k -> new Category(k));
+        } else if (info.ok.contains(reaction.reactionContent)) {
+            return categories.computeIfAbsent("ok", k -> new Category(k));
+        } else if (info.revise.contains(reaction.reactionContent)) {
+            return categories.computeIfAbsent("revise", k -> new Category(k));
+        } else {
+            return categories.computeIfAbsent("ignored", k -> new Category(k));
         }
     }
 
@@ -280,7 +295,10 @@ public class VoteTally {
                         + ignoredToString();
             }
             if (!isDone) {
-                result += "\r\n A vote manager comment containing `vote::result` will close the vote.";
+                result += """
+                        \r\nA vote manager comment containing `vote::result` will close the vote.
+                        \r\n\r\n[^alt]: Alternate representative
+                        """.stripIndent();
             }
         }
 
@@ -291,7 +309,7 @@ public class VoteTally {
         return categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey())) // Skip ignored votes here
                 .map(e -> String.format("| %s | %d | %d | %s |",
-                        e.getKey(), e.getValue().total, e.getValue().teamTotal,
+                        e.getKey(), e.getValue().getTotal(), e.getValue().getTeamTotal(),
                         actorsToString(e.getValue().team)))
                 .collect(Collectors.joining("\r\n"));
     }
@@ -322,7 +340,7 @@ public class VoteTally {
 
     String ignoredToString() {
         Category ignored = categories.get("ignored");
-        if (ignored == null || ignored.total == 0) {
+        if (ignored == null || ignored.getTotal() == 0) {
             return "";
         }
         return "\r\nThe following reactions were not counted:\r\n"
@@ -334,17 +352,26 @@ public class VoteTally {
 
     String actorsToString(Collection<VoteRecord> actors) {
         return actors.stream()
-                .map(actor -> String.format("[%s](%s)", actor.login, actor.url))
+                .map(actor -> {
+                    String format = "[%s](%s)";
+                    if (actor.isAlternate()) {
+                        format = "[%s](%s)[^alt]";
+                    }
+                    return String.format(format, actor.login, actor.url);
+                })
                 .collect(Collectors.joining(", "));
     }
 
     int ignoredVotes() {
         Category ignored = categories.get("ignored");
-        return ignored == null ? 0 : ignored.total;
+        return ignored == null ? 0 : ignored.getTotal();
     }
 
     @RegisterForReflection
     public static class Category {
+        @JsonIgnore
+        final String name;
+
         @JsonProperty
         final Set<ReactionContent> reactions = new HashSet<>();
 
@@ -353,10 +380,9 @@ public class VoteTally {
         @JsonProperty
         final Set<VoteRecord> otherVotes = new TreeSet<>(compareRecords);
 
-        @JsonProperty
-        int teamTotal = 0;
-        @JsonProperty
-        int total = 0;
+        Category(String name) {
+            this.name = name;
+        }
 
         void add(DataReaction reaction, Map<String, DataActor> teamLogins) {
             reactions.add(reaction.reactionContent);
@@ -364,31 +390,34 @@ public class VoteTally {
         }
 
         void add(VoteRecord record, Map<String, DataActor> teamLogins) {
-            total++;
             if (teamLogins.get(record.login) != null) {
-                teamTotal++;
                 team.add(record);
             } else {
                 otherVotes.add(record);
             }
         }
 
-        void countAlternates(Collection<DataActor> missingGroupActors, Map<String, DataActor> alternates) {
-            for (DataActor actor : missingGroupActors) {
-                DataActor alternate = alternates.get(actor.login);
-                if (alternate != null) {
-                    VoteRecord alternateVote = otherVotes.stream()
-                            .filter(vr -> vr.login.equals(alternate.login))
-                            .findFirst().orElse(null);
-                    if (alternateVote != null) {
-                        // Promote to a team vote.
-                        teamTotal++;
-                        team.add(alternateVote);
-                        otherVotes.remove(alternateVote);
-                        alternateVote.setAlternate(true); // indicate this is an alternate
-                    }
-                }
+        boolean promoteAlternate(DataActor alternate) {
+            VoteRecord alternateVote = otherVotes.stream()
+                    .filter(vr -> vr.login.equals(alternate.login))
+                    .findFirst().orElse(null);
+
+            if (alternateVote != null) {
+                // Promote to a team vote.
+                team.add(alternateVote);
+                otherVotes.remove(alternateVote);
+                alternateVote.setAlternate(true); // indicate this is an alternate
+                return true;
             }
+            return false;
+        }
+
+        int getTotal() {
+            return team.size() + otherVotes.size();
+        }
+
+        int getTeamTotal() {
+            return team.size();
         }
     }
 

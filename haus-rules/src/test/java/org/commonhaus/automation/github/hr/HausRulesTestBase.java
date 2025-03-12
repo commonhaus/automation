@@ -28,6 +28,8 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockVerificationContext;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -42,6 +44,8 @@ public abstract class HausRulesTestBase extends ContextHelper {
     public static final long repoId = 742099370;
     public static final long installationId = 46053716;
     public static final long organizationId = 144493209;
+
+    protected static final ObjectMapper objectMapper = new ObjectMapper();
 
     protected static final DefaultValues TEST_ORG = new DefaultValues(
             installationId, // installationId

@@ -23,8 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHEvent;
 import org.kohsuke.github.GHUser;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -35,8 +33,6 @@ public class VotingTest extends HausRulesTestBase {
             VOTE_DONE, VOTE_OPEN, VOTE_QUORUM, VOTE_PROCEED, VOTE_REVISE);
     static final Set<DataLabel> ITEM_VOTE_OPEN = Set.of(VOTE_OPEN);
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
-
-    ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @BeforeEach

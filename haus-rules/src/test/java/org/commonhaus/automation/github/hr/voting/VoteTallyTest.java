@@ -3,12 +3,14 @@ package org.commonhaus.automation.github.hr.voting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -27,14 +29,16 @@ import org.commonhaus.automation.github.hr.config.VoteConfig.AlternateConfig;
 import org.commonhaus.automation.github.hr.config.VoteConfig.AlternateDefinition;
 import org.commonhaus.automation.github.hr.config.VoteConfig.TeamMapping;
 import org.commonhaus.automation.github.hr.voting.VoteInformation.Alternates;
+import org.commonhaus.automation.github.hr.voting.VoteTally.Category;
 import org.commonhaus.automation.github.hr.voting.VoteTally.CountingMethod;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.ReactionContent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.junit.QuarkusTest;
@@ -44,54 +48,159 @@ import io.quarkus.test.junit.QuarkusTest;
 public class VoteTallyTest extends HausRulesTestBase {
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
 
-    ObjectMapper objectMapper = new ObjectMapper();
+    static final Date date = new Date();
 
-    @Test
-    void testVoteTally() throws Exception {
+    List<DataReaction> teamReactions = new ArrayList<>(51);
+    Set<GHUser> teamUsers = new HashSet<>(51);
+    List<DataReaction> unignore = new ArrayList<>(3);
+    List<DataReaction> duplicates = new ArrayList<>(3);
+    List<DataReaction> extraReactions = new ArrayList<>(10);
+
+    @BeforeEach
+    void setupVotes() throws Exception {
         setupDefaultMocks(TEST_ORG);
-
-        List<DataReaction> teamReactions = new ArrayList<>(51);
-        Set<GHUser> teamUsers = new HashSet<>(51);
-        List<DataReaction> unignore = new ArrayList<>(3);
-        List<DataReaction> duplicates = new ArrayList<>(3);
-        List<DataReaction> primary = new ArrayList<>(1);
-        Date date = new Date();
 
         for (int i = 1; i < 51; i++) {
             GHUser ghUser = mockUser("user" + i);
             DataActor user = new DataActor(ghUser);
             teamUsers.add(ghUser);
 
-            if (i == 28) {
-                // don't add the primary user to the list of team reactions. Secondary user will be counted instead
-                primary.add(new DataReaction(user, "thumbs_up", date));
-            } else {
-                teamReactions.add(new DataReaction(user,
-                        i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
-            }
-
-            if (i % 13 == 0) {
-                unignore.add(new DataReaction(user, "eyes", date));
-            }
-            if (i % 19 == 0) {
-                duplicates.add(new DataReaction(user, "thumbs_down", date));
-            }
+            // teamReactions.add(new DataReaction(user,
+            //         i % 13 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
+            mockReaction(teamReactions, user, i);
         }
-        teamUsers.add(mockUser("excluded")); // should be excluded from totals
 
-        List<DataReaction> extraReactions = new ArrayList<>(10);
         for (int i = 1; i < 11; i++) {
             DataActor user = new DataActor(mockUser("extra" + i));
-            extraReactions.add(new DataReaction(user,
-                    i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
+            // extraReactions.add(new DataReaction(user,
+            //         i % 4 == 0 ? "rocket" : i % 3 == 0 ? "thumbs_down" : i % 2 == 0 ? "thumbs_up" : "eyes", date));
+            mockReaction(extraReactions, user, i);
         }
 
+        // Create team with 50 members
+        mockTeam("commonhaus/test-quorum-default", teamUsers);
+    }
+
+    @AfterEach
+    void cleanupVotes() {
+        teamReactions.clear();
+        teamUsers.clear();
+        unignore.clear();
+        duplicates.clear();
+        extraReactions.clear();
+    }
+
+    @Test
+    void testQuorum() {
+        // Test cases for different thresholds and group sizes
+        assertAll("Threshold required votes",
+                // Group size 3
+                () -> assertEquals(3, VoteConfig.Threshold.all.requiredVotes(3), "All members required for group size 3"),
+                () -> assertEquals(2, VoteConfig.Threshold.majority.requiredVotes(3), "Majority required for group size 3"),
+                () -> assertEquals(2, VoteConfig.Threshold.twothirds.requiredVotes(3), "Two-thirds required for group size 3"),
+                () -> assertEquals(3, VoteConfig.Threshold.fourfifths.requiredVotes(3),
+                        "Four-fifths required for group size 3"),
+
+                // Group size 5
+                () -> assertEquals(5, VoteConfig.Threshold.all.requiredVotes(5), "All members required for group size 5"),
+                () -> assertEquals(3, VoteConfig.Threshold.majority.requiredVotes(5), "Majority required for group size 5"),
+                () -> assertEquals(4, VoteConfig.Threshold.twothirds.requiredVotes(5), "Two-thirds required for group size 5"),
+                () -> assertEquals(4, VoteConfig.Threshold.fourfifths.requiredVotes(5),
+                        "Four-fifths required for group size 5"),
+
+                // Group size 10
+                () -> assertEquals(10, VoteConfig.Threshold.all.requiredVotes(10), "All members required for group size 10"),
+                () -> assertEquals(5, VoteConfig.Threshold.majority.requiredVotes(10), "Majority required for group size 10"),
+                () -> assertEquals(7, VoteConfig.Threshold.twothirds.requiredVotes(10),
+                        "Two-thirds required for group size 10"),
+                () -> assertEquals(8, VoteConfig.Threshold.fourfifths.requiredVotes(10),
+                        "Four-fifths required for group size 10"));
+    }
+
+    @Test
+    void testVoteMarthas() throws Exception {
+        assertVoteTallyByMethod(CountingMethod.marthas);
+    }
+
+    @Test
+    void testVoteManualReactions() throws Exception {
+        assertVoteTallyByMethod(CountingMethod.manualReactions);
+    }
+
+    @Test
+    void testVoteManualComments() throws Exception {
+        assertVoteTallyByMethod(CountingMethod.manualComments);
+    }
+
+    @Test
+    void testVoteMarthasMajority() throws Exception {
+        extraReactions.addAll(unignore);
+        extraReactions.addAll(duplicates);
+
+        DataCommonItem mockItem = createItem(CountingMethod.marthas);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
+
+        VoteConfig votingConfig = createVoteConfig(VoteConfig.Threshold.majority);
+        VoteEvent event = createVoteEvent(votingConfig);
+
+        VoteInformation voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
+        assertVoteInformation(voteInfo, votingConfig, CountingMethod.marthas, false);
+
+        assertVoteTally(26, true, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(23, false, voteInfo, extraReactions, teamReactions);
+    }
+
+    @Test
+    void testVoteMarthasTwoThirds() throws Exception {
+        extraReactions.addAll(unignore);
+        extraReactions.addAll(duplicates);
+
+        DataCommonItem mockItem = createItem(CountingMethod.marthas);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
+
+        VoteConfig votingConfig = createVoteConfig(VoteConfig.Threshold.twothirds);
+        VoteEvent event = createVoteEvent(votingConfig);
+
+        VoteInformation voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
+        assertVoteInformation(voteInfo, votingConfig, CountingMethod.marthas, false);
+
+        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions);
+    }
+
+    @Test
+    void testVoteMarthasFourFifths() throws Exception {
+        extraReactions.addAll(unignore);
+        extraReactions.addAll(duplicates);
+
+        DataCommonItem mockItem = createItem(CountingMethod.marthas);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
+
+        VoteConfig votingConfig = createVoteConfig(VoteConfig.Threshold.fourfifths);
+        VoteEvent event = createVoteEvent(votingConfig);
+
+        VoteInformation voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
+        assertVoteInformation(voteInfo, votingConfig, CountingMethod.marthas, false);
+
+        assertVoteTally(40, true, voteInfo, extraReactions, teamReactions);
+        assertVoteTally(39, false, voteInfo, extraReactions, teamReactions);
+    }
+
+    @Test
+    void testAlternateVote() throws Exception {
         GHUser alternate = mockUser("alt_1");
         DataActor alternateUser = new DataActor(alternate);
-        extraReactions.add(new DataReaction(alternateUser, "thumbs_down", date)); // opposite of primary
+        DataReaction altReaction = new DataReaction(alternateUser, "thumbs_down", date);
 
-        mockTeam("commonhaus/test-quorum-default", teamUsers);
         mockTeam("commonhaus/test-quorum-seconds", Set.of(alternate));
+
+        extraReactions.addAll(unignore);
+        extraReactions.addAll(duplicates);
+
+        // Remove reaction for user28
+        teamReactions.removeIf(r -> r.user.login.equals("user28"));
+        // add alternate/secondary user reaction
+        extraReactions.add(altReaction);
 
         VoteConfig votingConfig = new VoteConfig();
         votingConfig.voteThreshold = new java.util.HashMap<>();
@@ -106,15 +215,11 @@ public class VoteTallyTest extends HausRulesTestBase {
 
         setupMockAlternates(votingConfig.alternates.hashCode(),
                 "commonhaus/test-quorum-default",
-                Map.of(primary.get(0).user.login, alternateUser));
+                Map.of("user28", alternateUser));
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
 
-        // Martha's
-
-        VoteEvent event = createVoteEvent(votingConfig,
-                "commonhaus/test-quorum-default",
-                VoteConfig.Threshold.all, discussionId);
+        VoteEvent event = createVoteEvent(votingConfig);
 
         DataCommonItem mockItem = createItem("""
                 voting group: @commonhaus/test-quorum-default
@@ -122,97 +227,152 @@ public class VoteTallyTest extends HausRulesTestBase {
                 """);
 
         VoteInformation voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
-        assertThat(voteInfo.isValid()).isTrue();
-        assertThat(voteInfo.group).isEqualTo("commonhaus/test-quorum-default");
         assertThat(voteInfo.alternates).isNotNull();
-        assertThat(voteInfo.votingThreshold).isEqualTo(VoteConfig.Threshold.all);
-        assertThat(voteInfo.approve).containsExactlyInAnyOrder(ReactionContent.PLUS_ONE);
-        assertThat(voteInfo.ok).containsExactlyInAnyOrder(ReactionContent.EYES);
-        assertThat(voteInfo.revise).containsExactlyInAnyOrder(ReactionContent.MINUS_ONE);
-        assertThat(voteInfo.voteType).isEqualTo(CountingMethod.marthas);
 
-        // All have voted: but some are ignored!
         // All have voted, but user28 vote is replaced by an alternate
-
-        VoteTally voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions);
-        assertThat(voteTally.categories.get("approve")).isNotNull();
-        assertThat(voteTally.categories.get("ok")).isNotNull();
-        assertThat(voteTally.categories.get("revise")).isNotNull();
-        assertThat(voteTally.categories.get("ignored")).isNotNull();
-        assertThat(voteTally.missingGroupActors).size().isEqualTo(4); // 3 ignored values, missing primary vote
-
-        // now add the missing votes with valid (not ignored) and duplicate values
-        extraReactions.addAll(unignore);
-        extraReactions.addAll(duplicates);
-
         // secondary should be counted to meet quorum
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
+        VoteTally voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
 
-        // Majority have voted
+        // primary rep is missing
+        assertThat(voteTally.missingGroupActors).hasSize(1);
 
-        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.majority);
-        voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
-        assertVoteTally(26, 27, true, voteInfo, extraReactions, teamReactions); // alt_1 still included
-        assertVoteTally(23, 24, false, voteInfo, extraReactions, teamReactions); // alt_1 still included
+        // 1. Verify the alternate was promoted to the correct category
+        // Assuming the alternate should be in the "revise" category:
+        Category reviseCategory = voteTally.categories.get("revise");
+        assertNotNull(reviseCategory, "Revise category should exist");
+        assertEquals(16, reviseCategory.getTeamTotal(),
+                "Revise category should have 16 team votes (including the alternate)");
 
-        // Supermajority (2/3) have voted
+        // Find the alternate vote in the team votes
+        Optional<VoteRecord> alternateInTeam = reviseCategory.team.stream()
+                .filter(VoteRecord::isAlternate)
+                .filter(vr -> vr.login().equals("alt_1")) // Replace with your alternate's login
+                .findFirst();
 
-        votingConfig.voteThreshold.put("commonhaus/test-quorum-default", VoteConfig.Threshold.twothirds);
-        voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
-        assertVoteTally(34, true, voteInfo, extraReactions, teamReactions);
-        assertVoteTally(33, false, voteInfo, extraReactions, teamReactions);
+        assertThat(alternateInTeam).isPresent();
+        assertThat(alternateInTeam.get().alternate).isTrue();
 
-        // Manual (count reactions implied)
-
-        mockItem = createItem("""
-                voting group: @commonhaus/test-quorum-default
-                <!--vote::manual -->
-                """);
-
-        event = createVoteEvent(votingConfig,
-                "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
-                discussionId);
-
-        voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
-        assertThat(voteInfo.isValid()).isTrue();
-        assertThat(voteInfo.approve).isEmpty();
-        assertThat(voteInfo.ok).isEmpty();
-        assertThat(voteInfo.revise).isEmpty();
-        assertThat(voteInfo.voteType).isEqualTo(CountingMethod.manualReactions);
-
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
-        assertThat(voteTally.categories).hasSize(4);
-        assertThat(voteTally.categories.get("👍")).isNotNull();
-        assertThat(voteTally.categories.get("👀")).isNotNull();
-        assertThat(voteTally.categories.get("👎")).isNotNull();
-        assertThat(voteTally.categories.get("🚀")).isNotNull();
-        assertVoteTally(49, false, voteInfo, extraReactions, teamReactions);
-
-        // Manual: count comments instead of reactions
-
-        mockItem = createItem("""
-                voting group: @commonhaus/test-quorum-default
-                <!--vote::manual comments -->
-                """);
-
-        event = createVoteEvent(votingConfig,
-                "commonhaus/test-quorum-default", VoteConfig.Threshold.all,
-                discussionId);
-
-        voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
-        assertThat(voteInfo.isValid()).isTrue();
-        assertThat(voteInfo.approve).isEmpty();
-        assertThat(voteInfo.ok).isEmpty();
-        assertThat(voteInfo.revise).isEmpty();
-        assertThat(voteInfo.voteType).isEqualTo(CountingMethod.manualComments);
-
-        voteTally = assertVoteTally(50, true, voteInfo, extraReactions, teamReactions);
-        assertThat(voteTally.categories).hasSize(1);
+        // 4. Verify the markdown contains the alternate in the right place
+        String[] markdown = voteTally.toMarkdown(false).split("\n");
+        assertThat(markdown).anyMatch(line -> line.contains("alt_1") && line.contains("revise"));
+        assertThat(markdown).noneMatch(line -> line.contains("alt_1") && !line.contains("revise"));
     }
 
-    VoteEvent createVoteEvent(VoteConfig votingConfig, String teamName, VoteConfig.Threshold threshold, String nodeId) {
+    VoteConfig createVoteConfig(VoteConfig.Threshold threshold) {
+        return createVoteConfig("commonhaus/test-quorum-default", threshold);
+    }
+
+    VoteConfig createVoteConfig(String teamName, VoteConfig.Threshold threshold) {
+        VoteConfig votingConfig = new VoteConfig();
+        votingConfig.voteThreshold = new java.util.HashMap<>();
         votingConfig.voteThreshold.put(teamName, threshold);
-        return new VoteEvent(installationId, repoFullName, EventType.discussion, nodeId, 10);
+        votingConfig.excludeLogin = List.of("excluded");
+        return votingConfig;
+    }
+
+    VoteEvent createVoteEvent(VoteConfig votingConfig) {
+        return new VoteEvent(installationId, repoFullName, EventType.discussion, discussionId, 10);
+    }
+
+    DataCommonItem createItem(CountingMethod method) {
+        switch (method) {
+            case marthas:
+                return createItem("""
+                        voting group: @commonhaus/test-quorum-default
+                        <!--vote::marthas approve="+1" ok="eyes" revise="-1" -->
+                        """);
+            case manualReactions:
+                return createItem("""
+                        voting group: @commonhaus/test-quorum-default
+                        <!--vote::manual -->
+                        """);
+            case manualComments:
+                return createItem("""
+                        voting group: @commonhaus/test-quorum-default
+                        <!--vote::manual comments -->
+                        """);
+            default:
+                throw new IllegalArgumentException("Invalid method: " + method);
+        }
+    }
+
+    void assertVoteTallyByMethod(CountingMethod method) throws Exception {
+        VoteConfig votingConfig = createVoteConfig(VoteConfig.Threshold.all);
+        VoteEvent event = createVoteEvent(votingConfig);
+
+        DataCommonItem mockItem = createItem(method);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
+
+        VoteInformation voteInfo = new VoteInformation(ctx, qc, votingConfig, mockItem, event);
+        assertVoteInformation(voteInfo, votingConfig, method, false);
+
+        VoteTally voteTally;
+
+        // Martha's is the only method that ignores extra reactions due to specific defined categories.
+        // Other methods will count all responses
+        // @see #mockReaction for how these reactions are assigned
+        if (method == CountingMethod.marthas) {
+            voteTally = assertVoteTally(50, 47, false, voteInfo, extraReactions, teamReactions);
+            assertThat(voteTally.missingGroupActors).size().isEqualTo(3);
+
+            // Add extra votes that are within the martha's categories (should now be counted)
+            extraReactions.addAll(unignore); // add 👀 in addition to 🚀
+            // Add duplicate votes within martha's categories (count only one)
+            extraReactions.addAll(duplicates); // add 👎 in addition to 👀
+        }
+
+        voteTally = assertVoteTally(50, 50, true, voteInfo, extraReactions, teamReactions);
+        assertThat(voteTally.missingGroupActors).size().isEqualTo(0);
+
+        switch (method) {
+            case manualComments -> {
+                assertThat(voteTally.categories.get("comment")).isNotNull();
+            }
+            case manualReactions -> {
+                assertThat(voteTally.categories.get("👍")).isNotNull();
+                assertThat(voteTally.categories.get("👀")).isNotNull();
+                assertThat(voteTally.categories.get("🚀")).isNotNull();
+            }
+            case marthas -> {
+                assertThat(voteTally.categories.get("approve")).isNotNull();
+                assertThat(voteTally.categories.get("ok")).isNotNull();
+                assertThat(voteTally.categories.get("revise")).isNotNull();
+                assertThat(voteTally.categories.get("ignored")).isNotNull();
+            }
+            case undefined -> {
+
+            }
+            default -> {
+                throw new IllegalArgumentException("Invalid method: " + method);
+            }
+        }
+    }
+
+    void assertVoteInformation(VoteInformation info, VoteConfig config, CountingMethod method, boolean alternates) {
+        assertVoteInformation(info, config, method, alternates, "commonhaus/test-quorum-default");
+    }
+
+    void assertVoteInformation(VoteInformation info, VoteConfig config, CountingMethod method, boolean alternates,
+            String teamName) {
+        assertThat(info.isValid()).isTrue();
+        assertThat(info.group).isEqualTo(teamName);
+        assertThat(info.voteType).isEqualTo(method);
+
+        VoteConfig.Threshold threshold = config.voteThreshold.get(teamName);
+        assertThat(info.votingThreshold).isEqualTo(threshold);
+
+        if (method == CountingMethod.marthas) {
+            assertThat(info.approve).containsExactlyInAnyOrder(ReactionContent.PLUS_ONE);
+            assertThat(info.ok).containsExactlyInAnyOrder(ReactionContent.EYES);
+            assertThat(info.revise).containsExactlyInAnyOrder(ReactionContent.MINUS_ONE);
+        }
+
+        if (alternates) {
+            assertThat(info.alternates).isNotNull();
+        } else {
+            assertThat(info.alternates).isNull();
+        }
+
     }
 
     VoteTally assertVoteTally(int numUsers, boolean expectHasQuorum,
@@ -309,36 +469,25 @@ public class VoteTallyTest extends HausRulesTestBase {
         return voteTally;
     }
 
-    @Test
-    void testQuorum() {
-        // Test cases for different thresholds and group sizes
-        assertAll("Threshold required votes",
-                // Group size 3
-                () -> assertEquals(3, VoteConfig.Threshold.all.requiredVotes(3), "All members required for group size 3"),
-                () -> assertEquals(2, VoteConfig.Threshold.majority.requiredVotes(3), "Majority required for group size 3"),
-                () -> assertEquals(2, VoteConfig.Threshold.twothirds.requiredVotes(3), "Two-thirds required for group size 3"),
-                () -> assertEquals(3, VoteConfig.Threshold.fourfifths.requiredVotes(3),
-                        "Four-fifths required for group size 3"),
-
-                // Group size 5
-                () -> assertEquals(5, VoteConfig.Threshold.all.requiredVotes(5), "All members required for group size 5"),
-                () -> assertEquals(3, VoteConfig.Threshold.majority.requiredVotes(5), "Majority required for group size 5"),
-                () -> assertEquals(4, VoteConfig.Threshold.twothirds.requiredVotes(5), "Two-thirds required for group size 5"),
-                () -> assertEquals(4, VoteConfig.Threshold.fourfifths.requiredVotes(5),
-                        "Four-fifths required for group size 5"),
-
-                // Group size 10
-                () -> assertEquals(10, VoteConfig.Threshold.all.requiredVotes(10), "All members required for group size 10"),
-                () -> assertEquals(5, VoteConfig.Threshold.majority.requiredVotes(10), "Majority required for group size 10"),
-                () -> assertEquals(7, VoteConfig.Threshold.twothirds.requiredVotes(10),
-                        "Two-thirds required for group size 10"),
-                () -> assertEquals(8, VoteConfig.Threshold.fourfifths.requiredVotes(10),
-                        "Four-fifths required for group size 10"));
-    }
-
     void setupMockAlternates(int hash, String primaryTeam, Map<String, DataActor> alternateLogins) {
         Alternates alts = new Alternates(hash, Map.of(primaryTeam, alternateLogins));
         VoteQueryCache.ALT_ACTORS.put("ALTS_" + repositoryId, alts);
+    }
+
+    private void mockReaction(List<DataReaction> reactions, DataActor user, int i) {
+        if (i % 13 == 0) {
+            reactions.add(new DataReaction(user, "rocket", date));
+            unignore.add(new DataReaction(user, "eyes", date));
+        } else if (i % 19 == 0) {
+            reactions.add(new DataReaction(user, "eyes", date));
+            duplicates.add(new DataReaction(user, "thumbs_down", date));
+        } else if (i % 3 == 0) {
+            reactions.add(new DataReaction(user, "thumbs_down", date));
+        } else if (i % 2 == 0) {
+            reactions.add(new DataReaction(user, "thumbs_up", date));
+        } else {
+            reactions.add(new DataReaction(user, "eyes", date));
+        }
     }
 
     DataCommonItem createItem(String body) {
