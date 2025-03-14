@@ -224,7 +224,7 @@ public class DataLabel extends DataCommonType {
         ;
         Response response = qc.execRepoQuerySync(CREATE_LABEL, variables);
         if (qc.hasErrors()) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.createLabel.jsonObjectFrom(response.getData());
@@ -241,7 +241,7 @@ public class DataLabel extends DataCommonType {
             variables.put("after", pageInfo.cursor());
             Response response = qc.execRepoQuerySync(query, variables);
             if (qc.hasErrors()) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 break;
             }
             JsonObject pageLabels = findPageLabels.apply(response.getData());

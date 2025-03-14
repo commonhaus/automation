@@ -77,6 +77,14 @@ public abstract class BaseContextService implements ContextService {
         return gh;
     }
 
+    public void resetConnection(long installationId) {
+        if (installationId < 0) { // user session
+            return;
+        }
+        BaseQueryCache.CONNECTION.invalidate("gh-" + installationId);
+        BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
+    }
+
     public void updateConnection(long installationId, GitHub gh) {
         BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
     }

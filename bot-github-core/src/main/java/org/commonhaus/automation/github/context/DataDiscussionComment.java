@@ -70,7 +70,7 @@ public class DataDiscussionComment extends DataCommonComment {
 
         Response response = qc.execQuerySync(ADD_DISCUSSION_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.addDiscussionComment.jsonObjectFrom(response.getData());
@@ -86,7 +86,7 @@ public class DataDiscussionComment extends DataCommonComment {
 
         Response response = qc.execQuerySync(EDIT_DISCUSSION_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());

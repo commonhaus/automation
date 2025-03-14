@@ -151,7 +151,7 @@ public class DataCommonItem extends DataCommonObject {
 
         Response response = qc.execQuerySync(CREATE_ISSUE, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.createIssue.jsonObjectFrom(response.getData());
@@ -170,7 +170,7 @@ public class DataCommonItem extends DataCommonObject {
         Response response = qc.execQuerySync(EDIT_ISSUE_DESCRIPTION.formatted(issueFields),
                 variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateIssue.jsonObjectFrom(response.getData());
@@ -188,7 +188,7 @@ public class DataCommonItem extends DataCommonObject {
 
         Response response = qc.execQuerySync(EDIT_PR_DESCRIPTION.formatted(prFields), variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updatePullRequest.jsonObjectFrom(response.getData());
@@ -231,7 +231,7 @@ public class DataCommonItem extends DataCommonObject {
 
         Response response = qc.execQuerySync(QUERY_ITEM_BY_NODE, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         return JsonAttribute.node.commonItemFrom(response.getData());

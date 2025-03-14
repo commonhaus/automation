@@ -91,7 +91,7 @@ public class DataDiscussion extends DataCommonItem {
             variables.put("after", pageInfo.cursor());
             Response response = qc.execRepoQuerySync(QUERY_DISCUSSIONS_WITH_LABEL, variables);
             if (qc.hasErrors()) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 return null;
             }
 
@@ -113,7 +113,7 @@ public class DataDiscussion extends DataCommonItem {
 
         Response response = qc.execQuerySync(QUERY_DISCUSSION_BY_ID, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         return new DataDiscussion(JsonAttribute.node.jsonObjectFrom(response.getData()));
@@ -133,7 +133,7 @@ public class DataDiscussion extends DataCommonItem {
 
         Response response = qc.execRepoQuerySync(UPDATE_DISCUSSION, variables);
         if (qc.hasErrors()) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         return JsonAttribute.discussion.discussionFrom(response.getData());

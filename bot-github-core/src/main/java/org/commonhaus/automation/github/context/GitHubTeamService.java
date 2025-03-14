@@ -122,7 +122,7 @@ public class GitHubTeamService {
                 GHTeam result = org.getTeamByName(relativeName);
                 return result;
             });
-            qc.clearNotFound();
+            qc.checkRemoveNotFound(); // normal
             team = putCachedTeam(fullName, team);
         }
         return team;
@@ -149,7 +149,7 @@ public class GitHubTeamService {
                     return ghTeam.getMembers();
                 });
                 if (qc.hasErrors() || members == null) {
-                    qc.clearNotFound();
+                    qc.checkRemoveNotFound(); // normal
                     members = Set.of();
                 }
             }
@@ -242,7 +242,7 @@ public class GitHubTeamService {
             ghTeam.add(user);
             return null;
         });
-        qc.clearNotFound();
+        qc.checkRemoveNotFound(); // normal
         refreshTeam(teamFullName);
     }
 
@@ -278,7 +278,7 @@ public class GitHubTeamService {
                 return repository.getCollaboratorNames();
             });
             if (qc.hasErrors() || collaborators == null) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 collaborators = Set.of();
             }
             Log.debugf("%s members: %s", repoFullName, collaborators);
@@ -305,7 +305,7 @@ public class GitHubTeamService {
                     GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
             return null;
         });
-        qc.clearNotFound();
+        qc.checkRemoveNotFound();
         refreshCollaborators(repo.getFullName());
     }
 

@@ -71,6 +71,8 @@ public interface ContextService {
 
     String[] getErrorAddresses(EmailNotification notifications);
 
+    void resetConnection(long installationId);
+
     GitHub getInstallationClient(long installationId);
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
@@ -88,12 +90,20 @@ public interface ContextService {
      */
     void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 
+    default void logAndSendEmail(String logId, String title, Throwable t) {
+        logAndSendEmail(logId, title, t, botErrorEmailAddress());
+    }
+
     /**
      * Log exception and send email
      *
      * @see LogMailer#sendEmail(String, String, String, String[])
      */
     void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses);
+
+    default void logAndSendEmail(String logId, String title, String body, Throwable t) {
+        logAndSendEmail(logId, title, body, t, botErrorEmailAddress());
+    }
 
     /**
      * Send email.

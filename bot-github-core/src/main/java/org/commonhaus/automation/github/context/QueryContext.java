@@ -5,6 +5,7 @@ import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -20,7 +21,6 @@ import jakarta.json.JsonObject;
 import org.commonhaus.automation.config.EmailNotification;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHFileNotFoundException;
-import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -196,8 +196,8 @@ public class QueryContext {
      *
      * @param e Exception
      */
-    public void addException(Exception e) {
-        exceptions.add(e);
+    public void addException(Throwable t) {
+        exceptions.add(t);
     }
 
     /**
@@ -250,7 +250,7 @@ public class QueryContext {
      *
      * @return true if there were any not found exceptions
      */
-    public boolean clearNotFound() {
+    public boolean checkRemoveNotFound() {
         int size = exceptions.size() + errors.size();
         exceptions.removeIf(e -> e instanceof GHFileNotFoundException);
         errors.removeIf(e -> hasFieldError(e, "NOT_FOUND"));
@@ -270,9 +270,7 @@ public class QueryContext {
      */
     public HttpException getConflict() {
         return exceptions.stream()
-                .filter(e -> e instanceof HttpException)
-                .map(e -> (HttpException) e)
-                .filter(e -> e.getResponseCode() == 409 || e.getMessage().contains("409"))
+                .filter(e -> e instanceof HttpException && ((HttpException) e).getResponseCode() == 409)
                 .findFirst()
                 .map(e -> (HttpException) e).orElse(null);
     }
@@ -282,12 +280,37 @@ public class QueryContext {
      *
      * @return true if there was a conflict exception
      */
-    public boolean clearConflict() {
-        if (hasConflict()) {
-            clearErrors();
-            return true;
+    public boolean checkRemoveConflict() {
+        int size = exceptions.size();
+        exceptions.removeIf(e -> e instanceof HttpException && ((HttpException) e).getResponseCode() == 409);
+        return exceptions.size() != size;
+    }
+
+    /**
+     * Check if the error is a network error that can be retried
+     *
+     * @return true if there is a network error that can be retried
+     */
+    public boolean hasRetriableNetworkError() {
+        // Unauthorized can be retried after connection is refreshed.
+        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
+                HttpURLConnection.HTTP_PROXY_AUTH,
+                HttpURLConnection.HTTP_BAD_GATEWAY,
+                HttpURLConnection.HTTP_CLIENT_TIMEOUT,
+                HttpURLConnection.HTTP_GATEWAY_TIMEOUT).contains(getResponseCode(e)));
+    }
+
+    public boolean hasAuthorizationError() {
+        // Unauthorized can be retried after connection is refreshed.
+        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
+                HttpURLConnection.HTTP_PROXY_AUTH).contains(getResponseCode(e)));
+    }
+
+    private int getResponseCode(Throwable e) {
+        if (e instanceof HttpException) {
+            return ((HttpException) e).getResponseCode();
         }
-        return false;
+        return -1;
     }
 
     /**
@@ -303,7 +326,7 @@ public class QueryContext {
      * will result in an email being sent to the configured error addresses.
      * <p>
      * Recoverable exceptions (like file not found errors) are captured and can be
-     * checked for with {@link #hasNotFound()} or cleared with {@link #clearNotFound()}.
+     * checked for with {@link #hasNotFound()} or cleared with {@link #checkRemoveNotFound()}.
      * <p>
      * Errors and exceptions are captured for the caller in the queryContext,
      * and can be checked with {@link #hasErrors()},
@@ -314,7 +337,7 @@ public class QueryContext {
      * @param ghApiCall Function to be invoked with GitHub instance
      * @return result of ghApiCall or null of there were errors
      * @see #hasNotFound()
-     * @see #clearNotFound()
+     * @see #checkRemoveNotFound()
      * @see #hasErrors()
      * @see #bundleExceptions()
      * @see #clearErrors()
@@ -327,15 +350,11 @@ public class QueryContext {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHFileNotFoundException e) {
             addException(e);
-        } catch (GHIOException e) {
-            logAndSendEmail(getLogId(), "Error making GH Request", e);
-            addException(e);
-        } catch (IOException | RuntimeException e) {
-            logAndSendEmail(getLogId(), "Error making GH Request", e);
-            addException(e);
         } catch (Throwable e) {
-            logAndSendEmail("Unexpected error making GH Request", e);
-            exceptions.add(e);
+            addException(e);
+        }
+        if (hasAuthorizationError()) {
+            ctx.resetConnection(installationId);
         }
         return null;
     }
@@ -373,13 +392,10 @@ public class QueryContext {
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
             if (response != null && response.hasError()) {
-                logAndSendEmail("Error executing GraphQL query", response.getErrors().toString(),
-                        null);
                 errors.addAll(response.getErrors());
             }
         } catch (Throwable e) {
-            logAndSendEmail("Error executing GraphQL query", e);
-            exceptions.add(e);
+            addException(e);
         }
         return response;
     }
@@ -433,7 +449,7 @@ public class QueryContext {
     public GHUser getUser(String login) {
         return execGitHubSync((gh, dryRun) -> {
             GHUser user = gh.getUser(login);
-            clearNotFound();
+            checkRemoveNotFound();
             return user;
         });
     }
@@ -451,7 +467,7 @@ public class QueryContext {
     public GHRepository getRepository(String repoName) {
         return execGitHubSync((gh, dryRun) -> {
             GHRepository repo = gh.getRepository(repoName);
-            clearNotFound();
+            checkRemoveNotFound();
             return repo;
         });
     }
@@ -471,7 +487,7 @@ public class QueryContext {
     public GHOrganization getOrganization(String orgName) {
         return execGitHubSync((gh, dryRun) -> {
             GHOrganization org = gh.getOrganization(orgName);
-            clearNotFound();
+            checkRemoveNotFound();
             return org;
         });
     }
@@ -541,12 +557,10 @@ public class QueryContext {
             } else {
                 // new comment
                 comment = switch (itemType) {
-                    case discussion ->
-                        DataDiscussionComment.addComment(this, itemId, commentBody);
-                    case issue, pull_request ->
-                        DataIssueComment.addIssueComment(this, itemId, commentBody);
+                    case discussion -> DataDiscussionComment.addComment(this, itemId, commentBody);
+                    case issue, pull_request -> DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
-                        logAndSendEmail(getLogId(), "addBotComment: Unknown event type " + itemType, null);
+                        logAndSendEmail("addBotComment: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -561,12 +575,10 @@ public class QueryContext {
                 botComment.setBody(commentBody);
             } else {
                 comment = switch (itemType) {
-                    case discussion ->
-                        DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
-                    case issue, pull_request ->
-                        DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
+                    case discussion -> DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
+                    case issue, pull_request -> DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
                     default -> {
-                        logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + itemType, null);
+                        logAndSendEmail("updateItemDescription: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -586,12 +598,10 @@ public class QueryContext {
             return null;
         }
         return switch (eventType) {
-            case discussion ->
-                DataDiscussion.queryDiscussion(this, nodeId);
-            case issue, pull_request ->
-                DataCommonItem.queryItem(this, nodeId);
+            case discussion -> DataDiscussion.queryDiscussion(this, nodeId);
+            case issue, pull_request -> DataCommonItem.queryItem(this, nodeId);
             default -> {
-                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                logAndSendEmail("getItem: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -603,10 +613,9 @@ public class QueryContext {
             return null;
         }
         return switch (eventType) {
-            case issue ->
-                DataCommonItem.createIssue(this, title, description, labels);
+            case issue -> DataCommonItem.createIssue(this, title, description, labels);
             default -> {
-                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                logAndSendEmail("getItem: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -627,14 +636,12 @@ public class QueryContext {
         }
 
         return switch (eventType) {
-            case discussion, discussion_comment ->
-                DataDiscussion.editDiscussion(this, nodeId, bodyString, fields);
-            case issue, issue_comment ->
-                DataCommonItem.editIssueDescription(this, nodeId, bodyString, fields);
-            case pull_request, pull_request_review ->
-                DataCommonItem.editPullRequestDescription(this, nodeId, bodyString, fields);
+            case discussion, discussion_comment -> DataDiscussion.editDiscussion(this, nodeId, bodyString, fields);
+            case issue, issue_comment -> DataCommonItem.editIssueDescription(this, nodeId, bodyString, fields);
+            case pull_request, pull_request_review -> DataCommonItem.editPullRequestDescription(this, nodeId, bodyString,
+                    fields);
             default -> {
-                logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
+                logAndSendEmail("updateItemDescription: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -650,7 +657,7 @@ public class QueryContext {
             return null;
         });
         if (hasErrors()) {
-            clearNotFound();
+            checkRemoveNotFound();
             return false;
         }
         return true;
@@ -714,7 +721,7 @@ public class QueryContext {
     public Collection<DataLabel> findLabels(List<String> labels) {
         Collection<DataLabel> repoLabels = getLabels(getRepositoryId());
         if (repoLabels == null) {
-            Log.errorf("[%s] Labels not found in repository %s", getLogId(), getRepositoryId());
+            logAndSendEmail("[%s] Labels not found in repository %s".formatted(getLogId(), getRepositoryId()), null);
             return List.of();
         }
 
@@ -727,7 +734,7 @@ public class QueryContext {
                     .findFirst().orElse(null);
 
             if (label == null) {
-                Log.errorf("[%s] Label '%s' not found in repository", getLogId(), labelName);
+                logAndSendEmail("[%s] Label '%s' not found in repository".formatted(getLogId(), labelName), null);
             } else {
                 newLabels.add(label);
             }
@@ -807,8 +814,11 @@ public class QueryContext {
     public JsonNode readYamlSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            clearNotFound();
-            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            if (checkRemoveNotFound()) {
+                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            } else {
+                logAndSendContextErrors("error reading source file %s from repo %s".formatted(path, repo.getFullName()));
+            }
             return null;
         }
 
@@ -816,8 +826,7 @@ public class QueryContext {
             JsonNode node = ctx.parseYamlFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
-            logAndSendEmail("readYamlSourceFile",
-                    "Unable to read file %s from repo %s".formatted(path, repo.getFullName()),
+            logAndSendEmail("Unable to parse file %s from repo %s".formatted(path, repo.getFullName()),
                     e);
             return null;
         }
@@ -826,15 +835,17 @@ public class QueryContext {
     public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            clearNotFound();
-            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            if (checkRemoveNotFound()) {
+                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            } else {
+                logAndSendContextErrors("error reading source file %s from repo %s".formatted(path, repo.getFullName()));
+            }
             return null;
         }
         try {
             return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
-            logAndSendEmail("readYamlSourceFile",
-                    "Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),
+            logAndSendEmail("Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),
                     e);
             return null;
         }
@@ -860,6 +871,21 @@ public class QueryContext {
     @Nonnull
     public String[] getErrorAddresses(EmailNotification notifications) {
         return ctx.getErrorAddresses(notifications);
+    }
+
+    /**
+     * Log an error and send an collected errors and exceptions to the
+     * configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, Throwable, String[])
+     */
+    public void logAndSendContextErrors(String title) {
+        ctx.logAndSendEmail(getLogId(), title, bundleExceptions(), getErrorAddresses());
     }
 
     /**

@@ -180,7 +180,7 @@ public class DataReaction {
             variables.put("after", pageInfo.cursor());
             Response response = qc.execRepoQuerySync(QUERY_REACTIONS, variables);
             if (qc.hasErrors()) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 break;
             }
             JsonObject allReactions = JsonAttribute.reactions.extractObjectFrom(response.getData(),
@@ -207,7 +207,7 @@ public class DataReaction {
         variables.put("content", reaction.name());
         qc.execQuerySync(ADD_BOT_REACTION, variables);
 
-        qc.clearNotFound();
+        qc.checkRemoveNotFound();
         if (qc.hasErrors()) {
             Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
             qc.clearErrors();
@@ -232,7 +232,7 @@ public class DataReaction {
         variables.put("content", reaction.name());
         qc.execQuerySync(REMOVE_BOT_REACTION, variables);
 
-        qc.clearNotFound();
+        qc.checkRemoveNotFound();
         if (qc.hasErrors()) {
             Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
             qc.clearErrors();

@@ -80,7 +80,7 @@ public class DataCommonComment extends DataCommonObject {
             variables.put("commentId", commentId);
             Response response = qc.execQuerySync(QUERY_COMMENT, variables);
             if (qc.hasErrors() || response == null) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
@@ -104,7 +104,7 @@ public class DataCommonComment extends DataCommonObject {
             variables.put("after", pageInfo.cursor());
             Response response = qc.execQuerySync(QUERY_ALL_COMMENTS, variables);
             if (qc.hasErrors() || response == null) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 return null;
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());

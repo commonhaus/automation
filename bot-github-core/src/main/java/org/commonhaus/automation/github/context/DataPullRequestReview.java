@@ -70,7 +70,7 @@ public class DataPullRequestReview extends DataCommonObject {
             variables.put("after", pageInfo.cursor());
             Response response = qc.execRepoQuerySync(QUERY_PR_REVIEW, variables);
             if (qc.hasErrors()) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 break;
             }
             JsonObject latestReviews = JsonAttribute.latestReviews.extractObjectFrom(response.getData(), JsonAttribute.node);
