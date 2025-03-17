@@ -816,8 +816,6 @@ public class QueryContext {
         if (content == null || hasErrors()) {
             if (checkRemoveNotFound()) {
                 Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
-            } else {
-                logAndSendContextErrors("error reading source file %s from repo %s".formatted(path, repo.getFullName()));
             }
             return null;
         }
@@ -826,8 +824,7 @@ public class QueryContext {
             JsonNode node = ctx.parseYamlFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
-            logAndSendEmail("Unable to parse file %s from repo %s".formatted(path, repo.getFullName()),
-                    e);
+            addException(e);
             return null;
         }
     }
@@ -837,30 +834,42 @@ public class QueryContext {
         if (content == null || hasErrors()) {
             if (checkRemoveNotFound()) {
                 Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
-            } else {
-                logAndSendContextErrors("error reading source file %s from repo %s".formatted(path, repo.getFullName()));
             }
             return null;
         }
         try {
             return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
-            logAndSendEmail("Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),
-                    e);
+            addException(e);
             return null;
         }
     }
 
-    JsonNode parseYamlFile(GHContent content) throws IOException {
-        return ctx.parseYamlFile(content);
+    JsonNode readYamlContent(GHContent content) {
+        try {
+            return ctx.parseYamlFile(content);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
-    public <T> T parseYamlFile(GHContent content, Class<T> type) throws IOException {
-        return ctx.parseYamlFile(content, type);
+    public <T> T readYamlContent(GHContent content, Class<T> type) {
+        try {
+            return ctx.parseYamlFile(content, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
-    public <T> String writeYamlValue(T user) throws IOException {
-        return ctx.writeYamlValue(user);
+    public <T> String writeYamlValue(T user) {
+        try {
+            return ctx.writeYamlValue(user);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
     @Nonnull
