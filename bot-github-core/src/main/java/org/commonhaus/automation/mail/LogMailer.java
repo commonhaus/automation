@@ -28,6 +28,15 @@ import io.vertx.mutiny.core.eventbus.EventBus;
  */
 @ApplicationScoped
 public class LogMailer {
+    private static LogMailer instance;
+
+    public static LogMailer instance() {
+        if (instance == null) {
+            instance = Arc.container().instance(LogMailer.class).get();
+        }
+        return instance;
+    }
+
     static final String[] EMPTY = new String[0];
 
     @CheckedTemplate
@@ -87,6 +96,15 @@ public class LogMailer {
         if (event.hasAddresses()) {
             bus.send(MailEvent.ADDRESS, event);
         }
+    }
+
+    /**
+     * Log an error and queue an email (EventBus, fire-and-forget).
+     *
+     * @see #logAndSendEmail(String, String, String, Throwable, String[])
+     */
+    public void logAndSendEmail(String logId, String title, Throwable t) {
+        this.logAndSendEmail(logId, title, "", t, botErrorEmailAddress());
     }
 
     /**
