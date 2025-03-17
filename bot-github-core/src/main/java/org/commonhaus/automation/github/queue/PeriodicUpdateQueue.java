@@ -14,6 +14,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.mail.LogMailer;
 
 import io.quarkus.logging.Log;
@@ -57,6 +58,9 @@ public class PeriodicUpdateQueue {
     }
 
     @Inject
+    BotConfig botConfig;
+
+    @Inject
     LogMailer logMailer;
 
     // This is a primitive Queue whose primary purpose is to space
@@ -68,23 +72,12 @@ public class PeriodicUpdateQueue {
 
     void startup(@Observes StartupEvent startup) {
         Log.debugf("Starting PeriodicUpdateQueue");
-        int initialDelay = LaunchMode.current() == LaunchMode.TEST
-                ? 1
-                : 15;
-        int period = LaunchMode.current() == LaunchMode.TEST
-                ? 1
-                : 2;
-        TimeUnit unit = LaunchMode.current() == LaunchMode.TEST
-                ? TimeUnit.MILLISECONDS
-                : TimeUnit.SECONDS;
 
         // Don't flood. Plod along for interactions with GH API
-        executor.scheduleAtFixedRate(() -> {
-            Task task = taskQueue.poll();
-            if (task != null) {
-                run(task);
-            }
-        }, initialDelay, period, unit);
+        executor.scheduleAtFixedRate(this::runTask,
+                botConfig.initialQueueDelay(),
+                botConfig.queuePeriod(),
+                TimeUnit.MILLISECONDS);
     }
 
     void shutdown(@Observes ShutdownEvent shutdown) {
@@ -119,31 +112,37 @@ public class PeriodicUpdateQueue {
         retryTasks.putIfAbsent(name, new RetryTask(name, retryRunnable, retryCount));
     }
 
-    private void run(Task task) {
-        Task next = taskQueue.peek();
-
-        if (task.type() == TaskType.RECONCILE) {
-            // Defer reconciliation if changes of the same group are pending
-            if (next != null && next.name().equals(task.name())) {
-                if (next.type() == TaskType.CHANGE) {
-                    taskQueue.add(task); // Re-queue this reconciliation for later
-                    Log.debugf("RECONCILE %s task postponed for same-group changes", task.name());
-                } else {
-                    Log.debugf("RECONCILE %s task skipped (duplicate next)", task.name());
-                }
-                return;
-            }
+    private void runTask() {
+        Task task = taskQueue.poll();
+        if (task != null) {
+            run(task);
         }
+    }
 
+    private void run(Task task) {
         try {
-            // Execute the main task
+            // skip or collapse reconciliation task?
+            Task next = taskQueue.peek();
+            if (task.type() == TaskType.RECONCILE) {
+                // Defer reconciliation if changes of the same group are pending
+                if (next != null && next.name().equals(task.name())) {
+                    if (next.type() == TaskType.CHANGE) {
+                        taskQueue.add(task); // Re-queue this reconciliation for later
+                        Log.debugf("RECONCILE %s task postponed for same-group changes", task.name());
+                    } else {
+                        Log.debugf("RECONCILE %s task skipped (duplicate next)", task.name());
+                    }
+                    return;
+                }
+            }
+
+            // Execute the task
             task.task().run();
         } catch (Throwable e) {
             logMailer.logAndSendEmail("queue",
                     "Error running %s %s task".formatted(task.type(), task.name()),
                     e, logMailer.botErrorEmailAddress());
         }
-
         Log.debugf("%s %s task completed; %s remaining", task.type(), task.name(), taskQueue.size());
     }
 

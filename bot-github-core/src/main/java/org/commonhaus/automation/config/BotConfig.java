@@ -12,6 +12,19 @@ import io.smallrye.config.WithDefault;
  */
 @ConfigMapping(prefix = "automation")
 public interface BotConfig {
+
+    /**
+     * Initial delay before the queue is processed in milliseconds
+     */
+    @WithDefault("10000")
+    int initialQueueDelay();
+
+    /**
+     * The period between successive executions in milliseconds
+     */
+    @WithDefault("2000")
+    int queuePeriod();
+
     /**
      * Email address used as the reply-to when sending notifications.
      */

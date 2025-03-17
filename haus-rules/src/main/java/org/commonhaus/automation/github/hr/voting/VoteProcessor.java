@@ -29,6 +29,7 @@ import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.hr.AppContextService;
 import org.commonhaus.automation.github.hr.config.ConfigWatcher;
 import org.commonhaus.automation.github.hr.config.VoteConfig;
+import org.commonhaus.automation.github.hr.rules.MatchLabel;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.mail.LogMailer;
@@ -55,6 +56,8 @@ public class VoteProcessor {
     public static final String VOTE_PROCEED = "vote/proceed";
     public static final String VOTE_QUORUM = "vote/quorum";
     public static final String VOTE_REVISE = "vote/revise";
+
+    static final MatchLabel OPEN_VOTE = new MatchLabel(List.of(VOTE_OPEN));
 
     @CheckedTemplate
     static class Templates {
@@ -146,6 +149,10 @@ public class VoteProcessor {
         DataCommonItem item = qc.getItem(event.getItemType(), event.getItemNodeId());
         if (item == null) {
             Log.warnf("[%s] VoteProcessor.processVoteCount: item not found", event.getLogId());
+            return;
+        }
+        if (!OPEN_VOTE.matches(qc, item.id)) {
+            Log.debugf("[%s] VoteProcessor.processVoteCount: item is not open", event.getLogId());
             return;
         }
 

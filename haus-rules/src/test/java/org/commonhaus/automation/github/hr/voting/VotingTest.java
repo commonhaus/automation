@@ -523,7 +523,7 @@ public class VotingTest extends HausRulesTestBase {
 
         // repository and discussion label
         setLabels(repositoryId, REPO_LABELS);
-        setLabels(discussionId, ITEM_VOTE_OPEN);
+        setLabels(pullRequestId, ITEM_VOTE_OPEN);
 
         given()
                 .github(mocks -> {

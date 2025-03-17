@@ -89,4 +89,14 @@ public class TestBotConfig implements BotConfig {
             }
         };
     }
+
+    @Override
+    public int initialQueueDelay() {
+        return 1;
+    }
+
+    @Override
+    public int queuePeriod() {
+        return 1;
+    }
 }
