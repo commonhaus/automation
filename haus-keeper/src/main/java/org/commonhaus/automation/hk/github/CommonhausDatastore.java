@@ -1,351 +1,285 @@
 package org.commonhaus.automation.hk.github;
 
-import java.io.IOException;
-import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.hk.AdminDataCache;
-import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.data.CommonhausUser;
+import org.commonhaus.automation.hk.github.DatastoreEvent.QueryEvent;
+import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
+import org.commonhaus.automation.hk.member.MemberInfo;
+import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHUser;
-import org.kohsuke.github.HttpException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkus.logging.Log;
-import io.quarkus.vertx.ConsumeEvent;
-import io.smallrye.common.annotation.Blocking;
-import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
-import io.vertx.mutiny.core.eventbus.Message;
 
 @ApplicationScoped
 public class CommonhausDatastore {
-    public static final String READ = "commonhaus-read";
-    public static final String CREATE = "commonhaus-create";
-    public static final String WRITE = "commonhaus-write";
-
     @Inject
     AppContextService ctx;
 
     @Inject
     ObjectMapper mapper;
 
-    Executor executor = Infrastructure.getDefaultWorkerPool();
-
-    interface DatastoreEvent {
-        long id();
-
-        String login();
-
-        boolean create();
-    }
-
-    public record QueryEvent(String login, long id, boolean refresh,
-            boolean create) implements DatastoreEvent {
-    }
+    @Inject
+    PeriodicUpdateQueue updateQueue;
 
     /**
-     * Update Commonhaus user data
+     * Get or create Commonhaus user data using login and ID from the session.
+     * The cached record will not be refreshed, and the record will not be created if missing.
      *
-     * @param user Commonhaus user object
-     * @param updateUser Function to apply changes to the user. This function will not have access to the MemberSession.
-     * @param message Commit message
-     * @param history Whether to add the message to the user's history
-     * @param retry Whether to retry the update if there is a conflict
+     * @see #getCommonhausUser(MemberInfo, boolean, boolean)
      */
-    public record UpdateEvent(
-            CommonhausUser user,
-            BiConsumer<AppContextService, CommonhausUser> updateUser,
-            String message,
-            boolean history,
-            boolean retry) implements DatastoreEvent {
-
-        @Override
-        public long id() {
-            return user.id();
-        }
-
-        @Override
-        public String login() {
-            return user.login();
-        }
-
-        @Override
-        public boolean create() {
-            return true;
-        }
-
-        public void applyChanges(AppContextService ctx, CommonhausUser user) {
-            updateUser.accept(ctx, user);
-        }
-
-        static UpdateEvent retryEvent(UpdateEvent initial, CommonhausUser revisedUser) {
-            return new UpdateEvent(revisedUser, initial.updateUser(), initial.message(), initial.history(), false);
-        }
-    }
-
-    public CommonhausUser getCommonhausUser(MemberSession session) {
+    public CommonhausUser getCommonhausUser(MemberInfo session) {
         return getCommonhausUser(session, false, false);
     }
 
     /**
-     * GET Commonhaus user data
+     * Get or create Commonhaus user data using login and ID from the session.
      *
-     * @return A Commonhaus user object (never null)
-     * @throws RuntimeException if GitHub or other API query fails
+     * @see #getCommonhausUser(String, long, boolean, boolean)
      */
-    public CommonhausUser getCommonhausUser(MemberSession session, boolean resetCache, boolean create) {
+    public CommonhausUser getCommonhausUser(MemberInfo session, boolean resetCache, boolean create) {
         return getCommonhausUser(session.login(), session.id(), resetCache, create);
     }
 
     /**
-     * Async: ensure a Commonhaus User exists.
-     */
-    public void asyncEnsureCommonhausUser(GHUser user) {
-        QueryEvent query = new QueryEvent(user.getLogin(), user.getId(), false, true);
-        ctx.getBus().send(CommonhausDatastore.CREATE, query); // fire and forget
-    }
-
-    /**
-     * GET Commonhaus user data
+     * Retrieve Commonhaus user data from the repository using the GitHub
+     * bot's login and id (dqc)
      *
-     * @return A Commonhaus user object (never null)
-     * @throws RuntimeException if GitHub or other API query fails
+     * @param login User login
+     * @param id User ID
+     * @param resetCache True if the cached record should be discarded (re-fetch)
+     * @param create True if the record should be created if it does not exist
+     * @throw Exception if the query context is not available or an irrecoverable error occurs (propagate to REST client)
+     * @return fetched commonhaus user
      */
     public CommonhausUser getCommonhausUser(String login, long id, boolean resetCache, boolean create) {
-        QueryEvent query = new QueryEvent(login, id, resetCache, create);
-        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
-        return response.body();
+        final QueryEvent query = new QueryEvent(login, id, resetCache, create);
+        final String userKey = getKey(login, id);
+
+        DatastoreQueryContext dqc = ensureQueryContext().withLogId(userKey);
+        CommonhausUser result = readCommonhausUser(dqc, userKey, query);
+
+        // If there are errors at this point, they're actual errors, not just NotFound
+        if (dqc.hasErrors()) {
+            throw dqc.bundleExceptions(); // Propagate to REST client
+        }
+        return result;
     }
 
     /**
-     * Update Commonhaus user data
+     * Get user data: will return null on IOException (including not found)
+     * Note: Exceptions are collected in the query context and are not thrown.
      *
-     * @param updateEvent Update message containing the user and commit message
+     * @param dqc DatastoreQueryContext with repository context; collects exceptions and errors
+     * @return CommonhausUser or null
+     */
+    private CommonhausUser readCommonhausUser(DatastoreQueryContext dqc, String userKey, QueryEvent event) {
+        // Get or create a _cache entry_ for this user
+        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
+                .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+
+        // Let QueryContext handle the errors from the fetch
+        CommonhausUser result = dqc.readYamlSourceFile(dqc.getRepository(), dataPath(event.id()), CommonhausUser.class);
+
+        // NotFound is handled by QueryContext.readYamlSourceFile, and is not an error for this path
+        if (result == null && event.create()) {
+            // Create a new user if requested and not found
+            result = CommonhausUser.create(event.login(), event.id());
+        }
+        if (result != null) {
+            entry.refreshUserData(result);
+        }
+        return result;
+    }
+
+    /**
+     * REST API driven update of Commonhaus user data.
      *
-     * @throws RuntimeException if GitHub or other API query fails
+     * @param updateEventssh
+     * @return valid user data
+     * @throws Exception on invalid data or unrecoverable errors (propagate to REST client)
      */
     public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {
-        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.WRITE, updateEvent);
-        return response.body();
-    }
-
-    @Blocking
-    @ConsumeEvent(CREATE)
-    public void createCommonhausUser(QueryEvent query) {
-        Message<CommonhausUser> response = ctx.getBus().requestAndAwait(CommonhausDatastore.READ, query);
-        CommonhausUser cfUser = response.body();
-        if (cfUser != null && cfUser.isNew()) {
-            ctx.getBus().send(CommonhausDatastore.WRITE, new UpdateEvent(cfUser,
-                    (ctx, u) -> {
-                    },
-                    "Created by bot", true, false));
+        if (updateEvent == null || updateEvent.user() == null) {
+            throw new IllegalArgumentException("Update event with user is required");
         }
-    }
+        final String userKey = getKey(updateEvent);
 
-    /**
-     * Retrieve Commonhaus user data from the repository using
-     * the GitHub bot's login and id.
-     *
-     * @param event Query message containing the login and id
-     * @return A Commonhaus user object (never null)
-     * @throws RuntimeException if GitHub or other API query fails
-     */
-    @ConsumeEvent(READ)
-    public Uni<CommonhausUser> fetchCommonhausUser(QueryEvent event) {
-        final String key = getKey(event);
+        DatastoreQueryContext dqc = ensureQueryContext().withLogId(userKey); // throws
 
-        DatastoreQueryContext dqc = ctx.getDatastoreContext();
-        if (dqc == null) {
-            return Uni.createFrom().failure(new IllegalStateException("No admin query context"));
+        // Get or create a _cache entry_ for this user
+        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
+                .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+        if (!entry.hasUserData()) {
+            // we're being asked to store an update, create a user record if it is missing
+            readCommonhausUser(dqc, userKey, new QueryEvent(updateEvent));
+            if (dqc.hasErrors()) {
+                throw dqc.bundleExceptions();
+            }
+            if (!entry.hasUserData()) {
+                throw new IllegalStateException("Failed to load or create user: " + updateEvent.login());
+            }
         }
+        // Update the working/cached user data
+        CommonhausUser result = entry.applyUpdate(ctx, updateEvent);
 
-        CommonhausUser result = event.refresh()
-                ? null
-                : deepCopy(AdminDataCache.COMMONHAUS_DATA.get(key));
+        // Offload persistence to the update queue
+        updateQueue.queueReconciliation(userKey, () -> {
+            persistUserToGitHub(userKey, 0);
+        });
 
-        if (result == null) {
-            // read or create commonhaus user
-            GHRepository repo = dqc.getRepository();
-            result = readCommonhausUser(dqc, repo, event, key);
-        }
-
-        // any other kind of error (including parse errors) will be logged and returned
-        if (dqc.hasErrors()) {
-            Throwable e = dqc.bundleExceptions();
-            Log.errorf(e, "[%s|%s] Unable to read or create data for %s", dqc.getLogId(), event.login(), e);
-            return Uni.createFrom().failure(e);
-        } else if (result == null && event.create()) {
-            Exception e = new IllegalStateException("No result for user after fetch with create");
-            dqc.logAndSendEmail("Failed to create Commonhaus user", e);
-            return Uni.createFrom().failure(e);
-        }
-
-        Log.debugf("[%s|%s] Fetched Commonhaus user data: %s", dqc.getLogId(), event.login(), result);
-        final CommonhausUser r = result;
-        return Uni.createFrom().item(() -> r).emitOn(executor);
+        // Respond with the updated user data
+        return result;
     }
 
     /**
-     * Update Commonhaus user data in the repository using
-     * the GitHub bot's login and id.
+     * Reconcile action driven from the single-threaded update queue.
+     * This will lag behind user-driven events and can batch updates.
+     * This is a self-contained/isolated task: exceptions should be handled.
      *
-     * @param event Update message containing the user and commit message
-     * @return Updated Commonhaus user object (never null)
-     * @throws RuntimeException if GitHub or other API query fails
+     * @param entry DatastoreCacheEntry with user data and update context
+     * @param retryCount Number of retries attempted
      */
-    @Blocking
-    @ConsumeEvent(WRITE)
-    public Uni<CommonhausUser> pushCommonhausUser(UpdateEvent event) {
-        final CommonhausUser user = event.user();
+    private void persistUserToGitHub(String userKey, int retryCount) {
+        // Retrieve the user data from the cache (should be present; prevent/defer expiry)
+        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA.get(userKey);
+        DatastoreQueryContext dqc = ensureQueryContext().withLogId(entry.userKey());
 
-        CommonhausUser result = null;
-        DatastoreQueryContext dqc = ctx.getDatastoreContext();
-        if (dqc == null) {
-            Exception e = new IllegalStateException("No query context");
-            ctx.logAndSendEmail("pushCommonhausUser", "Unable to get datastore query context", e, null);
-            return Uni.createFrom().failure(e);
+        CommonhausUser user = entry.beginUpdate();
+        if (dqc.isDryRun() || user == null) {
+            // nothing to do.
+            return;
         }
 
-        result = updateCommonhausUser(dqc, event);
+        String content = dqc.writeYamlValue(user);
         if (dqc.hasErrors()) {
-            Throwable e = dqc.bundleExceptions();
-            dqc.clearErrors();
-            dqc.logAndSendEmail("Failed to update Commonhaus user", e);
-            return Uni.createFrom().failure(e);
+            // Can't proceed without content
+            dqc.logAndSendContextErrors("Failed to flatten user data for persistence");
+            return;
         }
 
-        Log.debugf("[%s|%s] Updated Commonhaus user data: %s", dqc.getLogId(), user.login(), result);
-        final CommonhausUser u = result;
-        return Uni.createFrom().item(() -> u).emitOn(executor);
-    }
-
-    private CommonhausUser updateCommonhausUser(DatastoreQueryContext dqc, UpdateEvent event) {
         GHRepository repo = dqc.getRepository();
-        CommonhausUser user = deepCopy(event.user()); // leave original alone
-        String key = getKey(user);
-
-        // Callback: Apply changes to the user
-        event.applyChanges(ctx, user);
-        if (event.history()) {
-            user.addHistory(event.message());
-        }
-
-        if (dqc.isDryRun()) {
-            return user;
-        }
-
-        String content = writeUser(dqc, user);
-        if (content == null) {
-            // If it can't be serialized, bail and return the original
-            return event.user();
-        }
-
         GHContentBuilder update = repo.createContent()
                 .path(dataPath(user.id()))
-                .message("🤖 [%s] %s".formatted(user.id(), event.message()))
+                .message("🤖 [%s] %s".formatted(user.id(), entry.commitMessage()))
                 .content(content);
 
+        // include previous sha in the update if available
         if (user.sha() != null) {
             update.sha(user.sha());
         }
 
+        // Commit/Push the change to GitHub
         GHContentUpdateResponse response = dqc.execGitHubSync((gh3, dryRun3) -> update.commit());
-        HttpException ex = dqc.getConflict();
-        if (ex != null) {
-            dqc.clearConflict();
+        // Handle any errors that occurred during the GitHub operation
+        if (dqc.hasErrors()) {
+            handlePersistenceError(dqc, entry, user, retryCount);
+            return;
+        }
+
+        GHContent responseContent = response.getContent();
+        final CommonhausUser updated = dqc.readYamlContent(responseContent, CommonhausUser.class);
+        if (updated != null) {
+            entry.finishUpdate(updated);
+        }
+    }
+
+    /**
+     * Centralized error handling for persistence operations
+     * Do not throw exceptions; log and schedule retries as needed.
+     *
+     * @param dqc DatastoreQueryContext with repository context; collects exceptions and errors
+     */
+    private void handlePersistenceError(DatastoreQueryContext dqc, DatastoreCacheEntry entry,
+            CommonhausUser user, int retryCount) {
+
+        // Check for conflicts first
+        final String userKey = entry.userKey();
+        if (dqc.checkRemoveConflict()) {
             Log.debugf("[%s|%s] Conflict updating Commonhaus user data", dqc.getLogId(), user.login());
 
-            // we're here after a save conflict; re-read the data
-            user = readCommonhausUser(dqc, repo, event, key);
-            if (user != null) {
-                if (event.retry()) {
-                    // retry the update
-                    return updateCommonhausUser(dqc, UpdateEvent.retryEvent(event, user));
-                } else {
-                    // allow caller to handle unresolved conflict
-                    user.setConflict(true);
-                }
+            // Fetch the latest from GitHub
+            CommonhausUser latestUser = readCommonhausUser(dqc, userKey,
+                    new QueryEvent(user.login(), user.id(), true, false));
+            if (latestUser != null) {
+                // Merge the changes
+                entry.handleConflict(ctx, latestUser);
+
+                // Queue a fresh start with updated/rebased content
+                updateQueue.queueReconciliation(userKey, () -> persistUserToGitHub(userKey, 0));
+                return;
             }
-        } else if (!dqc.hasErrors()) {
-            GHContent responseContent = response.getContent();
-            user = CommonhausUser.parseFile(dqc, responseContent);
-            if (user != null) {
-                AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(user));
-            }
+            // Fall through to retry logic if we couldn't fetch latest
         }
-        // Caller should be check for query context errors
-        return user;
-    }
+        // If it is a retriable network error, schedule a retry
+        // dqc errors are logged when they occur
+        if (dqc.hasRetriableNetworkError()) {
+            Log.infof("[%s|%s] Network error during persistence, scheduling retry #%d",
+                    dqc.getLogId(), user.login(), retryCount + 1);
 
-    /** Get user data: will return null on IOException (including not found) */
-    private CommonhausUser readCommonhausUser(DatastoreQueryContext dqc, GHRepository repo,
-            DatastoreEvent event, String key) {
-
-        CommonhausUser response = dqc.execGitHubSync((gh, dryRun) -> {
-            GHContent content = repo.getFileContent(dataPath(event.id()));
-            // parse file could throw -- captured/recorded in the query context
-            return content == null
-                    ? null
-                    : CommonhausUser.parseFile(dqc, content);
-        });
-
-        dqc.clearNotFound();
-        if (response == null && event.create() && !dqc.hasErrors()) {
-            // Create a new user if not found (when instructed and no errors)
-            response = CommonhausUser.create(event.login(), event.id());
-        }
-        if (dqc.hasErrors() || response == null) {
-            Log.debugf("[%s|%s] Commonhaus user data not found or could not be parsed: %s",
-                    dqc.getLogId(), event.login(), dqc.bundleExceptions());
+            updateQueue.scheduleReconciliationRetry(userKey,
+                    count -> persistUserToGitHub(userKey, count), retryCount);
         } else {
-            AdminDataCache.COMMONHAUS_DATA.put(key, deepCopy(response));
+            dqc.logAndSendContextErrors(
+                    "Non-retriable error during GitHub persistence. Data may be lost (retry #%d)".formatted(retryCount + 1));
         }
-        return response;
     }
 
-    private CommonhausUser deepCopy(CommonhausUser user) {
+    private DatastoreQueryContext ensureQueryContext() {
+        DatastoreQueryContext dqc = ctx.getDatastoreContext();
+        if (dqc == null || dqc.getRepository() == null) {
+            var e = new IllegalStateException("Bad query context for the datastore");
+            ctx.logAndSendEmail("ensureQueryContext",
+                    "Unable to get datastore query context",
+                    e);
+            throw e;
+        }
+        return dqc;
+    }
+
+    /**
+     * Create a deep copy of the user data to avoid concurrent modifications.
+     * Static/stateless for access from DatastoreCacheEntry.
+     * Should be a rare event.
+     */
+    static CommonhausUser deepCopy(CommonhausUser user) {
         if (user == null) {
             return null;
         }
         // create a disconnected copy of the essential data.
         try {
-            String json = mapper.writeValueAsString(user);
-            CommonhausUser copy = mapper.readValue(json, CommonhausUser.class);
+            String json = ContextService.yamlMapper.writeValueAsString(user);
+            CommonhausUser copy = ContextService.yamlMapper.readValue(json, CommonhausUser.class);
             copy.sha(user.sha());
+            return copy;
         } catch (JsonProcessingException e) {
-            ctx.logAndSendEmail("CommonhausDatastore.deepCopy", "Unable to copy Commonbaus user", e, null);
+            LogMailer.instance().logAndSendEmail(
+                    "CommonhausDatastore.deepCopy",
+                    "Unable to copy Commonbaus user",
+                    e);
         }
         return user;
     }
 
-    private String writeUser(DatastoreQueryContext dqc, CommonhausUser input) {
-        try {
-            return dqc.writeYamlValue(input);
-        } catch (IOException e) {
-            dqc.addException(e);
-            return null;
-        }
-    }
-
-    private String dataPath(long id) {
+    public static String dataPath(long id) {
         return "data/users/" + id + ".yaml";
     }
 
-    public static String getKey(QueryEvent event) {
-        return event.login() + ":" + event.id();
+    public static String getKey(DatastoreEvent event) {
+        return getKey(event.login(), event.id());
     }
 
-    public static String getKey(CommonhausUser user) {
-        return user.login() + ":" + user.id();
+    public static String getKey(String login, long id) {
+        return login + ":" + id;
     }
 }

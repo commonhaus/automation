@@ -7,30 +7,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.hk.api.MemberApplicationProcess.ApplicationPost;
 import org.commonhaus.automation.hk.api.MemberAttestationResource.AttestationPost;
 import org.commonhaus.automation.hk.data.CommonhausUser;
-import org.commonhaus.automation.hk.data.CommonhausUserData;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.hk.data.MemberStatus;
+import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
+import org.commonhaus.automation.hk.member.MemberApplicationProcess;
+import org.commonhaus.automation.hk.member.MemberApplicationProcess.ApplicationPost;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContentBuilder;
@@ -38,6 +36,7 @@ import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -53,10 +52,16 @@ import io.restassured.http.ContentType;
 @GitHubAppTest
 @TestHTTPEndpoint(MemberResource.class)
 public class MemberDataTest extends HausKeeperTestBase {
-    static final String USER_WITH_APPLICATION = "src/test/resources/haus-member-application.yaml";
-
     @Inject
     ObjectMapper mapper;
+
+    @Inject
+    CommonhausDatastore datastore;
+
+    @Inject
+    MemberApplicationProcess applicationProcess;
+
+    boolean errorMailExpected = false;
 
     @Override
     @BeforeEach
@@ -66,6 +71,13 @@ public class MemberDataTest extends HausKeeperTestBase {
         setupBotLogin();
         setupMockTeam();
         setUserManagementConfig();
+    }
+
+    @AfterEach
+    void noErrorMail() {
+        if (!errorMailExpected) {
+            assertNoErrorEmails();
+        }
     }
 
     @Test
@@ -88,10 +100,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .then()
                 .log().all()
                 .statusCode(403);
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -118,10 +126,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(200)
                 .body("INFO.login", equalTo(botLogin));
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -148,10 +152,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                         .path("/")
                         .secured(true)
                         .maxAge(60));
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -166,8 +166,8 @@ public class MemberDataTest extends HausKeeperTestBase {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
-        GHRepository dataStore = dataMocks.repository();
-        when(dataStore.getFileContent(anyString())).thenThrow(new GHFileNotFoundException("Badness"));
+        when(dataMocks.repository().getFileContent(anyString()))
+                .thenThrow(new GHFileNotFoundException("Badness"));
 
         given()
                 .log().all()
@@ -177,10 +177,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(200)
                 .body("HAUS.status", equalTo("UNKNOWN"));
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -195,8 +191,8 @@ public class MemberDataTest extends HausKeeperTestBase {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
-        GHRepository dataStore = dataMocks.repository();
-        when(dataStore.getFileContent(anyString())).thenThrow(new IOException("Badness"));
+        when(dataMocks.repository().getFileContent(anyString()))
+                .thenThrow(new IOException("Badness"));
 
         given()
                 .log().all()
@@ -206,6 +202,7 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(500);
 
+        errorMailExpected = true;
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() != 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(1);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
@@ -221,7 +218,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     })
     void testGetCommonhausUser() throws Exception {
 
-        mockExistingCommonhausData();
+        mockExistingCommonhausData(UserPath.WITH_ATTESTATION);
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
@@ -234,36 +231,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(200)
                 .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-    }
-
-    @Test
-    void testGetCommonhausUserStatus() throws Exception {
-
-        setUserManagementConfig();
-        ctx.getStatusForRole("sponsor");
-
-        CommonhausUser user = new CommonhausUser.Builder()
-                .withId(12345)
-                .withData(new CommonhausUserData())
-                .build();
-
-        assertThat(user.status()).isEqualTo(MemberStatus.UNKNOWN);
-
-        Set<String> roles = Set.of("sponsor");
-        boolean update = user.statusUpdateRequired(ctx, roles);
-        assertThat(update).isTrue();
-        user.updateMemberStatus(ctx, roles);
-        assertThat(user.status()).isEqualTo(MemberStatus.SPONSOR);
-
-        roles = Set.of("sponsor", "member", "egc");
-        update = user.statusUpdateRequired(ctx, roles);
-        assertThat(update).isTrue();
-        user.updateMemberStatus(ctx, roles);
-        assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
     }
 
     @Test
@@ -283,9 +250,9 @@ public class MemberDataTest extends HausKeeperTestBase {
                 "draft");
         String attestJson = mapper.writeValueAsString(attestation);
 
-        mockExistingCommonhausData(); // pre-existing data
-
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockExistingCommonhausData(UserPath.WITH_ATTESTATION); // getFileContent(anyString())
+        mockUpdateCommonhausData(builder, UserPath.WITH_ATTESTATION);
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
@@ -299,6 +266,8 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .then()
                 .log().all()
                 .statusCode(200)
+                // this will match the mock-return value above (mockUpdateCommonhausData)
+                // we will verify the captured argument below
                 .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
         // Verify captured input (common test output)
@@ -319,10 +288,6 @@ public class MemberDataTest extends HausKeeperTestBase {
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("draft");
         assertThat(att.withStatus()).isEqualTo(MemberStatus.COMMITTEE);
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -351,10 +316,6 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .then()
                 .log().all()
                 .statusCode(400);
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -374,7 +335,9 @@ public class MemberDataTest extends HausKeeperTestBase {
                 new AttestationPost("coc", "2.0"));
         String attestJson = mapper.writeValueAsString(attestations);
 
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockExistingCommonhausData(UserPath.WITH_ATTESTATION); // getFileContent(anyString())
+        mockUpdateCommonhausData(builder, UserPath.WITH_ATTESTATION);
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
@@ -390,6 +353,8 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .statusCode(200)
                 .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
+        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+
         // Verify captured input (common test output)
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
@@ -397,7 +362,8 @@ public class MemberDataTest extends HausKeeperTestBase {
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.status()).isEqualTo(MemberStatus.ACTIVE);
 
-        assertThat(result.goodUntil().attestation()).hasSize(2);
+        assertThat(result.goodUntil().attestation()).hasSize(3);
+        assertThat(result.goodUntil().attestation()).containsKey("test");
         assertThat(result.goodUntil().attestation()).containsKey("member");
         assertThat(result.goodUntil().attestation()).containsKey("coc");
 
@@ -410,10 +376,6 @@ public class MemberDataTest extends HausKeeperTestBase {
         assertThat(att.date()).isEqualTo(YMD);
         assertThat(att.version()).isEqualTo("2.0");
         assertThat(att.withStatus()).isEqualTo(MemberStatus.ACTIVE);
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
     }
 
     @Test
@@ -424,11 +386,17 @@ public class MemberDataTest extends HausKeeperTestBase {
             @UserInfo(key = "node_id", value = botNodeId),
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
-    void testGetUnknownApplication() throws Exception {
+    void testGetApplication() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
-        mockExistingCommonhausData();
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockExistingCommonhausData(UserPath.WITH_APPLICATION); // getFileContent(anyString())
+        mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
+
+        setupGraphQLProcessing(dataMocks,
+                MemberQueryResponse.APPLICATION_MATCH,
+                MemberQueryResponse.QUERY_COMMENTS);
 
         given()
                 .log().all()
@@ -436,11 +404,9 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .get("/apply")
                 .then()
                 .log().all()
-                .statusCode(404);
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+                .statusCode(200)
+                .body("HAUS.status", equalTo("PENDING"))
+                .body("APPLY.feedback.htmlContent", equalTo("<p>Feedback</p>\n"));
     }
 
     @Test
@@ -456,13 +422,14 @@ public class MemberDataTest extends HausKeeperTestBase {
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         // dataStore.getFileContent(anyString()))
-        mockExistingCommonhausData(USER_WITH_APPLICATION);
+        mockExistingCommonhausData(UserPath.WITH_APPLICATION);
 
         // dataStore.createContent()
-        GHContentBuilder builder = mockUpdateCommonhausData(USER_WITH_APPLICATION);
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
 
         setupGraphQLProcessing(dataMocks,
-                QueryReponse.APPLICATION_BAD_TITLE);
+                MemberQueryResponse.APPLICATION_BAD_TITLE);
 
         given()
                 .log().all()
@@ -470,7 +437,7 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .get("/apply")
                 .then()
                 .log().all()
-                .statusCode(404);
+                .statusCode(400);
 
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
@@ -478,64 +445,7 @@ public class MemberDataTest extends HausKeeperTestBase {
         var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
         assertThat(result.application()).isNull();
 
-        for (String cue : graphQueries) {
-            verify(dataMocks.dql(), timeout(500))
-                    .executeSync(contains(cue), anyMap());
-        }
-        verifyNoMoreInteractions(dataMocks.dql());
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-    }
-
-    @Test
-    @TestSecurity(user = botLogin)
-    @OidcSecurity(userinfo = {
-            @UserInfo(key = "login", value = botLogin),
-            @UserInfo(key = "id", value = botId + ""),
-            @UserInfo(key = "node_id", value = botNodeId),
-            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
-    })
-    void testGetApplicationWithFeedback() throws Exception {
-        GHUser botUser = sponsorMocks.github().getUser(botLogin);
-        appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
-
-        // dataStore.getFileContent(anyString()))
-        mockExistingCommonhausData(USER_WITH_APPLICATION);
-
-        // dataStore.createContent() -- update to regular user
-        GHContentBuilder builder = mockUpdateCommonhausData();
-
-        setupGraphQLProcessing(dataMocks,
-                QueryReponse.APPLICATION_MATCH,
-                QueryReponse.QUERY_COMMENTS);
-
-        given()
-                .log().all()
-                .when()
-                .get("/apply")
-                .then()
-                .log().all()
-                .statusCode(200)
-                .body("APPLY.feedback.htmlContent", equalTo("<p>Feedback</p>\n"));
-
-        final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
-        verify(builder).content(contentCaptor.capture());
-
-        var result = ctx.yamlMapper().readValue(contentCaptor.getValue(), CommonhausUser.class);
-        assertThat(result.application()).isNotNull();
-        assertThat(result.status()).isEqualTo(MemberStatus.PENDING);
-
-        for (String cue : graphQueries) {
-            verify(dataMocks.dql(), timeout(500))
-                    .executeSync(contains(cue), anyMap());
-        }
-        verifyNoMoreInteractions(dataMocks.dql());
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+        verifyGraphQLProcessing(dataMocks, true);
     }
 
     @Test
@@ -554,14 +464,15 @@ public class MemberDataTest extends HausKeeperTestBase {
         String applyJson = mapper.writeValueAsString(application);
 
         // dataStore.getFileContent(anyString()))
-        mockExistingCommonhausData(USER_WITH_APPLICATION);
+        mockExistingCommonhausData(UserPath.WITH_APPLICATION);
 
         // dataStore.createContent() -- create a normal user
-        GHContentBuilder builder = mockUpdateCommonhausData();
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
 
         setupGraphQLProcessing(dataMocks,
-                QueryReponse.APPLICATION_MATCH,
-                QueryReponse.UPDATE_ISSUE);
+                MemberQueryResponse.APPLICATION_MATCH,
+                MemberQueryResponse.UPDATE_ISSUE);
 
         given()
                 .log().all()
@@ -572,7 +483,7 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN")) // mock response
+                .body("HAUS.status", equalTo("PENDING")) // mock response
                 .body("APPLY.created", notNullValue()) // from mutableUpdateIssue.json
                 .body("APPLY.updated", notNullValue()) // from mutableUpdateIssue.json
                 .body("APPLY.contributions", equalTo("testContrib")) // from mutableUpdateIssue.json
@@ -587,53 +498,6 @@ public class MemberDataTest extends HausKeeperTestBase {
         assertThat(result.application()).isNotNull();
         assertThat(result.status()).isEqualTo(MemberStatus.PENDING); // changed from UNKNOWN -> PENDING
 
-        for (String cue : graphQueries) {
-            verify(dataMocks.dql(), timeout(500))
-                    .executeSync(contains(cue), anyMap());
-        }
-        verifyNoMoreInteractions(dataMocks.dql());
-
-        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 0);
-        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
-        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
-    }
-
-    enum QueryReponse implements MockResponse {
-        APPLICATION_BAD_TITLE("query($id: ID!) {",
-                "src/test/resources/github/queryIssue-ApplicationBadTitle.json"),
-
-        APPLICATION_MATCH("query($id: ID!) {",
-                "src/test/resources/github/queryIssue-ApplicationMatch.json"),
-
-        QUERY_COMMENTS("comments(first: 50",
-                "src/test/resources/github/queryComments.json"),
-
-        UPDATE_ISSUE("updateIssue(input: {",
-                "src/test/resources/github/mutableUpdateIssue.json"),
-                ;
-
-        String cue;
-        Path path;
-
-        QueryReponse(String cue, String path) {
-            this.cue = cue;
-            this.path = Path.of(path);
-        }
-
-        @Override
-        public String cue() {
-            return cue;
-        }
-
-        @Override
-        public Path path() {
-            return path;
-        }
-
-        @Override
-        public long installationId() {
-            return datastoreInstallationId;
-        }
-
+        verifyGraphQLProcessing(dataMocks, true);
     }
 }

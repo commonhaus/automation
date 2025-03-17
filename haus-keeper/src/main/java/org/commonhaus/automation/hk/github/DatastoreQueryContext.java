@@ -20,6 +20,7 @@ public class DatastoreQueryContext extends QueryContext {
 
     private GHRepository repository;
     private final TokenGitHubClients tokenClients;
+    private String logId;
 
     public DatastoreQueryContext(AppContextService ctx, TokenGitHubClients tokenClients, String repoFullName) {
         super(ctx, -1);
@@ -27,11 +28,17 @@ public class DatastoreQueryContext extends QueryContext {
         this.repoFullName = repoFullName;
         this.ownerName = toOrganizationName(repoFullName);
         this.tokenClients = tokenClients;
+        this.logId = "dqc";
     }
 
     @Override
     public String getLogId() {
-        return repoFullName;
+        return logId;
+    }
+
+    public DatastoreQueryContext withLogId(String logId) {
+        this.logId = "dqc-" + logId;
+        return this;
     }
 
     public DatastoreQueryContext withExisting(GitHub github) {

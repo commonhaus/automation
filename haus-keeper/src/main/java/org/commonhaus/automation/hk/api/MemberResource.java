@@ -19,7 +19,7 @@ import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
-import org.commonhaus.automation.hk.github.CommonhausDatastore.UpdateEvent;
+import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.quarkus.logging.Log;
@@ -81,7 +81,7 @@ public class MemberResource {
         if (session.hasConnection()) {
             return Response.ok(new ApiResponse(ApiResponse.Type.INFO, session.getUserData())).build();
         } else {
-            return ctx.toResponseWithEmail("getUserInfo", "Unable to establish connection to GH for " + session.login(),
+            return ctx.toResponse("getUserInfo", "Unable to establish connection to GH for " + session.login(),
                     session.connectionError());
         }
     }

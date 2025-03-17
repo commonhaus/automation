@@ -10,15 +10,22 @@ import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 public enum AdminDataCache {
-    MEMBER_SESSION(b -> b.expireAfterAccess(1, TimeUnit.HOURS)),
+    /** Cached user application state. Update events may be replayed as part of user persistence */
+    APPLICATION_STATE(b -> b.expireAfterAccess(3, TimeUnit.HOURS)),
 
-    COMMONHAUS_DATA(b -> b.expireAfterAccess(1, TimeUnit.HOURS)),
+    /** Retrievable GitHub connections that can be used to renew connection */
+    MEMBER_SESSION(b -> b.expireAfterAccess(15, TimeUnit.MINUTES)),
 
-    KNOWN_USER(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
+    /** Cached user record state. Stores state for immedate update and deferred/batched persistence */
+    COMMONHAUS_DATA(b -> b.expireAfterAccess(3, TimeUnit.HOURS)),
 
-    ALIASES(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
+    /** Cache if a user is known or not to avoid recomputation of groups membership */
+    KNOWN_USER(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
 
-    APPLICATION_CHECK(b -> b.expireAfterWrite(1, TimeUnit.HOURS));
+    /** Cache forward email aliases to reduce API calls */
+    ALIASES(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
+
+    ;
 
     private QueryCache cache = null;
 

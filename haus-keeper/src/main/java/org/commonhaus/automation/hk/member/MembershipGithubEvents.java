@@ -1,4 +1,4 @@
-package org.commonhaus.automation.hk.github;
+package org.commonhaus.automation.hk.member;
 
 import java.util.Collection;
 
@@ -11,7 +11,8 @@ import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.commonhaus.automation.github.context.JsonAttributeAccessor;
-import org.commonhaus.automation.hk.api.MemberApplicationProcess;
+import org.commonhaus.automation.hk.github.AppContextService;
+import org.commonhaus.automation.hk.github.DatastoreQueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitHub;
 
@@ -55,17 +56,20 @@ public class MembershipGithubEvents {
             return;
         }
 
-        DatastoreQueryContext dqc = ctx.getDatastoreContext();
-        Log.debugf("[%s] applicationIssueLabelAdded #%s - %s", dqc.getLogId(),
-                issue.number, actionType);
+        DatastoreQueryContext dqc = ctx.getDatastoreContext().withLogId("" + installationId);
+        Log.debugf("[%s] applicationIssueLabelAdded %s#%s - %s", dqc.getLogId(),
+                repoFullName, issue.number, actionType);
 
         try {
             dqc.getLabels(dqc.getRepositoryId()); // pre-fetch
-            applicationProcess.handleApplicationLabelAdded(dqc, eventPayload.getIssue(), issue, label);
+            if (!dqc.hasErrors()) {
+                applicationProcess.handleApplicationLabelAdded(dqc, eventPayload.getIssue(), issue, label);
+            }
+            if (dqc.hasErrors()) {
+                dqc.logAndSendContextErrors("Error with issue label event");
+            }
         } catch (Throwable e) {
-            dqc.logAndSendEmail("Error with issue label event", e);
-        } finally {
-            dqc.clearErrors();
+            dqc.logAndSendEmail("Error with issue comment event", e);
         }
     }
 
@@ -111,8 +115,6 @@ public class MembershipGithubEvents {
             }
         } catch (Throwable e) {
             dqc.logAndSendEmail("Error with issue comment event", e);
-        } finally {
-            dqc.clearErrors();
         }
     }
 

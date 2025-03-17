@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.config.EmailNotification;
@@ -307,22 +308,19 @@ public class AppContextService extends BaseContextService {
     }
 
     public Response toResponse(String logId, String message, Throwable t) {
-        if (t == null) {
-            Log.errorf("[%s] %s; %s", logId, message, t);
-        } else {
+        if (t != null) {
+            if (t instanceof WebApplicationException) {
+                WebApplicationException ex = (WebApplicationException) t;
+                if (ex.getResponse().getStatus() >= 500) {
+                    logAndSendEmail(logId, message, t);
+                }
+                return ((WebApplicationException) t).getResponse();
+            }
             if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
                 return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
             }
-            Log.errorf(t, "[%s] %s; %s", logId, message, t);
         }
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
-    public Response toResponseWithEmail(String logId, String message, Throwable t) {
-        logAndSendEmail(logId, message, t, null);
-        if (t != null && t.toString().toLowerCase().contains("timeout")) { // totally cheating
-            return Response.status(Response.Status.GATEWAY_TIMEOUT).build();
-        }
+        logAndSendEmail(logId, message, t);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
 }

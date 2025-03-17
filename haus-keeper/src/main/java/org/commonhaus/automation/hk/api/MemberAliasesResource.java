@@ -22,7 +22,7 @@ import org.commonhaus.automation.hk.forwardemail.AliasKey;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
-import org.commonhaus.automation.hk.github.CommonhausDatastore.UpdateEvent;
+import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -68,7 +68,7 @@ public class MemberAliasesResource {
             }
             return e.getResponse();
         } catch (Throwable e) {
-            return ctx.toResponseWithEmail("getAliases", "Unable to fetch user aliases for " + session.login(), e);
+            return ctx.toResponse("getAliases", "Unable to fetch user aliases for " + session.login(), e);
         }
     }
 
@@ -102,7 +102,7 @@ public class MemberAliasesResource {
             Log.errorf(e, "updateAliases: Unable to update user aliases for %s: %s", session.login(), e);
             return e.getResponse();
         } catch (Throwable e) {
-            return ctx.toResponseWithEmail("updateAliases", "Unable to update user aliases for " + session.login(), e);
+            return ctx.toResponse("updateAliases", "Unable to update user aliases for " + session.login(), e);
         }
     }
 
@@ -123,11 +123,12 @@ public class MemberAliasesResource {
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Throwable e) {
-            return ctx.toResponseWithEmail("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
+            return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
         }
     }
 
     protected CommonhausUser getUser() {
+        // throws to caller
         CommonhausUser user = datastore.getCommonhausUser(session);
         if (user == null) {
             // should never happen
@@ -140,12 +141,23 @@ public class MemberAliasesResource {
         if (!ctx.getValidAttestations(ID)) {
             // Not the user's fault.. misconfiguration
             Exception e = new Exception("Invalid attestation id");
-            ctx.logAndSendEmail("getUser", ID + " is an nvalid attestation id", e, null);
+            ctx.logAndSendEmail("getUser", ID + " is an invalid attestation id", e);
         }
         return user;
     }
 
+    /**
+     * Ensure the user has the default alias flag set if they have a default alias
+     *
+     * @param user
+     * @return user or null
+     * @throws Exception
+     */
     CommonhausUser updateHasDefaultFlag(CommonhausUser user) {
+        if (user == null) {
+            return null;
+        }
+        // throws to caller
         CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
                 (c, u) -> {
                     u.services().forwardEmail().enableDefaultAlias();

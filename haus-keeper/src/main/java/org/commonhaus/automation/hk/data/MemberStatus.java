@@ -29,7 +29,7 @@ public enum MemberStatus {
                 || this == INACTIVE;
     }
 
-    public boolean updateToPending() {
+    public boolean missedUpdateToPending() {
         return this == UNKNOWN
                 || this == SPONSOR
                 || this == INACTIVE;

@@ -20,7 +20,7 @@ import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.hk.data.MemberStatus;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
-import org.commonhaus.automation.hk.github.CommonhausDatastore.UpdateEvent;
+import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;

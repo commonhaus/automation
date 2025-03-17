@@ -1,6 +1,5 @@
 package org.commonhaus.automation.hk.data;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -14,10 +13,9 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.hk.data.CommonhausUserData.GoodStanding;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Services;
 import org.commonhaus.automation.hk.github.AppContextService;
-import org.commonhaus.automation.hk.github.DatastoreQueryContext;
-import org.kohsuke.github.GHContent;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -41,7 +39,9 @@ public class CommonhausUser {
 
     Boolean isMember;
     String statusChange;
-    MembershipApplication application;
+
+    @JsonProperty("application")
+    ApplicationIssue appIssue;
 
     transient String sha = null;
     transient boolean conflict = false;
@@ -51,7 +51,7 @@ public class CommonhausUser {
         this.id = builder.id;
         this.data = builder.data == null ? new CommonhausUserData() : builder.data;
         this.history = builder.history == null ? new ArrayList<>() : builder.history;
-        this.application = builder.application;
+        this.appIssue = builder.appIssue;
         this.isMember = builder.isMember;
         this.statusChange = builder.statusChange;
     }
@@ -109,15 +109,15 @@ public class CommonhausUser {
     }
 
     public boolean hasApplication() {
-        return application != null;
+        return appIssue != null;
     }
 
-    public MembershipApplication application() {
-        return application;
+    public ApplicationIssue application() {
+        return appIssue;
     }
 
-    public void setApplication(MembershipApplication application) {
-        this.application = application;
+    public void setAppIssue(ApplicationIssue application) {
+        this.appIssue = application;
     }
 
     public void addHistory(String message) {
@@ -158,7 +158,7 @@ public class CommonhausUser {
             // this could be a missed automation step
             ctx.logAndSendEmail("refreshStatus",
                     "refreshStatus: %s is a member but does not have the member role (missing group?)".formatted(login()),
-                    null, null);
+                    null);
             roles.add(MEMBER_ROLE);
         }
         if (!roles.isEmpty()) {
@@ -190,26 +190,12 @@ public class CommonhausUser {
 
     @Override
     public String toString() {
-        return "CommonhausUser [login=%s, id=%s, sha=%s, conflict=%s, status=%s]"
-                .formatted(login, id, sha, conflict, status());
+        return "CommonhausUser [login=%s, id=%s, sha=%s, conflict=%s, status=%s, application=%s]"
+                .formatted(login, id, sha, conflict, status(), application());
     }
 
     private String now() {
         return DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.MINUTES));
-    }
-
-    public static CommonhausUser parseFile(DatastoreQueryContext dqc, GHContent content) {
-        try {
-            CommonhausUser user = dqc.parseYamlFile(content, CommonhausUser.class);
-            if (user != null) {
-                user.sha = content.getSha();
-            }
-            return user;
-        } catch (IOException e) {
-            dqc.logAndSendEmail("Unable to parse " + content.getHtmlUrl(), e);
-            dqc.addException(e);
-            return null;
-        }
     }
 
     public static CommonhausUser create(String login, long id) {
@@ -217,7 +203,6 @@ public class CommonhausUser {
         return user;
     }
 
-    @SuppressWarnings("unused")
     public static class Builder {
         private String login;
         private long id;
@@ -225,7 +210,7 @@ public class CommonhausUser {
         private Boolean isMember;
         private String statusChange;
 
-        private MembershipApplication application;
+        private ApplicationIssue appIssue;
         private List<String> history;
 
         public Builder withLogin(String login) {
@@ -248,8 +233,8 @@ public class CommonhausUser {
             return this;
         }
 
-        public Builder withApplication(MembershipApplication application) {
-            this.application = application;
+        public Builder withApplication(ApplicationIssue appIssue) {
+            this.appIssue = appIssue;
             return this;
         }
 

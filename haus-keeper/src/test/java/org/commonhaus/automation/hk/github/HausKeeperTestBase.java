@@ -20,9 +20,10 @@ import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.hk.AdminDataCache;
-import org.commonhaus.automation.hk.api.MemberApplicationProcess;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.HausKeeperConfig;
+import org.commonhaus.automation.hk.member.MemberApplicationProcess;
+import org.commonhaus.automation.hk.member.MemberInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
@@ -87,6 +88,8 @@ public class HausKeeperTestBase extends ContextHelper {
     protected MockInstallation dataMocks;
     protected MockInstallation sponsorMocks;
 
+    protected MemberInfo mockMemberInfo;
+
     @BeforeEach
     protected void init() throws Exception {
         reset();
@@ -128,12 +131,12 @@ public class HausKeeperTestBase extends ContextHelper {
         BaseQueryCache.COLLABORATORS.put(repoName, Set.of(login));
     }
 
-    public GitHub setupBotLogin() throws IOException {
+    public GHUser setupBotLogin() throws IOException {
 
         // Set up the bot login in the sponsor/user repo
 
         GitHub gh = sponsorMocks.github();
-        GHUser bot = mockUser(botLogin, gh);
+        GHUser bot = mockUser(botLogin, botId, botNodeId, gh);
 
         GHEmail email = mock(GHEmail.class);
         when(email.isPrimary()).thenReturn(true);
@@ -141,6 +144,7 @@ public class HausKeeperTestBase extends ContextHelper {
 
         GHMyself myself = mock(GHMyself.class);
         when(myself.getEmails2()).thenReturn(List.of(email));
+
         when(sponsorMocks.github().getMyself()).thenReturn(myself);
 
         // Pre-set the connection for the bot user session
@@ -150,7 +154,10 @@ public class HausKeeperTestBase extends ContextHelper {
         // Make sure the same bot user is returned everywhere
 
         when(dataMocks.github().getUser(botLogin)).thenReturn(bot);
+        when(dataMocks.github().getMyself()).thenReturn(myself);
+
         when(hausMocks.github().getUser(botLogin)).thenReturn(bot);
+        when(hausMocks.github().getMyself()).thenReturn(myself);
 
         // Special token is used for r/w to datastore repo
 
@@ -163,7 +170,14 @@ public class HausKeeperTestBase extends ContextHelper {
         ctx.attestationIds.add("member");
         ctx.attestationIds.add("coc");
 
-        return gh;
+        mockMemberInfo = mock(MemberInfo.class);
+        when(mockMemberInfo.id()).thenReturn(botId);
+        when(mockMemberInfo.login()).thenReturn(botLogin);
+        when(mockMemberInfo.name()).thenReturn("Commonhaus Bot");
+        when(mockMemberInfo.url()).thenReturn("https://example.com");
+        when(mockMemberInfo.notificationEmail()).thenReturn(Optional.of("test@example.com"));
+
+        return bot;
     }
 
     public void setupMockTeam() throws IOException {
@@ -197,37 +211,14 @@ public class HausKeeperTestBase extends ContextHelper {
         ctx.currentConfig.set(Optional.of(config));
     }
 
-    public void mockExistingCommonhausData() throws IOException {
-        mockExistingCommonhausData("src/test/resources/commonhaus-user.yaml");
-    }
-
-    public void mockExistingCommonhausData(String filename) throws IOException {
-        GHContent content = mock(GHContent.class);
-        when(content.read()).thenReturn(Files.newInputStream(Path.of(filename)));
-        when(content.getSha()).thenReturn("1234567890abcdef");
-
+    public void mockExistingCommonhausData(UserPath userPath) throws IOException {
         GHRepository dataStore = dataMocks.repository();
-        when(dataStore.getFileContent(anyString())).thenReturn(content);
+        mockFileContent(dataStore, "data/users/" + botId + ".yaml", userPath.filename());
     }
 
-    public GHContentBuilder mockUpdateCommonhausData() throws IOException {
-        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
-        return mockUpdateCommonhausData(builder);
-    }
-
-    public GHContentBuilder mockUpdateCommonhausData(String filename) throws IOException {
-        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
-        return mockUpdateCommonhausData(builder, filename);
-    }
-
-    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder)
-            throws IOException {
-        return mockUpdateCommonhausData(builder, "src/test/resources/commonhaus-user.yaml");
-    }
-
-    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, String filename) throws IOException {
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, UserPath userPath) throws IOException {
         GHContent responseContent = mock(GHContent.class);
-        when(responseContent.read()).thenReturn(Files.newInputStream(Path.of(filename)));
+        when(responseContent.read()).thenReturn(Files.newInputStream(Path.of(userPath.filename())));
         when(responseContent.getSha()).thenReturn("1234567890adefgh");
 
         GHContentUpdateResponse response = Mockito.mock(GHContentUpdateResponse.class);
@@ -244,5 +235,68 @@ public class HausKeeperTestBase extends ContextHelper {
 
         // Return updated data
         return builder;
+    }
+
+    public enum UserPath {
+        WITH_APPLICATION("src/test/resources/commonhaus-user.application.unknown.yaml"),
+        WITH_ATTESTATION("src/test/resources/commonhaus-user.attestation.yaml"),
+        NEW_USER("src/test/resources/commonhaus-user.new.yaml");
+
+        private String filename;
+
+        UserPath(String filename) {
+            this.filename = filename;
+        }
+
+        String filename() {
+            return filename;
+        }
+    }
+
+    public enum MemberQueryResponse implements MockResponse {
+        APPLICATION_BAD_TITLE("query($id: ID!) {",
+                "src/test/resources/github/queryIssue-ApplicationBadTitle.json"),
+
+        APPLICATION_MATCH("query($id: ID!) {",
+                "src/test/resources/github/queryIssue-ApplicationMatch.json"),
+
+        APPLICATION_OTHER_OWNER("query($id: ID!) {",
+                "src/test/resources/github/queryIssue-ApplicationOtherOwner.json"),
+
+        QUERY_COMMENTS("comments(first: 50",
+                "src/test/resources/github/queryComments.json"),
+
+        QUERY_NO_COMMENTS("comments(first: 50",
+                "src/test/resources/github/queryComments.None.json"),
+
+        CREATE_ISSUE("createIssue(input: {",
+                "src/test/resources/github/mutableCreateIssue.json"),
+
+        UPDATE_ISSUE("updateIssue(input: {",
+                "src/test/resources/github/mutableUpdateIssue.json"),
+                ;
+
+        String cue;
+        Path path;
+
+        MemberQueryResponse(String cue, String path) {
+            this.cue = cue;
+            this.path = Path.of(path);
+        }
+
+        @Override
+        public String cue() {
+            return cue;
+        }
+
+        @Override
+        public Path path() {
+            return path;
+        }
+
+        @Override
+        public long installationId() {
+            return datastoreInstallationId;
+        }
     }
 }

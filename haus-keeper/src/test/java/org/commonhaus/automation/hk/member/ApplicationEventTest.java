@@ -1,4 +1,4 @@
-package org.commonhaus.automation.hk.api;
+package org.commonhaus.automation.hk.member;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -62,8 +62,8 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     setupMockTeam();
                     setUserManagementConfig();
 
-                    mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
-                    mockUpdateCommonhausData(builder);
+                    mockExistingCommonhausData(UserPath.WITH_APPLICATION);
+                    mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
                 })
                 .when().payloadFromClasspath("/github/eventIssueCommentCreated.json")
                 .event(GHEvent.ISSUE_COMMENT)
@@ -74,6 +74,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("test@example.com")).hasSize(1);
     }
 
     @Test
@@ -88,8 +89,8 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     setupMockTeam();
                     setUserManagementConfig();
 
-                    mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
-                    mockUpdateCommonhausData(builder);
+                    mockExistingCommonhausData(UserPath.WITH_APPLICATION);
+                    mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
 
                     setupGraphQLProcessing(mocks,
                             QueryResponse.REMOVE_LABELS,
@@ -127,6 +128,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("test@example.com")).hasSize(1);
     }
 
     @Test
@@ -141,8 +143,8 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                     setupMockTeam();
                     setUserManagementConfig();
 
-                    mockExistingCommonhausData("src/test/resources/haus-member-application.yaml");
-                    mockUpdateCommonhausData(builder);
+                    mockExistingCommonhausData(UserPath.WITH_APPLICATION);
+                    mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
 
                     setupGraphQLProcessing(mocks,
                             QueryResponse.REMOVE_LABELS,
@@ -178,6 +180,7 @@ public class ApplicationEventTest extends HausKeeperTestBase {
         await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
         assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
         assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("test@example.com")).hasSize(1);
     }
 
     enum QueryResponse implements MockResponse {

@@ -1,6 +1,7 @@
 package org.commonhaus.automation.hk.api;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Set;
 
 import org.commonhaus.automation.github.context.BaseQueryCache;
@@ -8,14 +9,17 @@ import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.UserQueryContext;
+import org.commonhaus.automation.hk.member.MemberInfo;
+import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 
+import io.quarkus.logging.Log;
 import io.quarkus.oidc.AccessTokenCredential;
 import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.identity.SecurityIdentity;
 
-public class MemberSession {
+public class MemberSession implements MemberInfo {
 
     static MemberSession getMemberSession(AppContextService ctx, UserInfo userInfo, SecurityIdentity identity) {
         // Lookup based on userInfo, replace with cached session data if present
@@ -170,5 +174,19 @@ public class MemberSession {
 
     public SecurityIdentity identity() {
         return identity;
+    }
+
+    public Optional<String> notificationEmail() {
+        // non-fatal. Proceed, but notification can't be sent to user
+        try {
+            GHMyself myself = connection().getMyself();
+            return myself.getEmails2().stream()
+                    .filter(x -> x.isPrimary())
+                    .map(x -> x.getEmail())
+                    .findFirst();
+        } catch (IOException e) {
+            Log.errorf(e, "getNotificationEmail: Failed to get primary email for %s", login());
+        }
+        return Optional.empty();
     }
 }

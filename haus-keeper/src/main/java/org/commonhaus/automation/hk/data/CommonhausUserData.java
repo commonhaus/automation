@@ -18,7 +18,6 @@ public class CommonhausUserData {
 
     Services services = new Services();
 
-    @SuppressWarnings("unused")
     public static class Discord {
         String id;
         String username;
@@ -48,7 +47,6 @@ public class CommonhausUserData {
         }
     }
 
-    @SuppressWarnings("unused")
     public static class Services {
         @JsonAlias("forward_email")
         ForwardEmail forwardEmail;
@@ -69,7 +67,6 @@ public class CommonhausUserData {
         }
     }
 
-    @SuppressWarnings("unused")
     public static class GoodStanding {
         Map<String, Attestation> attestation = new HashMap<>();
         String contribution;
