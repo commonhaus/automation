@@ -61,7 +61,7 @@
         <!-- Quarkus -->
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.18.4</quarkus.platform.version>
+        <quarkus.platform.version>3.19.3</quarkus.platform.version>
         <quarkus-github-app.version>2.8.4</quarkus-github-app.version>
         <quarkus.mailpit.version>1.6.1</quarkus.mailpit.version>
         <!-- Libraries -->
@@ -73,6 +73,13 @@
         <quarkus.container-image.group>commonhaus</quarkus.container-image.group>
         <quarkus.container-image.name>${project.artifactId}</quarkus.container-image.name>
         <quarkus.container-image.tag>${revision}</quarkus.container-image.tag>
+        <quarkus.container-image.labels.org.opencontainers.image.title>${project.artifactId}</quarkus.container-image.labels.org.opencontainers.image.title>
+        <quarkus.container-image.labels.org.opencontainers.image.description>${project.name}</quarkus.container-image.labels.org.opencontainers.image.description>
+        <quarkus.container-image.labels.org.opencontainers.image.url>${project.url}</quarkus.container-image.labels.org.opencontainers.image.url>
+        <quarkus.container-image.labels.org.opencontainers.image.source>${project.url}</quarkus.container-image.labels.org.opencontainers.image.source>
+        <quarkus.container-image.labels.org.opencontainers.image.version>${git.build.version}</quarkus.container-image.labels.org.opencontainers.image.version>
+        <quarkus.container-image.labels.org.opencontainers.image.revision>${git.commit.id.describe-short}</quarkus.container-image.labels.org.opencontainers.image.revision>
+        <quarkus.container-image.labels.org.opencontainers.image.licenses>Apache-2.0</quarkus.container-image.labels.org.opencontainers.image.licenses>
     </properties>
 
     <dependencyManagement>
