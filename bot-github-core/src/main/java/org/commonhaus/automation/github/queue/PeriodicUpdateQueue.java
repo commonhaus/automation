@@ -157,9 +157,9 @@ public class PeriodicUpdateQueue {
         while (iterator.hasNext()) {
             RetryTask retryTask = iterator.next().getValue();
             if (retryTask.isReady()) {
+                iterator.remove();
                 Log.debugf("RETRY %s", retryTask.name);
                 taskQueue.add(new Task(TaskType.RECONCILE, retryTask.name, retryTask));
-                iterator.remove();
             }
         }
     }
@@ -169,7 +169,7 @@ public class PeriodicUpdateQueue {
     }
 
     public String toString() {
-        return "PeriodicUpdateQueue(%s)".formatted(taskQueue.size());
+        return "PeriodicUpdateQueue(%s :: %s)".formatted(taskQueue.size(), retryTasks.size());
     }
 
     public record Task(TaskType type, String name, Runnable task) {
@@ -192,7 +192,7 @@ public class PeriodicUpdateQueue {
         private RetryTask(String taskGroup, Consumer<Integer> retryRunnable, int retryCount) {
             this.name = taskGroup;
             this.task = retryRunnable;
-            this.retryCount = retryCount++;
+            this.retryCount = retryCount + 1;
 
             // GitHub client only retries twice with 100ms delays
             // Our strategy should start after those quick retries would have failed
@@ -201,13 +201,15 @@ public class PeriodicUpdateQueue {
             // Third retry: 2 minutes
             // Fourth retry: 10 minutes
             // Fifth+ retry: 30 minutes
-            long delayMs = switch (retryCount) {
-                case 0 -> 5_000; // 5 seconds
-                case 1 -> 30_000; // 30 seconds
-                case 2 -> 120_000; // 2 minutes
-                case 3 -> 600_000; // 10 minutes
-                default -> 1_800_000; // 30 minutes
-            };
+            long delayMs = LaunchMode.TEST == LaunchMode.current()
+                    ? 5 // tiny delay for tests
+                    : switch (retryCount) {
+                        case 0 -> 5_000; // 5 seconds
+                        case 1 -> 30_000; // 30 seconds
+                        case 2 -> 120_000; // 2 minutes
+                        case 3 -> 600_000; // 10 minutes
+                        default -> 1_800_000; // 30 minutes
+                    };
 
             this.nextRetryTime = System.currentTimeMillis() + delayMs;
         }
