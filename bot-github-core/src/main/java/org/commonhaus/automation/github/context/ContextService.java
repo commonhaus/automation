@@ -30,7 +30,7 @@ public interface ContextService {
      * <p>
      * Supplier creates the singleton instance when the interface is loaded.
      */
-    ObjectMapper yamlMapper = new Supplier<ObjectMapper>() {
+    public static ObjectMapper yamlMapper = new Supplier<ObjectMapper>() {
         @Override
         public ObjectMapper get() {
             DumperOptions options = new DumperOptions();
