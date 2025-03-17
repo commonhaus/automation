@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github.context;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.commonhaus.automation.github.context.GitHubTeamService.getCachedTeamMembers;
 import static org.commonhaus.automation.github.context.GitHubTeamService.putCachedTeam;
 import static org.commonhaus.automation.github.context.GitHubTeamService.putCachedTeamMembers;
@@ -10,6 +12,9 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -23,6 +28,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import jakarta.enterprise.event.Event;
@@ -59,6 +66,7 @@ import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.quarkiverse.githubapp.testing.internal.GitHubAppTestingContext;
 import io.quarkus.jackson.ObjectMapperCustomizer;
 import io.quarkus.mailer.MockMailbox;
+import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
@@ -265,6 +273,16 @@ public class ContextHelper {
         Stream.of(BaseQueryCache.values()).forEach(v -> v.invalidateAll());
     }
 
+    public void assertNoErrorEmails() {
+        await()
+                .atMost(1, TimeUnit.SECONDS)
+                .failFast("You've got mail:\n" + mailbox.getTotalMessagesSent(), () -> mailbox.getTotalMessagesSent() > 0)
+                .until(() -> mailbox.getTotalMessagesSent() == 0);
+
+        assertThat(mailbox.getMailsSentTo("bot-errors@example.com")).hasSize(0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(0);
+    }
+
     public MockInstallation setupGivenMocks(GitHubMockSetupContext mocks, DefaultValues defaultValues) throws IOException {
         this.mocks = mocks;
         return setupDefaultMocks(defaultValues);
@@ -464,6 +482,14 @@ public class ContextHelper {
         return mockUser(login, hausMocks.github());
     }
 
+    public GHUser mockUser(String login, GitHub gh) throws IOException {
+        return mockUser(login, login.hashCode(), login, gh);
+    }
+
+    public GHUser mockUser(String login, long id, GitHub gh) throws IOException {
+        return mockUser(login, id, login, gh);
+    }
+
     /**
      * Mock a user.
      * (login, id, node_id, html_url, url, avatar_url)
@@ -473,7 +499,7 @@ public class ContextHelper {
      * @return
      * @throws IOException
      */
-    public GHUser mockUser(String login, GitHub gh) throws IOException {
+    public GHUser mockUser(String login, long id, String nodeId, GitHub gh) throws IOException {
         if (visited.containsKey(login)) {
             return gh.getUser(login);
         }
@@ -482,8 +508,8 @@ public class ContextHelper {
         final URL url = new URL("https://github.com/test-stuff");
         GHUser user = mock(GHUser.class);
         lenient().when(user.getLogin()).thenReturn(login);
-        lenient().when(user.getId()).thenReturn((long) login.hashCode());
-        lenient().when(user.getNodeId()).thenReturn(login);
+        lenient().when(user.getId()).thenReturn(id);
+        lenient().when(user.getNodeId()).thenReturn(nodeId);
         lenient().when(user.getHtmlUrl()).thenReturn(url);
         lenient().when(user.getUrl()).thenReturn(url);
         lenient().when(user.getAvatarUrl()).thenReturn("");
@@ -592,6 +618,28 @@ public class ContextHelper {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Response mockGraphQLNotFound(MockInstallation mocks, String cue) throws ExecutionException, InterruptedException {
+        GraphQLError error = mock(GraphQLError.class);
+        when(error.getMessage()).thenReturn("Not Found");
+        when(error.getOtherFields()).thenReturn(Map.of("type", "NOT_FOUND"));
+
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.hasError()).thenReturn(true);
+        when(mockResponse.getErrors()).thenReturn(List.of(error));
+        when(mocks.dql()
+                .executeSync(contains(cue), anyMap()))
+                .thenReturn(mockResponse);
+        return mockResponse;
+    }
+
+    public void mockGraphQLException(MockInstallation mocks, String cue, Exception e)
+            throws ExecutionException, InterruptedException {
+        ;
+        when(mocks.dql()
+                .executeSync(contains(cue), anyMap()))
+                .thenThrow(e);
     }
 
     /**
@@ -828,6 +876,16 @@ public class ContextHelper {
             when(mocks.dql()
                     .executeSync(contains(cue), anyMap()))
                     .thenReturn(mockResponse);
+        }
+    }
+
+    public void verifyGraphQLProcessing(MockInstallation mocks, boolean only) throws Exception {
+        for (String cue : graphQueries) {
+            verify(mocks.dql(), timeout(500))
+                    .executeSync(contains(cue), anyMap());
+        }
+        if (only) {
+            verifyNoMoreInteractions(mocks.dql());
         }
     }
 }

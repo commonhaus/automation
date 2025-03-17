@@ -4,6 +4,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.commonhaus.automation.github.context.ContextHelper;
@@ -120,5 +121,41 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         // mail sent on a separate/unrelated thread
         await().atMost(10, SECONDS).until(() -> mailbox.getTotalMessagesSent() >= 1);
         assertThat(mailbox.getMailsSentTo("bot-error@commonhaus.org")).hasSize(1);
+    }
+
+    @Test
+    void testScheduledRetryBehavior() {
+        AtomicInteger attemptCounter = new AtomicInteger(0);
+
+        // Schedule the initial task (retry count 0)
+        updateQueue.scheduleReconciliationRetry("retryTest",
+                (x) -> retryableTask(x, attemptCounter), 0);
+
+        while (!updateQueue.isEmpty()) {
+            System.out.println(updateQueue.toString());
+            updateQueue.processRetries();
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException e) {
+            }
+        }
+
+        // Wait for all retries to complete
+        await().atMost(3, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+
+        // Verify the task was attempted multiple times with increasing retry counts
+        assertThat(attemptCounter.get()).isEqualTo(3); // Initial + 2 retries
+    }
+
+    // Create a task that will fail twice then succeed
+    private void retryableTask(int retryCount, AtomicInteger attemptCounter) {
+        attemptCounter.incrementAndGet();
+        System.out.println(retryCount + " is doing stuff");
+
+        // Schedule a retry if we haven't tried enough times yet
+        if (retryCount < 3) {
+            updateQueue.scheduleReconciliationRetry("retryTest",
+                    (x) -> retryableTask(x, attemptCounter), retryCount);
+        }
     }
 }
