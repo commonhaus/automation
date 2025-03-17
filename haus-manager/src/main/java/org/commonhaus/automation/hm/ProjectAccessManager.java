@@ -86,6 +86,8 @@ public class ProjectAccessManager {
      */
     @Scheduled(cron = "${automation.hausManager.cron:13 27 */3 * * ?}")
     public void refreshAccessLists() {
+        Log.info("⏰ Scheduled: refresh access lists");
+
         for (String resourceKey : resourceToTaskGroup.keySet()) {
             String fullName = resourceToFullName(resourceKey);
             // Clear cache to force re-fetch on next access
@@ -168,7 +170,7 @@ public class ProjectAccessManager {
      * @see #readProjectConfig(ScopedQueryContext)
      */
     protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
-        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
 
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
             String repoFullName = fileUpdate.repository().getFullName();

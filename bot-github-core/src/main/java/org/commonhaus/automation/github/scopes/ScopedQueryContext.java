@@ -12,7 +12,6 @@ import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.scopes.ScopedInstallationMap.AppInstallationState;
-import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
@@ -79,16 +78,6 @@ public class ScopedQueryContext extends QueryContext {
                 null,
                 repoFullName,
                 installState.orgName());
-    }
-
-    public ScopedQueryContext(
-            @Nonnull ContextService contextService,
-            @Nonnull FileUpdate update) {
-        this(contextService,
-                update.installationId(),
-                update.repository(),
-                update.repository().getFullName(),
-                toOrganizationName(update.repository().getFullName()));
     }
 
     @Override

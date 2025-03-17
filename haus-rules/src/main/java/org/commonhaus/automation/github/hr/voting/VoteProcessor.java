@@ -57,7 +57,7 @@ public class VoteProcessor {
     public static final String VOTE_QUORUM = "vote/quorum";
     public static final String VOTE_REVISE = "vote/revise";
 
-    static final MatchLabel OPEN_VOTE = new MatchLabel(List.of(VOTE_OPEN));
+    static final MatchLabel HAS_OPEN_VOTE = new MatchLabel(List.of(VOTE_OPEN));
 
     @CheckedTemplate
     static class Templates {
@@ -102,8 +102,26 @@ public class VoteProcessor {
         RouteSupplier.registerSupplier("Votes recounted", () -> lastRun);
     }
 
+    public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
+        long ghiId = repoEvent.installationId();
+        GHRepository repo = repoEvent.repository();
+        VoteConfig voteConfig = ctx.getVoteConfig(repo.getFullName());
+
+        if (repoEvent.removed() || voteConfig.isDisabled()) {
+            votingRepositories.remove(repo.getFullName());
+        } else {
+            // update map.
+            votingRepositories.put(repo.getFullName(), ghiId);
+            scheduleQueryRepository(ghiId, repo.getFullName());
+        }
+    }
+
     @Scheduled(cron = "${automation.voting.cron:13 27 */3 * * ?}")
     void discoverVotes() {
+        Log.info("⏰ Scheduled: count votes");
+
         var i = votingRepositories.entrySet().iterator();
         while (i.hasNext()) {
             var e = i.next();
@@ -151,7 +169,7 @@ public class VoteProcessor {
             Log.warnf("[%s] VoteProcessor.processVoteCount: item not found", event.getLogId());
             return;
         }
-        if (!OPEN_VOTE.matches(qc, item.id)) {
+        if (!HAS_OPEN_VOTE.matches(qc, item.id)) {
             Log.debugf("[%s] VoteProcessor.processVoteCount: item is not open", event.getLogId());
             return;
         }
@@ -359,22 +377,6 @@ public class VoteProcessor {
                 VoteEvent.eventToType(eventData),
                 eventData.getNodeId(),
                 eventData.getNumber());
-    }
-
-    public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
-
-        long ghiId = repoEvent.installationId();
-        GHRepository repo = repoEvent.repository();
-        VoteConfig voteConfig = ctx.getVoteConfig(repo.getFullName());
-
-        if (repoEvent.removed() || voteConfig.isDisabled()) {
-            votingRepositories.remove(repo.getFullName());
-        } else {
-            // update map.
-            votingRepositories.put(repo.getFullName(), ghiId);
-            scheduleQueryRepository(ghiId, repo.getFullName());
-        }
     }
 
     void scheduleQueryRepository(long installationId, String repoFullName) {

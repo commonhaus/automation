@@ -14,7 +14,6 @@ import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
-import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.kohsuke.github.GHRepository;
 
@@ -75,47 +74,36 @@ public class ConfigWatcher {
         long installationId = repoEvent.installationId();
 
         Log.debugf("%s/repoDiscovered: %s", ME, repoFullName);
+        readConfiguration(repoEvent.installationId(), repoEvent.repository(), null);
 
         if (action.repository() && action.added()) {
             fileEvents.watchFile(ME,
                     installationId, repoFullName, HausRulesConfig.PATH,
-                    (fileUpdate) -> processConfigUpdate(fileUpdate));
+                    (fileUpdate) -> readConfiguration(fileUpdate.installationId(), fileUpdate.repository(),
+                            fileUpdate.updateType()));
         }
     }
 
-    /**
-     * Configuration file updated, read and process the new configuration.
-     *
-     * @param fileUpdate
-     */
-    protected void processConfigUpdate(FileUpdate fileUpdate) {
-        // Queue the actual update to be processed at a controlled rate
-        periodicUpdate.queue(ME, () -> {
-            if (ctxInstance.isUnsatisfied()) {
-                Log.warnf("%s/processConfigUpdate: ContextService not available", ME);
-                return;
-            }
-            GHRepository repo = fileUpdate.repository();
-            if (repo == null) {
-                Log.warnf("%s/processConfigUpdate: repository not set in FileUpdate", ME);
-                return;
-            }
-            if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
-                Log.debugf("%s/processConfigUpdate: %s config deleted", repo.getFullName());
-                repoConfig.remove(repo.getFullName());
-                return;
-            }
+    protected void readConfiguration(long installationId, GHRepository repo, FileUpdateType updateType) {
+        if (repo == null) {
+            Log.warnf("%s/processConfigUpdate: repository not set in FileUpdate", ME);
+            return;
+        }
+        if (updateType == FileUpdateType.REMOVED) {
+            Log.debugf("%s/processConfigUpdate: %s config deleted", repo.getFullName());
+            repoConfig.remove(repo.getFullName());
+            return;
+        }
 
-            ContextService ctx = ctxInstance.get();
-            ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate);
-            HausRulesConfig hausRulesCfg = qc.readYamlSourceFile(repo, HausRulesConfig.PATH, HausRulesConfig.class);
-            if (hausRulesCfg == null) {
-                Log.debugf("%s/readHausRulesConfig: no %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
-                repoConfig.remove(repo.getFullName());
-                return;
-            }
-            Log.debugf("%s/readHausRulesConfig: found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
-            repoConfig.put(repo.getFullName(), hausRulesCfg);
-        });
+        ContextService ctx = ctxInstance.get();
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo);
+        HausRulesConfig hausRulesCfg = qc.readYamlSourceFile(repo, HausRulesConfig.PATH, HausRulesConfig.class);
+        if (hausRulesCfg == null) {
+            Log.debugf("%s/readHausRulesConfig: no %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
+            repoConfig.remove(repo.getFullName());
+            return;
+        }
+        Log.debugf("%s/readHausRulesConfig: found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
+        repoConfig.put(repo.getFullName(), hausRulesCfg);
     }
 }
