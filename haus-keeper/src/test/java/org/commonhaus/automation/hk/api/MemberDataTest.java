@@ -439,6 +439,10 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(400);
 
+        // wait for pending queue to drain (persisted data)
+        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+
+        // read captured parameter of persisted file content
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
 
