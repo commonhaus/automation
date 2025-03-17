@@ -119,10 +119,15 @@ jobs:
         gh release upload "${SNAPSHOT}" --clobber ./haus-rules/target/${CB}.jar#${CB}.jar
         gh release upload "${SNAPSHOT}" --clobber ./haus-rules/target/${CB}#${CB}
 
-        CB=cf-admin-bot-${SNAPSHOT}-runner
-        ls -al ./cf-admin-bot/target
-        gh release upload "${SNAPSHOT}" --clobber ./cf-admin-bot/target/${CB}.jar#${CB}.jar
-        gh release upload "${SNAPSHOT}" --clobber ./cf-admin-bot/target/${CB}#${CB}
+        CB=haus-keeper-${SNAPSHOT}-runner
+        ls -al ./haus-keeper/target
+        gh release upload "${SNAPSHOT}" --clobber ./haus-keeper/target/${CB}.jar#${CB}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./haus-keeper/target/${CB}#${CB}
+
+        CB=haus-manager-${SNAPSHOT}-runner
+        ls -al ./haus-manager/target
+        gh release upload "${SNAPSHOT}" --clobber ./haus-manager/target/${CB}.jar#${CB}.jar
+        gh release upload "${SNAPSHOT}" --clobber ./haus-manager/target/${CB}#${CB}
 
         echo "Update tag for $SNAPSHOT"
         git push origin :refs/tags/$SNAPSHOT
@@ -150,7 +155,11 @@ jobs:
         docker tag "${image}" "ghcr.io/${image}"
         docker push "ghcr.io/${image}"
 
-        image="commonhaus/cf-admin-bot:${SNAPSHOT}"
+        image="commonhaus/haus-keeper:${SNAPSHOT}"
+        docker tag "${image}" "ghcr.io/${image}"
+        docker push "ghcr.io/${image}"
+
+        image="commonhaus/haus-manager:${SNAPSHOT}"
         docker tag "${image}" "ghcr.io/${image}"
         docker push "ghcr.io/${image}"
 

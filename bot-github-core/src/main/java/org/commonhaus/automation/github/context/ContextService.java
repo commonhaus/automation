@@ -3,6 +3,9 @@ package org.commonhaus.automation.github.context;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GitHub;
 import org.yaml.snakeyaml.DumperOptions;
@@ -22,7 +25,12 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public interface ContextService {
 
-    ObjectMapper yamlMapper = new Supplier<ObjectMapper>() {
+    /**
+     * A YAML mapper that is configured to be pretty-printed and to use plain scalars.
+     * <p>
+     * Supplier creates the singleton instance when the interface is loaded.
+     */
+    public static ObjectMapper yamlMapper = new Supplier<ObjectMapper>() {
         @Override
         public ObjectMapper get() {
             DumperOptions options = new DumperOptions();
@@ -57,30 +65,50 @@ public interface ContextService {
 
     boolean isDryRun();
 
-    Class<?> getConfigType();
-
-    String getConfigFileName();
-
     boolean isDiscoveryEnabled();
 
     String[] botErrorEmailAddress();
+
+    String[] getErrorAddresses(EmailNotification notifications);
+
+    void resetConnection(long installationId);
 
     GitHub getInstallationClient(long installationId);
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
 
-    default void updateConnections(long installationId, GitHub github, DynamicGraphQLClient graphQLClient) {
-        updateConnection(installationId, github);
-        updateConnection(installationId, graphQLClient);
-    }
+    void updateConnection(long installationId, GitHub github);
 
-    void updateConnection(long installationId, GitHub gh);
+    void updateConnection(long installationId, DynamicGraphQLClient graphQLClient);
 
-    void updateConnection(long installationId, DynamicGraphQLClient gql);
+    ScopedQueryContext getOrgScopedQueryContext(String orgName);
 
+    /**
+     * Log exception and send email
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
     void logAndSendEmail(String logId, String title, Throwable t, String[] addresses);
 
+    default void logAndSendEmail(String logId, String title, Throwable t) {
+        logAndSendEmail(logId, title, t, botErrorEmailAddress());
+    }
+
+    /**
+     * Log exception and send email
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
     void logAndSendEmail(String logId, String title, String body, Throwable t, String[] addresses);
 
-    void sendEmail(String logId, String title, String body, String htmlBody, String[] addresses);
+    default void logAndSendEmail(String logId, String title, String body, Throwable t) {
+        logAndSendEmail(logId, title, body, t, botErrorEmailAddress());
+    }
+
+    /**
+     * Send email.
+     *
+     * @see LogMailer#sendEmail(String, String, String, String[])
+     */
+    void sendEmail(String logId, String title, String body, String[] addresses);
 }

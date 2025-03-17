@@ -37,7 +37,47 @@ public class DataReaction {
             }
             content
             createdAt
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String QUERY_REACTIONS = """
+            query($id: ID!, $after: String) {
+                node(id: $id) {
+                    ... on Reactable {
+                        reactions(first: 100, after: $after) {
+                            nodes {
+                                """ + REACTION_FIELDS + """
+                            }
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String ADD_BOT_REACTION = """
+            mutation AddReaction($subjectId: ID!, $content: ReactionContent!) {
+                addReaction(input: {
+                        subjectId: $subjectId,
+                        content: $content}) {
+                    clientMutationId
+                }
+            }
+            """.stripIndent();
+
+    static final String REMOVE_BOT_REACTION = """
+            mutation RemoveReaction($subjectId: ID!, $content: ReactionContent!) {
+                removeReaction(input: {
+                        subjectId: $subjectId,
+                        content: $content}) {
+                    clientMutationId
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     public final DataActor user;
     public final Date createdAt;
@@ -133,31 +173,14 @@ public class DataReaction {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);
 
-        JsonObject pageInfo;
-        String cursor = null;
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
 
         // paginated...
         do {
-            variables.put("after", cursor);
-            Response response = qc.execRepoQuerySync("""
-                    query($id: ID!, $after: String) {
-                        node(id: $id) {
-                            ... on Reactable {
-                                reactions(first: 100, after: $after) {
-                                    nodes {
-                                        """ + REACTION_FIELDS + """
-                                        }
-                                        pageInfo {
-                                            hasNextPage
-                                            endCursor
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    """, variables);
+            variables.put("after", pageInfo.cursor());
+            Response response = qc.execRepoQuerySync(QUERY_REACTIONS, variables);
             if (qc.hasErrors()) {
-                qc.clearNotFound();
+                qc.checkRemoveNotFound();
                 break;
             }
             JsonObject allReactions = JsonAttribute.reactions.extractObjectFrom(response.getData(),
@@ -169,9 +192,8 @@ public class DataReaction {
                     .map(DataReaction::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(allReactions);
-            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(allReactions);
+        } while (pageInfo.hasNextPage());
         return reactions;
     }
 
@@ -183,16 +205,9 @@ public class DataReaction {
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", subjectId);
         variables.put("content", reaction.name());
-        qc.execQuerySync("""
-                mutation AddReaction($subjectId: ID!, $content: ReactionContent!) {
-                    addReaction(input: {
-                            subjectId: $subjectId,
-                            content: $content}) {
-                        clientMutationId
-                    }
-                }""", variables);
+        qc.execQuerySync(ADD_BOT_REACTION, variables);
 
-        qc.clearNotFound();
+        qc.checkRemoveNotFound();
         if (qc.hasErrors()) {
             Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
             qc.clearErrors();
@@ -215,16 +230,9 @@ public class DataReaction {
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", subjectId);
         variables.put("content", reaction.name());
-        qc.execQuerySync("""
-                mutation RemoveReaction($subjectId: ID!, $content: ReactionContent!) {
-                    removeReaction(input: {
-                            subjectId: $subjectId,
-                            content: $content}) {
-                        clientMutationId
-                    }
-                }""", variables);
+        qc.execQuerySync(REMOVE_BOT_REACTION, variables);
 
-        qc.clearNotFound();
+        qc.checkRemoveNotFound();
         if (qc.hasErrors()) {
             Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
             qc.clearErrors();

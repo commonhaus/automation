@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.annotation.Nonnull;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
@@ -22,20 +23,98 @@ public class DataCommonItem extends DataCommonObject {
             body
             closed
             closedAt
-            """;
+            """.stripIndent();
 
     public static final String PR_FIELDS = ISSUE_FIELDS + """
             reviewDecision
-            """;
+            """.stripIndent();
 
     public static final String ISSUE_FIELDS_MIN = COMMON_OBJECT_MIN + """
             number
             title
-            """;
+            """.stripIndent();
 
     public static final String PR_FIELDS_MIN = ISSUE_FIELDS_MIN + """
             reviewDecision
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String CREATE_ISSUE = """
+            mutation($title: String!, $body: String!, $repositoryId: ID!, $labelIds: [ID!]) {
+                createIssue(input: {
+                    repositoryId: $repositoryId,
+                    title: $title,
+                    body: $body,
+                    labelIds: $labelIds
+                }) {
+                    clientMutationId
+                    issue {
+                        """ + ISSUE_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String EDIT_ISSUE_DESCRIPTION = """
+            mutation($id: ID!, $body: String!) {
+                updateIssue(input: {
+                    id: $id,
+                    body: $body
+                }) {
+                    clientMutationId
+                    issue {
+                        %s
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String EDIT_PR_DESCRIPTION = """
+            mutation($id: ID!, $body: String!) {
+                updatePullRequest(input: {
+                    pullRequestId: $id,
+                    body: $body
+                }) {
+                    clientMutationId
+                    pullRequest {
+                        %s
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String QUERY_ISSUES_WITH_LABEL = """
+            query($query: String!, $after: String) {
+                search(query: $query, type: ISSUE, first: 100, after: $after) {
+                    pageInfo {
+                        endCursor
+                        hasNextPage
+                    }
+                    nodes {
+                        ... on Issue {
+                            """ + ISSUE_FIELDS + """
+                        }
+                        ... on PullRequest {
+                            """ + PR_FIELDS + """
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String QUERY_ITEM_BY_NODE = """
+            query($id: ID!) {
+                node(id: $id) {
+                    ... on Issue {
+                        """ + ISSUE_FIELDS + """
+                    }
+                    ... on PullRequest {
+                        """ + PR_FIELDS + """
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     /** Issue/Discussion/PR number within repository */
     public final Integer number;
@@ -43,6 +122,7 @@ public class DataCommonItem extends DataCommonObject {
 
     // Closable
     public final Date closedAt;
+    public final String state;
     public final boolean closed;
     public final boolean isPullRequest;
 
@@ -52,8 +132,10 @@ public class DataCommonItem extends DataCommonObject {
         this.number = JsonAttribute.number.integerFrom(object);
         this.title = JsonAttribute.title.stringFrom(object);
 
+        this.state = JsonAttribute.state.stringFrom(object);
         this.closedAt = JsonAttribute.closedAt.dateFrom(object);
-        this.closed = JsonAttribute.closed.booleanFromOrFalse(object);
+        this.closed = JsonAttribute.closed.booleanFromOrDefault(object,
+                state != null && state.equalsIgnoreCase("closed"));
 
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
@@ -67,23 +149,9 @@ public class DataCommonItem extends DataCommonObject {
             variables.put("labelIds", labels.stream().map(x -> x.id).toList());
         }
 
-        Response response = qc.execQuerySync("""
-                mutation($title: String!, $body: String!, $repositoryId: ID!, $labelIds: [ID!]) {
-                    createIssue(input: {
-                        repositoryId: $repositoryId,
-                        title: $title,
-                        body: $body,
-                        labelIds: $labelIds
-                    }) {
-                        clientMutationId
-                        issue {
-                            """ + ISSUE_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(CREATE_ISSUE, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.createIssue.jsonObjectFrom(response.getData());
@@ -99,21 +167,10 @@ public class DataCommonItem extends DataCommonObject {
         variables.put("id", nodeId);
         variables.put("body", bodyString);
 
-        Response response = qc.execQuerySync("""
-                mutation($id: ID!, $body: String!) {
-                    updateIssue(input: {
-                        id: $id,
-                        body: $body
-                    }) {
-                        clientMutationId
-                        issue {
-                            """ + issueFields + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(EDIT_ISSUE_DESCRIPTION.formatted(issueFields),
+                variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateIssue.jsonObjectFrom(response.getData());
@@ -129,27 +186,16 @@ public class DataCommonItem extends DataCommonObject {
         variables.put("id", nodeId);
         variables.put("body", bodyString);
 
-        Response response = qc.execQuerySync("""
-                mutation($id: ID!, $body: String!) {
-                    updatePullRequest(input: {
-                        pullRequestId: $id,
-                        body: $body
-                    }) {
-                        clientMutationId
-                        pullRequest {
-                            """ + prFields + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(EDIT_PR_DESCRIPTION.formatted(prFields), variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updatePullRequest.jsonObjectFrom(response.getData());
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
+    @Nonnull
     public static List<DataCommonItem> findIssuesWithLabel(QueryContext qc,
             String labelName) {
         List<DataCommonItem> allIssues = new ArrayList<>();
@@ -158,29 +204,11 @@ public class DataCommonItem extends DataCommonObject {
         variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
                 qc.getRepository().getFullName(), labelName));
 
-        JsonObject pageInfo;
-        String cursor = null;
-        do {
-            variables.put("after", cursor);
-            Response response = qc.execRepoQuerySync("""
-                    query($query: String!, $after: String) {
-                        search(query: $query, type: ISSUE, first: 100, after: $after) {
-                            pageInfo {
-                                endCursor
-                                hasNextPage
-                            }
-                            nodes {
-                                ... on Issue {
-                                    """ + ISSUE_FIELDS + """
-                    }
-                    ... on PullRequest {
-                        """ + PR_FIELDS + """
-                                }
-                            }
-                        }
-                    }
-                        """, variables);
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
 
+        do {
+            variables.put("after", pageInfo.cursor());
+            Response response = qc.execRepoQuerySync(QUERY_ISSUES_WITH_LABEL, variables);
             if (qc.hasErrors()) {
                 break;
             }
@@ -192,9 +220,8 @@ public class DataCommonItem extends DataCommonObject {
                     .map(DataCommonItem::new)
                     .toList());
 
-            pageInfo = JsonAttribute.pageInfo.jsonObjectFrom(search);
-            cursor = JsonAttribute.endCursor.stringFrom(pageInfo);
-        } while (JsonAttribute.hasNextPage.booleanFromOrFalse(pageInfo));
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(search);
+        } while (pageInfo.hasNextPage());
         return allIssues;
     }
 
@@ -202,20 +229,9 @@ public class DataCommonItem extends DataCommonObject {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
 
-        Response response = qc.execQuerySync("""
-                query($id: ID!) {
-                    node(id: $id) {
-                        ... on Issue {
-                            """ + ISSUE_FIELDS + """
-                }
-                ... on PullRequest {
-                    """ + PR_FIELDS + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(QUERY_ITEM_BY_NODE, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         return JsonAttribute.node.commonItemFrom(response.getData());

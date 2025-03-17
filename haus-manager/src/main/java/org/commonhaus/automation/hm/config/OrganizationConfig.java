@@ -3,6 +3,9 @@ package org.commonhaus.automation.hm.config;
 import java.util.List;
 import java.util.Map;
 
+import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.config.RepoSource;
+
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -16,26 +19,53 @@ public class OrganizationConfig {
     protected ProjectList projects;
 
     /**
+     * @return the emailNotifications
+     */
+    public EmailNotification emailNotifications() {
+        return emailNotifications == null
+                ? EmailNotification.UNDEFINED
+                : emailNotifications;
+    }
+
+    /**
+     * @return the sponsors
+     */
+    public Sponsors sponsors() {
+        return sponsors;
+    }
+
+    /**
+     * @return the teamMembership
+     */
+    public GroupMapping teamMembership() {
+        return teamMembership;
+    }
+
+    /**
+     * @return the projects
+     */
+    public ProjectList projects() {
+        return projects;
+    }
+
+    @Override
+    public String toString() {
+        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, projects=%s}"
+                .formatted(emailNotifications, sponsors, teamMembership, projects);
+    }
+
+    /**
      * Automation to verify/synchronize/discover sponsors
      * and other financial supporters of the organization.
      *
-     * @param githubSponsorable List of GitHub sponsorables to query
-     * @param openCollective List of Open Collective collectives to query
+     * @param sources List of sources to check for sponsors
      * @param targetRepository Repository to update with sponsors (as outside contributors)
-     * @param atStartup If true, search for sponsors at startup
      * @param dryRun If true, do not update the repository
      */
     public record Sponsors(
-            String[] githubSponsorable,
-            String[] openCollective,
+            List<RepoSource> sources,
             String targetRepository,
-            Boolean atStartup,
             Boolean dryRun) {
-
-        @Override
-        public Boolean atStartup() {
-            return atStartup != null && atStartup;
-        }
 
         @Override
         public Boolean dryRun() {
@@ -44,8 +74,8 @@ public class OrganizationConfig {
 
         @Override
         public String toString() {
-            return "SponsorsConfig{dryRun=%s, targetRepository='%s', githubSponsorable='%s', openCollective=%s}"
-                    .formatted(dryRun(), targetRepository, githubSponsorable, openCollective);
+            return "SponsorsConfig{dryRun=%s, targetRepository='%s', sources=%s}"
+                    .formatted(dryRun(), targetRepository, sources);
         }
     }
 
@@ -53,23 +83,19 @@ public class OrganizationConfig {
      * File to read as source of groups and their members.
      * The file should contain a list of groups, each with a list of members.
      *
-     * @param sourceFile Path to the source file (usually CONTACTS.yaml)
-     * @param repository Repository that contains the source file
-     * @param defaults Default values for group configuration
+     * @param source Path to the source file (usually CONTACTS.yaml)
+     * @param defaults Common fallback values for team configuration
      * @param sync Mapping of groups to teams and their members
      * @param dryRun If true, do not update team or organization membership
      */
     public record GroupMapping(
-            String sourceFile,
-            String repository,
+            RepoSource source,
             OrgDefaults defaults,
             Map<String, SyncToTeams> sync,
             Boolean dryRun) {
 
         public boolean performSync() {
-            return sync() != null
-                    && sourceFile() != null
-                    && repository() != null;
+            return sync() != null && source() != null && !source().isEmpty();
         }
 
         @Override
@@ -79,8 +105,8 @@ public class OrganizationConfig {
 
         @Override
         public String toString() {
-            return "GroupMapping{dryRun=%s, path='%s', repo='%s', defaults=%s, sync=%s}"
-                    .formatted(dryRun(), sourceFile, repository, defaults, sync);
+            return "GroupMapping{dryRun=%s, source='%s', defaults=%s, sync=%s}"
+                    .formatted(dryRun(), source(), defaults, sync);
         }
     }
 
@@ -181,10 +207,12 @@ public class OrganizationConfig {
 
     /**
      * List of projects to be verified by automation.
+     *
+     * @param source Repository and path of the source file (usually PROJECTS.yaml)
+     * @param statusField Field in the source file that contains the status (default: 'status')
      */
     public record ProjectList(
-            String sourceFile,
-            String repository,
+            RepoSource source,
             String statusField) {
         @Override
         public String statusField() {
@@ -193,8 +221,7 @@ public class OrganizationConfig {
 
         @Override
         public String toString() {
-            return "ProjectList{sourceFile='%s', repository=%s}"
-                    .formatted(sourceFile, repository);
+            return "ProjectList{source='%s'}".formatted(source);
         }
     }
 }

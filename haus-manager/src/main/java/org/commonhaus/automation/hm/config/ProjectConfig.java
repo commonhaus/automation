@@ -1,6 +1,13 @@
 package org.commonhaus.automation.hm.config;
 
 import java.util.List;
+import java.util.Set;
+
+import jakarta.annotation.Nonnull;
+
+import org.commonhaus.automation.config.EmailNotification;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Configuration file for the Haus Manager.
@@ -14,15 +21,18 @@ public class ProjectConfig {
     protected Boolean dryRun;
 
     protected String gitHubResources;
-    protected TeamMapping[] teamSync;
+    protected TeamAccess teamAccess;
     protected EmailNotification emailNotifications;
+
+    @JsonIgnore
+    private Set<String> allResources;
 
     /**
      * Return list of teams that should have membership
      * syncnronized from a source team.
      */
-    public List<TeamMapping> teamSync() {
-        return teamSync != null ? List.of(teamSync) : List.of();
+    public TeamAccess teamAccess() {
+        return teamAccess;
     }
 
     /** If present and true, do not modify any resources */
@@ -35,26 +45,31 @@ public class ProjectConfig {
         return enabled == null || enabled;
     }
 
+    /** Email notifications configuration */
+    @Nonnull
+    public EmailNotification emailNotifications() {
+        return emailNotifications == null
+                ? EmailNotification.UNDEFINED
+                : emailNotifications;
+    }
+
     @Override
     public String toString() {
-        return "ProjectConfigFile{dryRun=%s, enabled='%s', emailNotifications='%s', teamSync=%s}"
-                .formatted(dryRun(), enabled(), emailNotifications, teamSync);
+        return "ProjectConfigFile{dryRun=%s, enabled='%s', %s, %s}"
+                .formatted(dryRun(), enabled(), emailNotifications(), teamAccess());
     }
 
     /**
-     * This is a mapping of source teams to target teams and repositories.
+     * Define the source team (from another repository) that should be
+     * synchronized with outside collaborators of the repo
+     * containing this configuration file.
      *
      * @param source Source team to synchronize from (organization/teamName)
      * @param ignoreUsers List of users to ignore when syncing
-     * @param teams List of target teams to sync membership to (organization/teamName)
-     * @param repositories List of repositories; All members from the source team will be added
-     *        as outside collaborators to these repositories
      */
-    public record TeamMapping(
+    public record TeamAccess(
             String source,
-            List<String> ignoreUsers,
-            List<String> teams,
-            List<String> repositories) {
+            List<String> ignoreUsers) {
 
         @Override
         public List<String> ignoreUsers() {
@@ -62,19 +77,9 @@ public class ProjectConfig {
         }
 
         @Override
-        public List<String> teams() {
-            return teams != null ? teams : List.of();
-        }
-
-        @Override
-        public List<String> repositories() {
-            return repositories != null ? repositories : List.of();
-        }
-
-        @Override
         public String toString() {
-            return "TeamSyncConfig{source=%s, ignoreUsers='%s', teams='%s', repositories=%s}"
-                    .formatted(source, ignoreUsers(), teams, repositories);
+            return "TeamAccess{source=%s, ignoreUsers='%s'}"
+                    .formatted(source, ignoreUsers());
         }
     }
 }

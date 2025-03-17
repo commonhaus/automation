@@ -13,7 +13,39 @@ public class DataIssueComment extends DataCommonComment {
             issue {
                 id
             }
-            """;
+            """.stripIndent();
+
+    // @formatter:off
+    static final String ADD_ISSUE_COMMENT = """
+            mutation AddComment($subjectId: ID!, $body: String!) {
+                addComment(input: {
+                    subjectId: $subjectId,
+                    body: $body
+                }) {
+                    clientMutationId
+                    commentEdge {
+                        node {
+                            """ + ISSUE_COMMENT + """
+                        }
+                    }
+                }
+            }
+            """.stripIndent();
+
+    static final String EDIT_ISSUE_COMMENT = """
+            mutation($commentId: ID!, $body: String!) {
+                updateIssueComment(input: {
+                    id: $commentId,
+                    body: $body
+                }) {
+                    clientMutationId
+                    issueComment {
+                        """ + ISSUE_COMMENT + """
+                    }
+                }
+            }
+            """.stripIndent();
+    // @formatter:on
 
     // Issue or pull request (minimal fields)
     public final DataCommonItem issue;
@@ -30,23 +62,9 @@ public class DataIssueComment extends DataCommonComment {
         variables.put("subjectId", itemId);
         variables.put("body", commentBody);
 
-        Response response = qc.execQuerySync("""
-                mutation AddComment($subjectId: ID!, $body: String!) {
-                    addComment(input: {
-                        subjectId: $subjectId,
-                        body: $body
-                    }) {
-                        clientMutationId
-                        commentEdge {
-                            node {
-                                """ + ISSUE_COMMENT + """
-                            }
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(ADD_ISSUE_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateDiscussionComment.jsonObjectFrom(response.getData());
@@ -61,21 +79,9 @@ public class DataIssueComment extends DataCommonComment {
         variables.put("commentId", commentId);
         variables.put("body", commentBody);
 
-        Response response = qc.execQuerySync("""
-                mutation($commentId: ID!, $body: String!) {
-                    updateIssueComment(input: {
-                        id: $commentId,
-                        body: $body
-                    }) {
-                        clientMutationId
-                        issueComment {
-                            """ + ISSUE_COMMENT + """
-                        }
-                    }
-                }
-                """, variables);
+        Response response = qc.execQuerySync(EDIT_ISSUE_COMMENT, variables);
         if (qc.hasErrors() || response == null) {
-            qc.clearNotFound();
+            qc.checkRemoveNotFound();
             return null;
         }
         JsonObject result = JsonAttribute.updateIssueComment.jsonObjectFrom(response.getData());

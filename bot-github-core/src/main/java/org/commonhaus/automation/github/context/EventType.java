@@ -16,10 +16,12 @@ public enum EventType {
     issues,
     issue_comment,
     label,
+    member,
     membership,
     pull_request,
     pull_request_review,
-    bot;
+    bot,
+    unknown;
 
     public boolean isDiscussion() {
         return this == discussion || this == discussion_comment;
@@ -29,8 +31,16 @@ public enum EventType {
         return this == pull_request || this == pull_request_review;
     }
 
-    public static EventType fromString(String action) {
-        return EventType.valueOf(action.toLowerCase());
+    public static EventType fromString(String event) {
+        if (event != null) {
+            for (var x : EventType.values()) {
+                if (x.name().equalsIgnoreCase(event)) {
+                    return x;
+                }
+            }
+        }
+        Log.warnf("Unknown event type: %s", event);
+        return unknown;
     }
 
     public EventPayload getDataFrom(ActionType action, JsonObject jsonData) {

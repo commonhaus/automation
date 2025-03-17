@@ -1,0 +1,26 @@
+projects:
+  source:
+    filePath: PROJECTS.yaml
+teamMembership:
+  dryRun: true
+  source:
+    repository: public-org/source
+    filePath: CONTACTS.yaml
+  defaults:
+    field: login
+    preserve_users:
+      - test-bot
+  sync:
+    cf-council:
+      teams:
+        - test-org/cf-council
+        - test-org/admin
+    egc:
+      teams:
+        - test-org/team-quorum
+
+emailNotifications:
+  errors:
+    - test@test.org
+  dryRun:
+    - test@test.org

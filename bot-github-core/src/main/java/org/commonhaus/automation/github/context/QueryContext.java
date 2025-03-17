@@ -1,12 +1,11 @@
 package org.commonhaus.automation.github.context;
 
 import static org.commonhaus.automation.github.context.BaseQueryCache.BOT_LOGIN;
-import static org.commonhaus.automation.github.context.BaseQueryCache.COLLABORATORS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
-import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -16,15 +15,15 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Nonnull;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.config.EmailNotification;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHFileNotFoundException;
-import org.kohsuke.github.GHIOException;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
@@ -37,7 +36,32 @@ import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
+/**
+ * Base class for short-lived context objects that can handle a series of GitHub
+ * API calls and GraphQL queries for a single event.
+ * <p>
+ * It provides context for the duration of processing one event and aggregates
+ * errors that occur during this processing for centralized handling.
+ * <p>
+ * This context is created by a {@link ContextService} implementation and should not
+ * be retained beyond the scope of a single event processing.
+ * <p>
+ * Error handling in QueryContext is designed to collect errors during processing
+ * to allow continuation where possible, with final error handling and/or reporting
+ * performed by the caller.
+ * <p>
+ * This class is not thread-safe and should not be shared between threads.
+ * It can be garbage collected after the event processing is complete.
+ */
 public class QueryContext {
+    static final String QUERY_BOT_LOGIN = """
+            query {
+                viewer {
+                login
+                }
+            }
+            """.stripIndent();
+
     @FunctionalInterface
     public interface GitHubParameterApiCall<R> {
         R apply(GitHub gh, boolean isDryRun) throws IOException;
@@ -60,6 +84,13 @@ public class QueryContext {
     public QueryContext(QueryContext other) {
         this.ctx = other.ctx;
         this.installationId = other.installationId;
+    }
+
+    /** Optional: clean up resources used by this obect ahead of GC */
+    public void done() {
+        clearErrors();
+        github = null;
+        graphQLClient = null;
     }
 
     public String getLogId() {
@@ -90,11 +121,23 @@ public class QueryContext {
         throw new UnsupportedOperationException("Unimplemented method 'getJsonData'");
     }
 
+    /**
+     * @return true if the context is in dry run mode
+     */
     public boolean isDryRun() {
         return ctx.isDryRun();
     }
 
-    public QueryContext addExisting(GitHub github) {
+    /**
+     * Use an existing GitHub client instance.
+     * <p>
+     * Useful when creating a new context from an existing one
+     * (to isolate errors or exceptions, for example).
+     *
+     * @param github Existing GitHub instance
+     * @return this context
+     */
+    public QueryContext withExisting(GitHub github) {
         this.github = github;
         return this;
     }
@@ -110,7 +153,16 @@ public class QueryContext {
         return github;
     }
 
-    public QueryContext addExisting(DynamicGraphQLClient graphQLClient) {
+    /**
+     * Use an existing GraphQL client instance.
+     * <p>
+     * Useful when creating a new context from an existing one
+     * (to isolate errors or exceptions, for example).
+     *
+     * @param graphQLClient Existing DynamicGraphQLClient instance
+     * @return this context
+     */
+    public QueryContext withExisting(DynamicGraphQLClient graphQLClient) {
         this.graphQLClient = graphQLClient;
         return this;
     }
@@ -126,79 +178,169 @@ public class QueryContext {
         return graphQLClient;
     }
 
+    /**
+     * The installationId is the unique identifier for the GitHub App installation
+     * associated with this context. It is almost always set.
+     * <p>
+     * It is not set for Sponsorship events (REST API only).
+     *
+     * @return the installationId associated with this context
+     */
     public long getInstallationId() {
         return installationId;
     }
 
-    public void addException(Exception e) {
-        exceptions.add(e);
+    /**
+     * Add an exception to the context. This could be a GraphQL error
+     * or a GitHub API exception.
+     *
+     * @param e Exception
+     */
+    public void addException(Throwable t) {
+        exceptions.add(t);
     }
 
+    /**
+     * @return true if there are errors or exceptions
+     */
     public boolean hasErrors() {
         return !errors.isEmpty() || !exceptions.isEmpty();
     }
 
+    /**
+     * Clear errors and exceptions
+     */
     public void clearErrors() {
         errors.clear();
         exceptions.clear();
     }
 
-    public Throwable bundleExceptions() {
-        if (exceptions.size() == 1) {
-            return exceptions.get(0);
-        }
+    /**
+     * @return PackagedException if there are multiple exceptions or errors; or null
+     */
+    public PackagedException bundleExceptions() {
         return hasErrors()
                 ? new PackagedException(exceptions, errors)
                 : null;
     }
 
+    /**
+     * Check the GraphQLError for a specific type
+     *
+     * @param e GraphQL error
+     * @param testType GraphQL error type to test for
+     * @return true if the error has the specified type
+     */
+    private boolean hasFieldError(GraphQLError e, String testType) {
+        var others = e.getOtherFields();
+        var type = others == null ? null : others.get("type");
+        return testType.equals(type);
+    }
+
+    /**
+     * @return true if a not found exception occurred
+     */
     public boolean hasNotFound() {
         return exceptions.stream().anyMatch(e -> e instanceof GHFileNotFoundException)
                 || errors.stream().anyMatch(e -> hasFieldError(e, "NOT_FOUND"));
     }
 
-    private boolean hasFieldError(GraphQLError e, String message) {
-        var others = e.getOtherFields();
-        var type = others == null ? null : others.get("type");
-        return message.equals(type);
+    /**
+     * If there are any not found exceptions, clear them and return true
+     *
+     * @return true if there were any not found exceptions
+     */
+    public boolean checkRemoveNotFound() {
+        int size = exceptions.size() + errors.size();
+        exceptions.removeIf(e -> e instanceof GHFileNotFoundException);
+        errors.removeIf(e -> hasFieldError(e, "NOT_FOUND"));
+        // did we remove anything?
+        return (exceptions.size() + errors.size()) != size;
     }
 
-    public boolean clearNotFound() {
-        if (hasNotFound()) {
-            clearErrors();
-            return true;
-        }
-        return false;
-    }
-
+    /**
+     * @return true if a conflict occurred
+     */
     public boolean hasConflict() {
         return getConflict() != null;
     }
 
+    /**
+     * @return the Exception if a conflict occurred (409 response code or message contains 409)
+     */
     public HttpException getConflict() {
         return exceptions.stream()
-                .filter(e -> e instanceof HttpException)
-                .map(e -> (HttpException) e)
-                .filter(e -> e.getResponseCode() == 409 || e.getMessage().contains("409"))
+                .filter(e -> e instanceof HttpException && ((HttpException) e).getResponseCode() == 409)
                 .findFirst()
                 .map(e -> (HttpException) e).orElse(null);
     }
 
-    public boolean clearConflict() {
-        if (hasConflict()) {
-            clearErrors();
-            return true;
-        }
-        return false;
+    /**
+     * If there is a conflict exception, clear it and return true
+     *
+     * @return true if there was a conflict exception
+     */
+    public boolean checkRemoveConflict() {
+        int size = exceptions.size();
+        exceptions.removeIf(e -> e instanceof HttpException && ((HttpException) e).getResponseCode() == 409);
+        return exceptions.size() != size;
     }
 
     /**
-     * Invoke passed argument with GitHub instance.
-     * Exceptions will be captured in the query context.
+     * Check if the error is a network error that can be retried
+     *
+     * @return true if there is a network error that can be retried
+     */
+    public boolean hasRetriableNetworkError() {
+        // Unauthorized can be retried after connection is refreshed.
+        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
+                HttpURLConnection.HTTP_PROXY_AUTH,
+                HttpURLConnection.HTTP_BAD_GATEWAY,
+                HttpURLConnection.HTTP_CLIENT_TIMEOUT,
+                HttpURLConnection.HTTP_GATEWAY_TIMEOUT).contains(getResponseCode(e)));
+    }
+
+    public boolean hasAuthorizationError() {
+        // Unauthorized can be retried after connection is refreshed.
+        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
+                HttpURLConnection.HTTP_PROXY_AUTH).contains(getResponseCode(e)));
+    }
+
+    private int getResponseCode(Throwable e) {
+        if (e instanceof HttpException) {
+            return ((HttpException) e).getResponseCode();
+        }
+        return -1;
+    }
+
+    /**
+     * Invoke the specified function within a try/finally using the GitHub instance
+     * held in this context.
+     * <p>
+     * The dryRun parameter is passed to the function.
+     * <p>
+     * Operations will not be attempted if there are errors present in the context
+     * (connection issues, for example).
+     * <p>
+     * Some exceptions, specifically those related to connections with GitHub
+     * will result in an email being sent to the configured error addresses.
+     * <p>
+     * Recoverable exceptions (like file not found errors) are captured and can be
+     * checked for with {@link #hasNotFound()} or cleared with {@link #checkRemoveNotFound()}.
+     * <p>
+     * Errors and exceptions are captured for the caller in the queryContext,
+     * and can be checked with {@link #hasErrors()},
+     * bundled for final error handling with {@link #bundleExceptions()}
+     * or cleared with {@link #clearErrors()}.
      *
      * @param <R> return type
      * @param ghApiCall Function to be invoked with GitHub instance
      * @return result of ghApiCall or null of there were errors
+     * @see #hasNotFound()
+     * @see #checkRemoveNotFound()
+     * @see #hasErrors()
+     * @see #bundleExceptions()
+     * @see #clearErrors()
      */
     public <R> R execGitHubSync(GitHubParameterApiCall<R> ghApiCall) {
         if (hasErrors()) {
@@ -208,18 +350,27 @@ public class QueryContext {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHFileNotFoundException e) {
             addException(e);
-        } catch (GHIOException e) {
-            logAndSendEmail(getLogId(), "Error making GH Request", e);
+        } catch (Throwable e) {
             addException(e);
-        } catch (IOException | RuntimeException e) {
-            logAndSendEmail(getLogId(), "Error making GH Request", e);
-            addException(e);
+        }
+        if (hasAuthorizationError()) {
+            ctx.resetConnection(installationId);
         }
         return null;
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with parameters.
+     * Overall behavior is similar to {@link #execGitHubSync(GitHubParameterApiCall)}
+     * <p>
+     * If a mutation is detected and the bot is in dryRun mode, the query will be logged
+     * but not executed. It will return null, as it can not otherwise determine the correct
+     * response type.
+     * <p>
+     * Errors executing GraphQL queries will be stored as errors in the context
+     * to be inspected by the caller. An email will also be sent to the configured error
+     * addresses, as this can indicate a connection issue or other problem with the
+     * GraphQL endpoint.
      *
      * @param query GraphQL query.
      * @return GraphQL Response
@@ -241,19 +392,18 @@ public class QueryContext {
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
             if (response != null && response.hasError()) {
-                logAndSendEmail("Error executing GraphQL query", response.getErrors().toString(),
-                        null);
                 errors.addAll(response.getErrors());
             }
         } catch (Throwable e) {
-            logAndSendEmail("Error executing GraphQL query", e);
-            exceptions.add(e);
+            addException(e);
         }
         return response;
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with standard repository parameters.
+     * <p>
+     * Overall behavior is similar to {@link #execQuerySync(String, Map)}
      *
      * @param query GraphQL query. Values for repository owner and name
      *        ({@code $name: String!, $owner: String!})
@@ -266,7 +416,9 @@ public class QueryContext {
     }
 
     /**
-     * Exceptions and errors are captured for caller in the queryContext
+     * Run a synchronous GraphQL query with standard repository and other parameters.
+     * <p>
+     * Overall behavior is similar to {@link #execQuerySync(String, Map)}
      *
      * @param query GraphQL query. Values for repository owner and name
      *        ({@code $name: String!, $owner: String!})
@@ -282,24 +434,52 @@ public class QueryContext {
         return execQuerySync(query, variables);
     }
 
+    /**
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     * <p>
+     * Note: GitHub caches user lookups
+     *
+     * @param orgName
+     * @return
+     */
     public GHUser getUser(String login) {
         return execGitHubSync((gh, dryRun) -> {
             GHUser user = gh.getUser(login);
-            clearNotFound();
+            checkRemoveNotFound();
             return user;
         });
     }
 
+    /**
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     *
+     * @param orgName
+     * @return
+     */
     public GHRepository getRepository(String repoName) {
         return execGitHubSync((gh, dryRun) -> {
             GHRepository repo = gh.getRepository(repoName);
-            clearNotFound();
+            checkRemoveNotFound();
             return repo;
         });
     }
 
     /**
-     * GitHub caches org lookups
+     * Get the GitHub organization for the repository owner.
+     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * which will capture errors and exceptions.
+     * <p>
+     * "Not found" is a normal status. That error will be cleared.
+     * <p>
+     * Note: GitHub caches org lookups
      *
      * @param orgName
      * @return
@@ -307,20 +487,14 @@ public class QueryContext {
     public GHOrganization getOrganization(String orgName) {
         return execGitHubSync((gh, dryRun) -> {
             GHOrganization org = gh.getOrganization(orgName);
-            clearNotFound();
+            checkRemoveNotFound();
             return org;
         });
     }
 
     public boolean isBot(String login) {
         String botLogin = BOT_LOGIN.computeIfAbsent("" + getInstallationId(), k -> {
-            Response response = execQuerySync("""
-                        query {
-                            viewer {
-                            login
-                            }
-                        }
-                    """, new HashMap<>());
+            Response response = execQuerySync(QUERY_BOT_LOGIN, new HashMap<>());
             if (hasErrors() || response == null) {
                 return "unknown";
             }
@@ -328,25 +502,6 @@ public class QueryContext {
             return JsonAttribute.login.stringFrom(viewer);
         });
         return botLogin.equals(login) || botLogin.replace("[bot]", "").equals(login);
-    }
-
-    public boolean isLoginIncluded(String login, List<String> groups) {
-        if (groups == null) {
-            return true;
-        } else if (groups.isEmpty()) {
-            return false;
-        }
-        for (var g : groups) {
-            if (g.startsWith("@")) {
-                TeamList team = getTeamList(g.substring(1));
-                if (team.isEmpty()) {
-                    return false;
-                }
-                return team.members.stream().anyMatch(m -> m.login.equals(login));
-            }
-            return g.equals(login);
-        }
-        return false;
     }
 
     /** Item-scoped comment lookup; doesn't always apply */
@@ -382,7 +537,7 @@ public class QueryContext {
         DataCommonComment comment = null;
         if (botComment == null) {
             String commentId = BotComment.getCommentId(botCommentPattern, itemBody);
-            comment = DataCommonComment.findBotComment(this, itemId, commentId);
+            comment = DataCommonComment.findComment(this, itemId, commentId);
             if (comment == null) {
                 List<DataCommonComment> botComments = getComments(itemId, (c) -> isBot(c.author.login));
                 if (botComments != null && !botComments.isEmpty()) {
@@ -402,16 +557,16 @@ public class QueryContext {
             } else {
                 // new comment
                 comment = switch (itemType) {
-                    case discussion ->
-                        DataDiscussionComment.addComment(this, itemId, commentBody);
-                    case issue, pull_request ->
-                        DataIssueComment.addIssueComment(this, itemId, commentBody);
+                    case discussion -> DataDiscussionComment.addComment(this, itemId, commentBody);
+                    case issue, pull_request -> DataIssueComment.addIssueComment(this, itemId, commentBody);
                     default -> {
-                        logAndSendEmail(getLogId(), "addBotComment: Unknown event type " + itemType, null);
+                        logAndSendEmail("addBotComment: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
-                botComment = comment == null ? null : new BotComment(itemId, comment);
+                botComment = comment == null
+                        ? null
+                        : new BotComment(itemId, comment).setBody(commentBody); // keep original body for test
             }
         } else if (botComment.requiresUpdate(commentBody)) {
             if (isDryRun()) {
@@ -420,12 +575,10 @@ public class QueryContext {
                 botComment.setBody(commentBody);
             } else {
                 comment = switch (itemType) {
-                    case discussion ->
-                        DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
-                    case issue, pull_request ->
-                        DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
+                    case discussion -> DataDiscussionComment.editComment(this, botComment.getCommentId(), commentBody);
+                    case issue, pull_request -> DataIssueComment.editIssueComment(this, botComment.getCommentId(), commentBody);
                     default -> {
-                        logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + itemType, null);
+                        logAndSendEmail("updateItemDescription: Unknown event type " + itemType, null);
                         yield null;
                     }
                 };
@@ -439,24 +592,16 @@ public class QueryContext {
         return botComment;
     }
 
-    protected BotComment createBotComment(String nodeId, DataCommonComment comment) {
-        BotComment botComment = new BotComment(nodeId, comment);
-        RECENT_BOT_CONTENT.put(nodeId, botComment);
-        return botComment;
-    }
-
     public DataCommonItem getItem(EventType eventType, String nodeId) {
         if (hasErrors()) {
             Log.debugf("[%s] getItem skipping due to errors", getLogId());
             return null;
         }
         return switch (eventType) {
-            case discussion ->
-                DataDiscussion.queryDiscussion(this, nodeId);
-            case issue, pull_request ->
-                DataCommonItem.queryItem(this, nodeId);
+            case discussion -> DataDiscussion.queryDiscussion(this, nodeId);
+            case issue, pull_request -> DataCommonItem.queryItem(this, nodeId);
             default -> {
-                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                logAndSendEmail("getItem: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -468,10 +613,9 @@ public class QueryContext {
             return null;
         }
         return switch (eventType) {
-            case issue ->
-                DataCommonItem.createIssue(this, title, description, labels);
+            case issue -> DataCommonItem.createIssue(this, title, description, labels);
             default -> {
-                logAndSendEmail(getLogId(), "getItem: Unknown event type " + eventType, null);
+                logAndSendEmail("getItem: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -492,14 +636,12 @@ public class QueryContext {
         }
 
         return switch (eventType) {
-            case discussion, discussion_comment ->
-                DataDiscussion.editDiscussion(this, nodeId, bodyString, fields);
-            case issue, issue_comment ->
-                DataCommonItem.editIssueDescription(this, nodeId, bodyString, fields);
-            case pull_request, pull_request_review ->
-                DataCommonItem.editPullRequestDescription(this, nodeId, bodyString, fields);
+            case discussion, discussion_comment -> DataDiscussion.editDiscussion(this, nodeId, bodyString, fields);
+            case issue, issue_comment -> DataCommonItem.editIssueDescription(this, nodeId, bodyString, fields);
+            case pull_request, pull_request_review -> DataCommonItem.editPullRequestDescription(this, nodeId, bodyString,
+                    fields);
             default -> {
-                logAndSendEmail(getLogId(), "updateItemDescription: Unknown event type " + eventType, null);
+                logAndSendEmail("updateItemDescription: Unknown event type " + eventType, null);
                 yield null;
             }
         };
@@ -515,10 +657,18 @@ public class QueryContext {
             return null;
         });
         if (hasErrors()) {
-            clearNotFound();
+            checkRemoveNotFound();
             return false;
         }
         return true;
+    }
+
+    public List<DataDiscussion> findDiscussionsWithLabel(String label) {
+        return DataDiscussion.findDiscussionsWithLabel(this, label);
+    }
+
+    public List<DataCommonItem> findIssuesWithLabel(String label) {
+        return DataCommonItem.findIssuesWithLabel(this, label);
     }
 
     public List<DataPullRequestReview> queryReviews(String nodeId) {
@@ -571,7 +721,7 @@ public class QueryContext {
     public Collection<DataLabel> findLabels(List<String> labels) {
         Collection<DataLabel> repoLabels = getLabels(getRepositoryId());
         if (repoLabels == null) {
-            Log.errorf("[%s] Labels not found in repository %s", getLogId(), getRepositoryId());
+            logAndSendEmail("[%s] Labels not found in repository %s".formatted(getLogId(), getRepositoryId()), null);
             return List.of();
         }
 
@@ -584,7 +734,7 @@ public class QueryContext {
                     .findFirst().orElse(null);
 
             if (label == null) {
-                Log.errorf("[%s] Label '%s' not found in repository", getLogId(), labelName);
+                logAndSendEmail("[%s] Label '%s' not found in repository".formatted(getLogId(), labelName), null);
             } else {
                 newLabels.add(label);
             }
@@ -643,7 +793,7 @@ public class QueryContext {
             if (action == ActionType.created || action == ActionType.labeled || action == ActionType.edited) {
                 labels.add(label);
             }
-            return labels;
+            return labels.isEmpty() ? null : labels;
         });
     }
 
@@ -661,140 +811,12 @@ public class QueryContext {
         return DataLabel.createLabel(this, this.getRepositoryId(), labelName, color);
     }
 
-    /**
-     * This is an indirect lookup: list of teams is fetched first,
-     * then the team is found by name.
-     *
-     * @param org GHOrganization
-     * @param relativeName name relative to organization
-     * @return GHTeam or null if not found
-     */
-    public GHTeam getTeam(GHOrganization org, String relativeName) {
-        String fullName = toFullName(org.getLogin(), relativeName);
-        GHTeam team = TEAM_MEMBERS.get("ghTeam-" + fullName);
-        if (team == null) {
-            team = execGitHubSync((gh, dryRun) -> {
-                GHTeam result = org.getTeamByName(relativeName);
-                clearNotFound();
-                return result;
-            });
-            if (team != null) {
-                TEAM_MEMBERS.put("ghTeam-" + fullName, team);
-            }
-        }
-        return team;
-    }
-
-    public boolean isTeamMember(GHUser user, String teamFullName) {
-        Set<GHUser> members = teamMembers(teamFullName);
-        Log.debugf("%s members: %s", teamFullName, members == null ? "[]" : members.stream().map(GHUser::getLogin).toList());
-        return members != null && members.contains(user);
-    }
-
-    public TeamList getTeamList(String teamFullName) {
-        Set<GHUser> members = teamMembers(teamFullName);
-        TeamList teamList = new TeamList(teamFullName, members);
-        Log.debugf("[%s] %s members: %s", getLogId(), teamList.name, teamList.members);
-        return teamList;
-    }
-
-    public void updateTeamList(String teamFullName, Set<GHUser> members) {
-        TEAM_MEMBERS.put(teamFullName, members);
-    }
-
-    public void updateTeamList(GHOrganization org, GHTeam ghTeam) {
-        // Normalize team name to include org name
-        String relativeName = ghTeam.getName().replace(org.getLogin() + "/", "");
-        String teamFullName = org.getLogin() + "/" + relativeName;
-        TEAM_MEMBERS.invalidate("ghTeam-" + teamFullName);
-        TEAM_MEMBERS.invalidate(teamFullName);
-    }
-
-    public Set<GHUser> teamMembers(String teamFullName) {
-        String orgName = toOrganizationName(teamFullName);
-        String relativeName = toRelativeName(orgName, teamFullName);
-
-        GHOrganization org = getOrganization(orgName);
-        Set<GHUser> members = TEAM_MEMBERS.get(teamFullName);
-        if (members == null) {
-            members = execGitHubSync((gh, dryRun) -> {
-                GHTeam ghTeam = org.getTeamByName(relativeName);
-                return ghTeam == null ? null : ghTeam.getMembers();
-            });
-            if (hasErrors() || members == null) {
-                clearNotFound();
-                return null;
-            }
-            TEAM_MEMBERS.put(teamFullName, members);
-        }
-        return members;
-    }
-
-    public void addTeamMember(GHUser user, String teamFullName) {
-        if (isDryRun()) {
-            Log.debugf("[%s] addTeamMember would add %s to %s", getLogId(), user.getLogin(), teamFullName);
-            return;
-        }
-        // this will trigger membership change events, which will come back around to update the cache.
-        TEAM_MEMBERS.invalidate(teamFullName);
-
-        String orgName = toOrganizationName(teamFullName);
-        String relativeName = toRelativeName(orgName, teamFullName);
-        GHOrganization org = getOrganization(orgName);
-        execGitHubSync((gh, dryRun) -> {
-            GHTeam ghTeam = org.getTeamByName(relativeName);
-            ghTeam.add(user);
-            return null;
-        });
-        if (hasErrors()) {
-            clearNotFound();
-        }
-    }
-
-    public Set<String> collaborators(String repoFullName) {
-        Set<String> collaborators = COLLABORATORS.get(repoFullName);
-        if (collaborators == null) {
-            collaborators = execGitHubSync((gh, dryRun) -> {
-                GHRepository repo = gh.getRepository(repoFullName);
-                return repo == null
-                        ? null
-                        : repo.getCollaboratorNames();
-            });
-            if (hasErrors() || collaborators == null) {
-                clearNotFound();
-                return null;
-            }
-            Log.debugf("%s members: %s", repoFullName, collaborators);
-            COLLABORATORS.put(repoFullName, collaborators);
-        }
-        return collaborators;
-    }
-
-    public void addCollaborators(GHRepository repo, List<GHUser> user) {
-        if (isDryRun()) {
-            Log.debugf("[%s] addCollaborators would add %s to %s",
-                    getLogId(),
-                    user.stream().map(GHUser::getLogin).toList(),
-                    repo.getFullName());
-            return;
-        }
-        execGitHubSync((gh, dryRun) -> {
-            repo.addCollaborators(user,
-                    GHOrganization.RepositoryRole.from(GHOrganization.Permission.PULL));
-            return null;
-        });
-    }
-
-    public boolean isCollaborator(GHUser user, String repoName) {
-        Set<String> collaborators = collaborators(repoName);
-        return collaborators != null && collaborators.contains(user.getLogin());
-    }
-
     public JsonNode readYamlSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            clearNotFound();
-            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            if (checkRemoveNotFound()) {
+                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            }
             return null;
         }
 
@@ -802,9 +824,7 @@ public class QueryContext {
             JsonNode node = ctx.parseYamlFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
-            logAndSendEmail("readYamlSourceFile",
-                    "Unable to read file %s from repo %s".formatted(path, repo.getFullName()),
-                    e);
+            addException(e);
             return null;
         }
     }
@@ -812,42 +832,112 @@ public class QueryContext {
     public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            clearNotFound();
-            Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            if (checkRemoveNotFound()) {
+                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            }
             return null;
         }
         try {
             return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
-            logAndSendEmail("readYamlSourceFile",
-                    "Unable to read file %s from repo %s as %s".formatted(path, repo.getFullName(), type.getName()),
-                    e);
+            addException(e);
             return null;
         }
     }
 
-    JsonNode parseYamlFile(GHContent content) throws IOException {
-        return ctx.parseYamlFile(content);
+    JsonNode readYamlContent(GHContent content) {
+        try {
+            return ctx.parseYamlFile(content);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
-    public <T> T parseYamlFile(GHContent content, Class<T> type) throws IOException {
-        return ctx.parseYamlFile(content, type);
+    public <T> T readYamlContent(GHContent content, Class<T> type) {
+        try {
+            return ctx.parseYamlFile(content, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
-    public <T> String writeYamlValue(T user) throws IOException {
-        return ctx.writeYamlValue(user);
+    public <T> String writeYamlValue(T user) {
+        try {
+            return ctx.writeYamlValue(user);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
+    @Nonnull
     public String[] getErrorAddresses() {
         return ctx.botErrorEmailAddress();
     }
 
+    @Nonnull
+    public String[] getErrorAddresses(EmailNotification notifications) {
+        return ctx.getErrorAddresses(notifications);
+    }
+
+    /**
+     * Log an error and send an collected errors and exceptions to the
+     * configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, Throwable, String[])
+     */
+    public void logAndSendContextErrors(String title) {
+        ctx.logAndSendEmail(getLogId(), title, bundleExceptions(), getErrorAddresses());
+    }
+
+    /**
+     * Log an error and send an email to the configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, Throwable, String[])
+     */
     public void logAndSendEmail(String title, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, t, getErrorAddresses());
     }
 
+    /**
+     * Log an error and send an email with the specified body to the configured error addresses.
+     * Uses this (QueryContext) logId and error addresses.
+     *
+     * @param title
+     * @param body
+     * @param t
+     * @see #getLogId()
+     * @see #getErrorAddresses()
+     * @see ContextService#logAndSendEmail(String, String, String, Throwable, String[])
+     */
     public void logAndSendEmail(String title, String body, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, body, t, getErrorAddresses());
+    }
+
+    /**
+     * Send an email with the specified body to the configured error addresses.
+     * Simple wrapper around ContextService to avoid injected dependencies.
+     *
+     * @param logId
+     * @param title
+     * @param body
+     * @param addresses
+     * @see ContextService#sendEmail(String, String, String, String, String[])
+     */
+    public void sendEmail(String logId, String title, String body, String[] addresses) {
+        ctx.sendEmail(logId, title, body, addresses);
     }
 
     public static String toOrganizationName(String fullName) {

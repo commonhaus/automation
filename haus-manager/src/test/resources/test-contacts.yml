@@ -1,0 +1,94 @@
+#--------------------------------------------------------------------------
+# CF Council members (elected, staggered elections)
+# name, avatarUrl, company, bio will be pulled from GitHub profile
+#
+# - login: github login
+#   term-start: most recent year of election
+#   avatarAlt: Optional. Avatar to show in addition to github avatar
+#   bio: Short description/bio to use instead of GH profile description
+#
+cf-council:
+  - login: user1
+  - login: user2
+  - login: user3
+
+#--------------------------------------------------------------------------
+# EGC Project Representatives (appointed by project governance process)
+# name, avatarUrl, company, bio will be pulled from GitHub profile
+#
+# - project: Project name (match key in PROJECTS.yaml)
+#   login: project representatives's github id
+#   avatarAlt: Optional. Avatar to show in addition to github avatar
+#   bio: Short description/bio to use instead of GH profile description
+#
+egc:
+  - project: jbang
+    login: user4
+  - project: jreleaser
+    login: user5
+  - project: morphia
+    login: user12
+  - project: openrewrite
+    login: user7
+  - project: jackson
+    login: user8
+  - project: hibernate
+    login: user9
+  - project: ...
+    login: ...
+
+#--------------------------------------------------------------------------
+# Advisory Board members (appointed)
+# name, avatarUrl, company, bio will be pulled from GitHub profile
+#
+# - organization: Name (should match name in ...)
+#   login: representative's github id
+#   avatarAlt: Optional. Avatar to show in addition to github avatar
+#   bio: Short description/bio to use instead of GH profile description
+#
+advisory-board:
+  - organization: Name
+    login: ...
+  - organization: Name
+    login: ...
+
+#--------------------------------------------------------------------------
+# Code of Conduct Panel members:
+# name, avatarUrl, company, bio will be pulled from GitHub profile
+#
+# - login: github id
+#   term-start: most recent year of election
+#   avatarAlt: Optional. Avatar to show in addition to github avatar
+#   bio: Short description/bio to use instead of GH profile description
+#
+# - login: github id
+#   term-start: most recent year of election
+#   see: other group to reference
+#
+cocp-panel:
+  - login: user3
+    term-start: 2024
+    see: cf-council
+  - login: ...
+    term-start: ...
+  - login: ...
+    term-start: ...
+
+#--------------------------------------------------------------------------
+# Mailing lists referenced in bylaws and policies.
+#
+# See CONTRIBUTING.md, but usage is like this:
+#    "send an email to the [`legal` mailing list][CONTACTS.yaml]"
+#
+mailing-list:
+  announce: announce@commonhaus.org
+  automation: automation@commonhaus.org
+  brand: brand@commonhaus.org
+  coc-escalation: coc-escalation@commonhaus.org
+  council: cf-council@commonhaus.org
+  egc: cf-egc@commonhaus.org
+  hello: hello@commonhaus.org
+  legal: legal@commonhaus.org
+  media: media@commonhaus.org
+  report: report@commonhaus.org
+  trademarks: legal@commonhaus.org
