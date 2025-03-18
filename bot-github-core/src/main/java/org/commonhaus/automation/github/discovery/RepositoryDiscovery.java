@@ -62,7 +62,7 @@ public class RepositoryDiscovery {
         }
 
         // Do the work from the queue
-        periodicUpdateQueue.queue(this::discoverRepositories);
+        periodicUpdateQueue.queue("discovery", this::discoverRepositories);
     }
 
     protected void handleRepositoryChanges(GitHub github, DynamicGraphQLClient graphQLClient, long installationId,

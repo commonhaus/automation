@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -83,7 +84,7 @@ public class AppContextService extends BaseContextService {
      * If the discovered repo matches the configured data store,
      * remember the installation id.
      */
-    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes @Priority(value = 10) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         long installationId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();

@@ -14,6 +14,6 @@ public class AppContextService extends BaseContextService {
     ManagerBotConfig mgrBotConfig;
 
     public ScopedQueryContext getDefaultQueryContext() {
-        return installationMap.getOrgScopedQueryContext(this, mgrBotConfig.configOrganization());
+        return installationMap.getOrgScopedQueryContext(this, mgrBotConfig.home().organization());
     }
 }

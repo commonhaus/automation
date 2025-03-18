@@ -91,12 +91,17 @@ public class TestBotConfig implements BotConfig {
     }
 
     @Override
-    public int initialQueueDelay() {
-        return 1;
-    }
+    public QueueConfig queue() {
+        return new QueueConfig() {
+            @Override
+            public int initialDelayMs() {
+                return 1;
+            }
 
-    @Override
-    public int queuePeriod() {
-        return 1;
+            @Override
+            public int periodMs() {
+                return 1;
+            }
+        };
     }
 }

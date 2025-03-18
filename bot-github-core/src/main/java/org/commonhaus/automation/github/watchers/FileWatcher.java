@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -39,7 +40,7 @@ public class FileWatcher {
      *
      * @param repoEvent
      */
-    protected void onRepositoryDiscovery(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void onRepositoryDiscovery(@Observes @Priority(value = 5) RepositoryDiscoveryEvent repoEvent) {
         if (repoEvent.removed()) {
             if (repoEvent.installation()) {
                 // If an entire installation is removed, clean up all watchers for that installation

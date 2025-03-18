@@ -14,18 +14,6 @@ import io.smallrye.config.WithDefault;
 public interface BotConfig {
 
     /**
-     * Initial delay before the queue is processed in milliseconds
-     */
-    @WithDefault("10000")
-    int initialQueueDelay();
-
-    /**
-     * The period between successive executions in milliseconds
-     */
-    @WithDefault("2000")
-    int queuePeriod();
-
-    /**
      * Email address used as the reply-to when sending notifications.
      */
     Optional<String> replyTo();
@@ -47,9 +35,18 @@ public interface BotConfig {
     Optional<String> errorEmailAddress();
 
     /**
-     * @return the database ID and node ID for the bot user in dry run mode
+     * Dry run bot configuration.
+     *
+     * @return {@link DryRunBotConfig}
      */
     DryRunBotConfig dryRunBot();
+
+    /**
+     * Configuration for the queue that processes updates.
+     *
+     * @return {@link QueueConfig}
+     */
+    QueueConfig queue();
 
     /**
      * @return true if discoveryEnabled is unset or is set to true
@@ -65,7 +62,6 @@ public interface BotConfig {
         return dryRun().orElse(false);
     }
 
-    @ConfigMapping(prefix = "automation.dryRunBot")
     interface DryRunBotConfig {
         @WithDefault("12345")
         int databaseId();
@@ -75,5 +71,19 @@ public interface BotConfig {
 
         @WithDefault("https://example.com")
         String url();
+    }
+
+    interface QueueConfig {
+        /**
+         * Initial delay before the queue is processed in milliseconds
+         */
+        @WithDefault("10000")
+        int initialDelayMs();
+
+        /**
+         * The period between successive executions in milliseconds
+         */
+        @WithDefault("2000")
+        int periodMs();
     }
 }

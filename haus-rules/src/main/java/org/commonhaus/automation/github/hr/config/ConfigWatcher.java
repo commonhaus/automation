@@ -3,6 +3,7 @@ package org.commonhaus.automation.github.hr.config;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -18,6 +19,7 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.kohsuke.github.GHRepository;
 
 import io.quarkus.logging.Log;
+import io.quarkus.scheduler.Scheduled;
 
 @Singleton
 public class ConfigWatcher {
@@ -67,7 +69,9 @@ public class ConfigWatcher {
         return voting;
     }
 
-    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
+        Log.infof("⚙️ 🗳️ ConfigWatcher.repositoryDiscovered: %s", repoEvent.repository().getFullName());
+
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -82,6 +86,12 @@ public class ConfigWatcher {
                     (fileUpdate) -> readConfiguration(fileUpdate.installationId(), fileUpdate.repository(),
                             fileUpdate.updateType()));
         }
+    }
+
+    // Quartz cron expression: s m h dom mon dow year(optional)
+    @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2,14 ? * ?}")
+    void refreshConfig() {
+        Log.info("⏰ ⚙️ Scheduled: refresh config");
     }
 
     protected void readConfiguration(long installationId, GHRepository repo, FileUpdateType updateType) {

@@ -32,22 +32,39 @@ class TestManagerBotConfig implements ManagerBotConfig {
     }
 
     @Override
-    public String configOrganization() {
-        return activeConfig.orgName();
+    public HomeConfig home() {
+        return new HomeConfig() {
+
+            @Override
+            public String organization() {
+                return activeConfig.orgName();
+            }
+
+            @Override
+            public String repository() {
+                return activeConfig.repoFullName();
+            }
+        };
     }
 
     @Override
-    public String mainRepository() {
-        return activeConfig.repoFullName();
-    }
+    public SchedulerConfig cron() {
+        return new SchedulerConfig() {
 
-    @Override
-    public Optional<String> sponsorCron() {
-        return Optional.empty();
-    }
+            @Override
+            public Optional<String> sponsor() {
+                return Optional.empty();
+            }
 
-    @Override
-    public Optional<String> cron() {
-        return Optional.empty();
+            @Override
+            public Optional<String> projects() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> organization() {
+                return Optional.empty();
+            }
+        };
     }
 }

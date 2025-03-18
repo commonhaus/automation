@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
@@ -57,7 +58,7 @@ public class ScopedInstallationMap {
      * Specifically, ensure we have and can find the right app installation for
      * a repository or organization.
      */
-    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes @Priority(value = 1) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         long installationId = repoEvent.installationId();
         String repoFullName = repoEvent.repository().getFullName();

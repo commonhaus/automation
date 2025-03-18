@@ -2,6 +2,8 @@ package org.commonhaus.automation.hm;
 
 import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -9,11 +11,13 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
+import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -37,10 +41,13 @@ import org.kohsuke.github.GitHub;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkus.logging.Log;
+import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class OrganizationManager implements LatestOrgConfig {
     static final String ME = "orgManager";
+
+    private static volatile String lastRun = "";
 
     final FileWatcher fileEvents;
     final MembershipWatcher membershipEvents;
@@ -61,7 +68,8 @@ public class OrganizationManager implements LatestOrgConfig {
         this.periodicSync = periodicSync;
         this.teamSyncService = teamSyncService;
 
-        Log.debugf("%s MAIN: %s :: %s", ME, mgrBotConfig.configOrganization(), mgrBotConfig.mainRepository());
+        Log.debugf("%s MAIN: %s :: %s", ME,
+                mgrBotConfig.home().organization(), mgrBotConfig.home().repository());
     }
 
     public OrganizationConfig getConfig() {
@@ -72,7 +80,7 @@ public class OrganizationManager implements LatestOrgConfig {
      * Event handler for repository discovery.
      * Specifically look for (and monitor) organization configuration.
      */
-    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -81,8 +89,8 @@ public class OrganizationManager implements LatestOrgConfig {
 
         // We only read configuration files from repositories in the configured organization
         if (action.repository()
-                && orgName.equals(mgrBotConfig.configOrganization())
-                && repo.getFullName().equals(mgrBotConfig.mainRepository())) {
+                && orgName.equals(mgrBotConfig.home().organization())
+                && repo.getFullName().equals(mgrBotConfig.home().repository())) {
             if (action.added()) {
                 // main repository for configuration
                 Log.debugf("%s/repoDiscovered: added main=%s", ME, repoFullName);
@@ -104,6 +112,25 @@ public class OrganizationManager implements LatestOrgConfig {
                 currentConfig.set(Optional.empty());
             }
         }
+
+        RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
+    }
+
+    /**
+     * Periodically refresh/re-synchronize team access lists.
+     */
+    // Quartz cron expression: s m h dom mon dow year(optional)
+    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 2 */3 * ?}")
+    public void refreshOrganizationMembership() {
+        Log.info("⏰ Scheduled: refresh organization membership");
+
+        ScopedQueryContext qc = ctx.getOrgScopedQueryContext(mgrBotConfig.home().organization());
+        if (qc == null) {
+            Log.debugf("%s/refreshAccessLists: no organization installation", ME);
+            return;
+        }
+        readOrgConfig(qc);
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
     }
 
     /**

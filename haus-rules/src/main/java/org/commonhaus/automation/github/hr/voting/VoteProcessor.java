@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -102,7 +103,8 @@ public class VoteProcessor {
         RouteSupplier.registerSupplier("Votes recounted", () -> lastRun);
     }
 
-    public void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    public void repositoryDiscovered(@Observes @Priority(value = 20) RepositoryDiscoveryEvent repoEvent) {
+        Log.infof("⚙️ 🗳️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
         lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 
         long ghiId = repoEvent.installationId();
@@ -118,9 +120,9 @@ public class VoteProcessor {
         }
     }
 
-    @Scheduled(cron = "${automation.voting.cron:13 27 */3 * * ?}")
+    @Scheduled(cron = "${automation.hausRules.cron.voting:13 47 */3 * * ?}")
     void discoverVotes() {
-        Log.info("⏰ Scheduled: count votes");
+        Log.info("⏰ 🗳️ Scheduled: count votes");
 
         var i = votingRepositories.entrySet().iterator();
         while (i.hasNext()) {
@@ -191,9 +193,6 @@ public class VoteProcessor {
     private void countVotes(ScopedQueryContext qc, VoteConfig votingConfig, DataCommonItem item,
             VoteEvent event) {
 
-        Log.debugf("[%s] countVotes: checking open vote (%s)", event.getLogId(),
-                votingConfig.voteThreshold);
-
         VoteInformation voteInfo = getVoteInformation(qc, votingConfig, item, event);
         if (voteInfo == null) {
             return;
@@ -205,8 +204,8 @@ public class VoteProcessor {
                 ? findManualResultComments(qc, votingConfig, event)
                 : List.of();
 
-        Log.debugf("[%s] checkOpenVote: counting votes using %s",
-                event.getLogId(), voteInfo.voteType);
+        Log.debugf("[🗳️ %s] countVotes: counting open vote (%s / %s)", event.getLogId(),
+                voteInfo.voteType, votingConfig.voteThreshold);
 
         final List<DataReaction> reactions = voteInfo.countComments()
                 ? List.of()
@@ -331,7 +330,7 @@ public class VoteProcessor {
         final VoteInformation voteInfo = new VoteInformation(ctx, qc, voteConfig, item, voteEvent);
         if (!voteInfo.isValid()) {
             qc.addBotReaction(voteEvent.getItemNodeId(), ReactionContent.CONFUSED);
-            Log.debugf("[%s] voting.checkVotes: invalid vote information -- %s", qc.getLogId(),
+            Log.debugf("[🤔 %s] voting.checkVotes: invalid vote information -- %s", qc.getLogId(),
                     voteInfo.getErrorContent());
 
             // Add or update a bot comment summarizing what went wrong.

@@ -8,15 +8,27 @@ import io.smallrye.config.ConfigMapping;
 @ConfigMapping(prefix = "automation.hausManager")
 public interface ManagerBotConfig {
 
-    // GitHub organization for configuration
-    String configOrganization();
+    /** GitHub organization for configuration */
+    HomeConfig home();
 
-    // GitHub repository for organization configuration
-    String mainRepository();
+    SchedulerConfig cron();
 
-    // Cron expression for periodic sync of sponsors
-    Optional<String> sponsorCron();
+    interface HomeConfig {
 
-    // Cron expression for periodic sync of members
-    Optional<String> cron();
+        String organization();
+
+        String repository();
+    }
+
+    interface SchedulerConfig {
+
+        // Cron expression for periodic sync of sponsors
+        Optional<String> sponsor();
+
+        // Cron expression for periodic sync of members
+        Optional<String> projects();
+
+        // Cron expression for periodic sync of members
+        Optional<String> organization();
+    }
 }

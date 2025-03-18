@@ -75,17 +75,13 @@ public class PeriodicUpdateQueue {
 
         // Don't flood. Plod along for interactions with GH API
         executor.scheduleAtFixedRate(this::runTask,
-                botConfig.initialQueueDelay(),
-                botConfig.queuePeriod(),
+                botConfig.queue().initialDelayMs(),
+                botConfig.queue().periodMs(),
                 TimeUnit.MILLISECONDS);
     }
 
     void shutdown(@Observes ShutdownEvent shutdown) {
         executor.shutdown();
-    }
-
-    public void queue(Runnable task) {
-        this.queue(CONFIG, task);
     }
 
     public void queue(String name, Runnable task) {

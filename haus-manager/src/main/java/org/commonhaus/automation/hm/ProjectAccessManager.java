@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -84,7 +85,8 @@ public class ProjectAccessManager {
     /**
      * Periodically refresh/re-synchronize team access lists.
      */
-    @Scheduled(cron = "${automation.hausManager.cron:13 27 */3 * * ?}")
+    // Quartz cron expression: s m h dom mon dow year(optional)
+    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 */3 ? * ?}")
     public void refreshAccessLists() {
         Log.info("⏰ Scheduled: refresh access lists");
 
@@ -108,7 +110,7 @@ public class ProjectAccessManager {
     /**
      * Event handler for repository discovery.
      */
-    protected void repositoryDiscovered(@Observes RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -118,7 +120,7 @@ public class ProjectAccessManager {
         long installationId = repoEvent.installationId();
 
         // We only read configuration files from repositories in the configured organization
-        if (action.repository() && orgName.equals(mgrBotConfig.configOrganization())) {
+        if (action.repository() && orgName.equals(mgrBotConfig.home().organization())) {
             final String taskGroup = "%s-%s".formatted(ME, repoFullName);
 
             if (action.added()) {
