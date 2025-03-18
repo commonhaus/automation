@@ -151,7 +151,6 @@ public class PeriodicUpdateQueue {
      */
     @Scheduled(every = "30s")
     public void processRetries() {
-        Log.debugf("Processing %s retry tasks", retryTasks.size());
         // Use an iterator to safely remove while iterating
         Iterator<Map.Entry<String, RetryTask>> iterator = retryTasks.entrySet().iterator();
         while (iterator.hasNext()) {
