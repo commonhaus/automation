@@ -2,7 +2,6 @@ package org.commonhaus.automation.github.hr.voting;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.timeout;
@@ -11,7 +10,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.nio.file.Path;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataLabel;
@@ -41,10 +39,41 @@ public class VotingTest extends HausRulesTestBase {
         setLogin("commonhaus-test-bot");
     }
 
+    @Override
     @AfterEach
-    protected void noErrorMail() {
-        await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
-                .atMost(3, TimeUnit.SECONDS);
+    protected void waitForQueue() {
+        super.waitForQueue();
+        assertNoErrorEmails();
+    }
+
+    @Test
+    void testDiscussionNoLabel() throws Exception {
+        // repository label; no discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, Set.of());
+
+        // There is no vote/open label. Only the discussion should be queried
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-voting.yml");
+                    setupGivenMocks(mocks, TEST_ORG);
+                    mockTeams(hausMocks);
+
+                    // Vote processing always starts fresh (query from item id)
+                    setupGraphQLProcessing(mocks,
+                            // initialize VoteProcessor + VoteInformation
+                            QueryResponse.DISCUSSION_NO_GROUP);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    for (String cue : graphQueries) {
+                        verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                                .executeSync(contains(cue), anyMap());
+                    }
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
     }
 
     @Test

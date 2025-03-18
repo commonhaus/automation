@@ -20,6 +20,7 @@ import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.hr.voting.VoteQueryCache;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHOrganization;
@@ -88,6 +89,12 @@ public abstract class HausRulesTestBase extends ContextHelper {
         // Reset before each test
         reset();
         Stream.of(VoteQueryCache.values()).forEach(v -> v.invalidateAll());
+    }
+
+    @AfterEach
+    protected void waitForQueue() {
+        // Make sure queue is drained between tests
+        await().atMost(5, SECONDS).until(() -> updateQueue.isEmpty());
     }
 
     /**
