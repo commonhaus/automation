@@ -89,7 +89,7 @@ public class ConfigWatcher {
     }
 
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2,14 ? * ?}")
+    @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2,14 * * ?}")
     void refreshConfig() {
         Log.info("⏰ ⚙️ Scheduled: refresh config");
     }
