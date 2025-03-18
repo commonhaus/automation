@@ -380,7 +380,8 @@ public class VoteProcessor {
     }
 
     void scheduleQueryRepository(long installationId, String repoFullName) {
-        periodicUpdate.queue(repoFullName, () -> {
+        // allow full repo queries to collapse/merge
+        periodicUpdate.queueReconciliation(repoFullName, () -> {
             VoteConfig voteConfig = ctx.getVoteConfig(repoFullName);
             if (voteConfig.isDisabled()) {
                 return;
@@ -405,8 +406,7 @@ public class VoteProcessor {
         VoteEvent voteEvent = new VoteEvent(
                 qc.getInstallationId(), repoFullName, eventType, item.id, item.number);
 
-        periodicUpdate.queue(voteEvent.getTaskGroup(), () -> {
-            reconcileVoteEvent(voteEvent);
-        });
+        // allow vote counting to collapse/merge
+        reconcileVoteEvent(voteEvent);
     }
 }
