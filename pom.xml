@@ -78,7 +78,8 @@
         <quarkus.container-image.labels.org.opencontainers.image.url>${project.url}</quarkus.container-image.labels.org.opencontainers.image.url>
         <quarkus.container-image.labels.org.opencontainers.image.source>${project.url}</quarkus.container-image.labels.org.opencontainers.image.source>
         <quarkus.container-image.labels.org.opencontainers.image.version>${git.build.version}</quarkus.container-image.labels.org.opencontainers.image.version>
-        <quarkus.container-image.labels.org.opencontainers.image.revision>${git.commit.id.describe-short}</quarkus.container-image.labels.org.opencontainers.image.revision>
+        <quarkus.container-image.labels.org.opencontainers.image.revision>
+            ${git.commit.id.describe-short}</quarkus.container-image.labels.org.opencontainers.image.revision>
         <quarkus.container-image.labels.org.opencontainers.image.licenses>Apache-2.0</quarkus.container-image.labels.org.opencontainers.image.licenses>
     </properties>
 
@@ -158,6 +159,16 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.smallrye.config</groupId>
+            <artifactId>smallrye-config-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.smallrye.config</groupId>
+            <artifactId>smallrye-config-source-keystore</artifactId>
+        </dependency>
+    </dependencies>
 
     <build>
         <!-- common plugin configurations -->
