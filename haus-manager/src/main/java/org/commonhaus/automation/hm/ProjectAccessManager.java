@@ -86,7 +86,7 @@ public class ProjectAccessManager {
      * Periodically refresh/re-synchronize team access lists.
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 */3 ? * ?}")
+    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 */3 * * ?}")
     public void refreshAccessLists() {
         Log.info("⏰ Scheduled: refresh access lists");
 
