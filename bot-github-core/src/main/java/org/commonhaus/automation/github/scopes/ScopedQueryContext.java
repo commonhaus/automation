@@ -36,9 +36,9 @@ public class ScopedQueryContext extends QueryContext {
             String repoFullName,
             String ownerName) {
         super(contextService, installationId);
-        this.repository = repository;
         this.repoFullName = repoFullName;
         this.ownerName = ownerName;
+        this.repository = (repository == null && repoFullName != null) ? getRepository(repoFullName) : repository;
     }
 
     public ScopedQueryContext(
@@ -64,9 +64,7 @@ public class ScopedQueryContext extends QueryContext {
             @Nonnull long installationId,
             @Nonnull String orgName,
             String repoFullName) {
-        super(contextService, installationId);
-        this.repoFullName = repoFullName;
-        this.ownerName = orgName;
+        this(contextService, installationId, null, repoFullName, repoFullName);
     }
 
     public ScopedQueryContext(

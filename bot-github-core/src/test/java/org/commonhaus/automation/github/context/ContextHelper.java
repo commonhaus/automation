@@ -342,7 +342,7 @@ public class ContextHelper {
         }
         visited.put(key, true);
         when(gh.isCredentialValid()).thenReturn(true);
-        ctx.updateConnection(installationId, gh);
+        BaseQueryCache.updateConnection(installationId, gh);
         return gh;
     }
 
@@ -354,7 +354,7 @@ public class ContextHelper {
      */
     public DynamicGraphQLClient mockGraphQLClient(long installationId) {
         DynamicGraphQLClient dql = mocks.installationGraphQLClient(installationId);
-        ctx.updateConnection(installationId, dql);
+        BaseQueryCache.updateConnection(installationId, dql);
         return dql;
     }
 
@@ -488,6 +488,14 @@ public class ContextHelper {
 
     public GHUser mockUser(String login, long id, GitHub gh) throws IOException {
         return mockUser(login, id, login, gh);
+    }
+
+    public GHTeam mockTeam(String fullTeamName, GitHub gh, Set<String> logins) throws IOException {
+        Set<GHUser> userSet = new HashSet<>();
+        for (String l : logins) {
+            userSet.add(mockUser(l, gh));
+        }
+        return mockTeam(fullTeamName, userSet, gh, true);
     }
 
     /**
@@ -887,5 +895,17 @@ public class ContextHelper {
         if (only) {
             verifyNoMoreInteractions(mocks.dql());
         }
+    }
+
+    protected void updateConnection(long installationId, GitHub gh) {
+        BaseQueryCache.updateConnection(installationId, gh);
+    }
+
+    protected void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
+        BaseQueryCache.updateConnection(installationId, graphQLClient);
+    }
+
+    protected void resetConnection(long installationId) {
+        BaseQueryCache.resetConnection(installationId);
     }
 }

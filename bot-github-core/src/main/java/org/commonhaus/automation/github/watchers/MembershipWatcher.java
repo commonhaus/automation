@@ -21,6 +21,7 @@ import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -49,7 +50,8 @@ public class MembershipWatcher {
      *
      * @param repoEvent
      */
-    protected void onRepositoryDiscovery(@Observes @Priority(value = 5) RepositoryDiscoveryEvent repoEvent) {
+    protected void onRepositoryDiscovery(
+            @Observes @Priority(value = RdePriority.WATCHER_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         if (repoEvent.removed()) {
             if (repoEvent.installation()) {
                 // If an entire installation is removed, clean up all watchers for that installation

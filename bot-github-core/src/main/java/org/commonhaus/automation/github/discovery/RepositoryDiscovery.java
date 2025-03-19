@@ -10,6 +10,7 @@ import jakarta.inject.Singleton;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.config.BotConfig;
+import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.commonhaus.automation.github.context.JsonAttributeAccessor;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
@@ -97,6 +98,9 @@ public class RepositoryDiscovery {
                 GHAuthenticatedAppInstallation ghai = github.getInstallation();
                 DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(ghiId);
 
+                BaseQueryCache.updateConnection(ghiId, github);
+                BaseQueryCache.updateConnection(ghiId, graphQLClient);
+
                 Log.debugf("[%s] Fire initial discovery events", ghiId);
                 for (GHRepository repo : ghai.listRepositories()) {
                     fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
@@ -129,13 +133,26 @@ public class RepositoryDiscovery {
      * Parter to Repository Discovery:
      * This is converted into a multiplexer to handle github events.
      */
-    public static class GitHubEventHandler {
+    static class GitHubEventHandler {
 
         @Inject
         RepositoryDiscovery repositoryDiscovery;
 
         @Inject
         Event<ConnectionEvent> fireConnectionEvent;
+
+        void onEvent(@RawEvent GitHubEvent event,
+                GitHub github, DynamicGraphQLClient graphQLClient) {
+            if (event == null || event.getInstallationId() == null) {
+                return;
+            }
+
+            BaseQueryCache.updateConnection(event.getInstallationId(), github);
+            BaseQueryCache.updateConnection(event.getInstallationId(), graphQLClient);
+
+            fireConnectionEvent.fire(
+                    new ConnectionEvent(event, github, graphQLClient));
+        }
 
         /**
          * Respond to installation changes
@@ -196,16 +213,5 @@ public class RepositoryDiscovery {
                     added == null ? List.of() : added,
                     removed == null ? List.of() : removed);
         }
-
-        void onEvent(@RawEvent GitHubEvent event,
-                GitHub github, DynamicGraphQLClient graphQLClient) {
-            if (event == null || event.getInstallationId() == null) {
-                return;
-            }
-
-            fireConnectionEvent.fire(
-                    new ConnectionEvent(event, github, graphQLClient));
-        }
     }
-
 }

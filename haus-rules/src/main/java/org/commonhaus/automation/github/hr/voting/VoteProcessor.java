@@ -27,6 +27,7 @@ import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.hr.AppContextService;
 import org.commonhaus.automation.github.hr.config.ConfigWatcher;
 import org.commonhaus.automation.github.hr.config.VoteConfig;
@@ -103,7 +104,7 @@ public class VoteProcessor {
         RouteSupplier.registerSupplier("Votes recounted", () -> lastRun);
     }
 
-    public void repositoryDiscovered(@Observes @Priority(value = 20) RepositoryDiscoveryEvent repoEvent) {
+    public void repositoryDiscovered(@Observes @Priority(value = RdePriority.APP_EVENT) RepositoryDiscoveryEvent repoEvent) {
         Log.infof("⚙️ 🗳️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
         lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 

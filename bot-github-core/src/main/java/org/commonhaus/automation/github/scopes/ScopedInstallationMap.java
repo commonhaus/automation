@@ -15,6 +15,7 @@ import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.ConnectionEvent;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 
 import io.quarkiverse.githubapp.GitHubEvent;
 
@@ -45,7 +46,8 @@ public class ScopedInstallationMap {
                 : new ScopedQueryContext(ctx, appInstallation, repoName);
     }
 
-    protected void updateInstallationMapping(@Observes ConnectionEvent connectEvent) {
+    protected void updateInstallationMapping(
+            @Observes @Priority(value = RdePriority.CONNECTED) ConnectionEvent connectEvent) {
         GitHubEvent event = connectEvent.event();
         Optional<String> optRepoFullName = event.getRepository();
         if (optRepoFullName.isPresent()) {
@@ -58,7 +60,8 @@ public class ScopedInstallationMap {
      * Specifically, ensure we have and can find the right app installation for
      * a repository or organization.
      */
-    protected void repositoryDiscovered(@Observes @Priority(value = 1) RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(
+            @Observes @Priority(value = RdePriority.CORE_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         long installationId = repoEvent.installationId();
         String repoFullName = repoEvent.repository().getFullName();

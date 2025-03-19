@@ -12,6 +12,7 @@ import jakarta.inject.Singleton;
 import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
@@ -69,7 +70,8 @@ public class ConfigWatcher {
         return voting;
     }
 
-    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(
+            @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         Log.infof("⚙️ 🗳️ ConfigWatcher.repositoryDiscovered: %s", repoEvent.repository().getFullName());
 
         DiscoveryAction action = repoEvent.action();

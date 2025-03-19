@@ -19,6 +19,7 @@ import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
@@ -86,7 +87,7 @@ public class ProjectAccessManager {
      * Periodically refresh/re-synchronize team access lists.
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 */3 * * ?}")
+    @Scheduled(cron = "${automation.hausManager.cron.projects:0 47 */3 * * ?}")
     public void refreshAccessLists() {
         Log.info("⏰ Scheduled: refresh access lists");
 
@@ -110,7 +111,8 @@ public class ProjectAccessManager {
     /**
      * Event handler for repository discovery.
      */
-    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(
+            @Observes @Priority(value = RdePriority.APP_DISCOVERY + 2) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -232,20 +234,25 @@ public class ProjectAccessManager {
      */
     public void reconcile(String taskGroup) {
         ProjectConfigState newState = taskGroupToState.get(taskGroup);
-        Log.debugf("%s/reconcile: team membership sync; %s", newState.taskGroup(), newState.projectConfig());
+        Log.debugf("%s::reconcile: team membership sync; %s", newState.taskGroup(), newState.projectConfig());
 
         ProjectConfig projectConfig = newState.projectConfig();
         if (!projectConfig.enabled() || projectConfig.teamAccess() == null) {
-            Log.infof("%s/reconcile: configuration disabled or teamAccess missing; skipping %s", newState.taskGroup(),
+            Log.infof("%s::reconcile: configuration disabled or teamAccess missing; skipping %s", newState.taskGroup(),
                     projectConfig);
             return;
         }
 
-        ScopedQueryContext projectQc = new ScopedQueryContext(ctx, newState.installationId(), newState.repoFullName());
-
         boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
         TeamAccess teamAccess = projectConfig.teamAccess();
         String sourceTeamName = teamAccess.source();
+
+        ScopedQueryContext projectQc = new ScopedQueryContext(ctx, newState.installationId(), newState.repoFullName());
+
+        // Find the repository where the configuration file is located
+        String repoFullName = newState.repoFullName();
+        GHRepository repo = projectQc.getRepository(repoFullName);
+        Log.debugf("[%s] reconcile project repo %s %s", ME, repoFullName, repo != null);
 
         // Find the source team and its members (from another organization)
         ScopedQueryContext teamQc = projectQc.forOrganization(sourceTeamName, isDryRun);
@@ -256,10 +263,10 @@ public class ProjectAccessManager {
 
         // Get team members
         Set<String> sourceLogins = teamSyncService.getTeamLogins(teamQc, sourceTeamName);
-
-        // Find the repository where the configuration file is located
-        String repoFullName = newState.repoFullName();
-        GHRepository repo = projectQc.getRepository(repoFullName);
+        if (sourceLogins == null) {
+            Log.warnf("[%s] The team was not found %s; skipping team sync", ME, sourceTeamName);
+            return;
+        }
 
         GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole.from(GHOrganization.Permission.PUSH);
 
@@ -288,7 +295,7 @@ public class ProjectAccessManager {
                 sourceTeamName,
                 (update) -> processMembershipUpdate(newState.taskGroup(), update));
 
-        Log.debugf("%s/reconcile: team membership sync complete: %s", newState.taskGroup(), newState.projectConfig());
+        Log.debugf("%s::reconcile: team membership sync complete: %s", newState.taskGroup(), newState.projectConfig());
     }
 
     static record ProjectConfigState(

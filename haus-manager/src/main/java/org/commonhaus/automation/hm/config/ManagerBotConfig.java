@@ -1,5 +1,7 @@
 package org.commonhaus.automation.hm.config;
 
+import static org.commonhaus.automation.github.context.QueryContext.toFullName;
+
 import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
@@ -18,6 +20,13 @@ public interface ManagerBotConfig {
         String organization();
 
         String repository();
+
+        default String repositoryFullName() {
+            if (repository().contains("/")) {
+                return repository();
+            }
+            return toFullName(organization(), repository());
+        }
     }
 
     interface SchedulerConfig {

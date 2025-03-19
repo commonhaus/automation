@@ -1,5 +1,6 @@
 package org.commonhaus.automation.config;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
@@ -75,15 +76,15 @@ public interface BotConfig {
 
     interface QueueConfig {
         /**
-         * Initial delay before the queue is processed in milliseconds
+         * Initial delay before the queue
          */
-        @WithDefault("10000")
-        int initialDelayMs();
+        @WithDefault("10s")
+        Duration initialDelay();
 
         /**
-         * The period between successive executions in milliseconds
+         * The period between successive executions
          */
-        @WithDefault("2000")
-        int periodMs();
+        @WithDefault("2s")
+        Duration period();
     }
 }

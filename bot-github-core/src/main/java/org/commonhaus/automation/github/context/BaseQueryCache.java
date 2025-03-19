@@ -4,8 +4,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
+import org.kohsuke.github.GitHub;
+
 import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Caffeine;
+
+import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public enum BaseQueryCache {
     CONNECTION(b -> b.expireAfterWrite(15, TimeUnit.MINUTES)),
@@ -51,5 +55,21 @@ public enum BaseQueryCache {
 
     public void invalidate(String login) {
         cache.invalidate(login);
+    }
+
+    public static void updateConnection(long installationId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
+    }
+
+    public static void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
+        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
+    }
+
+    public static void resetConnection(long installationId) {
+        if (installationId < 0) { // user session
+            return;
+        }
+        BaseQueryCache.CONNECTION.invalidate("gh-" + installationId);
+        BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
     }
 }

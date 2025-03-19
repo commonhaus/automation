@@ -71,15 +71,9 @@ public interface ContextService {
 
     String[] getErrorAddresses(EmailNotification notifications);
 
-    void resetConnection(long installationId);
-
     GitHub getInstallationClient(long installationId);
 
     DynamicGraphQLClient getInstallationGraphQLClient(long installationId);
-
-    void updateConnection(long installationId, GitHub github);
-
-    void updateConnection(long installationId, DynamicGraphQLClient graphQLClient);
 
     ScopedQueryContext getOrgScopedQueryContext(String orgName);
 

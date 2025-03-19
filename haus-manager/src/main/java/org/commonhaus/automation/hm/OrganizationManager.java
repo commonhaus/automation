@@ -21,6 +21,7 @@ import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
@@ -68,8 +69,10 @@ public class OrganizationManager implements LatestOrgConfig {
         this.periodicSync = periodicSync;
         this.teamSyncService = teamSyncService;
 
-        Log.debugf("%s MAIN: %s :: %s", ME,
+        Log.debugf("%s MAIN: %s / %s", ME,
                 mgrBotConfig.home().organization(), mgrBotConfig.home().repository());
+
+        RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
     }
 
     public OrganizationConfig getConfig() {
@@ -80,7 +83,8 @@ public class OrganizationManager implements LatestOrgConfig {
      * Event handler for repository discovery.
      * Specifically look for (and monitor) organization configuration.
      */
-    protected void repositoryDiscovered(@Observes @Priority(value = 15) RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(
+            @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
@@ -90,14 +94,14 @@ public class OrganizationManager implements LatestOrgConfig {
         // We only read configuration files from repositories in the configured organization
         if (action.repository()
                 && orgName.equals(mgrBotConfig.home().organization())
-                && repo.getFullName().equals(mgrBotConfig.home().repository())) {
+                && repo.getFullName().equals(mgrBotConfig.home().repositoryFullName())) {
             if (action.added()) {
                 // main repository for configuration
                 Log.debugf("%s/repoDiscovered: added main=%s", ME, repoFullName);
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                // read org config when repository is discovered
+                // read org config from the main repository
                 periodicSync.queue(ME, () -> readOrgConfig(qc));
 
                 // Register watcher to monitor for org config changes
@@ -113,14 +117,13 @@ public class OrganizationManager implements LatestOrgConfig {
             }
         }
 
-        RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
     }
 
     /**
      * Periodically refresh/re-synchronize team access lists.
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausManager.cron.teams:0 47 2 */3 * ?}")
+    @Scheduled(cron = "${automation.hausManager.cron.organization:0 47 2 */3 * ?}")
     public void refreshOrganizationMembership() {
         Log.info("⏰ Scheduled: refresh organization membership");
 
@@ -212,14 +215,14 @@ public class OrganizationManager implements LatestOrgConfig {
     public void reconcile() {
         OrganizationConfigState configState = currentConfig.get().orElse(null);
         if (configState == null || !configState.performSync()) {
-            Log.debugf("%s/reconcile: configuration not available or team sync not enabled: %s", ME, configState);
+            Log.debugf("%s::reconcile: configuration not available or team sync not enabled: %s", ME, configState);
             return;
         }
-        Log.debugf("%s/reconcile: starting %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("%s::reconcile: starting %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
 
         GroupMapping groupMapping = configState.groupMapping();
         if (groupMapping == null || !groupMapping.performSync()) {
-            Log.debugf("%s/reconcile: missing or empty group mapping: %s", ME, groupMapping);
+            Log.debugf("%s::reconcile: missing or empty group mapping: %s", ME, groupMapping);
             return;
         }
 
@@ -235,19 +238,19 @@ public class OrganizationManager implements LatestOrgConfig {
         String sourceRepoName = source.repository() == null ? configState.repoName() : source.repository();
         ScopedQueryContext sourceQc = orgQc.forOrganization(sourceRepoName, isDryRun);
         if (sourceQc == null) {
-            Log.warnf("%s/reconcile: No installation for %s; skipping org", ME, sourceRepoName);
+            Log.warnf("%s::reconcile: No installation for %s; skipping org", ME, sourceRepoName);
             return;
         }
 
         GHRepository sourceRepo = sourceQc == null ? null : sourceQc.getRepository(sourceRepoName);
         if (sourceRepo == null) {
-            Log.warnf("%s/reconcile: source repository %s not found", ME, sourceRepoName);
+            Log.warnf("%s::reconcile: source repository %s not found", ME, sourceRepoName);
             return;
         }
         // read the file from the repository
         JsonNode sourceData = sourceQc.readYamlSourceFile(sourceRepo, source.filePath());
         if (sourceData == null) {
-            Log.warnf("%s/reconcile: source file %s is empty or could not be read", ME, source.filePath());
+            Log.warnf("%s::reconcile: source file %s is empty or could not be read", ME, source.filePath());
             return;
         }
 
@@ -263,7 +266,7 @@ public class OrganizationManager implements LatestOrgConfig {
 
             JsonNode sourceTeamMemberList = sourceData.get(groupName);
             if (sourceTeamMemberList != null && sourceTeamMemberList.isArray()) {
-                Log.debugf("%s/reconcile: field %s from %s to %s", ME, field, groupName, sync.teams());
+                Log.debugf("%s::reconcile: field %s from %s to %s", ME, field, groupName, sync.teams());
 
                 // Populate list of expected logins with those we intend to preserve
                 Set<String> expectedLogins = new HashSet<>(sync.preserveUsers(defaults));
@@ -286,10 +289,10 @@ public class OrganizationManager implements LatestOrgConfig {
                 }
 
             } else {
-                Log.debugf("%s/reconcile: group %s not found in %s", ME, groupName, sourceData);
+                Log.debugf("%s::reconcile: group %s not found in %s", ME, groupName, sourceData);
             }
         }
-        Log.debugf("%s/reconcile: team membership sync complete", ME);
+        Log.debugf("%s::reconcile: team membership sync complete", ME);
     }
 
     /**

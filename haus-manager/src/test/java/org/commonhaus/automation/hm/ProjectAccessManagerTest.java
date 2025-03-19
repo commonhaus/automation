@@ -5,8 +5,10 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Set;
 
 import jakarta.inject.Inject;
 
@@ -36,6 +38,8 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
     @Inject
     ProjectAccessManager projectAccessManager;
 
+    Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
+
     @BeforeEach
     @Override
     void setup() throws IOException {
@@ -45,8 +49,6 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
         // Mock the file content for organization config in primary repo
         mockFileContent(hausMocks, ProjectConfig.PATH,
                 "src/test/resources/cf-haus-manager.yml");
-
-        mockTeam(project_org, "other-org/teamA", null);
 
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project_org, true);
@@ -75,6 +77,12 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
 
     @Test
     void testConfigurationUpdated() throws IOException {
+
+        mockTeam("other-org/teamA", project_org.github(), otherTeamLogins);
+
+        when(teamService.getTeamLogins(any(), any()))
+                .thenReturn(otherTeamLogins);
+
         projectAccessManager.processFileUpdate(taskGroup, new FileUpdate(
                 OrganizationConfig.PATH, FileUpdateType.MODIFIED,
                 hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));

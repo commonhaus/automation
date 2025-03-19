@@ -1,6 +1,7 @@
 projects:
   source:
     filePath: PROJECTS.yaml
+
 teamMembership:
   dryRun: true
   source:

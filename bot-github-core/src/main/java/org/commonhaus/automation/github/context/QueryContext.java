@@ -354,7 +354,8 @@ public class QueryContext {
             addException(e);
         }
         if (hasAuthorizationError()) {
-            ctx.resetConnection(installationId);
+            Log.debugf("[%s] execGitHubSync: Authorization error, resetting connection", getLogId());
+            BaseQueryCache.resetConnection(installationId);
         }
         return null;
     }

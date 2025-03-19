@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.nio.file.Path;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
 
@@ -68,6 +69,8 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                 .when().payloadFromClasspath("/github/eventIssueCommentCreated.json")
                 .event(GHEvent.ISSUE_COMMENT)
                 .then().github(mocks -> {
+                    await().atLeast(10, TimeUnit.MILLISECONDS)
+                            .atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
                     verifyNoMoreInteractions(mocks.installationGraphQLClient(datastoreInstallationId));
                 });
 
@@ -99,6 +102,8 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                 .when().payloadFromClasspath("/github/eventIssueLabeled-accepted.json")
                 .event(GHEvent.ISSUES)
                 .then().github(mocks -> {
+                    await().atLeast(10, TimeUnit.MILLISECONDS)
+                            .atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
 
                     // 1) Set member flag, move status from UNKNOWN -> ACTIVE
                     // 2) remove application
@@ -133,7 +138,6 @@ public class ApplicationEventTest extends HausKeeperTestBase {
 
     @Test
     void testApplicationDenied() throws Exception {
-
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
         given()
@@ -153,6 +157,9 @@ public class ApplicationEventTest extends HausKeeperTestBase {
                 .when().payloadFromClasspath("/github/eventIssueLabeled-declined.json")
                 .event(GHEvent.ISSUES)
                 .then().github(mocks -> {
+                    await().atLeast(10, TimeUnit.MILLISECONDS)
+                            .atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+
                     // 1) Set member flag, move status from UNKNOWN -> DECLINED
                     final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
                     verify(builder).content(contentCaptor.capture());

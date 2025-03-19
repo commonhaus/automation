@@ -10,8 +10,10 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public record EmailNotification(
         // List of email addresses to send notifications to when errors occur
         String[] errors,
+
         // List of email addresses to send results of dry run
         String[] dryRun,
+
         // List of email addresses to send audit/change logs
         String[] audit) {
 

@@ -23,6 +23,7 @@ import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
@@ -84,7 +85,8 @@ public class AppContextService extends BaseContextService {
      * If the discovered repo matches the configured data store,
      * remember the installation id.
      */
-    protected void repositoryDiscovered(@Observes @Priority(value = 10) RepositoryDiscoveryEvent repoEvent) {
+    protected void repositoryDiscovered(
+            @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         long installationId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();

@@ -15,6 +15,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHEventPayload.Push.PushCommit;
@@ -40,7 +41,8 @@ public class FileWatcher {
      *
      * @param repoEvent
      */
-    protected void onRepositoryDiscovery(@Observes @Priority(value = 5) RepositoryDiscoveryEvent repoEvent) {
+    protected void onRepositoryDiscovery(
+            @Observes @Priority(value = RdePriority.WATCHER_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         if (repoEvent.removed()) {
             if (repoEvent.installation()) {
                 // If an entire installation is removed, clean up all watchers for that installation

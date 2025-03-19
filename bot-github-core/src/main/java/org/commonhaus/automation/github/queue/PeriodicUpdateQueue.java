@@ -73,10 +73,13 @@ public class PeriodicUpdateQueue {
     void startup(@Observes StartupEvent startup) {
         Log.debugf("Starting PeriodicUpdateQueue");
 
+        long initialDelay = botConfig.queue().initialDelay().toMillis();
+        long period = botConfig.queue().period().toMillis();
+
         // Don't flood. Plod along for interactions with GH API
         executor.scheduleAtFixedRate(this::runTask,
-                botConfig.queue().initialDelayMs(),
-                botConfig.queue().periodMs(),
+                initialDelay,
+                period,
                 TimeUnit.MILLISECONDS);
     }
 

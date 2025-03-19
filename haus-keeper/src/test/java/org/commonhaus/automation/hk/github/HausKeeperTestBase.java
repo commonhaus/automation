@@ -105,20 +105,20 @@ public class HausKeeperTestBase extends ContextHelper {
         this.mocks = mocks;
 
         setupDefaultMocks(DEFAULTS);
-        ctx.updateConnection(DEFAULTS.installId(), hausMocks.github());
-        ctx.updateConnection(DEFAULTS.installId(), hausMocks.dql());
+        updateConnection(DEFAULTS.installId(), hausMocks.github());
+        updateConnection(DEFAULTS.installId(), hausMocks.dql());
 
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, false);
 
         dataMocks = setupInstallationMocks(DATASTORE);
-        ctx.updateConnection(DATASTORE.installId(), dataMocks.github());
-        ctx.updateConnection(DATASTORE.installId(), dataMocks.dql());
+        updateConnection(DATASTORE.installId(), dataMocks.github());
+        updateConnection(DATASTORE.installId(), dataMocks.dql());
 
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, dataMocks, false);
 
         sponsorMocks = setupInstallationMocks(SPONSORS);
-        ctx.updateConnection(SPONSORS.installId(), sponsorMocks.github());
-        ctx.updateConnection(SPONSORS.installId(), sponsorMocks.dql());
+        updateConnection(SPONSORS.installId(), sponsorMocks.github());
+        updateConnection(SPONSORS.installId(), sponsorMocks.dql());
 
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, sponsorMocks, false);
     }

@@ -133,7 +133,6 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    @Nonnull
     public Set<GHUser> getTeamMembers(QueryContext qc, String teamFullName) {
         String orgName = toOrganizationName(teamFullName);
         String relativeName = toRelativeName(orgName, teamFullName);
@@ -143,14 +142,14 @@ public class GitHubTeamService {
         if (members == null) {
             GHTeam ghTeam = getTeam(qc, org, relativeName);
             if (ghTeam == null) {
-                return Set.of();
+                return null;
             } else {
                 members = qc.execGitHubSync((gh, dryRun) -> {
                     return ghTeam.getMembers();
                 });
                 if (qc.hasErrors() || members == null) {
                     qc.checkRemoveNotFound(); // normal
-                    members = Set.of();
+                    return null;
                 }
             }
             members = putCachedTeamMembers(teamFullName, members);
@@ -166,6 +165,9 @@ public class GitHubTeamService {
     @Nonnull
     public Set<String> getTeamLogins(QueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
+        if (members == null) {
+            return null;
+        }
         return members.stream().map(GHUser::getLogin).collect(Collectors.toSet());
     }
 

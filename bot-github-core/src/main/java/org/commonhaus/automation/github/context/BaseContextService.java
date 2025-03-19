@@ -4,20 +4,16 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.enterprise.event.ObservesAsync;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.config.EmailNotification;
-import org.commonhaus.automation.github.discovery.ConnectionEvent;
 import org.commonhaus.automation.github.scopes.ScopedInstallationMap;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
-import io.quarkiverse.githubapp.GitHubEvent;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
@@ -73,20 +69,8 @@ public abstract class BaseContextService implements ContextService {
         BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
 
         gh = gitHubClientProvider.getInstallationClient(installationId);
-        updateConnection(installationId, gh);
+        BaseQueryCache.updateConnection(installationId, gh);
         return gh;
-    }
-
-    public void resetConnection(long installationId) {
-        if (installationId < 0) { // user session
-            return;
-        }
-        BaseQueryCache.CONNECTION.invalidate("gh-" + installationId);
-        BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
-    }
-
-    public void updateConnection(long installationId, GitHub gh) {
-        BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
     }
 
     public DynamicGraphQLClient getInstallationGraphQLClient(long installationId) {
@@ -96,12 +80,8 @@ public abstract class BaseContextService implements ContextService {
         }
 
         graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
-        updateConnection(installationId, graphQLClient);
+        BaseQueryCache.updateConnection(installationId, graphQLClient);
         return graphQLClient;
-    }
-
-    public void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
-        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
     }
 
     public ScopedQueryContext getOrgScopedQueryContext(String teamOrgName) {
@@ -135,22 +115,5 @@ public abstract class BaseContextService implements ContextService {
     @Override
     public void sendEmail(String logId, String title, String body, String[] addresses) {
         logMailer.sendEmail(logId, title, body, addresses);
-    }
-
-    /**
-     * Listen for connection events, and update the cached github/graphql clients
-     */
-    static class EventListener {
-
-        @Inject
-        Instance<ContextService> ctxInstance;
-
-        protected void updateConnection(@ObservesAsync ConnectionEvent connectEvent) {
-            GitHubEvent event = connectEvent.event();
-            if (ctxInstance.isResolvable()) {
-                ctxInstance.get().updateConnection(event.getInstallationId(), connectEvent.github());
-                ctxInstance.get().updateConnection(event.getInstallationId(), connectEvent.graphQLClient());
-            }
-        }
     }
 }

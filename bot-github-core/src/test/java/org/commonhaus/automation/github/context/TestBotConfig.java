@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github.context;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import jakarta.annotation.Priority;
@@ -94,13 +95,13 @@ public class TestBotConfig implements BotConfig {
     public QueueConfig queue() {
         return new QueueConfig() {
             @Override
-            public int initialDelayMs() {
-                return 1;
+            public Duration initialDelay() {
+                return Duration.ofMillis(1);
             }
 
             @Override
-            public int periodMs() {
-                return 1;
+            public Duration period() {
+                return Duration.ofMillis(1);
             }
         };
     }
