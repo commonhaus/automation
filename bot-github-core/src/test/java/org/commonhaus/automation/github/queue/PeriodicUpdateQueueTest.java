@@ -37,6 +37,7 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         updateQueue.queue("otherChange", () -> this.doStuff("otherChange", otherChange));
         updateQueue.queue("testGroup", () -> this.doStuff("testGroup", changeCounter));
         updateQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
+        updateQueue.queueReconciliation("testGroup", () -> this.doStuff("testGroup", reconcileCounter));
         updateQueue.queue("otherChange", () -> {
             otherChange.incrementAndGet();
             updateQueue.queueReconciliation("otherChange", () -> this.doStuff("otherChange", otherReconcile));
@@ -49,7 +50,7 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         // Verify change task ran, and only one reconciliation task
         assertThat(changeCounter.get()).isEqualTo(3);
         // How many times it is reduced will vary, but it should always be < the number of times called.
-        assertThat(reconcileCounter.get()).isLessThan(3);
+        assertThat(reconcileCounter.get()).isLessThan(4);
     }
 
     @Test
