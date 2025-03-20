@@ -1,5 +1,8 @@
 package org.commonhaus.automation.config;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public record RepoSource(String repository, String filePath) {
     public boolean isEmpty() {
         return filePath == null || filePath.isBlank();

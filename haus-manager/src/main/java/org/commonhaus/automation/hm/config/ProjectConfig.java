@@ -9,10 +9,13 @@ import org.commonhaus.automation.config.EmailNotification;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 /**
  * Configuration file for the Haus Manager.
  * Located in a repository at .github/cf-haus-manager.yml
  */
+@RegisterForReflection
 public class ProjectConfig {
     public static final String NAME = "cf-haus-manager.yml";
     public static final String PATH = ".github/" + NAME;
