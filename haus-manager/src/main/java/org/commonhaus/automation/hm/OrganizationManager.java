@@ -280,7 +280,7 @@ public class OrganizationManager implements LatestOrgConfig {
 
                 for (String targetTeam : sync.teams()) {
                     try {
-                        doSyncTeamMembers(sourceQc, targetTeam, expectedLogins, sync.ignoreUsers(),
+                        doSyncTeamMembers(sourceQc, targetTeam, expectedLogins, sync.ignoreUsers(defaults),
                                 isDryRun, configState.emailNotifications());
                     } catch (Throwable t) {
                         ctx.logAndSendEmail(ME, "Error syncing team members", t,

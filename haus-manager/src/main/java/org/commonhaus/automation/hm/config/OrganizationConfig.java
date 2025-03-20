@@ -153,7 +153,11 @@ public class OrganizationConfig {
 
         @Override
         public List<String> ignoreUsers() {
-            return ignoreUsers == null ? List.of() : preserveUsers;
+            return ignoreUsers == null ? List.of() : ignoreUsers;
+        }
+
+        public List<String> ignoreUsers(OrgDefaults defaults) {
+            return ignoreUsers == null ? defaults.ignoreUsers() : ignoreUsers;
         }
 
         @Override
@@ -195,13 +199,13 @@ public class OrganizationConfig {
 
         @Override
         public List<String> ignoreUsers() {
-            return ignoreUsers == null ? List.of() : preserveUsers;
+            return ignoreUsers == null ? List.of() : ignoreUsers;
         }
 
         @Override
         public String toString() {
-            return "OrgDefaults{field='%s', preserveUsers=%s}"
-                    .formatted(field, preserveUsers);
+            return "OrgDefaults{field='%s', ignoreUsers=%s}"
+                    .formatted(field, ignoreUsers);
         }
     }
 
