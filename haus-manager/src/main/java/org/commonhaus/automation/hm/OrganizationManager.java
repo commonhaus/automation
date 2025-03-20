@@ -14,6 +14,7 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
@@ -42,6 +43,7 @@ import org.kohsuke.github.GitHub;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
@@ -50,28 +52,27 @@ public class OrganizationManager implements LatestOrgConfig {
 
     private static volatile String lastRun = "";
 
-    final FileWatcher fileEvents;
-    final MembershipWatcher membershipEvents;
-    final ManagerBotConfig mgrBotConfig;
-    final AppContextService ctx;
-    final PeriodicUpdateQueue periodicSync;
-    final GitHubTeamService teamSyncService;
+    @Inject
+    AppContextService ctx;
+
+    @Inject
+    FileWatcher fileEvents;
+
+    @Inject
+    MembershipWatcher membershipEvents;
+
+    @Inject
+    ManagerBotConfig mgrBotConfig;
+
+    @Inject
+    PeriodicUpdateQueue periodicSync;
+
+    @Inject
+    GitHubTeamService teamSyncService;
 
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
 
-    public OrganizationManager(AppContextService appContext, ManagerBotConfig mgrBotConfig,
-            FileWatcher fileEvents, MembershipWatcher membershipEvents,
-            PeriodicUpdateQueue periodicSync, GitHubTeamService teamSyncService) {
-        this.ctx = appContext;
-        this.fileEvents = fileEvents;
-        this.membershipEvents = membershipEvents;
-        this.mgrBotConfig = mgrBotConfig;
-        this.periodicSync = periodicSync;
-        this.teamSyncService = teamSyncService;
-
-        Log.debugf("%s MAIN: %s / %s", ME,
-                mgrBotConfig.home().organization(), mgrBotConfig.home().repository());
-
+    void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
     }
 
@@ -86,23 +87,21 @@ public class OrganizationManager implements LatestOrgConfig {
     protected void repositoryDiscovered(
             @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
+        long installationId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
-        String orgName = toOrganizationName(repoFullName);
-        long installationId = repoEvent.installationId();
 
         // We only read configuration files from repositories in the configured organization
         if (action.repository()
-                && orgName.equals(mgrBotConfig.home().organization())
                 && repo.getFullName().equals(mgrBotConfig.home().repositoryFullName())) {
+            Log.debugf("%s/repoDiscovered: %s main=%s", ME, action.name(), repoFullName);
             if (action.added()) {
                 // main repository for configuration
-                Log.debugf("%s/repoDiscovered: added main=%s", ME, repoFullName);
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                // read org config from the main repository
-                periodicSync.queue(ME, () -> readOrgConfig(qc));
+                // READ ORG CONFIG from Main repository immediately.
+                readOrgConfig(qc);
 
                 // Register watcher to monitor for org config changes
                 // GHRepository is backed by a cached connection that can expire
@@ -112,7 +111,6 @@ public class OrganizationManager implements LatestOrgConfig {
                         (fileUpdate) -> processFileUpdate(fileUpdate));
             } else if (action.removed()) {
                 // main repository for configuration
-                Log.debugf("%s/repoDiscovered: removed main=%s", ME, repoFullName);
                 currentConfig.set(Optional.empty());
             }
         }
@@ -180,12 +178,14 @@ public class OrganizationManager implements LatestOrgConfig {
     protected void readOrgConfig(ScopedQueryContext qc) {
         GHRepository repo = qc.getRepository();
         if (repo == null) {
-            Log.warnf("%s/readOrgConfig: repository not set in QueryContext", ME);
+            Log.warnf("%s/readOrgConfig: repository not set in QueryContext; errors: %s", ME,
+                    qc.bundleExceptions());
             return;
         }
         OrganizationConfig orgCfg = qc.readYamlSourceFile(repo, OrganizationConfig.PATH, OrganizationConfig.class);
         if (orgCfg == null) {
-            Log.debugf("%s/readOrgConfig: no %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
+            Log.debugf("%s/readOrgConfig: no %s in %s; errors: %s", ME,
+                    OrganizationConfig.PATH, repo.getFullName(), qc.bundleExceptions());
             return;
         }
         Log.debugf("%s/readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());

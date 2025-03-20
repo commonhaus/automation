@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.context.TestFileNotFoundException;
 import org.commonhaus.automation.hk.api.MemberAttestationResource.AttestationPost;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
@@ -32,7 +33,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContentBuilder;
-import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.mockito.ArgumentCaptor;
@@ -167,7 +167,7 @@ public class MemberDataTest extends HausKeeperTestBase {
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
         when(dataMocks.repository().getFileContent(anyString()))
-                .thenThrow(new GHFileNotFoundException("Badness"));
+                .thenThrow(new TestFileNotFoundException("test ex"));
 
         given()
                 .log().all()

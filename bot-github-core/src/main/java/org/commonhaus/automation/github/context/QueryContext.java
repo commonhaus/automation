@@ -341,6 +341,7 @@ public class QueryContext {
         try {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHFileNotFoundException e) {
+            Log.debugf("[%s] execGitHubSync: file not found: %s", getLogId(), e.toString());
             addException(e);
         } catch (HttpException he) {
             if (he.getResponseCode() == 401 || he.getResponseCode() == 403) {
@@ -356,6 +357,8 @@ public class QueryContext {
                 } else {
                     logAndSendEmail("execGitHubSync: Error executing GitHub API call", he);
                 }
+            } else {
+                Log.debugf("[%s] execGitHubSync: HttpException: %s", getLogId(), he.toString());
             }
             addException(he);
         } catch (Throwable e) {
@@ -864,7 +867,10 @@ public class QueryContext {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
             if (checkRemoveNotFound()) {
-                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+                Log.debugf("readYamlSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            } else {
+                Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
+                        bundleExceptions());
             }
             return null;
         }
@@ -873,6 +879,8 @@ public class QueryContext {
             JsonNode node = ctx.parseYamlFile(content);
             return node == null || node.isNull() ? null : node;
         } catch (IOException e) {
+            Log.debugf("readYamlSourceFile: error parsing YAML from %s in %s: %s",
+                    path, repo.getFullName(), e.toString());
             addException(e);
             return null;
         }
@@ -882,7 +890,10 @@ public class QueryContext {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
             if (checkRemoveNotFound()) {
-                Log.debugf("readSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+                Log.debugf("readYamlSourceFile: source file %s not found in repo %s", path, repo.getFullName());
+            } else {
+                Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
+                        bundleExceptions());
             }
             return null;
         }

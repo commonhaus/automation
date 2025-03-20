@@ -4,7 +4,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.ActionType;
-import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.watchers.FileWatcher.FilePushEvent;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
@@ -17,9 +16,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.Member;
 import io.quarkiverse.githubapp.event.Membership;
 import io.quarkiverse.githubapp.event.Push;
-import io.quarkiverse.githubapp.event.RawEvent;
 import io.quarkiverse.githubapp.event.Team;
-import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 /**
  * GitHub App will transform this into a multiplexed bean for
@@ -34,16 +31,13 @@ public class GitHubEventHandler {
     @Inject
     MembershipWatcher membershipWatcher;
 
-    /** Refresh connections for installations when events arrive */
-    void onEvent(@RawEvent GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient) {
-        if (event == null || event.getInstallationId() == null) {
-            return;
-        }
-        long installationId = event.getInstallationId();
-        BaseQueryCache.putCachedGithubClient(installationId, github);
-        BaseQueryCache.putCachedGraphQLClient(installationId, graphQLClient);
-    }
-
+    /**
+     * Check for push to watched file
+     *
+     * @param event
+     * @param github
+     * @param pushEvent
+     */
     public void handlePushEvent(GitHubEvent event, GitHub github,
             @Push GHEventPayload.Push pushEvent) {
 

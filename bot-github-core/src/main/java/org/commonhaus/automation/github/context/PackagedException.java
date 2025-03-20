@@ -61,4 +61,9 @@ public class PackagedException extends RuntimeException {
         }
         return String.join("; ", messages);
     }
+
+    @Override
+    public String toString() {
+        return super.toString() + ": " + list();
+    }
 }
