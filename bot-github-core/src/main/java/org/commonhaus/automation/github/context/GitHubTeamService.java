@@ -6,10 +6,8 @@ import static org.commonhaus.automation.github.context.QueryContext.toFullName;
 import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -353,10 +351,8 @@ public class GitHubTeamService {
         }
 
         if (isDryRun) {
-            sendNotificationEmail(qc, changes, true, Collections.emptySet(), addresses);
+            sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
         } else {
-            final Set<String> errors = new HashSet<>();
-
             // Execute changes to team
             qc.execGitHubSync((gh, globalDryRunMode) -> {
                 if (globalDryRunMode || isDryRun) {
@@ -367,45 +363,18 @@ public class GitHubTeamService {
                     List<GHUser> toRemove = new ArrayList<>();
                     // Process removals first
                     for (String login : changes.toRemove()) {
-                        try {
-                            toRemove.add(gh.getUser(login));
-                        } catch (IOException e) {
-                            String errorMsg = String.format("Failed to find collaborator %s: %s", login, e.getMessage());
-                            Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
-                            errors.add(errorMsg);
-                        }
+                        toRemove.add(gh.getUser(login));
                     }
-
-                    try {
-                        repository.removeCollaborators(toRemove);
-                    } catch (IOException e) {
-                        String errorMsg = String.format("Failed to remove collaborators: %s", e.getMessage());
-                        Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
-                        errors.add(errorMsg);
-                    }
+                    repository.removeCollaborators(toRemove);
                 }
 
                 if (!changes.toAdd().isEmpty()) {
                     List<GHUser> toAdd = new ArrayList<>();
                     for (String login : changes.toAdd()) {
-                        try {
-                            toAdd.add(gh.getUser(login));
-                        } catch (IOException e) {
-                            String errorMsg = String.format("Failed to find collaborator %s: %s", login, e.getMessage());
-                            Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
-                            errors.add(errorMsg);
-                        }
+                        toAdd.add(gh.getUser(login));
                     }
-
-                    try {
-                        repository.addCollaborators(toAdd, role);
-                    } catch (IOException e) {
-                        String errorMsg = String.format("Failed to add collaborators: %s", e.getMessage());
-                        Log.errorf(e, "[%s] syncCollaborators: %s", qc.getLogId(), errorMsg);
-                        errors.add(errorMsg);
-                    }
+                    repository.addCollaborators(toAdd, role);
                 }
-
                 return null;
             });
 
@@ -413,7 +382,7 @@ public class GitHubTeamService {
             refreshCollaborators(repoFullName);
 
             // Send notification with results
-            sendNotificationEmail(qc, changes, false, errors, addresses);
+            sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
         }
 
         Log.infof("[%s] syncCollaborators: finished syncing %s; %s added; %s removed",
@@ -465,11 +434,10 @@ public class GitHubTeamService {
         }
 
         if (isDryRun) {
-            sendNotificationEmail(qc, changes, true, Collections.emptySet(), addresses);
+            sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
         } else {
-            final Set<String> errors = new HashSet<>();
-
             // Execute changes to team
+            // This will throw on connection or other exception
             qc.execGitHubSync((gh, globalDryRunMode) -> {
                 if (globalDryRunMode || isDryRun) {
                     return null;
@@ -477,28 +445,14 @@ public class GitHubTeamService {
 
                 // Process removals first
                 for (String login : changes.toRemove()) {
-                    try {
-                        GHUser user = gh.getUser(login);
-                        team.remove(user);
-                        Log.infof("[%s] syncMembers: removed %s from %s", qc.getLogId(), login, targetTeam);
-                    } catch (IOException e) {
-                        String errorMsg = String.format("Failed to remove user %s: %s", login, e.getMessage());
-                        Log.errorf(e, "[%s] syncMembers: %s", qc.getLogId(), errorMsg);
-                        errors.add(errorMsg);
-                    }
+                    GHUser user = gh.getUser(login);
+                    team.remove(user);
                 }
 
                 // Then handle additions
                 for (String login : changes.toAdd()) {
-                    try {
-                        GHUser user = gh.getUser(login);
-                        team.add(user);
-                        Log.infof("[%s] syncMembers: added %s to %s", qc.getLogId(), login, targetTeam);
-                    } catch (IOException e) {
-                        String errorMsg = String.format("Failed to add user %s: %s", login, e.getMessage());
-                        Log.errorf(e, "[%s] syncMembers: %s", qc.getLogId(), errorMsg);
-                        errors.add(errorMsg);
-                    }
+                    GHUser user = gh.getUser(login);
+                    team.add(user);
                 }
                 return null;
             });
@@ -507,7 +461,7 @@ public class GitHubTeamService {
             refreshTeam(targetTeam);
 
             // Send notification with results
-            sendNotificationEmail(qc, changes, false, errors, addresses);
+            sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
         }
 
         Log.infof("[%s] syncMembers: finished syncing %s; %s added; %s removed",
@@ -551,11 +505,11 @@ public class GitHubTeamService {
 
     // Send notification email (works for both dry run and audit)
     private void sendNotificationEmail(QueryContext qc, MembershipChanges changes,
-            boolean isDryRun, Set<String> errors, EmailNotification addresses) {
+            boolean isDryRun, PackagedException ex, EmailNotification addresses) {
 
         String[] recipients = isDryRun ? addresses.dryRun() : addresses.audit();
 
-        if (recipients == null || recipients.length == 0) {
+        if (isEmpty(recipients) && isEmpty(addresses.errors()) && ex == null) {
             Log.infof("[%s] sendNotificationEmail: No recipients configured. Changes for %s: Add=%s, Remove=%s",
                     qc.getLogId(), changes.fullName(), changes.addedMembers(), changes.removedMembers());
             return;
@@ -564,7 +518,7 @@ public class GitHubTeamService {
         String unit = changes.collaborators() ? "Outside collaborators for repository" : "Team";
 
         String title = String.format("%s %s changes for %s (%s)",
-                errors.isEmpty() ? "✅" : "⚠️",
+                ex == null ? "✅" : "⚠️",
                 changes.collaborators() ? "Outside collaborator" : "Team membership",
                 changes.fullName(),
                 isDryRun ? "Dry Run" : "Audit");
@@ -605,18 +559,22 @@ public class GitHubTeamService {
                 changes.finalMembers().size(),
                 formatMembers(changes.finalMembers())));
 
-        qc.sendEmail(qc.getLogId(), title, txtBody.toString(), recipients);
+        if (ex == null && !isEmpty(recipients)) {
+            qc.sendEmail(qc.getLogId(), title, txtBody.toString(), recipients);
+        }
 
-        if (!errors.isEmpty()) {
+        if (ex != null) {
             txtBody.append("\nErrors encountered during sync:\n");
-            for (String error : errors) {
-                txtBody.append("- ").append(error).append("\n");
-            }
+            txtBody.append(ex.details()).append("\n");
 
             // Note the scope for this error report: team sync scope first.
             qc.sendEmail(qc.getLogId(), title + " finished with errors", txtBody.toString(),
                     qc.getErrorAddresses(addresses));
         }
+    }
+
+    private boolean isEmpty(String[] array) {
+        return array == null || array.length == 0;
     }
 
     // Format a list of members for email display

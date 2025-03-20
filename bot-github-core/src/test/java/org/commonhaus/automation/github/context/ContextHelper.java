@@ -342,7 +342,7 @@ public class ContextHelper {
         }
         visited.put(key, true);
         when(gh.isCredentialValid()).thenReturn(true);
-        BaseQueryCache.updateConnection(installationId, gh);
+        BaseQueryCache.putCachedGithubClient(installationId, gh);
         return gh;
     }
 
@@ -354,7 +354,7 @@ public class ContextHelper {
      */
     public DynamicGraphQLClient mockGraphQLClient(long installationId) {
         DynamicGraphQLClient dql = mocks.installationGraphQLClient(installationId);
-        BaseQueryCache.updateConnection(installationId, dql);
+        BaseQueryCache.putCachedGraphQLClient(installationId, dql);
         return dql;
     }
 
@@ -628,6 +628,13 @@ public class ContextHelper {
         }
     }
 
+    public void mockResponse(String cue, JsonObject jsonObject) throws ExecutionException, InterruptedException {
+        Response mockResponse = Mockito.mock(Response.class);
+        when(mockResponse.getData()).thenReturn(jsonObject);
+        when(hausMocks.dql().executeSync(contains(cue), anyMap()))
+                .thenReturn(mockResponse);
+    }
+
     public Response mockGraphQLNotFound(MockInstallation mocks, String cue) throws ExecutionException, InterruptedException {
         GraphQLError error = mock(GraphQLError.class);
         when(error.getMessage()).thenReturn("Not Found");
@@ -644,7 +651,6 @@ public class ContextHelper {
 
     public void mockGraphQLException(MockInstallation mocks, String cue, Exception e)
             throws ExecutionException, InterruptedException {
-        ;
         when(mocks.dql()
                 .executeSync(contains(cue), anyMap()))
                 .thenThrow(e);
@@ -898,14 +904,14 @@ public class ContextHelper {
     }
 
     protected void updateConnection(long installationId, GitHub gh) {
-        BaseQueryCache.updateConnection(installationId, gh);
+        BaseQueryCache.putCachedGithubClient(installationId, gh);
     }
 
     protected void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
-        BaseQueryCache.updateConnection(installationId, graphQLClient);
+        BaseQueryCache.putCachedGraphQLClient(installationId, graphQLClient);
     }
 
     protected void resetConnection(long installationId) {
-        BaseQueryCache.resetConnection(installationId);
+        BaseQueryCache.resetCachedClients(installationId);
     }
 }

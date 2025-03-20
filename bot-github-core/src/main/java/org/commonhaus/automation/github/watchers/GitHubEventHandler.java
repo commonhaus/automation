@@ -40,8 +40,8 @@ public class GitHubEventHandler {
             return;
         }
         long installationId = event.getInstallationId();
-        BaseQueryCache.CONNECTION.put("gh-" + installationId, github);
-        BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
+        BaseQueryCache.putCachedGithubClient(installationId, github);
+        BaseQueryCache.putCachedGraphQLClient(installationId, graphQLClient);
     }
 
     public void handlePushEvent(GitHubEvent event, GitHub github,

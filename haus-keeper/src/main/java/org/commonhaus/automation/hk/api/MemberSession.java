@@ -49,17 +49,17 @@ public class MemberSession implements MemberInfo {
      * @throws IOException
      */
     public static GitHub getUserConnection(String nodeId, SecurityIdentity identity) throws IOException {
-        GitHub connect = BaseQueryCache.CONNECTION.get("user-" + nodeId);
+        GitHub connect = BaseQueryCache.getCachedUserConnection(nodeId);
         if (connect == null || !connect.isCredentialValid()) {
             AccessTokenCredential token = identity.getCredential(AccessTokenCredential.class);
             connect = new GitHubBuilder().withOAuthToken(token.getToken(), nodeId).build();
-            BaseQueryCache.CONNECTION.put("user-" + nodeId, connect);
+            BaseQueryCache.putCachedUserConnection(nodeId, connect);
         }
         return connect;
     }
 
     public static void updateUserConnection(String nodeId, GitHub gh) {
-        BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
+        BaseQueryCache.putCachedUserConnection(nodeId, gh);
     }
 
     private final String nodeId;

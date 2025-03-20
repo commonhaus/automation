@@ -98,8 +98,8 @@ public class RepositoryDiscovery {
                 GHAuthenticatedAppInstallation ghai = github.getInstallation();
                 DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(ghiId);
 
-                BaseQueryCache.updateConnection(ghiId, github);
-                BaseQueryCache.updateConnection(ghiId, graphQLClient);
+                BaseQueryCache.putCachedGithubClient(ghiId, github);
+                BaseQueryCache.putCachedGraphQLClient(ghiId, graphQLClient);
 
                 Log.debugf("[%s] Fire initial discovery events", ghiId);
                 for (GHRepository repo : ghai.listRepositories()) {
@@ -147,8 +147,8 @@ public class RepositoryDiscovery {
                 return;
             }
 
-            BaseQueryCache.updateConnection(event.getInstallationId(), github);
-            BaseQueryCache.updateConnection(event.getInstallationId(), graphQLClient);
+            BaseQueryCache.putCachedGithubClient(event.getInstallationId(), github);
+            BaseQueryCache.putCachedGraphQLClient(event.getInstallationId(), graphQLClient);
 
             fireConnectionEvent.fire(
                     new ConnectionEvent(event, github, graphQLClient));

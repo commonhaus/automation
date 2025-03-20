@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github.context;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,20 +35,30 @@ public class PackagedException extends RuntimeException {
     }
 
     public String details() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(getMessage());
-        if (!exceptions.isEmpty()) {
-            sb.append("Exceptions:\n");
+        try (StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw)) {
+            pw.printf("%s Exception(s)\n\n", exceptions.size());
             for (Throwable e : exceptions) {
-                sb.append(e.getMessage()).append("\n");
+                e.printStackTrace(pw);
             }
-        }
-        if (!errors.isEmpty()) {
-            sb.append("Errors:\n");
+            pw.printf("%s Errors(s)\n\n", errors.size());
             for (GraphQLError e : errors) {
-                sb.append(e.getMessage()).append("\n");
+                pw.println(e.getMessage());
             }
+            return sw.toString();
+        } catch (Exception e) {
+            return "Failed to generate details: %s".formatted(e.toString());
         }
-        return sb.toString();
+    }
+
+    public String list() {
+        List<String> messages = new ArrayList<>();
+        for (Throwable e : exceptions) {
+            messages.add(e.toString());
+        }
+        for (GraphQLError e : errors) {
+            messages.add(e.toString());
+        }
+        return String.join("; ", messages);
     }
 }

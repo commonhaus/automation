@@ -57,15 +57,34 @@ public enum BaseQueryCache {
         cache.invalidate(login);
     }
 
-    public static void updateConnection(long installationId, GitHub gh) {
+    public static GitHub getCachedUserConnection(String nodeId) {
+        return BaseQueryCache.CONNECTION.get("user-" + nodeId);
+    }
+
+    public static GitHub putCachedUserConnection(String nodeId, GitHub gh) {
+        BaseQueryCache.CONNECTION.put("user-" + nodeId, gh);
+        return gh;
+    }
+
+    public static GitHub getCachedGitHubClient(long installationId) {
+        return BaseQueryCache.CONNECTION.get("gh-" + installationId);
+    }
+
+    public static GitHub putCachedGithubClient(long installationId, GitHub gh) {
         BaseQueryCache.CONNECTION.put("gh-" + installationId, gh);
+        return gh;
     }
 
-    public static void updateConnection(long installationId, DynamicGraphQLClient graphQLClient) {
+    public static DynamicGraphQLClient getCachedGraphQLClient(long installationId) {
+        return BaseQueryCache.CONNECTION.get("graphQL-" + installationId);
+    }
+
+    public static DynamicGraphQLClient putCachedGraphQLClient(long installationId, DynamicGraphQLClient graphQLClient) {
         BaseQueryCache.CONNECTION.put("graphQL-" + installationId, graphQLClient);
+        return graphQLClient;
     }
 
-    public static void resetConnection(long installationId) {
+    public static void resetCachedClients(long installationId) {
         if (installationId < 0) { // user session
             return;
         }

@@ -14,6 +14,7 @@ import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GitHub;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
+import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 import io.vertx.mutiny.core.eventbus.EventBus;
 
@@ -59,28 +60,26 @@ public abstract class BaseContextService implements ContextService {
     }
 
     public GitHub getInstallationClient(long installationId) {
-        GitHub gh = BaseQueryCache.CONNECTION.get("gh-" + installationId);
-        if (gh != null) {
-            return gh;
+        GitHub gh = BaseQueryCache.getCachedGitHubClient(installationId);
+        if (gh == null) {
+            Log.debugf("GitHub client not found or expired for %s, creating new connection", installationId);
+            BaseQueryCache.resetCachedClients(installationId);
+            gh = gitHubClientProvider.getInstallationClient(installationId);
+            if (gh != null) {
+                BaseQueryCache.putCachedGithubClient(installationId, gh);
+            }
         }
-        // there is no way to test the graphql client's credentials for validity.
-        // if the GH credentials are invalid, invalidate the GraphQL client
-        // so it reconnects next time.
-        BaseQueryCache.CONNECTION.invalidate("graphQL-" + installationId);
-
-        gh = gitHubClientProvider.getInstallationClient(installationId);
-        BaseQueryCache.updateConnection(installationId, gh);
         return gh;
     }
 
     public DynamicGraphQLClient getInstallationGraphQLClient(long installationId) {
-        DynamicGraphQLClient graphQLClient = BaseQueryCache.CONNECTION.get("graphQL-" + installationId);
-        if (graphQLClient != null) {
-            return graphQLClient;
+        DynamicGraphQLClient graphQLClient = BaseQueryCache.getCachedGraphQLClient(installationId);
+        if (graphQLClient == null) {
+            graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
+            if (graphQLClient != null) {
+                BaseQueryCache.putCachedGraphQLClient(installationId, graphQLClient);
+            }
         }
-
-        graphQLClient = gitHubClientProvider.getInstallationGraphQLClient(installationId);
-        BaseQueryCache.updateConnection(installationId, graphQLClient);
         return graphQLClient;
     }
 

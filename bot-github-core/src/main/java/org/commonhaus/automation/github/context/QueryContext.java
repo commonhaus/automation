@@ -35,6 +35,7 @@ import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
+import io.smallrye.graphql.client.impl.ResponseImpl;
 
 /**
  * Base class for short-lived context objects that can handle a series of GitHub
@@ -69,6 +70,7 @@ public class QueryContext {
 
     final List<GraphQLError> errors = new ArrayList<>(1);
     final List<Throwable> exceptions = new ArrayList<>(1);
+    volatile int countAuthRetry = 0;
 
     protected final ContextService ctx;
     protected final long installationId;
@@ -297,20 +299,8 @@ public class QueryContext {
                 HttpURLConnection.HTTP_PROXY_AUTH,
                 HttpURLConnection.HTTP_BAD_GATEWAY,
                 HttpURLConnection.HTTP_CLIENT_TIMEOUT,
-                HttpURLConnection.HTTP_GATEWAY_TIMEOUT).contains(getResponseCode(e)));
-    }
-
-    public boolean hasAuthorizationError() {
-        // Unauthorized can be retried after connection is refreshed.
-        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
-                HttpURLConnection.HTTP_PROXY_AUTH).contains(getResponseCode(e)));
-    }
-
-    private int getResponseCode(Throwable e) {
-        if (e instanceof HttpException) {
-            return ((HttpException) e).getResponseCode();
-        }
-        return -1;
+                HttpURLConnection.HTTP_GATEWAY_TIMEOUT)
+                .contains(getResponseCode(e)));
     }
 
     /**
@@ -344,18 +334,32 @@ public class QueryContext {
      */
     public <R> R execGitHubSync(GitHubParameterApiCall<R> ghApiCall) {
         if (hasErrors()) {
+            Log.debugf("[%s] execGitHubSync: QueryContext has existing errors, skipping: %s",
+                    getLogId(), bundleExceptions().list());
             return null;
         }
         try {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHFileNotFoundException e) {
             addException(e);
+        } catch (HttpException he) {
+            if (he.getResponseCode() == 401 || he.getResponseCode() == 403) {
+                if (countAuthRetry++ < 2) {
+                    Log.debugf("[%s] execGitHubSync: Authorization error: %s", getLogId(), he);
+                    // Clear the cached clients to force fresh token acquisition
+                    BaseQueryCache.resetCachedClients(installationId);
+                    // Reset our local instances to force fresh retrieval
+                    this.github = null;
+                    this.graphQLClient = null;
+                    // Let's try again
+                    return execGitHubSync(ghApiCall);
+                } else {
+                    logAndSendEmail("execGitHubSync: Error executing GitHub API call", he);
+                }
+            }
+            addException(he);
         } catch (Throwable e) {
             addException(e);
-        }
-        if (hasAuthorizationError()) {
-            Log.debugf("[%s] execGitHubSync: Authorization error, resetting connection", getLogId());
-            BaseQueryCache.resetConnection(installationId);
         }
         return null;
     }
@@ -392,13 +396,57 @@ public class QueryContext {
             Log.debugf("[%s] execQuerySync: %s with %s", getLogId(), variables, query);
             response = graphqlCLI.executeSync(query, variables);
             Log.debugf("[%s] execQuerySync: result ? %s", getLogId(), response == null ? null : response.getData());
-            if (response != null && response.hasError()) {
-                errors.addAll(response.getErrors());
+
+            // Check if the response has authentication errors
+            if (response != null) {
+                // Check HTTP status code first
+                Integer statusCode = extractStatusCode(response);
+                if (statusCode != null && (statusCode == 401 || statusCode == 403)) {
+                    if (countAuthRetry++ < 2) {
+                        Log.debugf(
+                                "[%s] execQuerySync: Auth error detected (status code %d), refreshing token and retrying",
+                                getLogId(), statusCode);
+                        BaseQueryCache.resetCachedClients(installationId);
+                        this.github = null;
+                        this.graphQLClient = null;
+                        return execQuerySync(query, variables);
+                    } else {
+                        Log.debugf("[%s] execQuerySync: Auth error retry limit reached", getLogId());
+                    }
+                }
+                if (response.hasError()) {
+                    errors.addAll(response.getErrors());
+                }
             }
         } catch (Throwable e) {
             addException(e);
         }
         return response;
+    }
+
+    private int getResponseCode(Throwable e) {
+        if (e instanceof HttpException) {
+            return ((HttpException) e).getResponseCode();
+        }
+        return -1;
+    }
+
+    // Helper method to extract status code from response
+    private Integer extractStatusCode(Response response) {
+        if (response instanceof ResponseImpl) {
+            Map<String, List<String>> meta = response.getTransportMeta();
+            if (meta != null && meta.containsKey(ResponseImpl.STATUS_CODE)) {
+                List<String> codes = meta.get(ResponseImpl.STATUS_CODE);
+                if (codes != null && !codes.isEmpty()) {
+                    try {
+                        return Integer.parseInt(codes.get(0));
+                    } catch (NumberFormatException ignored) {
+                        // Ignore parsing errors
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**

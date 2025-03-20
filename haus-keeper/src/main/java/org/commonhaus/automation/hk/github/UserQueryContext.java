@@ -35,6 +35,13 @@ public class UserQueryContext extends QueryContext {
 
     @Override
     public GitHub getGitHub() {
+        if (github == null) {
+            try {
+                github = MemberSession.getUserConnection(session.nodeId(), session.identity());
+            } catch (Exception e) {
+                logAndSendEmail(session.nodeId(), e);
+            }
+        }
         return github;
     }
 
