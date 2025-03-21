@@ -88,12 +88,12 @@ public class PeriodicUpdateQueue {
     }
 
     public void queue(String name, Runnable task) {
-        Log.debugf("QUEUE task %s", name);
+        Log.debugf("QUEUE CHANGE task %s", name);
         taskQueue.add(new Task(TaskType.CHANGE, name, task));
     }
 
     public void queueReconciliation(String name, Runnable task) {
-        Log.debugf("QUEUE reconciliation %s", name);
+        Log.debugf("QUEUE RECONCILE task %s", name);
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 
@@ -107,7 +107,7 @@ public class PeriodicUpdateQueue {
      * @param retryCount Previous retry count (0 for initial attempt)
      */
     public void scheduleReconciliationRetry(String name, Consumer<Integer> retryRunnable, int retryCount) {
-        Log.debugf("SCHEDULE reconciliation %s", name);
+        Log.debugf("SCHEDULE task %s", name);
         retryTasks.putIfAbsent(name, new RetryTask(name, retryRunnable, retryCount));
     }
 
@@ -119,6 +119,7 @@ public class PeriodicUpdateQueue {
     }
 
     private void run(Task task) {
+        Log.debugf("%s [begin] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
         try {
             // skip or collapse reconciliation task?
             Task next = taskQueue.peek();
@@ -127,9 +128,9 @@ public class PeriodicUpdateQueue {
                 if (next != null && next.name().equals(task.name())) {
                     if (next.type() == TaskType.CHANGE) {
                         taskQueue.add(task); // Re-queue this reconciliation for later
-                        Log.debugf("RECONCILE %s task postponed for same-group changes", task.name());
+                        Log.debugf("RECONCILE [postpone] %s task; same-group changes", task.name());
                     } else {
-                        Log.debugf("RECONCILE %s task skipped (duplicate next)", task.name());
+                        Log.debugf("RECONCILE [skip] %s task; duplicate next", task.name());
                     }
                     return;
                 }
@@ -142,7 +143,7 @@ public class PeriodicUpdateQueue {
                     "Error running %s %s task".formatted(task.type(), task.name()),
                     e, logMailer.botErrorEmailAddress());
         }
-        Log.debugf("%s %s task completed; %s remaining", task.type(), task.name(), taskQueue.size());
+        Log.debugf("%s [end] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
     }
 
     /**
