@@ -7,8 +7,9 @@ gitHubResources: github-resources.yml
 
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
-teamAccess:
+collaboratorSync:
   source: other-org/teamA
+  role: push
   logins:
     - user4
   # ignore the presence/absence of these logins

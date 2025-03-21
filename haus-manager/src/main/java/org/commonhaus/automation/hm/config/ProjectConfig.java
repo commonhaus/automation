@@ -24,7 +24,7 @@ public class ProjectConfig {
     protected Boolean dryRun;
 
     protected String gitHubResources;
-    protected TeamAccess teamAccess;
+    protected CollaboratorSync collaboratorSync;
     protected EmailNotification emailNotifications;
 
     @JsonIgnore
@@ -34,8 +34,8 @@ public class ProjectConfig {
      * Return list of teams that should have membership
      * syncnronized from a source team.
      */
-    public TeamAccess teamAccess() {
-        return teamAccess;
+    public CollaboratorSync collaboratorSync() {
+        return collaboratorSync;
     }
 
     /** If present and true, do not modify any resources */
@@ -59,7 +59,7 @@ public class ProjectConfig {
     @Override
     public String toString() {
         return "ProjectConfigFile{dryRun=%s, enabled='%s', %s, %s}"
-                .formatted(dryRun(), enabled(), emailNotifications(), teamAccess());
+                .formatted(dryRun(), enabled(), emailNotifications(), collaboratorSync());
     }
 
     /**
@@ -70,8 +70,9 @@ public class ProjectConfig {
      * @param source Source team to synchronize from (organization/teamName)
      * @param ignoreUsers List of users to ignore when syncing
      */
-    public record TeamAccess(
+    public record CollaboratorSync(
             String source,
+            String role,
             List<String> logins,
             List<String> ignoreUsers) {
 
@@ -86,9 +87,14 @@ public class ProjectConfig {
         }
 
         @Override
+        public String role() {
+            return role != null ? role : "triage";
+        }
+
+        @Override
         public String toString() {
-            return "TeamAccess{source=%s, logins=%s, ignoreUsers=%s}"
-                    .formatted(source, logins(), ignoreUsers());
+            return "TeamAccess{source=%s, role=%s, logins=%s, ignoreUsers=%s}"
+                    .formatted(source(), role(), logins(), ignoreUsers());
         }
     }
 }

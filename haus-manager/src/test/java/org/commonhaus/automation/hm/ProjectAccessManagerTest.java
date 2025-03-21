@@ -2,6 +2,7 @@ package org.commonhaus.automation.hm;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -105,9 +106,13 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
 
         // We should expect members of the team, and login from the config file
         Set<String> expectedLogins = Set.of("user1", "user2", "other3", "other4", "user4");
+        String expectedRoleString = "push";
+
         // This should be called twice (file and membership events)
         verify(teamService, times(2)).syncCollaborators(any(),
-                eq(hausMocks.repository()), any(), eq(expectedLogins), any(), anyBoolean(), any());
+                eq(hausMocks.repository()),
+                argThat(actualRole -> actualRole.toString().equals(expectedRoleString)),
+                eq(expectedLogins), any(), anyBoolean(), any());
     }
 
     @Test

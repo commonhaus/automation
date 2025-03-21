@@ -114,7 +114,7 @@ dryRun: true
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
 # Specifially, this team can be in a different organization
-teamAccess:
+collaboratorSync:
   source: other-org/teamA
 
   # Hard-code some logins that should be added as collaborators

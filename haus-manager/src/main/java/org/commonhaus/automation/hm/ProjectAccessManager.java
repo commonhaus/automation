@@ -31,7 +31,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
-import org.commonhaus.automation.hm.config.ProjectConfig.TeamAccess;
+import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 
@@ -238,14 +238,14 @@ public class ProjectAccessManager {
         Log.debugf("[%s] %s: team membership sync; %s", ME, newState.taskGroup(), newState.projectConfig());
 
         ProjectConfig projectConfig = newState.projectConfig();
-        if (!projectConfig.enabled() || projectConfig.teamAccess() == null) {
+        if (!projectConfig.enabled() || projectConfig.collaboratorSync() == null) {
             Log.infof("[%s] %s: configuration disabled or teamAccess missing; skipping %s", ME, newState.taskGroup(),
                     projectConfig);
             return;
         }
 
         boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
-        TeamAccess teamAccess = projectConfig.teamAccess();
+        CollaboratorSync teamAccess = projectConfig.collaboratorSync();
         String sourceTeamName = teamAccess.source();
 
         ScopedQueryContext projectQc = new ScopedQueryContext(ctx, newState.installationId(), newState.repoFullName());
@@ -285,10 +285,10 @@ public class ProjectAccessManager {
             return;
         }
 
-        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole.from(GHOrganization.Permission.PUSH);
+        GHOrganization.RepositoryRole role = toRole(newState, teamAccess.role());
 
         // Add configured logins as outside collaborators on the repository that contains the configuration file.
-        teamSyncService.syncCollaborators(projectQc, repo, collaboratorRole,
+        teamSyncService.syncCollaborators(projectQc, repo, role,
                 sourceLogins, teamAccess.ignoreUsers(),
                 isDryRun, projectConfig.emailNotifications());
 
@@ -308,6 +308,30 @@ public class ProjectAccessManager {
         Log.debugf("[%s] %s: team membership sync complete; %s", ME, newState.taskGroup(), newState.projectConfig());
     }
 
+    private GHOrganization.RepositoryRole toRole(ProjectConfigState state, String rolePermission) {
+        GHOrganization.Permission permission = GHOrganization.Permission.TRIAGE;
+        if (rolePermission != null) {
+            for (GHOrganization.Permission p : GHOrganization.Permission.values()) {
+                if (p.name().equalsIgnoreCase(rolePermission)) {
+                    permission = p;
+                }
+            }
+            if (!permission.name().toLowerCase().equals(rolePermission.toLowerCase())) {
+                Log.warnf("[%s] %s: unknown role permission %s; using TRIAGE", ME, state.taskGroup(), rolePermission);
+                ctx.sendEmail(ME, "Unknown role permission",
+                        """
+                                Unknown role/permission %s in config file; using TRIAGE.
+
+                                Please check the configuration file and correct the role/permission value.
+
+                                %s
+                                """.formatted(rolePermission, state.projectConfig()),
+                        ctx.getErrorAddresses(state.projectConfig().emailNotifications()));
+            }
+        }
+        return GHOrganization.RepositoryRole.from(permission);
+    }
+
     static record ProjectConfigState(
             String taskGroup,
             String repoFullName,
@@ -315,16 +339,16 @@ public class ProjectAccessManager {
             ProjectConfig projectConfig) {
 
         public String sourceTeam() {
-            TeamAccess myAccess = projectConfig.teamAccess();
+            CollaboratorSync myAccess = projectConfig.collaboratorSync();
             return myAccess != null ? myAccess.source() : null;
         }
 
         public boolean sourceTeamHasChanged(ProjectConfigState other) {
-            TeamAccess myAccess = projectConfig.teamAccess();
+            CollaboratorSync myAccess = projectConfig.collaboratorSync();
             if (myAccess == null || myAccess.source() == null) {
                 return false; // nothing to clean up
             }
-            TeamAccess otherAccess = other.projectConfig.teamAccess();
+            CollaboratorSync otherAccess = other.projectConfig.collaboratorSync();
             return otherAccess == null || !myAccess.source().equals(otherAccess.source());
         }
 
