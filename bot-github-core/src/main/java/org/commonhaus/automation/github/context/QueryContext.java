@@ -335,13 +335,12 @@ public class QueryContext {
     public <R> R execGitHubSync(GitHubParameterApiCall<R> ghApiCall) {
         if (hasErrors()) {
             Log.debugf("[%s] execGitHubSync: QueryContext has existing errors, skipping: %s",
-                    getLogId(), bundleExceptions().list());
+                    getLogId(), bundleExceptions());
             return null;
         }
         try {
             return ghApiCall.apply(getGitHub(), isDryRun());
         } catch (GHFileNotFoundException e) {
-            Log.debugf("[%s] execGitHubSync: file not found: %s", getLogId(), e.toString());
             addException(e);
         } catch (HttpException he) {
             if (he.getResponseCode() == 401 || he.getResponseCode() == 403) {
@@ -355,13 +354,14 @@ public class QueryContext {
                     // Let's try again
                     return execGitHubSync(ghApiCall);
                 } else {
-                    logAndSendEmail("execGitHubSync: Error executing GitHub API call", he);
+                    Log.debugf("[%s] execGitHubSync: Auth error retry limit reached", getLogId());
                 }
             } else {
-                Log.debugf("[%s] execGitHubSync: HttpException: %s", getLogId(), he.toString());
+                Log.debugf("[%s] execGitHubSync: HttpException: %s", getLogId(), he);
             }
             addException(he);
         } catch (Throwable e) {
+            Log.debugf("[%s] execGitHubSync: Throwable: %s", getLogId(), e);
             addException(e);
         }
         return null;
@@ -418,10 +418,12 @@ public class QueryContext {
                     }
                 }
                 if (response.hasError()) {
+                    Log.debugf("[%s] execQuerySync: GraphQL Error: %s", getLogId(), response.getErrors());
                     errors.addAll(response.getErrors());
                 }
             }
         } catch (Throwable e) {
+            Log.debugf("[%s] execQuerySync: Throwable: %s", getLogId(), e);
             addException(e);
         }
         return response;
@@ -866,9 +868,7 @@ public class QueryContext {
     public JsonNode readYamlSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            if (checkRemoveNotFound()) {
-                Log.debugf("readYamlSourceFile: source file %s not found in repo %s", path, repo.getFullName());
-            } else {
+            if (!checkRemoveNotFound()) {
                 Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
                         bundleExceptions());
             }
@@ -889,9 +889,7 @@ public class QueryContext {
     public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
-            if (checkRemoveNotFound()) {
-                Log.debugf("readYamlSourceFile: source file %s not found in repo %s", path, repo.getFullName());
-            } else {
+            if (!checkRemoveNotFound()) {
                 Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
                         bundleExceptions());
             }
@@ -900,6 +898,8 @@ public class QueryContext {
         try {
             return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
+            Log.debugf("readYamlSourceFile: error parsing YAML from %s in %s: %s",
+                    path, repo.getFullName(), e.toString());
             addException(e);
             return null;
         }

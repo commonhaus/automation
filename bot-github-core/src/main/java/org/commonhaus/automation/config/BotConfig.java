@@ -63,6 +63,25 @@ public interface BotConfig {
         return dryRun().orElse(false);
     }
 
+    default String display() {
+        return """
+                dryRun=%s
+                discoveryEnabled=%s
+
+                errorEmailAddress=%s
+                replyTo=%s
+
+                queue.initialDelay=%s
+                queue.period=%s
+                """.formatted(
+                isDryRun(),
+                isDiscoveryEnabled(),
+                errorEmailAddress().orElse("N/A"),
+                replyTo().orElse("N/A"),
+                queue().initialDelay(),
+                queue().period());
+    }
+
     interface DryRunBotConfig {
         @WithDefault("12345")
         int databaseId();

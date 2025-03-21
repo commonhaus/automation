@@ -27,9 +27,7 @@ public class Main {
         public int run(String... args) {
             java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0");
 
-            System.out.println("discoveryEnabled=" + botConfig.isDiscoveryEnabled());
-            System.out.println("dryRun=" + botConfig.isDryRun());
-            System.out.println("replyTo=" + botConfig.replyTo().orElse("N/A"));
+            System.out.println(botConfig.display());
 
             // Reminder: stop can happen elsewhere with Quarkus.asyncExit()
             Quarkus.waitForExit();
