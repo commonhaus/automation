@@ -10,6 +10,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import jakarta.inject.Inject;
 
@@ -70,8 +72,10 @@ public class OrganizationManagerTest extends HausManagerTestBase {
 
         OrganizationConfig config = organizationManager.getConfig();
         assertThat(config).isNotNull();
-        System.out.println("Config teams: " + config.teamMembership().sync().keySet());
-        assertThat(config.teamMembership().sync()).isNotEmpty();
+
+        List<String> teamNames = teams(config);
+        System.out.println("Config teams: " + teamNames);
+        assertThat(teamNames).isNotEmpty();
 
         triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, true);
 
@@ -99,8 +103,9 @@ public class OrganizationManagerTest extends HausManagerTestBase {
 
         OrganizationConfig config = organizationManager.getConfig();
         assertThat(config).isNotNull();
-        System.out.println("Config teams: " + config.teamMembership().sync().keySet());
-        assertThat(config.teamMembership().sync()).isNotEmpty();
+        List<String> teamNames = teams(config);
+        System.out.println("Config teams: " + teamNames);
+        assertThat(teamNames).isNotEmpty();
 
         // Verify team cache was refreshed
         verify(contactRepo, timeout(1000)).getFileContent(anyString());
@@ -109,5 +114,11 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
+    }
+
+    List<String> teams(OrganizationConfig config) {
+        return config.teamMembership().stream()
+                .flatMap(x -> x.watchedTeams("org").stream())
+                .collect(Collectors.toList());
     }
 }

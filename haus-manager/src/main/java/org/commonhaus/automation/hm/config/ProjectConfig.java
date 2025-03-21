@@ -25,6 +25,7 @@ public class ProjectConfig {
 
     protected String gitHubResources;
     protected CollaboratorSync collaboratorSync;
+    protected List<GroupMapping> teamMembership;
     protected EmailNotification emailNotifications;
 
     @JsonIgnore
@@ -36,6 +37,10 @@ public class ProjectConfig {
      */
     public CollaboratorSync collaboratorSync() {
         return collaboratorSync;
+    }
+
+    public List<GroupMapping> teamMembership() {
+        return teamMembership == null ? List.of() : teamMembership;
     }
 
     /** If present and true, do not modify any resources */
@@ -67,18 +72,18 @@ public class ProjectConfig {
      * synchronized with outside collaborators of the repo
      * containing this configuration file.
      *
-     * @param source Source team to synchronize from (organization/teamName)
+     * @param sourceTeam Source team to synchronize from (organization/teamName)
      * @param ignoreUsers List of users to ignore when syncing
      */
     public record CollaboratorSync(
-            String source,
             String role,
-            List<String> logins,
+            String sourceTeam,
+            List<String> includeUsers,
             List<String> ignoreUsers) {
 
         @Override
-        public List<String> logins() {
-            return logins != null ? logins : List.of();
+        public List<String> includeUsers() {
+            return includeUsers != null ? includeUsers : List.of();
         }
 
         @Override
@@ -93,8 +98,8 @@ public class ProjectConfig {
 
         @Override
         public String toString() {
-            return "TeamAccess{source=%s, role=%s, logins=%s, ignoreUsers=%s}"
-                    .formatted(source(), role(), logins(), ignoreUsers());
+            return "TeamAccess{sourceTeam=%s, role=%s, logins=%s, ignoreUsers=%s}"
+                    .formatted(sourceTeam(), role(), includeUsers(), ignoreUsers());
         }
     }
 }

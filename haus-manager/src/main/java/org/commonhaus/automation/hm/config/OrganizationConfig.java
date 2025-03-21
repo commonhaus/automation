@@ -1,7 +1,6 @@
 package org.commonhaus.automation.hm.config;
 
 import java.util.List;
-import java.util.Map;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
@@ -14,9 +13,9 @@ public class OrganizationConfig {
     public static final String PATH = ".github/" + NAME;
 
     protected EmailNotification emailNotifications;
-    protected Sponsors sponsors;
-    protected GroupMapping teamMembership;
+    protected List<GroupMapping> teamMembership;
     protected ProjectList projects;
+    protected Sponsors sponsors;
 
     /**
      * @return the emailNotifications
@@ -37,8 +36,8 @@ public class OrganizationConfig {
     /**
      * @return the teamMembership
      */
-    public GroupMapping teamMembership() {
-        return teamMembership;
+    public List<GroupMapping> teamMembership() {
+        return teamMembership == null ? List.of() : teamMembership;
     }
 
     /**
@@ -76,103 +75,6 @@ public class OrganizationConfig {
         public String toString() {
             return "SponsorsConfig{dryRun=%s, targetRepository='%s', sources=%s}"
                     .formatted(dryRun(), targetRepository, sources);
-        }
-    }
-
-    /**
-     * File to read as source of groups and their members.
-     * The file should contain a list of groups, each with a list of members.
-     *
-     * @param source Path to the source file (usually CONTACTS.yaml)
-     * @param defaults Common fallback values for team configuration
-     * @param sync Mapping of groups to teams and their members
-     * @param dryRun If true, do not update team or organization membership
-     */
-    public record GroupMapping(
-            RepoSource source,
-            OrgDefaults defaults,
-            Map<String, SyncToTeams> sync,
-            Boolean dryRun) {
-
-        public boolean performSync() {
-            return sync() != null && source() != null && !source().isEmpty();
-        }
-
-        @Override
-        public Boolean dryRun() {
-            return dryRun != null && dryRun;
-        }
-
-        @Override
-        public String toString() {
-            return "GroupMapping{dryRun=%s, source='%s', defaults=%s, sync=%s}"
-                    .formatted(dryRun(), source(), defaults, sync);
-        }
-    }
-
-    /**
-     * Propagate the logins from the source file (CONTACTS.yaml) to the teams in the target repository.
-     * CONTACTS.yaml is read as the sourceFile in GroupMapping.
-     * Each element of a group looks something like this:
-     *
-     * <pre>
-     * # - role: Council/Officer role
-     * #   login: council/officer github id
-     * </pre>
-     *
-     * <pre>
-     * # - project: Project name (match key in PROJECTS.yaml)
-     * #   login: project representatives's github id
-     * </pre>
-     *
-     * This configuration defines the teams these individuals should belong to.
-     *
-     * @param field The field in the source file that contains the login (usually 'login')
-     * @param teams List of teams to which the logins should be added (organization/teamName)
-     * @param preserveUsers List of users to preserve in the teams (add if missing)
-     * @param ignoreUsers List of users to ignore in the teams (do nothing / skip)
-     */
-    public record SyncToTeams(
-            String field,
-            List<String> teams,
-            List<String> preserveUsers,
-            List<String> ignoreUsers) {
-        @Override
-        public List<String> teams() {
-            return teams == null ? List.of() : teams;
-        }
-
-        @Override
-        public List<String> preserveUsers() {
-            return preserveUsers == null ? List.of() : preserveUsers;
-        }
-
-        public List<String> preserveUsers(OrgDefaults defaults) {
-            return preserveUsers == null ? defaults.preserveUsers() : preserveUsers;
-        }
-
-        @Override
-        public List<String> ignoreUsers() {
-            return ignoreUsers == null ? List.of() : ignoreUsers;
-        }
-
-        public List<String> ignoreUsers(OrgDefaults defaults) {
-            return ignoreUsers == null ? defaults.ignoreUsers() : ignoreUsers;
-        }
-
-        @Override
-        public String field() {
-            return field == null ? "login" : field;
-        }
-
-        public String field(OrgDefaults defaults) {
-            return field == null ? defaults.field() : field;
-        }
-
-        @Override
-        public String toString() {
-            return "SyncToTeams{field='%s', preserveUsers=%s, teams=%s}"
-                    .formatted(field, preserveUsers, teams);
         }
     }
 
@@ -227,5 +129,20 @@ public class OrganizationConfig {
         public String toString() {
             return "ProjectList{source='%s'}".formatted(source);
         }
+    }
+
+    /**
+     * Ensure that the team name is fully qualified with the organization name.
+     * If the team name is already fully qualified, it is returned as is.
+     * Otherwise, the organization _of the source file_ is prepended to the team name.
+     *
+     * @param teamName
+     * @return
+     */
+    public static String toFullTeamName(String defaultOrg, String teamName) {
+        if (teamName.contains("/")) {
+            return teamName;
+        }
+        return "%s/%s".formatted(defaultOrg, teamName);
     }
 }

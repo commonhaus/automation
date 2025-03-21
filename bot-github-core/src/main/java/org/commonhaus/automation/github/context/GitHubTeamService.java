@@ -89,9 +89,6 @@ public class GitHubTeamService {
     /**
      * Invalidate the cache for the specified team to force
      * a refresh on the next access.
-     *
-     * @param org
-     * @param ghTeam
      */
     public static void refreshTeam(String teamFullName) {
         resetCachedTeam(teamFullName);
@@ -160,7 +157,6 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    @Nonnull
     public Set<String> getTeamLogins(QueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         if (members == null) {
@@ -263,7 +259,7 @@ public class GitHubTeamService {
      * Get repository collaborators.
      *
      * @param qc QueryContext
-     * @param repoFullName full repository name
+     * @param repository GH repository
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull

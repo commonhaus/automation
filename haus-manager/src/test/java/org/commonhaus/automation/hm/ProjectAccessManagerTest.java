@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,7 @@ import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.logging.Log;
@@ -63,6 +65,14 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
 
     @Test
     void testRepositoryEvents() throws IOException {
+        GHRepository contactRepo = mockRepository("public-org/source", hausMocks.github());
+        mockFileContent(contactRepo, "signatories.yaml",
+                "src/test/resources/signatories.yml");
+
+        mockTeam("test-org/cf-council", null);
+        mockTeam("test-org/admin", null);
+        mockTeam("test-org/team-quorum", null);
+
         // Trigger discovery to initialize manager
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
 
@@ -74,11 +84,14 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
         // This should be called only once (first event); second event cleans state
         verify(teamService, times(1)).syncCollaborators(any(),
                 eq(hausMocks.repository()), any(), any(), any(), anyBoolean(), any());
+
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
     }
 
     @Test
     void testConfigurationUpdated() throws IOException {
-
         mockTeam("other-org/teamA", project_org.github(), otherTeamLogins);
 
         when(teamService.getTeamLogins(any(), any()))

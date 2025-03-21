@@ -10,6 +10,6 @@ public record RepoSource(String repository, String filePath) {
 
     @Override
     public String toString() {
-        return "%s#=%s".formatted(repository(), filePath());
+        return "%s#%s".formatted(repository(), filePath());
     }
 }

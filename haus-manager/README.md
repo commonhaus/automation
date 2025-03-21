@@ -31,53 +31,53 @@ automation.hausManager.cron.organization=0 47 2 */3 * ?
 automation.hausManager.cron.projects=0 47 */3 * * ?
 ```
 
-## Common config structures
-
-- `source`: `repository` and `filePath` describing a file that should be read (for whatever reason).
-
-    If a repository is not specified for a `source` entry, the bot home repository is used (`${automation.hausManager.home.organization}/${automation.hausManager.home.repository}`)
-
 ## Organization Management
 
-- Configuraton file: `.github/cf-haus-organization.yml`
+Organization-level configuration management.
+
 - *Single configuration* read from `${automation.hausManager.home.organization}/${automation.hausManager.home.repository}`
+- File path: `.github/cf-haus-organization.yml`
 - Source: `haus-manager/src/main/java/org/commonhaus/automation/hm/config/OrganizationConfig.java`
+
+[`teamMembership`](#team-membership) is a common/shared structure.
 
 ```yaml
 teamMembership:
-  # If present and true, do not make any changes. Result sent to dry-run email address.
-  dryRun: true
+  - # Source mapping teams to users
+    source:
+      repository: public-org/source
+      filePath: CONTACTS.yaml
 
-  # Source mapping teams to users
-  source:
-    repository: public-org/source
-    filePath: CONTACTS.yaml
+    # If present and true, do not make any changes. Result sent to dry-run email address.
+    dryRun: true
 
-  # Define defaults for all teams:
-  # field defines key containing GitHub login
-  # preserve_users defines users whose presence/absence should be ignored (bots)
-  defaults:
-    field: login
-    preserve_users:
-      - test-bot
+    # Define defaults for all teams:
+    # field defines key containing GitHub login
+    # ignoreUsers: users not in the source list that should be ignored
+    # preserveUsers: users not in the source list that should be added if missing
+    defaults:
+      field: login
+      preserveUsers:
+        - maintainer
+      ignoreUsers:
+        - test-bot
 
-  # Map members of teams (as read from source) to GitHub organization teams
-  sync:
-    cf-council:
-      teams:
-        - test-org/cf-council
-        - test-org/admin
-    egc:
-      teams:
-        - test-org/team-quorum
+    # Map members of teams (as read from source) to GitHub organization teams
+    # field, ignoreUsers, perserveUsers can be defined as siblings of teams
+    pushMembers:
+      cf-council:
+        teams:
+          - test-org/cf-council
+          - test-org/admin
+      egc:
+        teams:
+          - test-org/team-quorum
 
 ## List of known projects (single source of truth, verifies project configuration)
 projects:
   source:
     filePath: PROJECTS.yaml
 
-# Define repository-specific target email addresses
-# Error addresses will be combined with bot default
 emailNotifications:
   errors:
     - test@test.org
@@ -87,21 +87,12 @@ emailNotifications:
     - records@test.org
 ```
 
-`sync` assumes the following source file structure:
-
-```yml
-team-name-key:
-    - field: user-login
-    ... (other stuff, ignored)
-```
-
-For each team (`team-name-key` from source), it will ensure each user (login specified by `login` or the field defined in `defaults.field`)
-is a member of the specified teams.
-
 ## Project Management
 
-- Configuraton file: `.github/cf-haus-manager.yml`
+Project-level management for project-specific teams and resources.
+
 - *Multiple configurations* read from projects in `${automation.hausManager.home.organization}`
+- File path: `.github/cf-haus-manager.yml`
 - Source: `haus-manager/src/main/java/org/commonhaus/automation/hm/config/ProjectConfig.java`
 
 ```yaml
@@ -113,20 +104,21 @@ dryRun: true
 
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
-# Specifially, this team can be in a different organization
+# This team will likely be in a different organization
 collaboratorSync:
-  source: other-org/teamA
+  sourceTeam: other-org/teamA
 
   # Hard-code some logins that should be added as collaborators
-  logins:
+  includeUsers:
     - userX
 
   # ignore the presence/absence of these logins
   ignoreUsers:
     - botLogin
 
-# Define repository-specific target email addresses
-# Error addresses will be combined with bot default
+teamMembership:
+  - ... # same as org-level config, see below
+
 emailNotifications:
   errors:
     - test@test.org
@@ -134,4 +126,72 @@ emailNotifications:
     - test@test.org
   audit:
     - records@test.org
+```
+
+## Common config structures
+
+### Source
+
+`source` describes a file that should be read (for whatever reason).
+
+```yaml
+source:
+  repository: full/name
+  filePath: path/to/file
+```
+
+If a repository is not specified for a `source` entry, the bot home repository is used (`${automation.hausManager.home.organization}/${automation.hausManager.home.repository}`)
+
+### Email notifications
+
+`emailNotifications` describe addresses that various notifications should be sent to.
+
+```yaml
+emailNotifications:
+errors:
+    - test@test.org
+dryRun:
+    - test@test.org
+audit:
+    - records@test.org
+```
+
+Error addresses will be combined with bot configured default
+
+### Team membership
+
+```yaml
+teamMembership:
+  - # Source mapping teams to users
+    source:
+      repository: public-org/source
+      filePath: CONTACTS.yaml
+
+    # If present and true, do not make any changes. Result sent to dry-run email address.
+    dryRun: true
+
+    # optional path to array of groups
+    mapPointer: /path/to/groupList"
+
+    # Define defaults for all teams:
+    # field defines key containing GitHub login
+    # ignoreUsers: users not in the source list that should be ignored
+    # preserveUsers: users not in the source list that should be added if missing
+    defaults:
+      field: login
+      preserveUsers:
+        - maintainer
+      ignoreUsers:
+        - test-bot
+
+    # Map members of teams (as read from source) to GitHub organization teams
+    # field, ignoreUsers, perserveUsers can be defined as siblings of teams
+    pushMembers:
+      cf-council:
+        teams:
+          - test-org/cf-council
+          - test-org/admin
+      egc:
+        teams:
+          - test-org/team-quorum
 ```

@@ -8,13 +8,29 @@ gitHubResources: github-resources.yml
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
 collaboratorSync:
-  source: other-org/teamA
   role: push
-  logins:
+  sourceTeam: other-org/teamA
+  includeUsers:
     - user4
   # ignore the presence/absence of these logins
   ignoreUsers:
     - botLogin
+
+teamMembership:
+  - dryRun: true
+    source:
+      repository: public-org/source
+      filePath: signatories.yaml
+    mapPointer: /signatories
+    defaults:
+      field: login
+      preserveUsers:
+        - test-bot
+    pushMembers:
+      active:
+        teams:
+          - test-org/cf-council
+          - test-org/admin
 
 emailNotifications:
   errors:

@@ -14,22 +14,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 
+import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
-import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
-import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
-import org.commonhaus.automation.github.watchers.MembershipWatcher;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
-import org.commonhaus.automation.hm.config.ManagerBotConfig;
+import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.kohsuke.github.GHOrganization;
@@ -40,28 +36,10 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class ProjectAccessManager {
+public class ProjectAccessManager extends GroupCoordinator {
     static final String ME = "projectAccess";
 
     private static volatile String lastRun = "never";
-
-    @Inject
-    AppContextService ctx;
-
-    @Inject
-    FileWatcher fileEvents;
-
-    @Inject
-    MembershipWatcher membershipEvents;
-
-    @Inject
-    ManagerBotConfig mgrBotConfig;
-
-    @Inject
-    PeriodicUpdateQueue periodicSync;
-
-    @Inject
-    GitHubTeamService teamSyncService;
 
     // flat map of tracked resources to the task group that manages them
     final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
@@ -72,15 +50,15 @@ public class ProjectAccessManager {
         RouteSupplier.registerSupplier("Project access refreshed", () -> lastRun);
     }
 
-    private static final String teamToResource(String teamFullName) {
+    private static String teamToResource(String teamFullName) {
         return "team-" + teamFullName;
     }
 
-    private static final String repoToResource(String repoFullName) {
+    private static String repoToResource(String repoFullName) {
         return "repo-" + repoFullName;
     }
 
-    public static final String resourceToFullName(String resource) {
+    public static String resourceToFullName(String resource) {
         return resource.substring(5);
     }
 
@@ -171,8 +149,6 @@ public class ProjectAccessManager {
     /**
      * Read project configuration from repository.
      * Called for file update events
-     *
-     * @see #readProjectConfig(ScopedQueryContext)
      */
     protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
@@ -191,10 +167,6 @@ public class ProjectAccessManager {
     /**
      * Read organization configuration from repository.
      * Called by repositoryDiscovered, on file events, and periodic sync
-     *
-     * @param installationId
-     * @param repoFullName
-     * @param github
      */
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc) {
         // The repository containing the (added/modified) file must be present in the query context
@@ -231,61 +203,79 @@ public class ProjectAccessManager {
      * Reconcile team membership with project/org configuration
      * Review collected configuration and perform required actions
      *
-     * @param string
+     * @param taskGroup
      */
     public void reconcile(String taskGroup) {
-        ProjectConfigState newState = taskGroupToState.get(taskGroup);
-        Log.debugf("[%s] %s: team membership sync; %s", ME, newState.taskGroup(), newState.projectConfig());
+        // Always fetch latest state (in case of changes / skips)
+        ProjectConfigState state = taskGroupToState.get(taskGroup);
+        Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, state.projectConfig());
 
-        ProjectConfig projectConfig = newState.projectConfig();
-        if (!projectConfig.enabled() || projectConfig.collaboratorSync() == null) {
-            Log.infof("[%s] %s: configuration disabled or teamAccess missing; skipping %s", ME, newState.taskGroup(),
+        ProjectConfig projectConfig = state.projectConfig();
+        boolean nothingToDo = projectConfig.collaboratorSync() == null && projectConfig.teamMembership().isEmpty();
+        if (!projectConfig.enabled() || nothingToDo) {
+            Log.infof("[%s] %s: configuration disabled or nothing to do; skipping %s", ME, taskGroup,
                     projectConfig);
             return;
         }
 
-        boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
-        CollaboratorSync teamAccess = projectConfig.collaboratorSync();
-        String sourceTeamName = teamAccess.source();
+        // Sync collaborators
+        doSyncCollaborators(state, projectConfig);
 
-        ScopedQueryContext projectQc = new ScopedQueryContext(ctx, newState.installationId(), newState.repoFullName());
+        // Sync team memberships
+        for (GroupMapping groupMapping : projectConfig.teamMembership()) {
+            if (groupMapping == null || !groupMapping.performSync()) {
+                Log.debugf("[%s] %s: missing or empty group mapping: %s", ME, state.taskGroup(), groupMapping);
+                continue;
+            }
+            processGroupMapping(state, groupMapping);
+        }
+
+        Log.debugf("[%s] %s: team membership sync complete; %s", ME, state.taskGroup(), state.projectConfig());
+    }
+
+    private void doSyncCollaborators(ProjectConfigState state, ProjectConfig projectConfig) {
+        CollaboratorSync teamAccess = projectConfig.collaboratorSync();
+
+        String sourceTeamName = teamAccess.sourceTeam();
+        String repoFullName = state.repoFullName();
+        boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
+
+        ScopedQueryContext projectQc = new ScopedQueryContext(ctx, state.installationId(), repoFullName);
 
         // Find the repository where the configuration file is located
-        String repoFullName = newState.repoFullName();
         GHRepository repo = projectQc.getRepository(repoFullName);
 
         // Include any hard-coded collaborators from the configuration
-        Set<String> sourceLogins = new HashSet<>(teamAccess.logins());
+        Set<String> sourceLogins = new HashSet<>(teamAccess.includeUsers());
 
         // Find members of the source team
         ScopedQueryContext teamQc = projectQc.forOrganization(sourceTeamName, isDryRun);
         if (teamQc == null) {
-            Log.warnf("[%s] %s: No installation associated with team %s", ME, newState.taskGroup(),
-                    sourceTeamName);
+            Log.warnf("[%s] %s: No installation associated with team %s", ME, state.taskGroup(), sourceTeamName);
         } else {
             // Get team members
             Set<String> teamLogins = teamSyncService.getTeamLogins(teamQc, sourceTeamName);
             if (teamLogins == null) {
-                Log.warnf("[%s] %s: team was not found %s", ME, newState.taskGroup(), sourceTeamName);
+                Log.warnf("[%s] %s: team was not found %s", ME, state.taskGroup(), sourceTeamName);
             } else {
                 sourceLogins.addAll(teamLogins);
 
                 // Watch for changes on the source team
-                membershipEvents.watchMembers(newState.taskGroup(),
+                membershipEvents.watchMembers(state.taskGroup(),
                         teamQc.getInstallationId(),
                         MembershipUpdateType.TEAM,
                         sourceTeamName,
-                        (update) -> processMembershipUpdate(newState.taskGroup(), update));
+                        (update) -> processMembershipUpdate(state.taskGroup(), update));
             }
         }
 
         // We got nobody. Skip the sync.
         if (sourceLogins.isEmpty()) {
-            Log.warnf("[%s] %s: No source logins found for %s; skipping team sync", ME, newState.taskGroup(), sourceTeamName);
+            Log.warnf("[%s] %s: No source logins found for %s; skipping team sync", ME, state.taskGroup(), sourceTeamName);
             return;
         }
 
-        GHOrganization.RepositoryRole role = toRole(newState, teamAccess.role());
+        GHOrganization.RepositoryRole role = toRole(state, teamAccess.role());
 
         // Add configured logins as outside collaborators on the repository that contains the configuration file.
         teamSyncService.syncCollaborators(projectQc, repo, role,
@@ -293,19 +283,16 @@ public class ProjectAccessManager {
                 isDryRun, projectConfig.emailNotifications());
 
         // Update/keep references: sourceTeam -> taskGroup; taskGroup -> state
-        resourceToTaskGroup.put(sourceTeamName, newState.taskGroup());
-        taskGroupToState.put(newState.taskGroup(), newState);
+        resourceToTaskGroup.put(sourceTeamName, state.taskGroup());
+        taskGroupToState.put(state.taskGroup(), state);
 
         // Note: taskGroup is tied to the repo where the config file lives
         // Watch for collaborator changes on the repository
-        String collaboratorGroup = newState.taskGroup() + "-collaborators";
-        membershipEvents.watchMembers(collaboratorGroup,
+        membershipEvents.watchMembers(state.taskGroup(),
                 projectQc.getInstallationId(),
                 MembershipUpdateType.COLLABORATOR,
                 repoFullName,
-                (update) -> processMembershipUpdate(collaboratorGroup, update));
-
-        Log.debugf("[%s] %s: team membership sync complete; %s", ME, newState.taskGroup(), newState.projectConfig());
+                (update) -> processMembershipUpdate(state.taskGroup(), update));
     }
 
     private GHOrganization.RepositoryRole toRole(ProjectConfigState state, String rolePermission) {
@@ -332,29 +319,8 @@ public class ProjectAccessManager {
         return GHOrganization.RepositoryRole.from(permission);
     }
 
-    static record ProjectConfigState(
-            String taskGroup,
-            String repoFullName,
-            long installationId,
-            ProjectConfig projectConfig) {
-
-        public String sourceTeam() {
-            CollaboratorSync myAccess = projectConfig.collaboratorSync();
-            return myAccess != null ? myAccess.source() : null;
-        }
-
-        public boolean sourceTeamHasChanged(ProjectConfigState other) {
-            CollaboratorSync myAccess = projectConfig.collaboratorSync();
-            if (myAccess == null || myAccess.source() == null) {
-                return false; // nothing to clean up
-            }
-            CollaboratorSync otherAccess = other.projectConfig.collaboratorSync();
-            return otherAccess == null || !myAccess.source().equals(otherAccess.source());
-        }
-
-        public String[] errors() {
-            return projectConfig().emailNotifications().errors();
-        }
+    protected String me() {
+        return ME;
     }
 
     /**
@@ -366,5 +332,40 @@ public class ProjectAccessManager {
         membershipEvents.unwatchAll(ME);
         resourceToTaskGroup.clear();
         taskGroupToState.clear();
+    }
+
+    record ProjectConfigState(
+            String taskGroup,
+            String repoFullName,
+            long installationId,
+            ProjectConfig projectConfig) implements ConfigState {
+
+        public String sourceTeam() {
+            CollaboratorSync myAccess = projectConfig.collaboratorSync();
+            return myAccess != null ? myAccess.sourceTeam() : null;
+        }
+
+        public boolean sourceTeamHasChanged(ProjectConfigState other) {
+            CollaboratorSync myAccess = projectConfig.collaboratorSync();
+            if (myAccess == null || myAccess.sourceTeam() == null) {
+                return false; // nothing to clean up
+            }
+            CollaboratorSync otherAccess = other.projectConfig.collaboratorSync();
+            return otherAccess == null || !myAccess.sourceTeam().equals(otherAccess.sourceTeam());
+        }
+
+        public String[] errors() {
+            return projectConfig().emailNotifications().errors();
+        }
+
+        @Override
+        public String repoName() {
+            return repoFullName;
+        }
+
+        @Override
+        public EmailNotification emailNotifications() {
+            return projectConfig().emailNotifications();
+        }
     }
 }

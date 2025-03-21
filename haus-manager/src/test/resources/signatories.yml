@@ -1,0 +1,5 @@
+signatories:
+  active:
+  - login: user1
+  - login: user2
+  - login: user3

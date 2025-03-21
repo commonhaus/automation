@@ -112,6 +112,22 @@ public class ScopedQueryContext extends QueryContext {
         return newContext;
     }
 
+    /**
+     * @return a ScopedQueryContext that can read public content from the target
+     */
+    public ScopedQueryContext forPublicContent(String fullName, boolean isDryRun) {
+        String orgName = ScopedQueryContext.toOrganizationName(fullName);
+
+        // If same organization, just use the original context
+        if (isSameOrganization(orgName)) {
+            return this;
+        }
+
+        // Otherwise, create a new context for the target organization
+        ScopedQueryContext newContext = ctx.getOrgScopedQueryContext(orgName);
+        return newContext == null ? this : newContext;
+    }
+
     @Override
     public String getRepositoryId() {
         GHRepository repo = getRepository();
