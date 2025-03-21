@@ -103,9 +103,11 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
 
         waitForQueue();
 
+        // We should expect members of the team, and login from the config file
+        Set<String> expectedLogins = Set.of("user1", "user2", "other3", "other4", "user4");
         // This should be called twice (file and membership events)
         verify(teamService, times(2)).syncCollaborators(any(),
-                eq(hausMocks.repository()), any(), any(), any(), anyBoolean(), any());
+                eq(hausMocks.repository()), any(), eq(expectedLogins), any(), anyBoolean(), any());
     }
 
     @Test

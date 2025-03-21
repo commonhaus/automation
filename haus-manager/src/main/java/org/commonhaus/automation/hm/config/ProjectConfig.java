@@ -72,7 +72,13 @@ public class ProjectConfig {
      */
     public record TeamAccess(
             String source,
+            List<String> logins,
             List<String> ignoreUsers) {
+
+        @Override
+        public List<String> logins() {
+            return logins != null ? logins : List.of();
+        }
 
         @Override
         public List<String> ignoreUsers() {
@@ -81,8 +87,8 @@ public class ProjectConfig {
 
         @Override
         public String toString() {
-            return "TeamAccess{source=%s, ignoreUsers='%s'}"
-                    .formatted(source, ignoreUsers());
+            return "TeamAccess{source=%s, logins=%s, ignoreUsers=%s}"
+                    .formatted(source, logins(), ignoreUsers());
         }
     }
 }

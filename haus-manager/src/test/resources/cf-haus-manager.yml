@@ -9,6 +9,8 @@ gitHubResources: github-resources.yml
 # to the repository containing this file.
 teamAccess:
   source: other-org/teamA
+  logins:
+    - user4
   # ignore the presence/absence of these logins
   ignoreUsers:
     - botLogin

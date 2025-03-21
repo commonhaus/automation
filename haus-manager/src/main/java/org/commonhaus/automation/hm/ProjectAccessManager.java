@@ -6,6 +6,7 @@ import static org.commonhaus.automation.github.context.QueryContext.toOrganizati
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -234,11 +235,11 @@ public class ProjectAccessManager {
      */
     public void reconcile(String taskGroup) {
         ProjectConfigState newState = taskGroupToState.get(taskGroup);
-        Log.debugf("%s::reconcile: team membership sync; %s", newState.taskGroup(), newState.projectConfig());
+        Log.debugf("[%s] %s: team membership sync; %s", ME, newState.taskGroup(), newState.projectConfig());
 
         ProjectConfig projectConfig = newState.projectConfig();
         if (!projectConfig.enabled() || projectConfig.teamAccess() == null) {
-            Log.infof("%s::reconcile: configuration disabled or teamAccess missing; skipping %s", newState.taskGroup(),
+            Log.infof("[%s] %s: configuration disabled or teamAccess missing; skipping %s", ME, newState.taskGroup(),
                     projectConfig);
             return;
         }
@@ -252,26 +253,41 @@ public class ProjectAccessManager {
         // Find the repository where the configuration file is located
         String repoFullName = newState.repoFullName();
         GHRepository repo = projectQc.getRepository(repoFullName);
-        Log.debugf("[%s] reconcile project repo %s %s", ME, repoFullName, repo != null);
 
-        // Find the source team and its members (from another organization)
+        // Include any hard-coded collaborators from the configuration
+        Set<String> sourceLogins = new HashSet<>(teamAccess.logins());
+
+        // Find members of the source team
         ScopedQueryContext teamQc = projectQc.forOrganization(sourceTeamName, isDryRun);
         if (teamQc == null) {
-            Log.warnf("[%s] No installation associated with team %s; skipping team sync", ME, sourceTeamName);
-            return;
+            Log.warnf("[%s] %s: No installation associated with team %s", ME, newState.taskGroup(),
+                    sourceTeamName);
+        } else {
+            // Get team members
+            Set<String> teamLogins = teamSyncService.getTeamLogins(teamQc, sourceTeamName);
+            if (teamLogins == null) {
+                Log.warnf("[%s] %s: team was not found %s", ME, newState.taskGroup(), sourceTeamName);
+            } else {
+                sourceLogins.addAll(teamLogins);
+
+                // Watch for changes on the source team
+                membershipEvents.watchMembers(newState.taskGroup(),
+                        teamQc.getInstallationId(),
+                        MembershipUpdateType.TEAM,
+                        sourceTeamName,
+                        (update) -> processMembershipUpdate(newState.taskGroup(), update));
+            }
         }
 
-        // Get team members
-        Set<String> sourceLogins = teamSyncService.getTeamLogins(teamQc, sourceTeamName);
-        if (sourceLogins == null) {
-            Log.warnf("[%s] The team was not found %s; skipping team sync", ME, sourceTeamName);
+        // We got nobody. Skip the sync.
+        if (sourceLogins.isEmpty()) {
+            Log.warnf("[%s] %s: No source logins found for %s; skipping team sync", ME, newState.taskGroup(), sourceTeamName);
             return;
         }
 
         GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole.from(GHOrganization.Permission.PUSH);
 
-        // Make sure source team members are outside collaborators on the repository that contains
-        // the configuration file.
+        // Add configured logins as outside collaborators on the repository that contains the configuration file.
         teamSyncService.syncCollaborators(projectQc, repo, collaboratorRole,
                 sourceLogins, teamAccess.ignoreUsers(),
                 isDryRun, projectConfig.emailNotifications());
@@ -282,20 +298,14 @@ public class ProjectAccessManager {
 
         // Note: taskGroup is tied to the repo where the config file lives
         // Watch for collaborator changes on the repository
-        membershipEvents.watchMembers(newState.taskGroup(),
+        String collaboratorGroup = newState.taskGroup() + "-collaborators";
+        membershipEvents.watchMembers(collaboratorGroup,
                 projectQc.getInstallationId(),
                 MembershipUpdateType.COLLABORATOR,
                 repoFullName,
-                (update) -> processMembershipUpdate(newState.taskGroup(), update));
+                (update) -> processMembershipUpdate(collaboratorGroup, update));
 
-        // Watch for changes on the source team
-        membershipEvents.watchMembers(newState.taskGroup(),
-                teamQc.getInstallationId(),
-                MembershipUpdateType.TEAM,
-                sourceTeamName,
-                (update) -> processMembershipUpdate(newState.taskGroup(), update));
-
-        Log.debugf("%s::reconcile: team membership sync complete: %s", newState.taskGroup(), newState.projectConfig());
+        Log.debugf("[%s] %s: team membership sync complete; %s", ME, newState.taskGroup(), newState.projectConfig());
     }
 
     static record ProjectConfigState(
