@@ -34,6 +34,11 @@ public class RouteSupplier {
         this.engine = engine;
     }
 
+    @Route(path = "/ping", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void handlePingRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
+        handleRootRequest(routingContext, routingExchange);
+    }
+
     @Route(path = "/", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void handleRootRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
         routingExchange
