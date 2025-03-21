@@ -98,7 +98,7 @@ team-name-key:
 For each team (`team-name-key` from source), it will ensure each user (login specified by `login` or the field defined in `defaults.field`)
 is a member of the specified teams.
 
-## Group/Team Management
+## Project Management
 
 - Configuraton file: `.github/cf-haus-manager.yml`
 - *Multiple configurations* read from projects in `${automation.hausManager.home.organization}`
