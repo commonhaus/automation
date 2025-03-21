@@ -1,5 +1,7 @@
 package org.commonhaus.automation.github.watchers;
 
+import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -12,11 +14,14 @@ import java.util.function.Consumer;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHEventPayload.Push.PushCommit;
 import org.kohsuke.github.GHRepository;
@@ -33,6 +38,9 @@ public class FileWatcher {
 
     @Inject
     PeriodicUpdateQueue updateQueue;
+
+    @Inject
+    Instance<ContextService> ctxInstance;
 
     /**
      * Watch for repository discovery events and clean up watchers
@@ -79,13 +87,43 @@ public class FileWatcher {
     }
 
     public void unwatchAll(String taskGroup) {
-        for (var entry : repositoryFiles.entrySet()) {
-            entry.getValue().filesByPath.values().removeIf(callbacks -> {
+        for (var watchedFiles : repositoryFiles.values()) {
+            watchedFiles.filesByPath.values().removeIf(callbacks -> {
                 callbacks.removeIf(callback -> callback.taskGroupName().equals(taskGroup));
                 return callbacks.isEmpty();
             });
         }
         repositoryFiles.values().removeIf(x -> x.filesByPath.isEmpty());
+    }
+
+    public void refresh(ContextService ctx, String taskGroup) {
+        for (var watchedFiles : repositoryFiles.values()) {
+            for (var fileWatcher : watchedFiles.filesByPath.entrySet()) {
+                String orgName = toOrganizationName(watchedFiles.repoFullName);
+                ScopedQueryContext qc = ctx.getOrgScopedQueryContext(orgName);
+                if (qc == null) {
+                    Log.warnf("[%s] No installation for %s; unable to refresh configuration", ME, orgName);
+                    continue;
+                }
+
+                GitHub github = qc.getGitHub();
+                GHRepository repo = qc.getRepository(watchedFiles.repoFullName);
+                if (repo == null) {
+                    Log.warnf("[%s] No repository for %s; unable to refresh configuration", ME, watchedFiles.repoFullName);
+                    continue;
+                }
+
+                FileUpdate update = new FileUpdate(fileWatcher.getKey(), FileUpdateType.REFRESH,
+                        watchedFiles.installationId, repo, github);
+
+                for (TaskCallback<FileUpdate> callback : fileWatcher.getValue()) {
+                    if (callback.taskGroupName().equals(taskGroup)) {
+                        Log.debugf("[%s] Refreshing %s", ME, callback);
+                        updateQueue.queue(callback.taskGroupName(), () -> callback.run(update));
+                    }
+                }
+            }
+        }
     }
 
     public void handleEvent(FilePushEvent fileEvent) {
@@ -220,7 +258,8 @@ public class FileWatcher {
     public enum FileUpdateType {
         ADDED,
         MODIFIED,
-        REMOVED
+        REMOVED,
+        REFRESH
     }
 
     public static record FileUpdate(

@@ -4,15 +4,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
-import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
+import org.commonhaus.automation.github.hr.AppContextService;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
@@ -22,12 +21,12 @@ import org.kohsuke.github.GHRepository;
 import io.quarkus.logging.Log;
 import io.quarkus.scheduler.Scheduled;
 
-@Singleton
+@ApplicationScoped
 public class ConfigWatcher {
     static final String ME = "rulesConfig";
 
     @Inject
-    Instance<ContextService> ctxInstance;
+    AppContextService ctx;
 
     @Inject
     FileWatcher fileEvents;
@@ -91,9 +90,10 @@ public class ConfigWatcher {
     }
 
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2,14 * * ?}")
+    @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2 * * ?}")
     void refreshConfig() {
         Log.info("⏰ ⚙️ Scheduled: refresh config");
+        fileEvents.refresh(ctx, ME);
     }
 
     protected void readConfiguration(long installationId, GHRepository repo, FileUpdateType updateType) {
@@ -107,7 +107,6 @@ public class ConfigWatcher {
             return;
         }
 
-        ContextService ctx = ctxInstance.get();
         ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo);
         HausRulesConfig hausRulesCfg = qc.readYamlSourceFile(repo, HausRulesConfig.PATH, HausRulesConfig.class);
         if (hausRulesCfg == null) {

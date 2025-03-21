@@ -3,6 +3,8 @@ package org.commonhaus.automation.github.watchers;
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
@@ -13,8 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.ContextHelper;
+import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +32,9 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 @GitHubAppTest
 public class FileWatcherTest extends ContextHelper {
+
+    @Inject
+    ContextService ctx;
 
     @Inject
     FileWatcher fileWatcher;
@@ -199,5 +206,38 @@ public class FileWatcherTest extends ContextHelper {
 
         await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
         assertThat(fileWatcher.repositoryFiles).isEmpty();
+    }
+
+    @Test
+    void testUpdateAll() throws IOException {
+        MockInstallation myMocks = setupDefaultMocks(defaultValues);
+
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, hausMocks.installationId(), hausMocks.repository())
+                .withExisting(hausMocks.github()).withExisting(hausMocks.dql());
+
+        when(ctx.getOrgScopedQueryContext(anyString())).thenReturn(qc);
+
+        // Register file watchers
+        fileWatcher.watchFile("testGroup", myMocks.installationId(),
+                myMocks.repository().getFullName(), "added.md",
+                this::recordFileUpdate);
+
+        fileWatcher.watchFile("testGroup", myMocks.installationId(),
+                myMocks.repository().getFullName(), "modified.md",
+                this::recordFileUpdate);
+
+        fileWatcher.watchFile("testGroup", myMocks.installationId(),
+                myMocks.repository().getFullName(), "removed.md",
+                this::recordFileUpdate);
+
+        fileWatcher.watchFile("testGroup2", myMocks.installationId(),
+                myMocks.repository().getFullName(), "modified.md",
+                this::recordFileUpdate);
+
+        fileWatcher.refresh(ctx, "testGroup");
+
+        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        assertThat(updateRef.size()).isEqualTo(3);
+        assertThat(updateRef).extracting(FileUpdate::updateType).contains(FileUpdateType.REFRESH);
     }
 }

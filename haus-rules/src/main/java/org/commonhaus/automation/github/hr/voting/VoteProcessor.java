@@ -122,7 +122,7 @@ public class VoteProcessor {
     }
 
     // Quartz cron expression: s m h dom mon dow year(optional)
-    @Scheduled(cron = "${automation.hausRules.cron.voting:0 47 */3 * * ?}")
+    @Scheduled(cron = "${automation.hausRules.cron.voting:0 23 */3 * * ?}")
     void discoverVotes() {
         Log.info("⏰ 🗳️ Scheduled: count votes");
 

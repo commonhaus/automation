@@ -28,7 +28,7 @@ automation.hausManager.home.repository=automation-test
 
 # Quartz cron expressions for re-scan of organization and team members
 automation.hausManager.cron.organization=0 47 2 */3 * ?
-automation.hausManager.cron.projects=0 47 */3 * * ?
+automation.hausManager.cron.projects=0 47 4 */3 * ?
 ```
 
 ## Organization Management
