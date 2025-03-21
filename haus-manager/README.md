@@ -117,6 +117,10 @@ dryRun: true
 teamAccess:
   source: other-org/teamA
 
+  # Hard-code some logins that should be added as collaborators
+  logins:
+    - userX
+
   # ignore the presence/absence of these logins
   ignoreUsers:
     - botLogin
