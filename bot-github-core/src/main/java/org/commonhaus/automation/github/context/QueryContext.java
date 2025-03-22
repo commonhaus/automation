@@ -865,47 +865,19 @@ public class QueryContext {
         return DataLabel.createLabel(this, this.getRepositoryId(), labelName, color);
     }
 
-    public JsonNode readYamlSourceFile(GHRepository repo, String path) {
+    public GHContent readSourceFile(GHRepository repo, String path) {
         GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
         if (content == null || hasErrors()) {
             if (!checkRemoveNotFound()) {
-                Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
+                Log.debugf("readSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
                         bundleExceptions());
             }
             return null;
         }
-
-        try {
-            JsonNode node = ctx.parseYamlFile(content);
-            return node == null || node.isNull() ? null : node;
-        } catch (IOException e) {
-            Log.debugf("readYamlSourceFile: error parsing YAML from %s in %s: %s",
-                    path, repo.getFullName(), e.toString());
-            addException(e);
-            return null;
-        }
+        return content;
     }
 
-    public <T> T readYamlSourceFile(GHRepository repo, String path, Class<T> type) {
-        GHContent content = execGitHubSync((gh, dryRun) -> repo.getFileContent(path));
-        if (content == null || hasErrors()) {
-            if (!checkRemoveNotFound()) {
-                Log.debugf("readYamlSourceFile: error reading source file %s in repo %s: %s", path, repo.getFullName(),
-                        bundleExceptions());
-            }
-            return null;
-        }
-        try {
-            return ctx.parseYamlFile(content, type);
-        } catch (IOException e) {
-            Log.debugf("readYamlSourceFile: error parsing YAML from %s in %s: %s",
-                    path, repo.getFullName(), e.toString());
-            addException(e);
-            return null;
-        }
-    }
-
-    JsonNode readYamlContent(GHContent content) {
+    public JsonNode readYamlContent(GHContent content) {
         try {
             return ctx.parseYamlFile(content);
         } catch (IOException e) {

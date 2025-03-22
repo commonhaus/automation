@@ -88,10 +88,15 @@ public class CommonhausDatastore {
         DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
                 .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
 
-        // Let QueryContext handle the errors from the fetch
-        CommonhausUser result = dqc.readYamlSourceFile(dqc.getRepository(), dataPath(event.id()), CommonhausUser.class);
+        CommonhausUser result = null;
 
-        // NotFound is handled by QueryContext.readYamlSourceFile, and is not an error for this path
+        // Let QueryContext handle the errors from the fetch
+        String userDataPath = dataPath(event.id());
+        GHContent content = dqc.readSourceFile(dqc.getRepository(), userDataPath);
+        if (content != null) {
+            // if this throws, it will be captured in the query context
+            result = dqc.readYamlContent(content, CommonhausUser.class);
+        }
         if (result == null && event.create()) {
             // Create a new user if requested and not found
             result = CommonhausUser.create(event.login(), event.id());

@@ -36,6 +36,7 @@ import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.hk.data.MemberStatus;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
@@ -139,9 +140,15 @@ public class AppContextService extends BaseContextService {
             Log.warnf("%s/readOrgConfig: repository not set in QueryContext", ME);
             return;
         }
-        HausKeeperConfig hkCfg = qc.readYamlSourceFile(repo, HausKeeperConfig.PATH, HausKeeperConfig.class);
-        if (hkCfg == null) {
+        GHContent content = qc.readSourceFile(repo, HausKeeperConfig.PATH);
+        if (content == null || qc.hasErrors()) {
             Log.debugf("%s/processConfigUpdate: no %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
+            return;
+        }
+        HausKeeperConfig hkCfg = qc.readYamlContent(content, HausKeeperConfig.class);
+        if (hkCfg == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("%s/processConfigUpdate: unable to parse %s in %s"
+                    .formatted(ME, HausKeeperConfig.PATH, repo.getFullName()));
             return;
         }
         Log.debugf("%s/processConfigUpdate: found %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
@@ -169,16 +176,27 @@ public class AppContextService extends BaseContextService {
         if (userConfig.isDisabled()) {
             return;
         }
-        JsonNode agreements = qc.readYamlSourceFile(qc.getRepository(), userConfig.attestations().path());
-        if (agreements != null) {
-            List<String> newIds = new ArrayList<>();
-            JsonNode attestations = agreements.get("attestations");
-            if (attestations != null && attestations.isObject()) {
-                attestations.fields().forEachRemaining(entry -> newIds.add(entry.getKey()));
-            }
-            attestationIds.addAll(newIds);
-            attestationIds.retainAll(newIds);
+        GHRepository repo = qc.getRepository();
+        GHContent content = qc.readSourceFile(repo, userConfig.attestations().path());
+        if (content == null || qc.hasErrors()) {
+            Log.debugf("%s/updateValidAttestations: no %s in %s", ME,
+                    userConfig.attestations().path(), repo.getFullName());
+            return;
         }
+        JsonNode agreements = qc.readYamlContent(content);
+        if (agreements == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] updateValidAttestations: unable to parse %s from %s"
+                    .formatted(ME, userConfig.attestations().path(), repo.getFullName()));
+            return;
+        }
+
+        List<String> newIds = new ArrayList<>();
+        JsonNode attestations = agreements.get("attestations");
+        if (attestations != null && attestations.isObject()) {
+            attestations.fields().forEachRemaining(entry -> newIds.add(entry.getKey()));
+        }
+        attestationIds.addAll(newIds);
+        attestationIds.retainAll(newIds);
     }
 
     public boolean getValidAttestations(String id) {

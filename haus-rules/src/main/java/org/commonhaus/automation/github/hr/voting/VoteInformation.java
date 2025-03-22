@@ -27,6 +27,7 @@ import org.commonhaus.automation.github.hr.config.VoteConfig.AlternateDefinition
 import org.commonhaus.automation.github.hr.config.VoteConfig.Threshold;
 import org.commonhaus.automation.github.hr.voting.VoteTally.CountingMethod;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.ReactionContent;
 
@@ -343,10 +344,16 @@ public class VoteInformation {
             return Optional.empty();
         }
         // get contents of file from the specified repo + path
-        Optional<JsonNode> config = Optional.ofNullable(qc.readYamlSourceFile(repo, altConfig.source()));
-        if (config.isEmpty()) {
-            Log.warnf("[%s] voteInformation.getAlternateConfigData: source %s:%s not found",
-                    qc.getLogId(), altConfig.repo(), altConfig.repo());
+        GHContent content = qc.readSourceFile(repo, altConfig.source());
+        if (content == null || qc.hasErrors()) {
+            Log.warnf("[%s] voteInformation.getAlternateConfigData: source %s from %s not found",
+                    qc.getLogId(), altConfig.source(), altConfig.repo());
+            return Optional.empty();
+        }
+        Optional<JsonNode> config = Optional.ofNullable(qc.readYamlContent(content));
+        if (config.isEmpty() || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] voteInformation.getAlternateConfigData: unable to parse %s from %s"
+                    .formatted(qc.getLogId(), altConfig.source(), altConfig.repo()));
             return Optional.empty();
         }
         return config;

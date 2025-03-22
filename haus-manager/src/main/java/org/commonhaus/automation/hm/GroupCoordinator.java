@@ -19,6 +19,7 @@ import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.OrgDefaults;
 import org.commonhaus.automation.hm.config.PushToTeams;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -74,52 +75,61 @@ public abstract class GroupCoordinator {
         ScopedQueryContext sourceQc = orgQc.forPublicContent(sourceRepoName, isDryRun);
         GHRepository sourceRepo = sourceQc == null ? null : sourceQc.getRepository(sourceRepoName);
         if (sourceQc == null || sourceRepo == null) {
-            ctx.sendEmail(me(), "Unable to read source file",
-                    """
-                            Unable to find repository %s (%s)
+            ctx.sendEmail(me(), "Unable to read source file", """
+                    Unable to find repository %s (%s)
 
-                            Group configuration %s
-                            """.formatted(sourceRepoName, groupMapping),
+                    Group configuration %s
+                    """.formatted(sourceRepoName, groupMapping),
                     orgQc.getErrorAddresses(configState.emailNotifications()));
             return;
         }
 
         // read the file from the repository
-        JsonNode sourceData = sourceQc.readYamlSourceFile(sourceRepo, source.filePath());
+        GHContent content = sourceQc.readSourceFile(sourceRepo, source.filePath());
+        JsonNode sourceData = content == null ? null : sourceQc.readYamlContent(content);
         if (sourceData == null) {
-            Log.warnf("[%s] groupMapping: source file %s is empty or could not be read", me(), source.filePath());
+            ctx.sendEmail(me(), "groupMapping: source file %s could not be read", """
+                    Source file %s could not be read (or parsed) from %s.
+
+                    Group configuration %s
+
+                    %s
+                    """.formatted(source.filePath(),
+                    sourceRepoName,
+                    groupMapping,
+                    sourceQc.bundleExceptions()),
+                    orgQc.getErrorAddresses(configState.emailNotifications()));
             return;
         }
+
         if (!groupMapping.mapPointer().isEmpty()) {
             JsonNode target = sourceData.at(groupMapping.mapPointer());
             if (target.isMissingNode()) {
-                ctx.sendEmail(me(), "Unable to read source file",
-                        """
-                                mapPointer %s not found in group configuration source %s
+                ctx.sendEmail(me(), "Unable to read source file", """
+                        mapPointer %s not found in group configuration source %s
 
-                                Group configuration %s
+                        Group configuration %s
 
-                                Source file %s
-                                """.formatted(groupMapping.mapPointer(),
-                                groupMapping.source().filePath(),
-                                groupMapping,
-                                sourceData),
+                        Source file %s
+                        """.formatted(groupMapping.mapPointer(),
+                        groupMapping.source().filePath(),
+                        groupMapping,
+                        sourceData),
                         orgQc.getErrorAddresses(configState.emailNotifications()));
                 return;
             }
             sourceData = target;
         }
         if (!sourceData.isObject()) {
-            ctx.sendEmail(me(), "Unable to read source file",
-                    """
-                            source data is not an object
+            ctx.sendEmail(me(), "Unable to read source file", """
+                    source data is not an object
 
-                            Group configuration %s
+                    Group configuration %s
 
-                            Source file %s
-                            """.formatted(groupMapping.mapPointer(),
-                            groupMapping,
-                            sourceData),
+                    Source file %s
+                    """.formatted(groupMapping.mapPointer(),
+                    groupMapping,
+                    sourceData),
                     orgQc.getErrorAddresses(configState.emailNotifications()));
             return;
         }

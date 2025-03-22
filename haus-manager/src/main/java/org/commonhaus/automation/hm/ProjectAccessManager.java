@@ -28,6 +28,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 
@@ -169,15 +170,32 @@ public class ProjectAccessManager extends GroupCoordinator {
      * Called by repositoryDiscovered, on file events, and periodic sync
      */
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc) {
+        ProjectConfigState oldState = taskGroupToState.get(taskGroup);
+
         // The repository containing the (added/modified) file must be present in the query context
         GHRepository repo = qc.getRepository();
         if (repo == null) {
             Log.warnf("%s/readProjectConfig: repository not set in QueryContext", taskGroup);
             return;
         }
-        ProjectConfig projectConfig = qc.readYamlSourceFile(repo, ProjectConfig.PATH, ProjectConfig.class);
-        if (projectConfig == null) {
+
+        GHContent content = qc.readSourceFile(repo, ProjectConfig.PATH);
+        if (content == null || qc.hasErrors()) {
+            // Normal
             Log.debugf("%s/readProjectConfig: no %s in %s", ME, ProjectConfig.PATH, repo.getFullName());
+            return;
+        }
+
+        ProjectConfig projectConfig = qc.readYamlContent(content, ProjectConfig.class);
+        if (projectConfig == null || qc.hasErrors()) {
+            ctx.sendEmail(me(), "haus-manager project configuration could not be read", """
+                    Source file %s could not be read (or parsed) from %s.
+
+                    %s
+                    """.formatted(ProjectConfig.PATH,
+                    repo.getFullName(),
+                    qc.bundleExceptions()),
+                    qc.getErrorAddresses(oldState == null ? null : oldState.emailNotifications()));
             return;
         }
         Log.debugf("%s/readProjectConfig: found %s in %s", ME, ProjectConfig.PATH, repo.getFullName());
@@ -185,9 +203,7 @@ public class ProjectAccessManager extends GroupCoordinator {
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
                 repo.getFullName(), qc.getInstallationId(), projectConfig);
 
-        ProjectConfigState oldState = taskGroupToState.get(taskGroup);
         if (oldState != null && oldState.sourceTeamHasChanged(newState)) {
-            // The source team could change
             Log.debugf("%s/readProjectConfig: remove old state source -- %s", taskGroup, oldState.sourceTeam());
             resourceToTaskGroup.remove(repoToResource(oldState.sourceTeam()));
             membershipEvents.unwatch(MembershipUpdateType.TEAM, oldState.sourceTeam());
@@ -237,6 +253,10 @@ public class ProjectAccessManager extends GroupCoordinator {
         CollaboratorSync teamAccess = projectConfig.collaboratorSync();
 
         String sourceTeamName = teamAccess.sourceTeam();
+        if (sourceTeamName == null) {
+            Log.warnf("[%s] %s: No source team configured; skipping team sync", ME, state.taskGroup());
+            return;
+        }
         String repoFullName = state.repoFullName();
         boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
 

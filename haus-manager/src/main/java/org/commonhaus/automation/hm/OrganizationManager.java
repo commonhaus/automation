@@ -25,6 +25,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
+import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
@@ -146,10 +147,16 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                     qc.bundleExceptions());
             return;
         }
-        OrganizationConfig orgCfg = qc.readYamlSourceFile(repo, OrganizationConfig.PATH, OrganizationConfig.class);
-        if (orgCfg == null) {
+        GHContent content = qc.readSourceFile(repo, OrganizationConfig.PATH);
+        if (content == null) {
             Log.debugf("[%s] readOrgConfig: no %s in %s; errors: %s", ME,
                     OrganizationConfig.PATH, repo.getFullName(), qc.bundleExceptions());
+            return;
+        }
+        OrganizationConfig orgCfg = qc.readYamlContent(content, OrganizationConfig.class);
+        if (orgCfg == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("%s/readOrgConfig: unable to parse %s in %s"
+                    .formatted(ME, OrganizationConfig.PATH, repo.getFullName()));
             return;
         }
         Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
