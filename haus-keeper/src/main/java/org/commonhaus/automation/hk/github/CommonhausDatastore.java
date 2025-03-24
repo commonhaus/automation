@@ -17,7 +17,6 @@ import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkus.logging.Log;
 
@@ -25,9 +24,6 @@ import io.quarkus.logging.Log;
 public class CommonhausDatastore {
     @Inject
     AppContextService ctx;
-
-    @Inject
-    ObjectMapper mapper;
 
     @Inject
     PeriodicUpdateQueue updateQueue;
@@ -59,8 +55,9 @@ public class CommonhausDatastore {
      * @param id User ID
      * @param resetCache True if the cached record should be discarded (re-fetch)
      * @param create True if the record should be created if it does not exist
-     * @throw Exception if the query context is not available or an irrecoverable error occurs (propagate to REST client)
      * @return fetched commonhaus user
+     * @throws org.commonhaus.automation.github.context.PackagedException if the query context is not available or an
+     *         irrecoverable error occurs (propagate to REST client)
      */
     public CommonhausUser getCommonhausUser(String login, long id, boolean resetCache, boolean create) {
         final QueryEvent query = new QueryEvent(login, id, resetCache, create);
@@ -110,9 +107,10 @@ public class CommonhausDatastore {
     /**
      * REST API driven update of Commonhaus user data.
      *
-     * @param updateEventssh
+     * @param updateEvent UpdateEvent with user data
      * @return valid user data
-     * @throws Exception on invalid data or unrecoverable errors (propagate to REST client)
+     * @throws org.commonhaus.automation.github.context.PackagedException if the query context is not available or an
+     *         irrecoverable error occurs (propagate to REST client)
      */
     public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {
         if (updateEvent == null || updateEvent.user() == null) {
@@ -139,9 +137,7 @@ public class CommonhausDatastore {
         CommonhausUser result = entry.applyUpdate(ctx, updateEvent);
 
         // Offload persistence to the update queue
-        updateQueue.queueReconciliation(userKey, () -> {
-            persistUserToGitHub(userKey, 0);
-        });
+        updateQueue.queueReconciliation(userKey, () -> persistUserToGitHub(userKey, 0));
 
         // Respond with the updated user data
         return result;
@@ -152,7 +148,7 @@ public class CommonhausDatastore {
      * This will lag behind user-driven events and can batch updates.
      * This is a self-contained/isolated task: exceptions should be handled.
      *
-     * @param entry DatastoreCacheEntry with user data and update context
+     * @param userKey key for the user
      * @param retryCount Number of retries attempted
      */
     private void persistUserToGitHub(String userKey, int retryCount) {

@@ -111,8 +111,6 @@ public class AppContextService extends BaseContextService {
     /**
      * Read organization configuration from repository.
      * Called by for file update events.
-     *
-     * @see #readOrgConfig(ScopedQueryContext)
      */
     protected void processFileUpdate(FileUpdate fileUpdate) {
         GitHub github = fileUpdate.github();

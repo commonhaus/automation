@@ -3,15 +3,13 @@ package org.commonhaus.automation.hk.config;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.commonhaus.automation.hk.config.HausKeeperConfig.RepositoryConfig;
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public class UserManagementConfig extends RepositoryConfig {
+public class UserManagementConfig {
     public static final UserManagementConfig DISABLED = new UserManagementConfig() {
         @Override
         public boolean isDisabled() {
@@ -19,10 +17,17 @@ public class UserManagementConfig extends RepositoryConfig {
         }
     };
 
+    Boolean enabled;
+
     AttestationConfig attestations;
     GroupRoleConfig groupRole;
     Map<String, String> roleStatus = new HashMap<>();
+
     String defaultAliasDomain;
+
+    public boolean isDisabled() {
+        return enabled != null && !enabled;
+    }
 
     public AttestationConfig attestations() {
         return attestations;
@@ -48,7 +53,7 @@ public class UserManagementConfig extends RepositoryConfig {
         return isDisabled() || defaultAliasDomain == null;
     }
 
-    public static record AttestationConfig(
+    public record AttestationConfig(
             String path,
             String repo) {
         public String path() {
@@ -60,7 +65,7 @@ public class UserManagementConfig extends RepositoryConfig {
         }
     }
 
-    public static record GroupRoleConfig(
+    public record GroupRoleConfig(
             Map<String, String> teams,
             Map<String, String> outsideCollaborators) {
     }

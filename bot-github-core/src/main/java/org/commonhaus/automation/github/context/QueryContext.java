@@ -88,13 +88,6 @@ public class QueryContext {
         this.installationId = other.installationId;
     }
 
-    /** Optional: clean up resources used by this obect ahead of GC */
-    public void done() {
-        clearErrors();
-        github = null;
-        graphQLClient = null;
-    }
-
     public String getLogId() {
         return "" + installationId;
     }
@@ -195,8 +188,6 @@ public class QueryContext {
     /**
      * Add an exception to the context. This could be a GraphQL error
      * or a GitHub API exception.
-     *
-     * @param e Exception
      */
     public void addException(Throwable t) {
         exceptions.add(t);
@@ -271,10 +262,9 @@ public class QueryContext {
      * @return the Exception if a conflict occurred (409 response code or message contains 409)
      */
     public HttpException getConflict() {
-        return exceptions.stream()
+        return (HttpException) exceptions.stream()
                 .filter(e -> e instanceof HttpException && ((HttpException) e).getResponseCode() == 409)
-                .findFirst()
-                .map(e -> (HttpException) e).orElse(null);
+                .findFirst().orElse(null);
     }
 
     /**
@@ -490,14 +480,13 @@ public class QueryContext {
 
     /**
      * Get the GitHub organization for the repository owner.
-     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * Note the wrapped call to {@link #execGitHubSync(GitHubParameterApiCall)},
      * which will capture errors and exceptions.
      * <p>
      * "Not found" is a normal status. That error will be cleared.
      * <p>
      * Note: GitHub caches user lookups
      *
-     * @param orgName
      * @return
      */
     public GHUser getUser(String login) {
@@ -510,12 +499,11 @@ public class QueryContext {
 
     /**
      * Get the GitHub organization for the repository owner.
-     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * Note the wrapped call to {@link #execGitHubSync(GitHubParameterApiCall)},
      * which will capture errors and exceptions.
      * <p>
      * "Not found" is a normal status. That error will be cleared.
      *
-     * @param orgName
      * @return
      */
     public GHRepository getRepository(String repoName) {
@@ -528,7 +516,7 @@ public class QueryContext {
 
     /**
      * Get the GitHub organization for the repository owner.
-     * Note the wrapped call to {@link #execGitHubSync(String)},
+     * Note the wrapped call to {@link #execGitHubSync(GitHubParameterApiCall)},
      * which will capture errors and exceptions.
      * <p>
      * "Not found" is a normal status. That error will be cleared.
@@ -920,7 +908,6 @@ public class QueryContext {
      * Uses this (QueryContext) logId and error addresses.
      *
      * @param title
-     * @param t
      * @see #getLogId()
      * @see #getErrorAddresses()
      * @see ContextService#logAndSendEmail(String, String, Throwable, String[])
@@ -966,7 +953,7 @@ public class QueryContext {
      * @param title
      * @param body
      * @param addresses
-     * @see ContextService#sendEmail(String, String, String, String, String[])
+     * @see ContextService#sendEmail(String, String, String, String[])
      */
     public void sendEmail(String logId, String title, String body, String[] addresses) {
         ctx.sendEmail(logId, title, body, addresses);
