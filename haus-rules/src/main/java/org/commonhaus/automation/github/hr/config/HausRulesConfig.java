@@ -7,7 +7,7 @@ public record HausRulesConfig(
         NoticeConfig notice,
         VoteConfig voting) {
 
-    public static final String NAME = "cf-automation.yml";
+    public static final String NAME = "cf-haus-rules.yml";
     public static final String PATH = ".github/" + NAME;
 
     public static class RepositoryConfig {

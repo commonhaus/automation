@@ -7,6 +7,8 @@
 - [Describing a vote](#describing-a-vote)
 - [References](#references)
 
+Configuration should be defined in `.github/cf-haus-rules.yml'
+
 The CF follows an adapted form of Martha's Rules for decision making. This GitHub App helps automate the process.
 
 The group that should be used to determine quorum must be specified in the item description (a default group can be specified in the bot config).
@@ -82,7 +84,7 @@ stateDiagram-v2
     vopen --> vquorum
     vopen --> vresult
     vquorum --> vresult
-    
+
     vresult --> vdone
     vdone --> [*]
 ```
