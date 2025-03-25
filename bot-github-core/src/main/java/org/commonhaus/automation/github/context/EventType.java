@@ -20,6 +20,7 @@ public enum EventType {
     membership,
     pull_request,
     pull_request_review,
+    team,
     bot,
     unknown;
 
