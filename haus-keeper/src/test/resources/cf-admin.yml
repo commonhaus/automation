@@ -1,41 +1,12 @@
-# Sync the member details from the described source
-# with the members of the specified teams
-# (specify team as organization/team-name)
-# If dry_run is true, an email will be sent to the specified email 
-# address with the results of the dry run.
-groupManagement:
-  sponsors: 
-    sponsorable: commonhaus
-    repository: commonhaus-test/sponsors-test
-    dryRun: true
-  sources:
-  - path: CONTACTS.yaml
-    repo: commonhaus/foundation
-    defaults:
-      field: login
-      preserveUsers:
-        - user6
-    sync:
-      cf-council:
-        preserveUsers:
-          - user9
-        teams:
-          - commonhaus-test/cf-council
-          - commonhaus-test/cf-voting
-      egc:
-        teams:
-          - commonhaus-test/team-quorum-default
-    dryRun: true
-
 userManagement:
   defaultAliasDomain: example.com
 
   attestations:
-    repo: commonhaus/foundation
-    path: ATTESTATIONS.yaml
+    repository: commonhaus/foundation
+    filePath: ATTESTATIONS.yaml
 
   ## Map GitHub teams to roles
-  ## The default role for known/discovered users 
+  ## The default role for known/discovered users
   groupRole:
     teams:
       commonhaus-test/cf-council: cfc
@@ -53,8 +24,10 @@ userManagement:
     sponsor: SPONSOR
 
 ## Email addresses to notify of errors and dry-run results
-emailAddress:
+emailNotifications:
   errors:
     - repo-errors@example.com
   dryRun:
     - dry-run@example.com
+  audit:
+    - test@commonhaus.org

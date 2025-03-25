@@ -13,13 +13,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
+import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.hk.AdminDataCache;
+import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.member.MemberApplicationProcess;
@@ -84,6 +89,9 @@ public class HausKeeperTestBase extends ContextHelper {
 
     @Inject
     protected AppContextService ctx;
+
+    @Inject
+    protected TestUserManagementConfig testConfig;
 
     protected MockInstallation dataMocks;
     protected MockInstallation sponsorMocks;
@@ -167,8 +175,8 @@ public class HausKeeperTestBase extends ContextHelper {
 
         // Add some default attestation ids
 
-        ctx.attestationIds.add("member");
-        ctx.attestationIds.add("coc");
+        testConfig.addAttestation("member");
+        testConfig.addAttestation("coc");
 
         mockMemberInfo = mock(MemberInfo.class);
         when(mockMemberInfo.id()).thenReturn(botId);
@@ -208,27 +216,39 @@ public class HausKeeperTestBase extends ContextHelper {
     public void setUserManagementConfig() throws Exception {
         HausKeeperConfig config = ctx.yamlMapper().readValue(
                 ContextHelper.class.getResourceAsStream("/cf-admin.yml"), HausKeeperConfig.class);
-        ctx.currentConfig.set(Optional.of(config));
+
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, datastoreInstallationId, dataMocks.repository());
+        testConfig.testUpdate(qc, config);
     }
 
-    public void mockExistingCommonhausData(UserPath userPath) throws IOException {
+    public GHContent mockExistingCommonhausData(UserPath userPath) throws IOException {
         GHRepository dataStore = dataMocks.repository();
-        mockFileContent(dataStore, "data/users/" + botId + ".yaml", userPath.filename());
+        return mockFileContent(dataStore, "data/users/" + botId + ".yaml", userPath.filename());
     }
 
     public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, UserPath userPath) throws IOException {
-        GHContent responseContent = mock(GHContent.class);
-        when(responseContent.read()).thenReturn(Files.newInputStream(Path.of(userPath.filename())));
-        when(responseContent.getSha()).thenReturn("1234567890adefgh");
+        GHContent content = mock(GHContent.class);
+        return mockUpdateCommonhausData(builder, userPath, content);
+    }
 
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, UserPath userPath,
+            GHContent content) throws IOException {
         GHContentUpdateResponse response = Mockito.mock(GHContentUpdateResponse.class);
-        when(response.getContent()).thenReturn(responseContent);
+        return mockUpdateCommonhausData(builder, userPath, content, response);
+    }
+
+    public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, UserPath userPath,
+            GHContent content, GHContentUpdateResponse response) throws IOException {
+        when(content.read()).thenReturn(Files.newInputStream(Path.of(userPath.filename())));
+        when(content.getSha()).thenReturn("1234567890adefgh");
+
+        when(response.getContent()).thenReturn(content);
+        when(builder.commit()).thenReturn(response);
 
         when(builder.content(anyString())).thenReturn(builder);
         when(builder.message(anyString())).thenReturn(builder);
         when(builder.path(anyString())).thenReturn(builder);
         when(builder.sha(anyString())).thenReturn(builder);
-        when(builder.commit()).thenReturn(response);
 
         GHRepository dataStore = dataMocks.repository();
         when(dataStore.createContent()).thenReturn(builder);
@@ -297,6 +317,23 @@ public class HausKeeperTestBase extends ContextHelper {
         @Override
         public long installationId() {
             return datastoreInstallationId;
+        }
+    }
+
+    @ApplicationScoped
+    @Alternative
+    @Priority(1)
+    static class TestUserManagementConfig extends ActiveHausKeeperConfig {
+        public TestUserManagementConfig() {
+            super();
+        }
+
+        public void addAttestation(String id) {
+            attestationIds.add(id);
+        }
+
+        public void testUpdate(ScopedQueryContext qc, HausKeeperConfig config) {
+            update(qc, config);
         }
     }
 }

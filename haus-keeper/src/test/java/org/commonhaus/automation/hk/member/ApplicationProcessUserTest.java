@@ -5,9 +5,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.TimeUnit;
@@ -15,16 +13,12 @@ import java.util.concurrent.TimeUnit;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.github.context.DataCommonItem;
-import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.PackagedException;
 import org.commonhaus.automation.github.context.TestRuntimeException;
-import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.MemberStatus;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
-import org.commonhaus.automation.hk.github.DatastoreQueryContext;
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
 import org.commonhaus.automation.hk.member.MemberApplicationProcess.ApplicationPost;
 import org.junit.jupiter.api.AfterEach;
@@ -227,63 +221,6 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
             ApplicationPost post = new ApplicationPost("unknown", "draft");
             process.setUserApplication(mockMemberInfo, user, post);
         });
-    }
-
-    @Test
-    public void testGetSetCachedApplication() throws Exception {
-        // mock graphql responses
-        setupGraphQLProcessing(dataMocks,
-                MemberQueryResponse.APPLICATION_MATCH,
-                MemberQueryResponse.QUERY_COMMENTS,
-                MemberQueryResponse.UPDATE_ISSUE);
-
-        // prime user data
-        mockExistingCommonhausData(UserPath.NEW_USER);
-        CommonhausUser user = datastore.getCommonhausUser(mockMemberInfo, false, false);
-
-        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
-        mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
-
-        // prime application state
-        String entryKey = CommonhausDatastore.getKey(mockMemberInfo.login(), mockMemberInfo.id());
-        MemberApplicationState state = AdminDataCache.APPLICATION_STATE.computeIfAbsent(entryKey,
-                k -> new MemberApplicationState(mockMemberInfo.login(), mockMemberInfo.id()));
-
-        DatastoreQueryContext dqc = ctx.getDatastoreContext();
-        DataCommonItem item = dqc.getItem(EventType.issue, "I_kwDOL8tG0s6LSQkK");
-        state.refreshApplication(item);
-
-        System.out.println(":: get application");
-
-        // find user application -- query comments
-        var getResult = process.getUserApplication(mockMemberInfo, user);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
-
-        assertThat(getResult.status()).isEqualTo(Response.Status.OK);
-        assertThat(getResult.user().status()).isEqualTo(MemberStatus.PENDING);
-        assertThat(getResult.user().application()).isNotNull();
-
-        System.out.println(":: set application");
-
-        // set user application -- update issue
-        ApplicationPost post = new ApplicationPost("unknown", "draft");
-        var setResult = process.setUserApplication(mockMemberInfo, user, post);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
-
-        assertThat(setResult.status()).isEqualTo(Response.Status.OK);
-        assertThat(setResult.user().status()).isEqualTo(MemberStatus.PENDING);
-        assertThat(setResult.user().application()).isNotNull();
-
-        verify(dataMocks.dql(), times(1))
-                .executeSync(contains(MemberQueryResponse.APPLICATION_MATCH.cue()), anyMap());
-        verify(dataMocks.dql(), times(1))
-                .executeSync(contains(MemberQueryResponse.QUERY_COMMENTS.cue()), anyMap());
-        verify(dataMocks.dql(), times(1))
-                .executeSync(contains(MemberQueryResponse.UPDATE_ISSUE.cue()), anyMap());
-
-        // Two: get, set; but could collapse into one (update queue behavior)
-        verify(builder, atLeast(1)).path("data/users/156364140.yaml");
-        verify(builder, atLeast(1)).commit();
     }
 
     void assertPersistedContentEquals(CommonhausUser expected, GHContentBuilder builder) throws Exception {

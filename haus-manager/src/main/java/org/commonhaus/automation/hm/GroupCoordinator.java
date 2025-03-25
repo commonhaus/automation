@@ -72,7 +72,7 @@ public abstract class GroupCoordinator {
         RepoSource source = groupMapping.source();
         String sourceRepoName = source.repository() == null ? configState.repoName() : source.repository();
 
-        ScopedQueryContext sourceQc = orgQc.forPublicContent(sourceRepoName, isDryRun);
+        ScopedQueryContext sourceQc = orgQc.forPublicContent(sourceRepoName);
         GHRepository sourceRepo = sourceQc == null ? null : sourceQc.getRepository(sourceRepoName);
         if (sourceQc == null || sourceRepo == null) {
             ctx.sendEmail(me(), "Unable to read source file", """

@@ -24,8 +24,8 @@ userManagement:
   defaultAliasDomain: example.com
 
   attestations:
-    repo: commonhaus/foundation
-    path: ATTESTATIONS.yaml
+    repository: commonhaus/foundation
+    filePath: ATTESTATIONS.yaml
 
   groupRole:
     teams:

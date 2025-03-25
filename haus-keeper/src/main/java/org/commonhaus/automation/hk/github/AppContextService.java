@@ -1,47 +1,28 @@
 package org.commonhaus.automation.hk.github;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
-import jakarta.annotation.Priority;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.context.QueryContext;
-import org.commonhaus.automation.github.discovery.DiscoveryAction;
-import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
-import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
-import org.commonhaus.automation.github.watchers.FileWatcher;
-import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
-import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.hk.AdminDataCache;
+import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.AdminBotConfig;
-import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
-import org.commonhaus.automation.hk.config.UserManagementConfig.AttestationConfig;
 import org.commonhaus.automation.hk.data.MemberStatus;
-import org.kohsuke.github.GHContent;
-import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkiverse.githubapp.TokenGitHubClients;
 import io.quarkus.logging.Log;
@@ -51,7 +32,7 @@ public class AppContextService extends BaseContextService {
     public static final String ME = "haus-keeper";
 
     @Inject
-    FileWatcher fileEvents;
+    protected GitHubTeamService teamService;
 
     @Inject
     TokenGitHubClients tokenClients;
@@ -60,14 +41,7 @@ public class AppContextService extends BaseContextService {
     protected AdminBotConfig adminData;
 
     @Inject
-    protected PeriodicUpdateQueue periodicSync;
-
-    @Inject
-    GitHubTeamService teamService;
-
-    final AtomicReference<Optional<HausKeeperConfig>> currentConfig = new AtomicReference<>(Optional.empty());
-
-    final Set<String> attestationIds = new HashSet<>();
+    protected ActiveHausKeeperConfig hkConfig;
 
     public ScopedQueryContext getScopedQueryContext(String repoFullName) {
         return installationMap.getOrgScopedQueryContext(this, repoFullName);
@@ -81,87 +55,6 @@ public class AppContextService extends BaseContextService {
         return new UserQueryContext(this, memberSession);
     }
 
-    /**
-     * Event handler for repository discovery.
-     * If the discovered repo matches the configured data store,
-     * remember the installation id.
-     */
-    protected void repositoryDiscovered(
-            @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
-        DiscoveryAction action = repoEvent.action();
-        long installationId = repoEvent.installationId();
-        GHRepository repo = repoEvent.repository();
-        String repoFullName = repoEvent.repository().getFullName();
-
-        Log.debugf("%s/repoDiscovered: %s", ME, repoFullName);
-
-        if (action.repository() && action.added()) {
-            ScopedQueryContext qc = new ScopedQueryContext(this, installationId, repo)
-                    .withExisting(repoEvent.github());
-
-            // read org config when repository is discovered
-            periodicSync.queue(ME, () -> processConfigUpdate(qc));
-
-            fileEvents.watchFile(ME,
-                    installationId, repoFullName, HausKeeperConfig.PATH,
-                    (fileUpdate) -> processFileUpdate(fileUpdate));
-        }
-    }
-
-    /**
-     * Read organization configuration from repository.
-     * Called by for file update events.
-     */
-    protected void processFileUpdate(FileUpdate fileUpdate) {
-        GitHub github = fileUpdate.github();
-        GHRepository repo = fileUpdate.repository();
-
-        if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
-            Log.debugf("%s/processFileUpdate: %s deleted", repo.getFullName());
-            // TODO: clean up associated resources.
-            // Leave the watcher, in case the file is re-added later
-            // currentConfig.set(Optional.empty());
-            if (repo.getFullName().equals(getDataStore())) {
-                currentConfig.set(Optional.empty());
-            }
-            return;
-        }
-
-        ScopedQueryContext qc = new ScopedQueryContext(this, fileUpdate.installationId(), fileUpdate.repository())
-                .withExisting(github);
-        processConfigUpdate(qc);
-    }
-
-    protected void processConfigUpdate(ScopedQueryContext qc) {
-        GHRepository repo = qc.getRepository();
-        if (repo == null) {
-            Log.warnf("%s/readOrgConfig: repository not set in QueryContext", ME);
-            return;
-        }
-        GHContent content = qc.readSourceFile(repo, HausKeeperConfig.PATH);
-        if (content == null || qc.hasErrors()) {
-            Log.debugf("%s/processConfigUpdate: no %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
-            return;
-        }
-        HausKeeperConfig hkCfg = qc.readYamlContent(content, HausKeeperConfig.class);
-        if (hkCfg == null || qc.hasErrors()) {
-            qc.logAndSendContextErrors("%s/processConfigUpdate: unable to parse %s in %s"
-                    .formatted(ME, HausKeeperConfig.PATH, repo.getFullName()));
-            return;
-        }
-        Log.debugf("%s/processConfigUpdate: found %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
-        currentConfig.set(Optional.of(hkCfg));
-        updateValidAttestations(qc, hkCfg.userManagement());
-    }
-
-    public UserManagementConfig getConfig() {
-        return currentConfig.get().map(HausKeeperConfig::userManagement).orElse(UserManagementConfig.DISABLED);
-    }
-
-    public EmailNotification getAddresses() {
-        return currentConfig.get().map(HausKeeperConfig::emailNotifications).orElse(EmailNotification.UNDEFINED);
-    }
-
     public String getDataStore() {
         return adminData.datastore();
     }
@@ -170,44 +63,20 @@ public class AppContextService extends BaseContextService {
         return adminData.memberHome();
     }
 
-    private void updateValidAttestations(ScopedQueryContext qc, UserManagementConfig userConfig) {
-        if (userConfig.isDisabled()) {
-            return;
-        }
-        GHRepository repo = qc.getRepository();
-        GHContent content = qc.readSourceFile(repo, userConfig.attestations().path());
-        if (content == null || qc.hasErrors()) {
-            Log.debugf("%s/updateValidAttestations: no %s in %s", ME,
-                    userConfig.attestations().path(), repo.getFullName());
-            return;
-        }
-        JsonNode agreements = qc.readYamlContent(content);
-        if (agreements == null || qc.hasErrors()) {
-            qc.logAndSendContextErrors("[%s] updateValidAttestations: unable to parse %s from %s"
-                    .formatted(ME, userConfig.attestations().path(), repo.getFullName()));
-            return;
-        }
-
-        List<String> newIds = new ArrayList<>();
-        JsonNode attestations = agreements.get("attestations");
-        if (attestations != null && attestations.isObject()) {
-            attestations.fields().forEachRemaining(entry -> newIds.add(entry.getKey()));
-        }
-        attestationIds.addAll(newIds);
-        attestationIds.retainAll(newIds);
+    public UserManagementConfig getConfig() {
+        return hkConfig.getConfig();
     }
 
-    public boolean getValidAttestations(String id) {
-        // If none are defined/found, anything goes
-        return attestationIds.isEmpty() || attestationIds.contains(id);
+    public EmailNotification getAddresses() {
+        return hkConfig.getAddresses();
     }
 
-    public AttestationConfig getAttestationConfig() {
-        UserManagementConfig userConfig = getConfig();
-        if (userConfig.isDisabled()) {
-            return null;
-        }
-        return userConfig.attestations();
+    public RepoSource getAttestationConfig() {
+        return hkConfig.getAttestationConfig();
+    }
+
+    public boolean isValidAttestation(String id) {
+        return hkConfig.isValidAttestation(id);
     }
 
     public void forgetKnown(GHUser user) {
@@ -333,7 +202,7 @@ public class AppContextService extends BaseContextService {
                 if (ex.getResponse().getStatus() >= 500) {
                     logAndSendEmail(logId, message, t);
                 }
-                return ((WebApplicationException) t).getResponse();
+                return ex.getResponse();
             }
             if (t.toString().toLowerCase().contains("timeout")) { // totally cheating
                 return Response.status(Response.Status.GATEWAY_TIMEOUT).build();

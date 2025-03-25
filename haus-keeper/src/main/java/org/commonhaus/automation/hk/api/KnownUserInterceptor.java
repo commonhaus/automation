@@ -8,6 +8,7 @@ import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.github.AppContextService;
 
 import io.quarkus.logging.Log;
@@ -20,10 +21,16 @@ public class KnownUserInterceptor implements Serializable {
     AppContextService appCtx;
 
     @Inject
+    protected ActiveHausKeeperConfig hkConfig;
+
+    @Inject
     MemberSession session;
 
     @AroundInvoke
     public Object checkKnownUser(InvocationContext ctx) throws Exception {
+        if (!hkConfig.isReady()) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
+        }
         if (session.userIsKnown(appCtx)) {
             Log.debugf("[%s] Known User %s / %s: %s", session.login(), session.id(), session.nodeId(), session.roles());
 

@@ -6,6 +6,7 @@ import java.util.Set;
 
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
@@ -18,6 +19,13 @@ public class CommonhausUserTest extends HausKeeperTestBase {
     @AfterEach
     void noErrorMail() {
         assertNoErrorEmails();
+    }
+
+    @Override
+    @BeforeEach
+    protected void init() throws Exception {
+        super.init();
+        setupInstallationRepositories();
     }
 
     @Test

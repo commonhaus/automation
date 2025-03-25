@@ -66,7 +66,7 @@ public class MemberAliasesResource {
             if (e.getResponse().getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
                 return new ApiResponse(ApiResponse.Type.ALIAS, Map.of()).finish();
             }
-            return e.getResponse();
+            return ctx.toResponse("getAliases", "Unable to fetch user aliases for " + session.login(), e);
         } catch (Throwable e) {
             return ctx.toResponse("getAliases", "Unable to fetch user aliases for " + session.login(), e);
         }
@@ -98,9 +98,6 @@ public class MemberAliasesResource {
                     .setData(ApiResponse.Type.ALIAS, aliasMap.entrySet().stream()
                             .collect(Collectors.toMap(e -> e.getKey().email(), Map.Entry::getValue)))
                     .finish();
-        } catch (WebApplicationException e) {
-            Log.errorf(e, "updateAliases: Unable to update user aliases for %s: %s", session.login(), e);
-            return e.getResponse();
         } catch (Throwable e) {
             return ctx.toResponse("updateAliases", "Unable to update user aliases for " + session.login(), e);
         }
@@ -120,8 +117,6 @@ public class MemberAliasesResource {
             return emailService.generatePassword(alias)
                     ? Response.noContent().build()
                     : Response.status(Response.Status.BAD_REQUEST).build();
-        } catch (WebApplicationException e) {
-            return e.getResponse();
         } catch (Throwable e) {
             return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
         }
@@ -138,7 +133,7 @@ public class MemberAliasesResource {
             Log.infof("getAliases|%s User is not eligible for email", user.login());
             throw new WebApplicationException(Status.FORBIDDEN);
         }
-        if (!ctx.getValidAttestations(ID)) {
+        if (!ctx.isValidAttestation(ID)) {
             // Not the user's fault.. misconfiguration
             Exception e = new Exception("Invalid attestation id");
             ctx.logAndSendEmail("getUser", ID + " is an invalid attestation id", e);

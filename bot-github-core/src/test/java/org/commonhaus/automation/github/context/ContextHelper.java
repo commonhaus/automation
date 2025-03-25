@@ -682,8 +682,8 @@ public class ContextHelper {
      *
      * @see #mockFileContent(GHRepository, String, Path)
      */
-    public void mockFileContent(GHRepository repo, String repoPath, String contentFilePath) throws IOException {
-        mockFileContent(repo, repoPath, Path.of(contentFilePath));
+    public GHContent mockFileContent(GHRepository repo, String repoPath, String contentFilePath) throws IOException {
+        return mockFileContent(repo, repoPath, Path.of(contentFilePath));
     }
 
     /**
@@ -696,10 +696,11 @@ public class ContextHelper {
      * @param contentFilePath Path to local file content
      * @throws IOException
      */
-    public void mockFileContent(GHRepository repo, String repoPath, Path contentFilePath) throws IOException {
+    public GHContent mockFileContent(GHRepository repo, String repoPath, Path contentFilePath) throws IOException {
         GHContent content = mock(GHContent.class);
         when(content.read()).thenReturn(Files.newInputStream(contentFilePath));
         when(repo.getFileContent(repoPath)).thenReturn(content);
+        return content;
     }
 
     /**

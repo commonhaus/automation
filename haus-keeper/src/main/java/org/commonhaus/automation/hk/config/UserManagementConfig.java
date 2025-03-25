@@ -3,6 +3,8 @@ package org.commonhaus.automation.hk.config;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.commonhaus.automation.config.RepoSource;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -19,17 +21,16 @@ public class UserManagementConfig {
 
     Boolean enabled;
 
-    AttestationConfig attestations;
+    String defaultAliasDomain;
+    RepoSource attestations;
     GroupRoleConfig groupRole;
     Map<String, String> roleStatus = new HashMap<>();
-
-    String defaultAliasDomain;
 
     public boolean isDisabled() {
         return enabled != null && !enabled;
     }
 
-    public AttestationConfig attestations() {
+    public RepoSource attestations() {
         return attestations;
     }
 
@@ -51,18 +52,6 @@ public class UserManagementConfig {
 
     public boolean emailDisabled() {
         return isDisabled() || defaultAliasDomain == null;
-    }
-
-    public record AttestationConfig(
-            String path,
-            String repo) {
-        public String path() {
-            return path;
-        }
-
-        public String repo() {
-            return repo;
-        }
     }
 
     public record GroupRoleConfig(

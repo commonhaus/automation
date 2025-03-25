@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
 
-@ConfigMapping(prefix = "automation.admin")
+@ConfigMapping(prefix = "automation.hausKeeper")
 public interface AdminBotConfig {
     Optional<String> teamSyncCron();
 

@@ -19,11 +19,13 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.common.http.TestHTTPEndpoint;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 
 @QuarkusTest
+@GitHubAppTest
 public class ForwardEmailTest extends HausKeeperTestBase {
 
     @Inject
@@ -36,10 +38,13 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @Inject
     ForwardEmailTestEndpoint testEndpoint;
 
+    @Override
     @BeforeEach
-    public void setup() {
+    public void init() throws Exception {
+        super.init();
         testEndpoint.clear();
         AdminDataCache.ALIASES.invalidateAll();
+        setupInstallationRepositories();
     }
 
     /**

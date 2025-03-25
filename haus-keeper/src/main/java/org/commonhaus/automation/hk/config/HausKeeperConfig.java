@@ -11,6 +11,6 @@ public record HausKeeperConfig(
         @JsonAlias("user_management") UserManagementConfig userManagement,
         @JsonAlias("email_address") EmailNotification emailNotifications) {
 
-    public static final String NAME = "cf-haus-admin.yml";
+    public static final String NAME = "cf-haus-keeper.yml";
     public static final String PATH = ".github/" + NAME;
 }

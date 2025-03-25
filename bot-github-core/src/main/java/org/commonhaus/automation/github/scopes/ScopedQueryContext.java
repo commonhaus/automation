@@ -115,7 +115,7 @@ public class ScopedQueryContext extends QueryContext {
     /**
      * @return a ScopedQueryContext that can read public content from the target
      */
-    public ScopedQueryContext forPublicContent(String fullName, boolean isDryRun) {
+    public ScopedQueryContext forPublicContent(String fullName) {
         String orgName = ScopedQueryContext.toOrganizationName(fullName);
 
         // If same organization, just use the original context

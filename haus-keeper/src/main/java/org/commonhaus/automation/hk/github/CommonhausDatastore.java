@@ -93,6 +93,7 @@ public class CommonhausDatastore {
         if (content != null) {
             // if this throws, it will be captured in the query context
             result = dqc.readYamlContent(content, CommonhausUser.class);
+            result.sha(content.getSha());
         }
         if (result == null && event.create()) {
             // Create a new user if requested and not found
@@ -191,7 +192,10 @@ public class CommonhausDatastore {
         GHContent responseContent = response.getContent();
         final CommonhausUser updated = dqc.readYamlContent(responseContent, CommonhausUser.class);
         if (updated != null) {
+            updated.sha(responseContent.getSha()); // update sha in the user data
             entry.finishUpdate(updated);
+        } else {
+            handlePersistenceError(dqc, entry, user, retryCount);
         }
     }
 
@@ -262,6 +266,7 @@ public class CommonhausDatastore {
             String json = ContextService.yamlMapper.writeValueAsString(user);
             CommonhausUser copy = ContextService.yamlMapper.readValue(json, CommonhausUser.class);
             copy.sha(user.sha());
+            Log.debugf("Deep copy of %s", user, copy);
             return copy;
         } catch (JsonProcessingException e) {
             LogMailer.instance().logAndSendEmail(

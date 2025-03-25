@@ -43,7 +43,7 @@ public class MemberAttestationResource {
     @KnownUser
     @Produces("application/json")
     public Response updateAttestation(AttestationPost post) {
-        if (!ctx.getValidAttestations(post.id())) {
+        if (!ctx.isValidAttestation(post.id())) {
             Log.errorf("updateAttestation|%s: %s is an invalid attestation id", session.login(), post.id());
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
@@ -76,7 +76,7 @@ public class MemberAttestationResource {
     @Path("/all")
     @Produces("application/json")
     public Response updateAttestations(List<AttestationPost> postList) {
-        if (postList.stream().anyMatch(x -> !ctx.getValidAttestations(x.id()))) {
+        if (postList.stream().anyMatch(x -> !ctx.isValidAttestation(x.id()))) {
             Log.errorf("updateAttestations|%s: Request includes an invalid attestation id",
                     session.login(), postList.stream().map(AttestationPost::id).toList());
             return Response.status(Response.Status.BAD_REQUEST).build();
