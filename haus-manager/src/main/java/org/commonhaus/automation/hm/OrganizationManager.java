@@ -220,10 +220,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             long installationId,
             String repoName,
             @Nonnull OrganizationConfig orgConfig,
-            Set<String> teams) implements ConfigState {
+            AtomicReference<Set<String>> teamRef) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {
-            this(installationId, repoName, orgConfig, new HashSet<>());
+            this(installationId, repoName, orgConfig, new AtomicReference<>(null));
         }
 
         public boolean performSync() {
@@ -232,10 +232,13 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
 
         public Set<String> teams() {
-            if (teams.isEmpty()) {
+            Set<String> teams = this.teamRef.get();
+            if (teams == null) {
+                teams = new HashSet<>();
                 teams.addAll(orgConfig.teamMembership().stream()
                         .flatMap(x -> x.watchedTeams(repoName).stream())
                         .toList());
+                this.teamRef.set(teams);
             }
             return teams;
         }

@@ -38,6 +38,7 @@ public record GroupMapping(
     public List<String> watchedTeams(String org) {
         return pushMembers().values().stream()
                 .flatMap(x -> x.teams().stream())
+                .filter(x -> x != null && !x.isBlank())
                 .map(x -> OrganizationConfig.toFullTeamName(org, x))
                 .toList();
     }
