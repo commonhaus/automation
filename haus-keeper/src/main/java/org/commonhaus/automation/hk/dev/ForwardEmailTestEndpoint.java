@@ -77,7 +77,7 @@ public class ForwardEmailTestEndpoint {
         test.name = "test";
         test.id = "66707183881a6ff4d292baeb";
         test.description = "Test Only (delete me)";
-        test.recipients = Set.of("test@commonhaus.org");
+        test.recipients = Set.of("test@example.com");
         test.is_enabled = true;
         test.domain = new AliasDomain();
         test.domain.name = commonhaus.name;

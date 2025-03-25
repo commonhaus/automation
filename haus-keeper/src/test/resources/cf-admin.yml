@@ -30,4 +30,4 @@ emailNotifications:
   dryRun:
     - dry-run@example.com
   audit:
-    - test@commonhaus.org
+    - audit@example.com

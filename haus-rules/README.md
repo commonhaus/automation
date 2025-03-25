@@ -50,7 +50,7 @@ notice:
     remove_open: ["!vote/open"]
     announce:
       address:
-      - test@commonhaus.org
+      - test@example.com
 ```
 
 The notice portion of the Haus Rules bot can add labels and send email when things matching a set of rules occur.
@@ -112,10 +112,10 @@ voting:
   managers:
     - "@commonhaus/test-quorum-default"
   error_email_address:
-    - test@commonhaus.org
+    - test@example.com
   status:
-    badge: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.svg
-    page: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.html
+    badge: https://www.example.com/votes/{{repoName}}/{{number}}.svg
+    page: https://www.example.comg/votes/{{repoName}}/{{number}}.html
 ```
 
 - `managers` Specify a group that is able to close votes
