@@ -60,8 +60,9 @@ public class DataPullRequestReview extends DataCommonObject {
         }
         Log.debugf("[%s] queryReviews for pull request %s", qc.getLogId(), pullRequestId);
         List<DataPullRequestReview> prReviews = new ArrayList<>();
+
         Map<String, Object> variables = new HashMap<>();
-        variables.put("id", pullRequestId);
+        variables.put("pr_id", pullRequestId);
 
         DataPageInfo pageInfo = new DataPageInfo(null, false);
 

@@ -38,7 +38,6 @@ import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.ReactionContent;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.githubapp.GitHubClientProvider;
@@ -169,8 +168,9 @@ public class VoteProcessor {
 
         // Fetch current item state
         DataCommonItem item = qc.getItem(event.getItemType(), event.getItemNodeId());
-        if (item == null) {
-            Log.warnf("[%s] VoteProcessor.processVoteCount: item not found", event.getLogId());
+        if (item == null || qc.hasErrors()) {
+            handleErrors(qc, event.getTaskGroup(), "item not found or can't be retrieved",
+                    () -> processVoteCount(event));
             return;
         }
         if (!HAS_OPEN_VOTE.matches(qc, item.id)) {
@@ -182,62 +182,57 @@ public class VoteProcessor {
         if (!repoHasLabels(qc, votingConfig, item, event)) {
             return; // Exit if required labels are missing
         }
-
-        try {
-            // Process the vote with fresh state
-            countVotes(qc, votingConfig, item, event);
-        } catch (Throwable e) {
-            Log.errorf(e, "[%s] VoteProcessor.processVoteCount: unexpected error", event.getLogId());
-            qc.logAndSendEmail("Vote processing error", e);
-        }
+        countVotes(qc, votingConfig, item, event);
     }
 
     private void countVotes(ScopedQueryContext qc, VoteConfig votingConfig, DataCommonItem item,
             VoteEvent event) {
 
-        VoteInformation voteInfo = getVoteInformation(qc, votingConfig, item, event);
-        if (voteInfo == null) {
-            return;
-        }
-
-        // Find manual vote result comments if the item is closed
-        String manualResultComment = VoteQueryCache.MANUAL_RESULT_COMMENT_ID.get(event.getItemNodeId());
-        final List<DataCommonComment> resultComments = (item.closed || manualResultComment != null)
-                ? findManualResultComments(qc, votingConfig, event)
-                : List.of();
-
-        Log.debugf("[🗳️ %s] countVotes: counting open vote (%s / %s)", event.getLogId(),
-                voteInfo.voteType, votingConfig.voteThreshold);
-
-        final List<DataReaction> reactions = voteInfo.countComments()
-                ? List.of()
-                : findHumanReactions(qc, event);
-        final List<DataCommonComment> comments = voteInfo.countComments()
-                ? findHumanComments(qc, event)
-                : List.of();
-
-        // Tally the votes
-        VoteTally tally = new VoteTally(voteInfo, reactions, comments, resultComments);
-
-        // Add or update a bot comment summarizing the vote.
-        String commentBody = tally.toMarkdown(item.closed);
         try {
+            VoteInformation voteInfo = getVoteInformation(qc, votingConfig, item, event);
+            if (voteInfo == null) {
+                return;
+            }
+
+            // Find manual vote result comments if the item is closed
+            String manualResultComment = VoteQueryCache.MANUAL_RESULT_COMMENT_ID.get(event.getItemNodeId());
+            final List<DataCommonComment> resultComments = (item.closed || manualResultComment != null)
+                    ? findManualResultComments(qc, votingConfig, event)
+                    : List.of();
+
+            Log.debugf("[🗳️ %s] countVotes: counting open vote (%s / %s)", event.getLogId(),
+                    voteInfo.voteType, votingConfig.voteThreshold);
+
+            final List<DataReaction> reactions = voteInfo.countComments()
+                    ? List.of()
+                    : findHumanReactions(qc, event);
+            final List<DataCommonComment> comments = voteInfo.countComments()
+                    ? findHumanComments(qc, event)
+                    : List.of();
+            // Tally the votes
+            VoteTally tally = new VoteTally(voteInfo, reactions, comments, resultComments);
+
+            // Add or update a bot comment summarizing the vote.
+            String commentBody = tally.toMarkdown(item.closed);
             String jsonData = objectMapper.writeValueAsString(tally);
             commentBody += "\r\n<!-- vote::data " + jsonData + " -->";
-        } catch (JsonProcessingException e) {
-            Log.errorf(e, "[%s] voting.checkVotes: unable to serialize voting data",
-                    event.getLogId());
-            sendErrorEmail(qc, votingConfig, item, event, e);
-        }
-        updateBotComment(qc, votingConfig, event, item, commentBody);
 
-        if (tally.hasQuorum) {
-            qc.addLabel(item.id, VOTE_QUORUM);
-        }
-        if (tally.isDone) {
-            // remove the open label first so we don't process votes again
-            qc.removeLabels(item.id, List.of(VOTE_OPEN));
-            qc.addLabel(item.id, VOTE_DONE);
+            updateBotComment(qc, votingConfig, event, item, commentBody);
+
+            if (tally.hasQuorum) {
+                qc.addLabel(item.id, VOTE_QUORUM);
+            }
+            if (tally.isDone) {
+                // remove the open label first so we don't process votes again
+                qc.removeLabels(item.id, List.of(VOTE_OPEN));
+                qc.addLabel(item.id, VOTE_DONE);
+            }
+
+            if (qc.hasErrors()) {
+                sendVotingErrorEmail(qc, votingConfig, item, event, null);
+            }
+        } catch (Throwable e) {
+            sendVotingErrorEmail(qc, votingConfig, item, event, e);
         }
     }
 
@@ -347,13 +342,15 @@ public class VoteProcessor {
                 && ctx.getTeamMembershipService().isLoginIncluded(qc, comment.author.login, votingConfig.managers);
     }
 
-    private void sendErrorEmail(QueryContext qc, VoteConfig votingConfig,
+    private void sendVotingErrorEmail(QueryContext qc, VoteConfig votingConfig,
             DataCommonItem item, VoteEvent voteEvent, Throwable e) {
         // If configured to do so, email the error_email_address
         if (votingConfig.sendErrorEmail()) {
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
+            if (e != null) {
+                e.printStackTrace(pw);
+            }
 
             String subject = "Voting error occurred with " + voteEvent.getRepoFullName() + " #" + voteEvent.getNumber();
 
@@ -389,11 +386,21 @@ public class VoteProcessor {
             }
             ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
             List<DataDiscussion> discussions = qc.findDiscussionsWithLabel("vote/open");
+            if (discussions == null || qc.hasErrors()) {
+                handleErrors(qc, repoFullName, "unable to fetch discussions",
+                        () -> scheduleQueryRepository(installationId, repoFullName));
+                return;
+            }
             for (var discussion : discussions) {
                 scheduleQueryItem(qc, repoFullName, discussion, EventType.discussion);
             }
 
             List<DataCommonItem> issues = qc.findIssuesWithLabel("vote/open");
+            if (issues == null || qc.hasErrors()) {
+                handleErrors(qc, repoFullName, "unable to fetch issues",
+                        () -> scheduleQueryRepository(installationId, repoFullName));
+                return;
+            }
             for (var issue : issues) {
                 scheduleQueryItem(qc, repoFullName,
                         issue,
@@ -409,5 +416,20 @@ public class VoteProcessor {
 
         // allow vote counting to collapse/merge
         reconcileVoteEvent(voteEvent);
+    }
+
+    private void handleErrors(QueryContext qc, String taskGroup, String message, Runnable retry) {
+        if (qc.hasRetriableNetworkError()) {
+            Log.debugf("[%s] retriable network error: %s", qc.getLogId(), message);
+            periodicUpdate.scheduleReconciliationRetry(taskGroup,
+                    (retryCount) -> retry.run(),
+                    0); // Start with retry count 0
+            return;
+        }
+        if (qc.hasErrors()) {
+            qc.logAndSendContextErrors(message);
+            return;
+        }
+        Log.errorf("[%s] unknown error: %s", qc.getLogId(), message);
     }
 }
