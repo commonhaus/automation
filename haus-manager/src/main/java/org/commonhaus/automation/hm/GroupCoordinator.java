@@ -38,7 +38,7 @@ public abstract class GroupCoordinator {
     ManagerBotConfig mgrBotConfig;
 
     @Inject
-    GitHubTeamService teamSyncService;
+    GitHubTeamService teamService;
 
     @Inject
     MembershipWatcher membershipEvents;
@@ -197,7 +197,7 @@ public abstract class GroupCoordinator {
         }
 
         // Delegate to the shared utility
-        teamSyncService.syncMembers(teamQc, targetTeam, expectedLogins, ignoreUsers, isDryRun, emailNotifications);
+        teamService.syncMembers(teamQc, targetTeam, expectedLogins, ignoreUsers, isDryRun, emailNotifications);
 
         // Register watcher for team membership changes
         membershipEvents.watchMembers(taskGroup,

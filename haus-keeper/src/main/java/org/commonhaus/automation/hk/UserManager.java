@@ -153,9 +153,6 @@ public class UserManager {
                 fileEvents.watchFile(ME,
                         installationId, repoFullName, HausKeeperConfig.PATH,
                         (fileUpdate) -> processFileUpdate(fileUpdate));
-
-            } else {
-
             }
         }
     }

@@ -274,7 +274,7 @@ public class ProjectAccessManager extends GroupCoordinator {
             Log.warnf("[%s] %s: No installation associated with team %s", ME, state.taskGroup(), sourceTeamName);
         } else {
             // Get team members
-            Set<String> teamLogins = teamSyncService.getTeamLogins(teamQc, sourceTeamName);
+            Set<String> teamLogins = teamService.getTeamLogins(teamQc, sourceTeamName);
             if (teamLogins == null) {
                 Log.warnf("[%s] %s: team was not found %s", ME, state.taskGroup(), sourceTeamName);
             } else {
@@ -298,7 +298,7 @@ public class ProjectAccessManager extends GroupCoordinator {
         GHOrganization.RepositoryRole role = toRole(state, teamAccess.role());
 
         // Add configured logins as outside collaborators on the repository that contains the configuration file.
-        teamSyncService.syncCollaborators(projectQc, repo, role,
+        teamService.syncCollaborators(projectQc, repo, role,
                 sourceLogins, teamAccess.ignoreUsers(),
                 isDryRun, projectConfig.emailNotifications());
 
