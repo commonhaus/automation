@@ -83,8 +83,8 @@ public abstract class BaseContextService implements ContextService {
         return graphQLClient;
     }
 
-    public ScopedQueryContext getOrgScopedQueryContext(String teamOrgName) {
-        return installationMap.getOrgScopedQueryContext(this, teamOrgName);
+    public ScopedQueryContext getOrgScopedQueryContext(String fullOrOrgName) {
+        return installationMap.getOrgScopedQueryContext(this, fullOrOrgName);
     }
 
     @Override

@@ -20,6 +20,7 @@ import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.OrgDefaults;
 import org.commonhaus.automation.hm.config.PushToTeams;
 import org.kohsuke.github.GHContent;
+import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -205,6 +206,31 @@ public abstract class GroupCoordinator {
                 MembershipUpdateType.TEAM,
                 targetTeam,
                 (update) -> processMembershipUpdate(taskGroup, update));
+    }
+
+    public GHOrganization.RepositoryRole toRole(String method, String rolePermission, EmailNotification notifications,
+            Object errorContent) {
+        GHOrganization.Permission permission = GHOrganization.Permission.TRIAGE;
+        if (rolePermission != null) {
+            for (GHOrganization.Permission p : GHOrganization.Permission.values()) {
+                if (p.name().equalsIgnoreCase(rolePermission)) {
+                    permission = p;
+                }
+            }
+            if (!permission.name().toLowerCase().equals(rolePermission.toLowerCase())) {
+                Log.warnf("[%s] %s: unknown role permission %s; using TRIAGE", me(), method, rolePermission);
+                ctx.sendEmail(me(), "Unknown role permission",
+                        """
+                                Unknown role/permission %s in config file; using TRIAGE.
+
+                                Please check the configuration file and correct the role/permission value.
+
+                                %s
+                                """.formatted(rolePermission, errorContent.toString()),
+                        ctx.getErrorAddresses(notifications));
+            }
+        }
+        return GHOrganization.RepositoryRole.from(permission);
     }
 
     protected String me() {

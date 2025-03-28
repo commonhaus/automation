@@ -70,6 +70,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     @Scheduled(cron = "${automation.hausManager.cron.projects:0 47 4 */3 * ?}")
     public void refreshAccessLists() {
         Log.info("⏰ Scheduled: refresh access lists");
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 
         for (String resourceKey : resourceToTaskGroup.keySet()) {
             String fullName = resourceToFullName(resourceKey);
@@ -85,7 +86,6 @@ public class ProjectAccessManager extends GroupCoordinator {
             ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
             readProjectConfig(ME, qc);
         }
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
     }
 
     /**
@@ -295,7 +295,8 @@ public class ProjectAccessManager extends GroupCoordinator {
             return;
         }
 
-        GHOrganization.RepositoryRole role = toRole(state, teamAccess.role());
+        GHOrganization.RepositoryRole role = toRole("doSyncCollaborators", teamAccess.role(),
+                projectConfig.emailNotifications(), teamAccess);
 
         // Add configured logins as outside collaborators on the repository that contains the configuration file.
         teamService.syncCollaborators(projectQc, repo, role,
@@ -313,30 +314,6 @@ public class ProjectAccessManager extends GroupCoordinator {
                 MembershipUpdateType.COLLABORATOR,
                 repoFullName,
                 (update) -> processMembershipUpdate(state.taskGroup(), update));
-    }
-
-    private GHOrganization.RepositoryRole toRole(ProjectConfigState state, String rolePermission) {
-        GHOrganization.Permission permission = GHOrganization.Permission.TRIAGE;
-        if (rolePermission != null) {
-            for (GHOrganization.Permission p : GHOrganization.Permission.values()) {
-                if (p.name().equalsIgnoreCase(rolePermission)) {
-                    permission = p;
-                }
-            }
-            if (!permission.name().toLowerCase().equals(rolePermission.toLowerCase())) {
-                Log.warnf("[%s] %s: unknown role permission %s; using TRIAGE", ME, state.taskGroup(), rolePermission);
-                ctx.sendEmail(ME, "Unknown role permission",
-                        """
-                                Unknown role/permission %s in config file; using TRIAGE.
-
-                                Please check the configuration file and correct the role/permission value.
-
-                                %s
-                                """.formatted(rolePermission, state.projectConfig()),
-                        ctx.getErrorAddresses(state.projectConfig().emailNotifications()));
-            }
-        }
-        return GHOrganization.RepositoryRole.from(permission);
     }
 
     protected String me() {

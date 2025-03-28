@@ -80,8 +80,8 @@ public class DataSponsorship extends DataCommonType {
         Map<String, Object> variables = new HashMap<>();
         variables.put("login", login);
         Response response = qc.execQuerySync(QUERY_RECENT_SPONSORS, variables);
-        if (qc.hasErrors() || response == null) {
-            return List.of();
+        if (qc.hasErrors() || response == null || response.getData() == null) {
+            return null;
         }
 
         JsonObject organization = JsonAttribute.organization.jsonObjectFrom(response.getData());

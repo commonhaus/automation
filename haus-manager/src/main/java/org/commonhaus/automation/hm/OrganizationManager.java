@@ -3,8 +3,10 @@ package org.commonhaus.automation.hm;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.annotation.Nonnull;
@@ -36,7 +38,6 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class OrganizationManager extends GroupCoordinator implements LatestOrgConfig {
     static final String ME = "orgManager";
-
     private static volatile String lastRun = "";
 
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
@@ -47,6 +48,15 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
     public OrganizationConfig getConfig() {
         return currentConfig.get().map(OrganizationConfigState::orgConfig).orElse(null);
+    }
+
+    private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
+
+    public void notifyOnUpdate(String id, Runnable callback) {
+        if (callback == null) {
+            return;
+        }
+        callbacks.put(id, callback);
     }
 
     /**
@@ -83,7 +93,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 currentConfig.set(Optional.empty());
             }
         }
-
     }
 
     /**
@@ -94,13 +103,12 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     public void refreshOrganizationMembership() {
         Log.info("⏰ Scheduled: refresh organization membership");
 
-        ScopedQueryContext qc = ctx.getOrgScopedQueryContext(mgrBotConfig.home().organization());
+        ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
             Log.debugf("[%s] refreshAccessLists: no organization installation", ME);
             return;
         }
         readOrgConfig(qc);
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
     }
 
     /**
@@ -156,7 +164,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         OrganizationConfig orgCfg = qc.readYamlContent(content, OrganizationConfig.class);
         if (orgCfg == null || qc.hasErrors()) {
             qc.logAndSendContextErrors("%s/readOrgConfig: unable to parse %s in %s"
-                    .formatted(ME, OrganizationConfig.PATH, repo.getFullName()));
+                    .formatted(ME, OrganizationConfig.PATH, repo.getFullName()),
+                    orgCfg.emailNotifications());
             return;
         }
         Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
@@ -177,6 +186,11 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         // queue reconcile action: deal with bursty config updates
         periodicSync.queueReconciliation(ME, this::reconcile);
+
+        // Queue callbacks for config consumers
+        for (var callback : callbacks.entrySet()) {
+            periodicSync.queueReconciliation(callback.getKey(), callback.getValue());
+        }
     }
 
     /**
@@ -184,12 +198,14 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Review collected configuration and perform required actions
      */
     public void reconcile() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
         OrganizationConfigState configState = currentConfig.get().orElse(null);
         if (configState == null || !configState.performSync()) {
             Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
             return;
         }
-        Log.debugf("[%s] reconcile: starting %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("[%s] reconcile: start %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
 
         for (GroupMapping groupMapping : configState.orgConfig().teamMembership()) {
             if (groupMapping == null || !groupMapping.performSync()) {
@@ -199,7 +215,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
             processGroupMapping(configState, groupMapping);
         }
-        Log.debugf("[%s] reconcile: team membership sync complete", ME);
+        Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
     }
 
     protected String me() {

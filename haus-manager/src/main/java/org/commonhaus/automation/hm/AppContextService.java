@@ -13,7 +13,7 @@ public class AppContextService extends BaseContextService {
     @Inject
     ManagerBotConfig mgrBotConfig;
 
-    public ScopedQueryContext getDefaultQueryContext() {
+    public ScopedQueryContext getHomeQueryContext() {
         return installationMap.getOrgScopedQueryContext(this, mgrBotConfig.home().organization());
     }
 }

@@ -15,7 +15,7 @@ public class OrganizationConfig {
     protected EmailNotification emailNotifications;
     protected List<GroupMapping> teamMembership;
     protected ProjectList projects;
-    protected Sponsors sponsors;
+    protected SponsorsConfig sponsors;
 
     /**
      * @return the emailNotifications
@@ -29,7 +29,7 @@ public class OrganizationConfig {
     /**
      * @return the sponsors
      */
-    public Sponsors sponsors() {
+    public SponsorsConfig sponsors() {
         return sponsors;
     }
 
@@ -61,10 +61,22 @@ public class OrganizationConfig {
      * @param targetRepository Repository to update with sponsors (as outside contributors)
      * @param dryRun If true, do not update the repository
      */
-    public record Sponsors(
-            List<RepoSource> sources,
+    public record SponsorsConfig(
+            String sponsorable,
             String targetRepository,
+            String role,
+            List<String> ignoreUsers,
             Boolean dryRun) {
+
+        @Override
+        public String role() {
+            return role == null ? "read" : role;
+        }
+
+        @Override
+        public List<String> ignoreUsers() {
+            return ignoreUsers == null ? List.of() : ignoreUsers;
+        }
 
         @Override
         public Boolean dryRun() {
@@ -73,8 +85,8 @@ public class OrganizationConfig {
 
         @Override
         public String toString() {
-            return "SponsorsConfig{dryRun=%s, targetRepository='%s', sources=%s}"
-                    .formatted(dryRun(), targetRepository, sources);
+            return "SponsorsConfig{dryRun=%s, targetRepository='%s', sponsorable=%s, ignoreUsers=%s}"
+                    .formatted(dryRun(), targetRepository, sponsorable, ignoreUsers);
         }
     }
 

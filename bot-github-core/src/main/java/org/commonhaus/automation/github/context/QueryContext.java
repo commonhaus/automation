@@ -916,6 +916,10 @@ public class QueryContext {
         ctx.logAndSendEmail(getLogId(), title, bundleExceptions(), getErrorAddresses());
     }
 
+    public void logAndSendContextErrors(String title, EmailNotification notifications) {
+        ctx.logAndSendEmail(getLogId(), title, bundleExceptions(), getErrorAddresses(notifications));
+    }
+
     /**
      * Log an error and send an email to the configured error addresses.
      * Uses this (QueryContext) logId and error addresses.
@@ -928,6 +932,10 @@ public class QueryContext {
      */
     public void logAndSendEmail(String title, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, t, getErrorAddresses());
+    }
+
+    public void logAndSendEmail(String title, Throwable t, EmailNotification notifications) {
+        ctx.logAndSendEmail(getLogId(), title, t, getErrorAddresses(notifications));
     }
 
     /**
@@ -943,6 +951,10 @@ public class QueryContext {
      */
     public void logAndSendEmail(String title, String body, Throwable t) {
         ctx.logAndSendEmail(getLogId(), title, body, t, getErrorAddresses());
+    }
+
+    public void logAndSendEmail(String title, String body, Throwable t, EmailNotification notifications) {
+        ctx.logAndSendEmail(getLogId(), title, body, t, getErrorAddresses(notifications));
     }
 
     /**
