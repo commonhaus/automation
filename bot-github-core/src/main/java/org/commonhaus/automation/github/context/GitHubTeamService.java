@@ -6,6 +6,7 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.toFull
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -23,6 +24,7 @@ import org.kohsuke.github.GHOrganization.RepositoryRole;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
+import org.kohsuke.github.GitHub;
 
 import io.quarkus.logging.Log;
 
@@ -358,7 +360,10 @@ public class GitHubTeamService {
                 }
                 List<GHUser> toAdd = new ArrayList<>();
                 for (String login : changes.toAdd()) {
-                    toAdd.add(gh.getUser(login));
+                    GHUser user = loginToUser(qc, gh, login);
+                    if (user != null) {
+                        toAdd.add(user);
+                    }
                 }
                 repository.addCollaborators(toAdd, role);
                 return null;
@@ -417,7 +422,10 @@ public class GitHubTeamService {
                     List<GHUser> toRemove = new ArrayList<>();
                     // Process removals first
                     for (String login : changes.toRemove()) {
-                        toRemove.add(gh.getUser(login));
+                        GHUser user = loginToUser(qc, gh, login);
+                        if (user != null) {
+                            toRemove.add(user);
+                        }
                     }
                     repository.removeCollaborators(toRemove);
                 }
@@ -425,7 +433,10 @@ public class GitHubTeamService {
                 if (!changes.toAdd().isEmpty()) {
                     List<GHUser> toAdd = new ArrayList<>();
                     for (String login : changes.toAdd()) {
-                        toAdd.add(gh.getUser(login));
+                        GHUser user = loginToUser(qc, gh, login);
+                        if (user != null) {
+                            toAdd.add(user);
+                        }
                     }
                     repository.addCollaborators(toAdd, role);
                 }
@@ -441,6 +452,20 @@ public class GitHubTeamService {
 
         Log.infof("[%s] syncCollaborators: finished syncing %s; %s added; %s removed",
                 qc.getLogId(), repoFullName, changes.toAdd().size(), changes.toRemove().size());
+    }
+
+    // Only use from w/in execGitHubSync
+    private GHUser loginToUser(GitHubQueryContext qc, GitHub gh, String login) throws IOException {
+        GHUser user = gh.getUser(login);
+        if (user == null) {
+            Log.warnf("[%s] loginToUser: user %s not found", qc.getLogId(), login);
+            return null;
+        }
+        if ("Organization".equalsIgnoreCase(user.getType())) {
+            Log.warnf("[%s] loginToUser: user %s is an organization", qc.getLogId(), login);
+            return null;
+        }
+        return user;
     }
 
     /**

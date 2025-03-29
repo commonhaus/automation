@@ -523,6 +523,7 @@ public class ContextHelper {
         lenient().when(user.getHtmlUrl()).thenReturn(url);
         lenient().when(user.getUrl()).thenReturn(url);
         lenient().when(user.getAvatarUrl()).thenReturn("");
+        lenient().when(user.getType()).thenReturn("User");
         lenient().when(gh.getUser(login)).thenReturn(user);
         return user;
     }
