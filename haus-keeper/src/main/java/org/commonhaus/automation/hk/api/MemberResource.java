@@ -119,7 +119,7 @@ public class MemberResource {
         }
 
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session, refresh, false);
+            CommonhausUser user = datastore.getCommonhausUser(session, refresh, true);
             if (refresh) {
                 emailService.forgetUser(session, user);
             }
