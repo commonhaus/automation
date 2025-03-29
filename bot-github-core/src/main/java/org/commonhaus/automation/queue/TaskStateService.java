@@ -8,8 +8,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.ContextService;
@@ -19,6 +19,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.LaunchMode;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
 public class TaskStateService {
@@ -29,20 +31,22 @@ public class TaskStateService {
     @Inject
     BotConfig botConfig;
 
+    @Inject
+    PeriodicUpdateQueue updateQueue;
+
     private Map<String, Instant> lastRunTimes = new ConcurrentHashMap<>();
     private Path stateFile;
 
-    @PostConstruct
-    void init() {
+    void init(@Observes StartupEvent event) {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }
         String filePath = botConfig.queue().stateFilePath().orElse(null);
         if (filePath == null) {
-            Log.warnf("[%s] State file path not configured, task state will not be persisted", ME);
             return;
         }
-        Path stateFile = Path.of(filePath);
+        Log.infof("[%s] Task state will be persisted to %s", ME, filePath);
+        stateFile = Path.of(filePath);
 
         // Load state from file if it exists
         if (Files.exists(stateFile)) {
@@ -57,23 +61,7 @@ public class TaskStateService {
         }
     }
 
-    public void recordRun(String taskId) {
-        lastRunTimes.put(taskId, Instant.now());
-        saveState();
-    }
-
-    public boolean shouldRun(String taskId, Duration maxAge) {
-        if (LaunchMode.current() == LaunchMode.TEST) {
-            return true;
-        }
-        Instant lastRun = lastRunTimes.get(taskId);
-        if (lastRun == null) {
-            return true;
-        }
-        return Duration.between(lastRun, Instant.now()).compareTo(maxAge) > 0;
-    }
-
-    private void saveState() {
+    private void saveState(@Observes ShutdownEvent event) {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }
@@ -85,5 +73,21 @@ public class TaskStateService {
                 Log.warn("Could not save state file", e);
             }
         }
+    }
+
+    public void recordRun(String taskId) {
+        lastRunTimes.put(taskId, Instant.now());
+        updateQueue.queueReconciliation(ME, () -> this.saveState(null));
+    }
+
+    public boolean shouldRun(String taskId, Duration maxAge) {
+        if (LaunchMode.current() == LaunchMode.TEST) {
+            return true;
+        }
+        Instant lastRun = lastRunTimes.get(taskId);
+        if (lastRun == null) {
+            return true;
+        }
+        return Duration.between(lastRun, Instant.now()).compareTo(maxAge) > 0;
     }
 }

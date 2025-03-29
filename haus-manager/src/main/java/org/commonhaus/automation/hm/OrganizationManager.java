@@ -64,6 +64,11 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         callbacks.put(id, callback);
     }
 
+    private void recordRun() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        taskState.recordRun(ME);
+    }
+
     /**
      * Event handler for repository discovery.
      * Specifically look for (and monitor) organization configuration.
@@ -87,10 +92,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
                 // READ ORG CONFIG from Main repository immediately.
                 readOrgConfig(qc);
-                if (qc.hasErrors()) {
-                    qc.logAndSendContextErrors(
-                            "Unable to read %s in %s".formatted(OrganizationConfig.PATH, repoFullName));
-                } else if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                if (taskState.shouldRun(ME, Duration.ofHours(6))) {
                     queueReconciliation();
                 } else {
                     Log.debugf("[%s] repoDiscovered: Skip eager team discovery", ME);
@@ -107,6 +109,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 currentConfig.set(Optional.empty());
             }
         }
+        recordRun();
     }
 
     /**
@@ -235,7 +238,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Review collected configuration and perform required actions
      */
     public void reconcile() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        recordRun();
 
         OrganizationConfigState configState = currentConfig.get().orElse(null);
         if (configState == null || !configState.performSync()) {

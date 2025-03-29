@@ -71,6 +71,11 @@ public class ProjectAccessManager extends GroupCoordinator {
         return resource.substring(5);
     }
 
+    private void recordRun() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        taskState.recordRun(ME);
+    }
+
     /**
      * Periodically refresh/re-synchronize team access lists.
      */
@@ -83,7 +88,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     }
 
     public void refreshAccessLists() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        recordRun();
 
         for (String resourceKey : resourceToTaskGroup.keySet()) {
             String fullName = resourceToFullName(resourceKey);
@@ -151,6 +156,7 @@ public class ProjectAccessManager extends GroupCoordinator {
                 }
             }
         }
+        recordRun();
     }
 
     /**
@@ -249,8 +255,7 @@ public class ProjectAccessManager extends GroupCoordinator {
      * @param taskGroup
      */
     public void reconcile(String taskGroup) {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
-        taskState.recordRun(ME);
+        recordRun();
 
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
