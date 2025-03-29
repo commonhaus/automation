@@ -32,7 +32,7 @@ import org.commonhaus.automation.github.hr.AppContextService;
 import org.commonhaus.automation.github.hr.config.ConfigWatcher;
 import org.commonhaus.automation.github.hr.config.VoteConfig;
 import org.commonhaus.automation.github.hr.rules.MatchLabel;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHRepository;

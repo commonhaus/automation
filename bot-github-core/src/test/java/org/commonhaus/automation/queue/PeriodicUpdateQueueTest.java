@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github.queue;
+package org.commonhaus.automation.queue;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;

@@ -13,7 +13,7 @@ import org.commonhaus.automation.JsonAttributeAccessor;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.mail.LogMailer;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHAuthenticatedAppInstallation;

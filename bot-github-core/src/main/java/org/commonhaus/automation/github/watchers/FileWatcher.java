@@ -20,7 +20,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHEventPayload.Push.PushCommit;

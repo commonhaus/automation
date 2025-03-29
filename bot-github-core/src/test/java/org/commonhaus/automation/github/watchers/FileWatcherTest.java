@@ -17,7 +17,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;

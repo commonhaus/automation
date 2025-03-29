@@ -43,7 +43,7 @@ import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.GitHubQueryContext.GitHubParameterApiCall;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHPullRequestFileDetail;

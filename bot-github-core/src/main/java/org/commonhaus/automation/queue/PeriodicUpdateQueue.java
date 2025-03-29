@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github.queue;
+package org.commonhaus.automation.queue;
 
 import java.util.Iterator;
 import java.util.Map;

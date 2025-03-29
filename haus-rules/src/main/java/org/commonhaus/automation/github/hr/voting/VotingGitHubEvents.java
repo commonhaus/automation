@@ -12,7 +12,7 @@ import org.commonhaus.automation.github.hr.EventQueryContext;
 import org.commonhaus.automation.github.hr.config.ConfigWatcher;
 import org.commonhaus.automation.github.hr.config.HausRulesConfig;
 import org.commonhaus.automation.github.hr.config.VoteConfig;
-import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHEventPayload;
 
 import io.quarkiverse.githubapp.ConfigFile;
