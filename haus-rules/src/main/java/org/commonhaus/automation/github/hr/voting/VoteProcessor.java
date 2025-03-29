@@ -122,9 +122,14 @@ public class VoteProcessor {
 
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausRules.cron.voting:0 23 */3 * * ?}")
-    void discoverVotes() {
-        Log.info("⏰ 🗳️ Scheduled: count votes");
+    public void scheduledDiscovery() {
+        Log.info("⏰ 🗳️ Scheduled: begin count votes");
+        discoverVotes();
+        Log.info("⏰ 🗳️ Scheduled: end count votes");
+    }
 
+    public void discoverVotes() {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
         var i = votingRepositories.entrySet().iterator();
         while (i.hasNext()) {
             var e = i.next();
@@ -139,7 +144,6 @@ public class VoteProcessor {
                         () -> scheduleQueryRepository(installationId, repoFullName));
             }
         }
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
     }
 
     public void reconcileVoteEvent(VoteEvent event) {

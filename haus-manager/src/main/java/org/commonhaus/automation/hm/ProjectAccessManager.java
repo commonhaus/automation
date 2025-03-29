@@ -76,8 +76,13 @@ public class ProjectAccessManager extends GroupCoordinator {
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.projects:0 47 4 */3 * ?}")
+    public void scheduledRefresh() {
+        Log.info("⏰ 🌳 Scheduled: begin refresh access lists");
+        refreshAccessLists();
+        Log.infof("⏰ 🌳 Scheduled: end refresh access lists");
+    }
+
     public void refreshAccessLists() {
-        Log.info("⏰ Scheduled: refresh access lists");
         lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 
         for (String resourceKey : resourceToTaskGroup.keySet()) {

@@ -114,9 +114,13 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.organization:0 47 2 */3 * ?}")
-    public void refreshOrganizationMembership() {
-        Log.info("⏰ Scheduled: refresh organization membership");
+    public void scheduledRefresh() {
+        Log.info("⏰ 🏡 Scheduled: begin refresh organization membership");
+        refreshOrganizationMembership();
+        Log.info("⏰ 🏡 Scheduled: end refresh organization membership");
+    }
 
+    public void refreshOrganizationMembership() {
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
             Log.debugf("[%s] refreshAccessLists: no organization installation", ME);

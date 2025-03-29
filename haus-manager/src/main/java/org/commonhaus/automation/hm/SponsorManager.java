@@ -56,9 +56,12 @@ public class SponsorManager extends GroupCoordinator {
      * Periodically refresh/re-synchronize sponsor collaborators
      */
     @Scheduled(cron = "${automation.hausManager.cron.sponsor:0 47 1 */3 * ?}")
-    public void refreshSponsors() {
+    public void scheduledRefresh() {
         Log.info("⏰ Scheduled: refresh sponsors");
+        refreshSponsors();
+    }
 
+    public void refreshSponsors() {
         periodicSync.queueReconciliation(ME, () -> reconcile());
     }
 
