@@ -71,7 +71,7 @@ public class PeriodicUpdateQueue {
     private final Map<String, RetryTask> retryTasks = new ConcurrentHashMap<>();
 
     void startup(@Observes StartupEvent startup) {
-        Log.debugf("Starting PeriodicUpdateQueue");
+        Log.debugf("🧵 Starting PeriodicUpdateQueue");
 
         long initialDelay = botConfig.queue().initialDelay().toMillis();
         long period = botConfig.queue().period().toMillis();
@@ -88,12 +88,12 @@ public class PeriodicUpdateQueue {
     }
 
     public void queue(String name, Runnable task) {
-        Log.debugf("QUEUE CHANGE task %s", name);
+        Log.debugf("🧵 QUEUE CHANGE task %s", name);
         taskQueue.add(new Task(TaskType.CHANGE, name, task));
     }
 
     public void queueReconciliation(String name, Runnable task) {
-        Log.debugf("QUEUE RECONCILE task %s", name);
+        Log.debugf("🧵 QUEUE RECONCILE task %s", name);
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 
@@ -107,7 +107,7 @@ public class PeriodicUpdateQueue {
      * @param retryCount Previous retry count (0 for initial attempt)
      */
     public void scheduleReconciliationRetry(String name, Consumer<Integer> retryRunnable, int retryCount) {
-        Log.debugf("SCHEDULE task %s", name);
+        Log.debugf("🧵 SCHEDULE task %s", name);
         retryTasks.putIfAbsent(name, new RetryTask(name, retryRunnable, retryCount));
     }
 
@@ -119,31 +119,37 @@ public class PeriodicUpdateQueue {
     }
 
     private void run(Task task) {
-        Log.debugf("%s [begin] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
         try {
-            // skip or collapse reconciliation task?
-            Task next = taskQueue.peek();
-            if (task.type() == TaskType.RECONCILE) {
+            boolean tryNext;
+            do {
+                // skip or collapse reconciliation task?
+                Task next = taskQueue.peek();
+                tryNext = false;
+
                 // Defer reconciliation if changes of the same group are pending
-                if (next != null && next.name().equals(task.name())) {
+                if (task.type() == TaskType.RECONCILE && next != null && next.name().equals(task.name())) {
                     if (next.type() == TaskType.CHANGE) {
-                        taskQueue.add(task); // Re-queue this reconciliation for later
-                        Log.debugf("RECONCILE [postpone] %s task; same-group changes", task.name());
+                        // There is another pending related change; postpone this reconciliation
+                        taskQueue.add(task);
+                        Log.debugf("🧵 RECONCILE [postpone] %s task; same-group changes", task.name());
                     } else {
-                        Log.debugf("RECONCILE [skip] %s task; duplicate next", task.name());
+                        // There is another pending reconciliation for the same group; skip this one
+                        Log.debugf("🧵 RECONCILE [skip] %s task; duplicate next", task.name());
                     }
-                    return;
+                    task = taskQueue.poll(); // Get the next task
+                    tryNext = true;
                 }
-            }
+            } while (tryNext);
 
             // Execute the task
+            Log.debugf("🧵 %s [begin] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
             task.task().run();
+            Log.debugf("🧵 %s [end] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
         } catch (Throwable e) {
             logMailer.logAndSendEmail("queue",
-                    "Error running %s %s task".formatted(task.type(), task.name()),
+                    "🧵 Error running %s %s task".formatted(task.type(), task.name()),
                     e, logMailer.botErrorEmailAddress());
         }
-        Log.debugf("%s [end] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
     }
 
     /**
@@ -157,7 +163,7 @@ public class PeriodicUpdateQueue {
             RetryTask retryTask = iterator.next().getValue();
             if (retryTask.isReady()) {
                 iterator.remove();
-                Log.debugf("RETRY %s", retryTask.name);
+                Log.debugf("🧵 RETRY %s", retryTask.name);
                 taskQueue.add(new Task(TaskType.RECONCILE, retryTask.name, retryTask));
             }
         }
