@@ -12,8 +12,8 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
-import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

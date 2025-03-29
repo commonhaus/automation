@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hm;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -13,6 +14,7 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
@@ -27,6 +29,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -40,7 +43,11 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     static final String ME = "orgManager";
     private static volatile String lastRun = "";
 
+    @Inject
+    TaskStateService taskState;
+
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
+    private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
@@ -49,8 +56,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     public OrganizationConfig getConfig() {
         return currentConfig.get().map(OrganizationConfigState::orgConfig).orElse(null);
     }
-
-    private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
 
     public void notifyOnUpdate(String id, Runnable callback) {
         if (callback == null) {
@@ -72,7 +77,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         // We only read configuration files from repositories in the configured organization
         if (action.repository()
-                && repo.getFullName().equals(mgrBotConfig.home().repositoryFullName())) {
+                && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
+
             Log.debugf("[%s] repoDiscovered: %s main=%s", ME, action.name(), repoFullName);
             if (action.added()) {
                 // main repository for configuration
@@ -81,6 +87,14 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
                 // READ ORG CONFIG from Main repository immediately.
                 readOrgConfig(qc);
+                if (qc.hasErrors()) {
+                    qc.logAndSendContextErrors(
+                            "Unable to read %s in %s".formatted(OrganizationConfig.PATH, repoFullName));
+                } else if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                    queueReconciliation();
+                } else {
+                    Log.debugf("[%s] repoDiscovered: Skip eager team discovery", ME);
+                }
 
                 // Register watcher to monitor for org config changes
                 // GHRepository is backed by a cached connection that can expire
@@ -108,7 +122,12 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             Log.debugf("[%s] refreshAccessLists: no organization installation", ME);
             return;
         }
-        readOrgConfig(qc);
+        if (readOrgConfig(qc)) {
+            queueReconciliation();
+        } else if (qc.hasErrors()) {
+            qc.logAndSendContextErrors(
+                    "Unable to read %s in %s".formatted(OrganizationConfig.PATH, mgrBotConfig.home().repositoryFullName()));
+        }
     }
 
     /**
@@ -141,38 +160,49 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), repo)
                 .withExisting(github);
-        readOrgConfig(qc);
+        if (readOrgConfig(qc)) {
+            queueReconciliation();
+        } else if (qc.hasErrors()) {
+            qc.logAndSendContextErrors(
+                    "Unable to read %s in %s".formatted(OrganizationConfig.PATH,
+                            mgrBotConfig.home().repositoryFullName()));
+        }
     }
 
     /**
      * Read organization configuration from repository.
      * Called by repositoryDiscovered and for fileEvents.
      */
-    protected void readOrgConfig(ScopedQueryContext qc) {
+    protected boolean readOrgConfig(ScopedQueryContext qc) {
         GHRepository repo = qc.getRepository();
         if (repo == null) {
             Log.warnf("%s/readOrgConfig: repository not set in QueryContext; errors: %s", ME,
                     qc.bundleExceptions());
-            return;
+            return false;
         }
         GHContent content = qc.readSourceFile(repo, OrganizationConfig.PATH);
         if (content == null) {
             Log.debugf("[%s] readOrgConfig: no %s in %s; errors: %s", ME,
                     OrganizationConfig.PATH, repo.getFullName(), qc.bundleExceptions());
-            return;
+            return false;
         }
         OrganizationConfig orgCfg = qc.readYamlContent(content, OrganizationConfig.class);
         if (orgCfg == null || qc.hasErrors()) {
             qc.logAndSendContextErrors("%s/readOrgConfig: unable to parse %s in %s"
                     .formatted(ME, OrganizationConfig.PATH, repo.getFullName()),
                     orgCfg.emailNotifications());
-            return;
+            return false;
         }
         Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
 
         OrganizationConfigState newState = new OrganizationConfigState(qc.getInstallationId(), repo.getFullName(), orgCfg);
         OrganizationConfigState oldState = currentConfig.get().orElse(null);
         if (oldState != null) {
+            if (oldState.orgConfig().equals(newState.orgConfig())) {
+                Log.debugf("[%s] readOrgConfig: no changes in %s", ME, OrganizationConfig.PATH);
+                return false;
+            }
+
             // Find teams that were removed
             Set<String> removedTeams = new HashSet<>(oldState.teams());
             removedTeams.removeAll(newState.teams());
@@ -183,7 +213,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             }
         }
         currentConfig.set(Optional.of(newState));
+        return true;
+    }
 
+    private void queueReconciliation() {
         // queue reconcile action: deal with bursty config updates
         periodicSync.queueReconciliation(ME, this::reconcile);
 

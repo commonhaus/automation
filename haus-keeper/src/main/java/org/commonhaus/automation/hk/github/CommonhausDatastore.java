@@ -4,13 +4,13 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.ContextService;
-import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.DatastoreEvent.QueryEvent;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 import org.commonhaus.automation.hk.member.MemberInfo;
 import org.commonhaus.automation.mail.LogMailer;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;

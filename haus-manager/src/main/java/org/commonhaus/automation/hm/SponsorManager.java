@@ -42,6 +42,7 @@ public class SponsorManager extends GroupCoordinator {
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Sponsor management refreshed", () -> lastRun);
+        // If the OrganizationConfig changes, we'll be notified
         latestOrgConfig.notifyOnUpdate(ME, this::reconcile);
     }
 

@@ -277,6 +277,10 @@ public class MembershipWatcher {
             }
             return null;
         }
+
+        public long installationId() {
+            return membershipEvent.installationId();
+        }
     }
 
     public static interface MembershipEvent {

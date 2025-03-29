@@ -12,10 +12,10 @@ import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.hr.AppContextService;
-import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 

@@ -111,6 +111,12 @@ public interface BotConfig {
          */
         @WithDefault("2s")
         Duration period();
+
+        /**
+         * If set, task run state will be written to this file.
+         * This is used to prevent tasks from running too frequently.
+         */
+        Optional<String> stateFilePath();
     }
 
     public interface OpenCollectiveConfig {

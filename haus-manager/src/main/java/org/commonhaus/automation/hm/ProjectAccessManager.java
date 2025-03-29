@@ -4,6 +4,7 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrga
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshCollaborators;
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -14,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
@@ -28,6 +30,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -41,9 +44,14 @@ public class ProjectAccessManager extends GroupCoordinator {
     static final String ME = "projectAccess";
 
     private static volatile String lastRun = "never";
+    private static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
+
+    @Inject
+    TaskStateService taskState;
 
     // flat map of tracked resources to the task group that manages them
     final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
+
     // flat map of task group to its current state
     final Map<String, ProjectConfigState> taskGroupToState = new ConcurrentHashMap<>();
 
@@ -109,7 +117,15 @@ public class ProjectAccessManager extends GroupCoordinator {
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                periodicSync.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+                if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                    periodicSync.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+                } else {
+                    Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates");
+
+                    // Leave an outpost so we know it is interesting
+                    resourceToTaskGroup.put(repoToResource(repoFullName), taskGroup);
+                    taskGroupToState.put(taskGroup, EMPTY);
+                }
 
                 // Register watcher to monitor for org config changes
                 // GHRepository is backed by a cached connection that can expire
@@ -143,6 +159,13 @@ public class ProjectAccessManager extends GroupCoordinator {
             Log.warnf("%s/processMembershipUpdate: no state for %s", ME, taskGroup);
             return;
         }
+
+        if (newState == EMPTY) { // lazy discovery
+            Log.debugf("%s/processMembershipUpdate: empty state for %s", ME, taskGroup);
+            ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
+            readProjectConfig(taskGroup, qc);
+        }
+
         // queue reconcile action: deal with bursty config updates
         periodicSync.queueReconciliation(ME, () -> reconcile(taskGroup));
     }
@@ -161,7 +184,6 @@ public class ProjectAccessManager extends GroupCoordinator {
             // TODO: clean up associated resources.
             return;
         }
-
         readProjectConfig(taskGroup, qc);
     }
 
@@ -222,6 +244,9 @@ public class ProjectAccessManager extends GroupCoordinator {
      * @param taskGroup
      */
     public void reconcile(String taskGroup) {
+        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        taskState.recordRun(ME);
+
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
         Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, state.projectConfig());

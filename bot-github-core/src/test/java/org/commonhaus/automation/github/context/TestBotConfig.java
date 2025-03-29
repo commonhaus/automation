@@ -103,6 +103,11 @@ public class TestBotConfig implements BotConfig {
             public Duration period() {
                 return Duration.ofMillis(1);
             }
+
+            @Override
+            public Optional<String> stateFilePath() {
+                return Optional.empty();
+            }
         };
     }
 
