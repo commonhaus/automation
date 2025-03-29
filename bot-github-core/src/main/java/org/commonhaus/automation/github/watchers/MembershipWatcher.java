@@ -1,10 +1,10 @@
 package org.commonhaus.automation.github.watchers;
 
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 import static org.commonhaus.automation.github.context.GitHubTeamService.getFullTeamName;
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshCollaborators;
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
 
 import java.util.HashMap;
 import java.util.HashSet;

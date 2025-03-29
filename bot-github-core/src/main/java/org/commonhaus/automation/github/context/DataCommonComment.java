@@ -72,7 +72,7 @@ public class DataCommonComment extends DataCommonObject {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment findComment(QueryContext qc, String itemId, String commentId) {
+    static DataCommonComment findComment(GitHubQueryContext qc, String itemId, String commentId) {
         if (commentId != null) {
             Log.debugf("[%s] findComment with id %s", qc.getLogId(), commentId);
             // we have a commentId, so we can just fetch it directly
@@ -92,7 +92,7 @@ public class DataCommonComment extends DataCommonObject {
         return null;
     }
 
-    static List<DataCommonComment> queryComments(QueryContext qc, String nodeId) {
+    static List<DataCommonComment> queryComments(GitHubQueryContext qc, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("itemId", nodeId);
 

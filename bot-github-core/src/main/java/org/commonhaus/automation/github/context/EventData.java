@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.context;
 
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.JsonAttributeAccessor;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHOrganization;

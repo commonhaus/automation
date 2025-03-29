@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hk.github;
 
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -13,7 +13,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * is managed by PAT, rather than GH App permissions (to reduce the permissions
  * required by the app overall)
  */
-public class DatastoreQueryContext extends QueryContext {
+public class DatastoreQueryContext extends GitHubQueryContext {
     final AppContextService ctx;
     final String repoFullName;
     final String ownerName;

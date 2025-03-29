@@ -140,7 +140,7 @@ public class DataCommonItem extends DataCommonObject {
         this.isPullRequest = JsonAttribute.reviewDecision.existsIn(object);
     }
 
-    public static DataCommonItem createIssue(QueryContext qc, String title, String body, Collection<DataLabel> labels) {
+    public static DataCommonItem createIssue(GitHubQueryContext qc, String title, String body, Collection<DataLabel> labels) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("title", title);
         variables.put("body", body);
@@ -158,7 +158,7 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.issue.commonItemFrom(result);
     }
 
-    public static DataCommonItem editIssueDescription(QueryContext qc,
+    public static DataCommonItem editIssueDescription(GitHubQueryContext qc,
             String nodeId, String bodyString, String issueFields) {
 
         issueFields = issueFields == null ? ISSUE_FIELDS_MIN : issueFields;
@@ -177,7 +177,7 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.issue.commonItemFrom(result);
     }
 
-    public static DataCommonItem editPullRequestDescription(QueryContext qc,
+    public static DataCommonItem editPullRequestDescription(GitHubQueryContext qc,
             String nodeId, String bodyString, String prFields) {
 
         prFields = prFields == null ? PR_FIELDS_MIN : prFields;
@@ -196,7 +196,7 @@ public class DataCommonItem extends DataCommonObject {
     }
 
     @Nonnull
-    public static List<DataCommonItem> findIssuesWithLabel(QueryContext qc,
+    public static List<DataCommonItem> findIssuesWithLabel(GitHubQueryContext qc,
             String labelName) {
         List<DataCommonItem> allIssues = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
@@ -225,7 +225,7 @@ public class DataCommonItem extends DataCommonObject {
         return allIssues;
     }
 
-    public static DataCommonItem queryItem(QueryContext qc, String nodeId) {
+    public static DataCommonItem queryItem(GitHubQueryContext qc, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
 

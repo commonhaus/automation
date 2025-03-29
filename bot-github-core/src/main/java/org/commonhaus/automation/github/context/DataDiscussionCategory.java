@@ -58,7 +58,7 @@ public class DataDiscussionCategory {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataDiscussionCategory> queryDiscussionCategories(QueryContext qc) {
+    static List<DataDiscussionCategory> queryDiscussionCategories(GitHubQueryContext qc) {
         if (qc.hasErrors()) {
             return List.of();
         }

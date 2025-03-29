@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
+import org.commonhaus.automation.QueryCache;
 import org.kohsuke.github.GitHub;
 
 import com.cronutils.Function;

@@ -9,6 +9,7 @@ import jakarta.json.JsonObject;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
 
+import org.commonhaus.automation.JsonAttributeAccessor;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;

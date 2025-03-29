@@ -36,6 +36,12 @@ public interface BotConfig {
     Optional<String> errorEmailAddress();
 
     /**
+     * Optional OpenCollective API configuration
+     * used to query information on contributors from OpenCollective.
+     */
+    Optional<OpenCollectiveConfig> openCollective();
+
+    /**
      * Dry run bot configuration.
      *
      * @return {@link DryRunBotConfig}
@@ -105,5 +111,17 @@ public interface BotConfig {
          */
         @WithDefault("2s")
         Duration period();
+    }
+
+    public interface OpenCollectiveConfig {
+        public static final String GRAPHQL_ENDPOINT = "https://api.opencollective.com/graphql/v2";
+
+        @WithDefault(GRAPHQL_ENDPOINT)
+        String apiEndpoint();
+
+        /** If not present, request will be rate-limited and read-only */
+        Optional<String> personalToken();
+
+        Optional<String> collectiveSlug();
     }
 }

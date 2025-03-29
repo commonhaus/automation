@@ -1,8 +1,8 @@
 package org.commonhaus.automation.hm;
 
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshCollaborators;
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;

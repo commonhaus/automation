@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hk.member;
 
-import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.hk.data.ApplicationIssue;
 import org.commonhaus.automation.hk.data.CommonhausUser;

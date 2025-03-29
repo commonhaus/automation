@@ -5,12 +5,12 @@ import java.util.Collection;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.JsonAttributeAccessor;
 import org.commonhaus.automation.github.context.ActionType;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.context.JsonAttributeAccessor;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.DatastoreQueryContext;
 import org.kohsuke.github.GHEventPayload;

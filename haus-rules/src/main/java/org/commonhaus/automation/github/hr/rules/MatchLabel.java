@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.commonhaus.automation.github.context.DataLabel;
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 
 public class MatchLabel {
 
@@ -22,7 +22,7 @@ public class MatchLabel {
         });
     }
 
-    public boolean matches(QueryContext qc, String nodeId) {
+    public boolean matches(GitHubQueryContext qc, String nodeId) {
         if (nodeId == null) {
             return false;
         }

@@ -56,7 +56,7 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataCommonComment addIssueComment(QueryContext qc, String itemId,
+    static DataCommonComment addIssueComment(GitHubQueryContext qc, String itemId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("subjectId", itemId);
@@ -73,7 +73,7 @@ public class DataIssueComment extends DataCommonComment {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static DataIssueComment editIssueComment(QueryContext qc, String commentId,
+    static DataIssueComment editIssueComment(GitHubQueryContext qc, String commentId,
             String commentBody) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("commentId", commentId);

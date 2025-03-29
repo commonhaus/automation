@@ -1,12 +1,12 @@
 package org.commonhaus.automation.hk.github;
 
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.kohsuke.github.GitHub;
 
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public class UserQueryContext extends QueryContext {
+public class UserQueryContext extends GitHubQueryContext {
 
     final MemberSession session;
     final AppContextService ctx;

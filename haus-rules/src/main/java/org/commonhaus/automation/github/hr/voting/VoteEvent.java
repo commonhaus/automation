@@ -4,7 +4,7 @@ import java.util.List;
 
 import jakarta.json.JsonObject;
 
-import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;

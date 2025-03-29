@@ -43,7 +43,7 @@ public class DataTeam extends DataCommonType {
             """.stripIndent();
     // @formatter:on
 
-    public static List<String> queryImmediateTeamMemberLogin(QueryContext qc, String orgName, String teamSlug) {
+    public static List<String> queryImmediateTeamMemberLogin(GitHubQueryContext qc, String orgName, String teamSlug) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("login", orgName);
         variables.put("slug", teamSlug);

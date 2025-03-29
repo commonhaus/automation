@@ -70,7 +70,7 @@ public class DataSponsorship extends DataCommonType {
                 + sponsorEntity + "]";
     }
 
-    public static List<DataSponsorship> queryRecentSponsors(QueryContext qc, String login) {
+    public static List<DataSponsorship> queryRecentSponsors(GitHubQueryContext qc, String login) {
         if (qc.hasErrors()) {
             Log.debugf("[%s] queryRecentSponsors for sponsorable %s; skipping modify (errors)", qc.getLogId(), login);
             return null;

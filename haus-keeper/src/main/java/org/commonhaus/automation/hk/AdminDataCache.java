@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-import org.commonhaus.automation.github.context.QueryCache;
+import org.commonhaus.automation.QueryCache;
 
 import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Caffeine;

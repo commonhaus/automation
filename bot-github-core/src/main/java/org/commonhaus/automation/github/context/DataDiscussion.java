@@ -78,7 +78,7 @@ public class DataDiscussion extends DataCommonItem {
     }
 
     @Nonnull
-    public static List<DataDiscussion> findDiscussionsWithLabel(QueryContext qc,
+    public static List<DataDiscussion> findDiscussionsWithLabel(GitHubQueryContext qc,
             String labelName) {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
@@ -107,7 +107,7 @@ public class DataDiscussion extends DataCommonItem {
         return allDiscussions;
     }
 
-    static DataDiscussion queryDiscussion(QueryContext qc, String nodeId) {
+    static DataDiscussion queryDiscussion(GitHubQueryContext qc, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
 
@@ -122,7 +122,7 @@ public class DataDiscussion extends DataCommonItem {
     /**
      * package private. See QueryHelper / QueryContext
      */
-    static DataDiscussion editDiscussion(QueryContext qc, String nodeId,
+    static DataDiscussion editDiscussion(GitHubQueryContext qc, String nodeId,
             String modifiedText, String fields) {
 
         fields = fields == null ? DISCUSSION_FIELDS : fields;

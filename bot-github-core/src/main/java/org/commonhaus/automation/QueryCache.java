@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github.context;
+package org.commonhaus.automation;
 
 import java.util.function.BiFunction;
 import java.util.function.Consumer;

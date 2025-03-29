@@ -25,7 +25,7 @@ import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.DataReaction;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.hr.AppContextService;
@@ -337,12 +337,12 @@ public class VoteProcessor {
         return voteInfo;
     }
 
-    public boolean isManualVoteResult(QueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {
+    public boolean isManualVoteResult(GitHubQueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {
         return comment.body.contains(MANUAL_VOTE_RESULT)
                 && ctx.getTeamMembershipService().isLoginIncluded(qc, comment.author.login, votingConfig.managers);
     }
 
-    private void sendVotingErrorEmail(QueryContext qc, VoteConfig votingConfig,
+    private void sendVotingErrorEmail(GitHubQueryContext qc, VoteConfig votingConfig,
             DataCommonItem item, VoteEvent voteEvent, Throwable e) {
         // If configured to do so, email the error_email_address
         if (votingConfig.sendErrorEmail()) {
@@ -418,7 +418,7 @@ public class VoteProcessor {
         reconcileVoteEvent(voteEvent);
     }
 
-    private void handleErrors(QueryContext qc, String taskGroup, String message, Runnable retry) {
+    private void handleErrors(GitHubQueryContext qc, String taskGroup, String message, Runnable retry) {
         if (qc.hasRetriableNetworkError()) {
             Log.debugf("[%s] retriable network error: %s", qc.getLogId(), message);
             periodicUpdate.scheduleReconciliationRetry(taskGroup,

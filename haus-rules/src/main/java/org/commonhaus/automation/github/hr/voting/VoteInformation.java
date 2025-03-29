@@ -17,8 +17,8 @@ import org.commonhaus.automation.github.context.DataCommonItem;
 import org.commonhaus.automation.github.context.DataPullRequestReview;
 import org.commonhaus.automation.github.context.DataReaction;
 import org.commonhaus.automation.github.context.EventType;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.GitHubTeamService;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.context.TeamList;
 import org.commonhaus.automation.github.hr.AppContextService;
 import org.commonhaus.automation.github.hr.config.VoteConfig;
@@ -290,7 +290,7 @@ public class VoteInformation {
                 .toList();
     }
 
-    private Map<String, DataActor> getAlternates(QueryContext qc, String teamName, VoteConfig voteConfig) {
+    private Map<String, DataActor> getAlternates(GitHubQueryContext qc, String teamName, VoteConfig voteConfig) {
         // Generate a cache key using the repository ID
         String key = "ALTS_" + qc.getRepositoryId();
 
@@ -336,7 +336,7 @@ public class VoteInformation {
         return alts.alternates().get(teamName);
     }
 
-    private Optional<JsonNode> getAlternateConfigData(QueryContext qc, AlternateConfig altConfig) {
+    private Optional<JsonNode> getAlternateConfigData(GitHubQueryContext qc, AlternateConfig altConfig) {
         GHRepository repo = qc.getRepository(altConfig.repo());
         if (repo == null) {
             Log.warnf("[%s] voteInformation.getAlternateConfigData: source repository %s not found",
@@ -359,7 +359,7 @@ public class VoteInformation {
         return config;
     }
 
-    private Map<String, DataActor> mapLoginToSecond(QueryContext qc, JsonNode data, AlternateDefinition altDef) {
+    private Map<String, DataActor> mapLoginToSecond(GitHubQueryContext qc, JsonNode data, AlternateDefinition altDef) {
         GitHubTeamService teamService = ctx.getTeamMembershipService();
         // AlternateDefinition has been checked for validity.
         // Contents of data (JsonNode) have not.

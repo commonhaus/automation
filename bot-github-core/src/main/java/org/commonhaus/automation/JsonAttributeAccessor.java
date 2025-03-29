@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github.context;
+package org.commonhaus.automation;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -14,6 +14,7 @@ import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
 
+import org.commonhaus.automation.github.context.JsonAttribute;
 import org.kohsuke.github.GitHub;
 
 import com.fasterxml.jackson.databind.ObjectReader;

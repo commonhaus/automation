@@ -25,6 +25,7 @@ import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,7 @@ public class GitHubTeamServiceTest extends ContextHelper {
     final Set<GHUser> users = new HashSet<>();
     GHTeam team;
     GHOrganization organization;
-    QueryContext queryContext;
+    GitHubQueryContext queryContext;
 
     @BeforeEach
     void setup() throws IOException {

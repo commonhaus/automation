@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github.watchers;
 
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,7 +17,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;

@@ -3,7 +3,7 @@ package org.commonhaus.automation.hk.github;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
@@ -56,7 +56,7 @@ public class CommonhausDatastore {
      * @param resetCache True if the cached record should be discarded (re-fetch)
      * @param create True if the record should be created if it does not exist
      * @return fetched commonhaus user
-     * @throws org.commonhaus.automation.github.context.PackagedException if the query context is not available or an
+     * @throws org.commonhaus.automation.PackagedException if the query context is not available or an
      *         irrecoverable error occurs (propagate to REST client)
      */
     public CommonhausUser getCommonhausUser(String login, long id, boolean resetCache, boolean create) {
@@ -110,7 +110,7 @@ public class CommonhausDatastore {
      *
      * @param updateEvent UpdateEvent with user data
      * @return valid user data
-     * @throws org.commonhaus.automation.github.context.PackagedException if the query context is not available or an
+     * @throws org.commonhaus.automation.PackagedException if the query context is not available or an
      *         irrecoverable error occurs (propagate to REST client)
      */
     public CommonhausUser setCommonhausUser(UpdateEvent updateEvent) {

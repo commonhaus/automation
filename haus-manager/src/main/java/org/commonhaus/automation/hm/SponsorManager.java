@@ -1,17 +1,18 @@
 package org.commonhaus.automation.hm;
 
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.DataSponsorship;
@@ -20,6 +21,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.SponsorsConfig;
+import org.commonhaus.automation.opencollective.OpenCollectiveQueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 
@@ -31,6 +33,9 @@ import io.quarkus.scheduler.Scheduled;
 public class SponsorManager extends GroupCoordinator {
     static final String ME = "sponsorManager";
     private static volatile String lastRun = "";
+
+    @Inject
+    protected BotConfig baseBotConfig;
 
     @Inject
     LatestOrgConfig latestOrgConfig;
@@ -99,7 +104,7 @@ public class SponsorManager extends GroupCoordinator {
         GHOrganization.RepositoryRole role = toRole("reconcile", sponsors.role(),
                 config.emailNotifications(), sponsors);
 
-        teamService.syncCollaborators(qc, repo, role, sponsorLogins,
+        teamService.addExpectedCollaborators(qc, repo, role, sponsorLogins,
                 sponsors.ignoreUsers(), sponsors.dryRun(),
                 config.emailNotifications());
 
@@ -110,29 +115,43 @@ public class SponsorManager extends GroupCoordinator {
         String sponsorable = config.sponsors().sponsorable();
         EmailNotification notifications = config.emailNotifications();
 
+        Set<String> sponsorLogins = new HashSet<>();
+
         // Extract sponsorable entity from source
         String sponsorableAccount = toOrganizationName(sponsorable);
         ScopedQueryContext qc = ctx.getOrgScopedQueryContext(sponsorableAccount);
         if (qc == null) {
             Log.warnf("[%s] getSponsors: no query context for %s", ME, sponsorable);
-            return null;
+        } else {
+            // Query for GitHub sponsors
+            List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);
+            if (recentSponsors != null) {
+                sponsorLogins.addAll(recentSponsors.stream()
+                        .map(DataSponsorship::sponsorLogin).toList());
+            }
         }
-
-        // Query for sponsors
-        List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);
-        if (qc.hasErrors() || recentSponsors == null) {
+        if (qc.hasErrors()) {
             qc.logAndSendContextErrors("[%s] getSponsors: unable to retrieve sponsors %s"
-                    .formatted(ME, OrganizationConfig.PATH, sponsorable),
+                    .formatted(ME, sponsorable),
                     notifications);
-            return null;
         }
-
-        Set<String> sponsorLogins = recentSponsors.stream()
-                .map(DataSponsorship::sponsorLogin)
-                .collect(Collectors.toSet());
-
         Log.debugf("[%s] getSponsors: found sponsors for %s: %s", ME,
                 sponsorable, sponsorLogins);
+
+        // Find github sponsors from OpenCollective
+        OpenCollectiveQueryContext ocQc = new OpenCollectiveQueryContext(ctx, baseBotConfig);
+        List<String> openCollectiveSponsors = ocQc.getGitContributorLogins();
+        if (ocQc.hasErrors() || openCollectiveSponsors == null) {
+            ocQc.logAndSendContextErrors("[%s] getSponsors: unable to retrieve OpenCollective sponsors"
+                    .formatted(ME),
+                    notifications);
+        } else {
+            Log.debugf("[%s] getSponsors: found sponsors from OpenCollective: %s", ME,
+                    openCollectiveSponsors);
+
+            sponsorLogins.addAll(openCollectiveSponsors);
+        }
+
         return sponsorLogins;
     }
 

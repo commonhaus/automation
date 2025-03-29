@@ -164,12 +164,13 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static List<DataReaction> queryReactions(QueryContext qc, String reactorId) {
+    static List<DataReaction> queryReactions(GitHubQueryContext qc, String reactorId) {
         if (qc.hasErrors()) {
             return List.of();
         }
         Log.debugf("[%s] queryReactions for reactable %s", qc.getLogId(), reactorId);
         List<DataReaction> reactions = new ArrayList<>();
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", reactorId);
 
@@ -198,7 +199,7 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void addBotReaction(QueryContext qc, String subjectId,
+    static void addBotReaction(GitHubQueryContext qc, String subjectId,
             ReactionContent reaction) {
         Log.debugf("[%s] addBotReaction %s to reactable %s", qc.getLogId(), reaction.name(), subjectId);
 
@@ -215,7 +216,7 @@ public class DataReaction {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static void removeBotReaction(QueryContext qc, String subjectId,
+    static void removeBotReaction(GitHubQueryContext qc, String subjectId,
             ReactionContent reaction) {
         if (qc.isDryRun()) {
             Log.infof("[%s] would remove reaction %s from %s", qc.getLogId(), reaction.name(), subjectId);

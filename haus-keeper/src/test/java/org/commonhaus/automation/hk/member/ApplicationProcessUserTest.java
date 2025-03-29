@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.github.context.PackagedException;
+import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.github.context.TestRuntimeException;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.MemberStatus;

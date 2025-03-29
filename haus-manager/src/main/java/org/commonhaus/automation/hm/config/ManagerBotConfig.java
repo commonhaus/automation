@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hm.config;
 
-import static org.commonhaus.automation.github.context.QueryContext.toFullName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
 
 import java.util.Optional;
 

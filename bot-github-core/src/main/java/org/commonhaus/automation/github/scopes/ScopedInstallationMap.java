@@ -1,7 +1,7 @@
 package org.commonhaus.automation.github.scopes;
 
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import java.util.Map;
 import java.util.Optional;
@@ -11,7 +11,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
-import org.commonhaus.automation.github.context.ContextService;
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.discovery.ConnectionEvent;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;

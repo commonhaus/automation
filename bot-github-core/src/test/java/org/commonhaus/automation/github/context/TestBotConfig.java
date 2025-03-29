@@ -19,7 +19,7 @@ public class TestBotConfig implements BotConfig {
     boolean dryRun;
     String errorEmail;
 
-    TestBotConfig() {
+    protected TestBotConfig() {
         reset();
     }
 
@@ -104,5 +104,10 @@ public class TestBotConfig implements BotConfig {
                 return Duration.ofMillis(1);
             }
         };
+    }
+
+    @Override
+    public Optional<OpenCollectiveConfig> openCollective() {
+        return Optional.empty();
     }
 }

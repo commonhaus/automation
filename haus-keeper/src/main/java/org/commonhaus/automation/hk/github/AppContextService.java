@@ -13,8 +13,8 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.context.BaseContextService;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.GitHubTeamService;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
@@ -87,7 +87,7 @@ public class AppContextService extends BaseContextService {
         AdminDataCache.KNOWN_USER.invalidate(session.login());
     }
 
-    public boolean userIsKnown(QueryContext initQc, String login, Set<String> roles) {
+    public boolean userIsKnown(GitHubQueryContext initQc, String login, Set<String> roles) {
         UserManagementConfig userConfig = getConfig();
         if (userConfig.isDisabled()) {
             return false;

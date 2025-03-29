@@ -1,4 +1,4 @@
-package org.commonhaus.automation.github.context;
+package org.commonhaus.automation;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -49,6 +49,14 @@ public class PackagedException extends RuntimeException {
         } catch (Exception e) {
             return "Failed to generate details: %s".formatted(e.toString());
         }
+    }
+
+    public List<Throwable> getExceptions() {
+        return exceptions;
+    }
+
+    public List<GraphQLError> getErrors() {
+        return errors;
     }
 
     public String list() {

@@ -14,8 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.context.ContextHelper;
-import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;

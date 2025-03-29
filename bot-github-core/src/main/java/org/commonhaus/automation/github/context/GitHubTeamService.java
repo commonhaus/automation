@@ -2,9 +2,9 @@ package org.commonhaus.automation.github.context;
 
 import static org.commonhaus.automation.github.context.BaseQueryCache.COLLABORATORS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
-import static org.commonhaus.automation.github.context.QueryContext.toFullName;
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.config.EmailNotification;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHOrganization.RepositoryRole;
@@ -109,7 +110,7 @@ public class GitHubTeamService {
      * @param relativeName name relative to organization
      * @return GHTeam or null if not found
      */
-    public GHTeam getTeam(QueryContext qc, GHOrganization org, String relativeName) {
+    public GHTeam getTeam(GitHubQueryContext qc, GHOrganization org, String relativeName) {
         String fullName = toFullName(org.getLogin(), relativeName);
         GHTeam team = getCachedTeam(fullName);
         if (team == null) {
@@ -128,7 +129,7 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    public Set<GHUser> getTeamMembers(QueryContext qc, String teamFullName) {
+    public Set<GHUser> getTeamMembers(GitHubQueryContext qc, String teamFullName) {
         String orgName = toOrganizationName(teamFullName);
         String relativeName = toRelativeName(orgName, teamFullName);
 
@@ -157,7 +158,7 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    public Set<String> getTeamLogins(QueryContext qc, String teamFullName) {
+    public Set<String> getTeamLogins(GitHubQueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         if (members == null) {
             return null;
@@ -171,7 +172,7 @@ public class GitHubTeamService {
      * @return
      */
     @Nonnull
-    public TeamList getTeamList(QueryContext qc, String teamFullName) {
+    public TeamList getTeamList(GitHubQueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
         Log.debugf("[%s] %s members: %s", qc, qc.getLogId(), teamList.name, teamList.members);
@@ -184,7 +185,7 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    public boolean isTeamMember(QueryContext qc, GHUser user, String teamFullName) {
+    public boolean isTeamMember(GitHubQueryContext qc, GHUser user, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         Log.debugf("%s members: %s", teamFullName, members.stream().map(GHUser::getLogin).toList());
         return members != null && members.contains(user);
@@ -198,7 +199,7 @@ public class GitHubTeamService {
      * @param groups list of groups to check
      * @return true if login is included in groups or groups is null
      */
-    public boolean isLoginIncluded(QueryContext qc, String login, List<String> groups) {
+    public boolean isLoginIncluded(GitHubQueryContext qc, String login, List<String> groups) {
         if (groups == null) {
             return true;
         } else if (groups.isEmpty()) {
@@ -224,7 +225,7 @@ public class GitHubTeamService {
      * @param user
      * @param teamFullName
      */
-    public void addTeamMember(QueryContext qc, GHUser user, String teamFullName) {
+    public void addTeamMember(GitHubQueryContext qc, GHUser user, String teamFullName) {
         if (qc.isDryRun()) {
             Log.debugf("[%s] addTeamMember would add %s to %s", qc.getLogId(), user.getLogin(), teamFullName);
             return;
@@ -250,7 +251,7 @@ public class GitHubTeamService {
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaborators(QueryContext qc, String repoFullName) {
+    public Set<String> getCollaborators(GitHubQueryContext qc, String repoFullName) {
         GHRepository repo = qc.getRepository(repoFullName);
         return repo == null ? Set.of() : getCollaborators(qc, repo);
     }
@@ -263,7 +264,7 @@ public class GitHubTeamService {
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaborators(QueryContext qc, GHRepository repository) {
+    public Set<String> getCollaborators(GitHubQueryContext qc, GHRepository repository) {
         if (repository == null) {
             return Set.of();
         }
@@ -288,7 +289,7 @@ public class GitHubTeamService {
      * @param repo
      * @param user
      */
-    public void addCollaborators(QueryContext qc, GHRepository repo, List<GHUser> user) {
+    public void addCollaborators(GitHubQueryContext qc, GHRepository repo, List<GHUser> user) {
         if (qc.isDryRun()) {
             Log.debugf("[%s] addCollaborators would add %s to %s",
                     qc.getLogId(),
@@ -311,9 +312,66 @@ public class GitHubTeamService {
      * @param repoName
      * @return
      */
-    public boolean isCollaborator(QueryContext qc, GHUser user, String repoName) {
+    public boolean isCollaborator(GitHubQueryContext qc, GHUser user, String repoName) {
         Set<String> collaborators = getCollaborators(qc, repoName);
         return collaborators.contains(user.getLogin());
+    }
+
+    /**
+     * Add expected logins as repository collaborators.
+     *
+     * @param qc QueryContext
+     * @param repository The repository to update collaborators for
+     * @param role The role to assign to new collaborators
+     * @param expectedLogins Set of logins that should be collaborators
+     * @param ignoreUsers List of users to ignore (not add or remove)
+     * @param isDryRun Whether to perform actions or just report what would happen
+     * @param addresses Email notification addresses
+     */
+    public void addExpectedCollaborators(GitHubQueryContext qc, GHRepository repository, RepositoryRole role,
+            Set<String> expectedLogins, List<String> ignoreUsers,
+            boolean isDryRun, EmailNotification addresses) {
+        Log.debugf("[%s] addExpectedCollaborators: adding collaborators to repository %s", qc.getLogId(),
+                repository.getFullName());
+
+        String repoFullName = repository.getFullName();
+        Set<String> currentLogins = getCollaborators(qc, repository);
+
+        // Determine logins to add and remove
+        MembershipChanges changes = computeMemberChanges(true,
+                repoFullName, currentLogins, expectedLogins, ignoreUsers);
+
+        changes.toRemove().clear(); // no removals
+        if (changes.toAdd().isEmpty()) {
+            Log.debugf("[%s] addExpectedCollaborators: No changes needed for repository %s",
+                    qc.getLogId(), repository.getFullName());
+            return;
+        }
+
+        if (isDryRun) {
+            sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
+        } else {
+            // Execute changes to team
+            qc.execGitHubSync((gh, globalDryRunMode) -> {
+                if (globalDryRunMode || isDryRun) {
+                    return null;
+                }
+                List<GHUser> toAdd = new ArrayList<>();
+                for (String login : changes.toAdd()) {
+                    toAdd.add(gh.getUser(login));
+                }
+                repository.addCollaborators(toAdd, role);
+                return null;
+            });
+
+            // invalidate cache to force refresh/re-fetch
+            refreshCollaborators(repoFullName);
+
+            // Send notification with results
+            sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
+        }
+        Log.infof("[%s] addExpectedCollaborators: finished adding %s; %s added; %s removed",
+                qc.getLogId(), repoFullName, changes.toAdd().size(), changes.toRemove().size());
     }
 
     /**
@@ -327,7 +385,7 @@ public class GitHubTeamService {
      * @param isDryRun Whether to perform actions or just report what would happen
      * @param addresses Email notification addresses
      */
-    public void syncCollaborators(QueryContext qc, GHRepository repository, RepositoryRole role,
+    public void syncCollaborators(GitHubQueryContext qc, GHRepository repository, RepositoryRole role,
             Set<String> expectedLogins, List<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
 
@@ -396,14 +454,14 @@ public class GitHubTeamService {
      * @param isDryRun dry run mode / local override based on team sync configuration
      * @param addresses email notification addresses
      */
-    public void syncMembers(QueryContext qc, String targetTeam,
+    public void syncMembers(GitHubQueryContext qc, String targetTeam,
             Set<String> expectedLogins, List<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
 
         Log.debugf("[%s] syncMembers: syncing members of team %s", qc.getLogId(), targetTeam);
 
-        String teamOrgName = QueryContext.toOrganizationName(targetTeam);
-        String relativeTeamName = QueryContext.toRelativeName(teamOrgName, targetTeam);
+        String teamOrgName = GitHubQueryContext.toOrganizationName(targetTeam);
+        String relativeTeamName = GitHubQueryContext.toRelativeName(teamOrgName, targetTeam);
 
         // Get the org and team
         GHOrganization org = qc.getOrganization(teamOrgName);
@@ -500,7 +558,7 @@ public class GitHubTeamService {
     }
 
     // Send notification email (works for both dry run and audit)
-    private void sendNotificationEmail(QueryContext qc, MembershipChanges changes,
+    private void sendNotificationEmail(GitHubQueryContext qc, MembershipChanges changes,
             boolean isDryRun, PackagedException ex, EmailNotification addresses) {
 
         String[] recipients = isDryRun ? addresses.dryRun() : addresses.audit();

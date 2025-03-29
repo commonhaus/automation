@@ -2,11 +2,11 @@ package org.commonhaus.automation.github.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 import static org.commonhaus.automation.github.context.GitHubTeamService.getCachedTeamMembers;
 import static org.commonhaus.automation.github.context.GitHubTeamService.putCachedTeam;
 import static org.commonhaus.automation.github.context.GitHubTeamService.putCachedTeamMembers;
-import static org.commonhaus.automation.github.context.QueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.QueryContext.toRelativeName;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
@@ -38,8 +38,9 @@ import jakarta.inject.Singleton;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.config.EmailNotification;
-import org.commonhaus.automation.github.context.QueryContext.GitHubParameterApiCall;
+import org.commonhaus.automation.github.context.GitHubQueryContext.GitHubParameterApiCall;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.queue.PeriodicUpdateQueue;
@@ -87,7 +88,8 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * {@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)},
  * or {@link #setupInstallationMocks(DefaultValues)} to create a {@link MockInstallation} with a GitHub client, GraphQL client,
  * organization,
- * and repository that all correctly reference each other. A generic {@link QueryContext} can also be mocked and associated with
+ * and repository that all correctly reference each other. A generic {@link GitHubQueryContext} can also be mocked and
+ * associated with
  * the installation.
  * <ul>
  * <li>{@link #setupGivenMocks(GitHubMockSetupContext, DefaultValues)} will set the {@link #mocks} field with the provided mocks
@@ -230,7 +232,7 @@ public class ContextHelper {
             DynamicGraphQLClient dql,
             GHOrganization organization,
             GHRepository repository,
-            QueryContext queryContext) {
+            GitHubQueryContext queryContext) {
     }
 
     @Singleton
@@ -308,9 +310,9 @@ public class ContextHelper {
         GHOrganization organization = mockOrganization(defaults, github);
 
         // Setup query context behavior
-        QueryContext queryContext = null;
+        GitHubQueryContext queryContext = null;
         if (defaults.mockQueryContext) {
-            queryContext = mock(QueryContext.class);
+            queryContext = mock(GitHubQueryContext.class);
             when(queryContext.getGitHub()).thenReturn(github);
             when(queryContext.getGraphQLClient()).thenReturn(dql);
             when(queryContext.getOrganization(defaults.orgName())).thenReturn(organization);

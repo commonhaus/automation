@@ -7,7 +7,7 @@ import java.util.Optional;
 import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.commonhaus.automation.github.context.PackagedException;
+import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.markdown.MarkdownConverter;
 import org.eclipse.microprofile.config.ConfigProvider;
 

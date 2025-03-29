@@ -4,11 +4,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.github.context.ActionType;
-import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.kohsuke.github.GHEventPayload;
 
 import io.quarkiverse.githubapp.GitHubEvent;
@@ -43,7 +43,7 @@ class LabelWatcher {
 
         Log.debugf("[%s] LabelChanges: repository %s changed label %s", initialData.getLogId(), cacheId, label);
 
-        QueryContext qc = new QueryContext(ctxInstance.get(), event.getInstallationId());
+        GitHubQueryContext qc = new GitHubQueryContext(ctxInstance.get(), event.getInstallationId());
         qc.modifyLabels(cacheId, label, actionType);
     }
 }

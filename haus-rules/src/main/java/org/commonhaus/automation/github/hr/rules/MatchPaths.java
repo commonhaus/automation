@@ -2,9 +2,9 @@ package org.commonhaus.automation.github.hr.rules;
 
 import java.util.List;
 
+import org.commonhaus.automation.QueryCache;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryCache;
 import org.commonhaus.automation.github.hr.EventQueryContext;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHPullRequest;

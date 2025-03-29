@@ -59,6 +59,8 @@ public class OrganizationConfig {
      *
      * @param sources List of sources to check for sponsors
      * @param targetRepository Repository to update with sponsors (as outside contributors)
+     * @param role Role to assign to the sponsors (default: 'triage')
+     * @param ignoreUsers List of users to ignore (do not add or remove)
      * @param dryRun If true, do not update the repository
      */
     public record SponsorsConfig(
@@ -70,7 +72,7 @@ public class OrganizationConfig {
 
         @Override
         public String role() {
-            return role == null ? "read" : role;
+            return role != null ? role : "triage";
         }
 
         @Override

@@ -139,7 +139,7 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> queryLabels(QueryContext qc, String labeledId) {
+    static Set<DataLabel> queryLabels(GitHubQueryContext qc, String labeledId) {
         if (qc.hasErrors()) {
             Log.debugf("[%s] queryLabels for labelable %s; skipping modify (errors)", qc.getLogId(), labeledId);
             return null;
@@ -168,7 +168,7 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> addLabels(QueryContext qc, String labeledId,
+    static Set<DataLabel> addLabels(GitHubQueryContext qc, String labeledId,
             Collection<DataLabel> newLabels) {
         if (qc.isDryRun()) {
             return new HashSet<>(newLabels);
@@ -190,7 +190,7 @@ public class DataLabel extends DataCommonType {
     }
 
     /** package private. See QueryHelper / QueryContext */
-    static Set<DataLabel> removeLabels(QueryContext qc, String labeledId,
+    static Set<DataLabel> removeLabels(GitHubQueryContext qc, String labeledId,
             Collection<DataLabel> oldLabels) {
         if (qc.isDryRun()) {
             return Set.of();
@@ -211,7 +211,7 @@ public class DataLabel extends DataCommonType {
         return labels;
     }
 
-    static DataLabel createLabel(QueryContext qc, String repoId, String name, String color) {
+    static DataLabel createLabel(GitHubQueryContext qc, String repoId, String name, String color) {
         if (qc.isDryRun()) {
             return new Builder().name(name).id(name).build();
         }
@@ -231,7 +231,7 @@ public class DataLabel extends DataCommonType {
         return JsonAttribute.label.labelFrom(result);
     }
 
-    static void paginateLabels(QueryContext qc, String query,
+    static void paginateLabels(GitHubQueryContext qc, String query,
             Map<String, Object> variables, Set<DataLabel> labels,
             Function<JsonObject, JsonObject> findPageLabels) {
 

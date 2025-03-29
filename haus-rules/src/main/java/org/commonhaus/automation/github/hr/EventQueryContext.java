@@ -10,8 +10,8 @@ import org.commonhaus.automation.github.context.DataCommonComment;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.JsonAttribute;
-import org.commonhaus.automation.github.context.QueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
@@ -31,7 +31,7 @@ import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
  * This context is Event-scoped, and is focused on changes to a specific item
  * (issue, pull request, etc.).
  */
-public class EventQueryContext extends QueryContext {
+public class EventQueryContext extends GitHubQueryContext {
     /**
      * Event data used to construct this query context
      */

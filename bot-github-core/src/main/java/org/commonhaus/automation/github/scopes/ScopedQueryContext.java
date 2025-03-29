@@ -6,11 +6,11 @@ import java.util.Set;
 
 import jakarta.annotation.Nonnull;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.ActionType;
-import org.commonhaus.automation.github.context.ContextService;
 import org.commonhaus.automation.github.context.EventType;
-import org.commonhaus.automation.github.context.QueryContext;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.scopes.ScopedInstallationMap.AppInstallationState;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
@@ -23,7 +23,7 @@ import org.kohsuke.github.GitHub;
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
-public class ScopedQueryContext extends QueryContext {
+public class ScopedQueryContext extends GitHubQueryContext {
     private final String ownerName;
     private final String repoFullName;
 
