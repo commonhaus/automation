@@ -344,7 +344,7 @@ public class GitHubTeamService {
                 repoFullName, currentLogins, expectedLogins, ignoreUsers);
 
         changes.toRemove().clear(); // no removals
-        if (changes.toAdd().isEmpty()) {
+        if (changes.isEmpty()) {
             Log.debugf("[%s] addExpectedCollaborators: No changes needed for repository %s",
                     qc.getLogId(), repository.getFullName());
             return;
@@ -353,6 +353,8 @@ public class GitHubTeamService {
         if (isDryRun) {
             sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
         } else {
+            Set<String> organizations = new HashSet<>();
+
             // Execute changes to team
             qc.execGitHubSync((gh, globalDryRunMode) -> {
                 if (globalDryRunMode || isDryRun) {
@@ -360,7 +362,7 @@ public class GitHubTeamService {
                 }
                 List<GHUser> toAdd = new ArrayList<>();
                 for (String login : changes.toAdd()) {
-                    GHUser user = loginToUser(qc, gh, login);
+                    GHUser user = loginToUser(qc, gh, login, organizations);
                     if (user != null) {
                         toAdd.add(user);
                     }
@@ -369,11 +371,14 @@ public class GitHubTeamService {
                 return null;
             });
 
-            // invalidate cache to force refresh/re-fetch
-            refreshCollaborators(repoFullName);
+            changes.removeOrganizations(organizations);
+            if (!changes.isEmpty()) {
+                // invalidate cache to force refresh/re-fetch
+                refreshCollaborators(repoFullName);
 
-            // Send notification with results
-            sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
+                // Send notification with results
+                sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
+            }
         }
         Log.infof("[%s] addExpectedCollaborators: finished adding %s; %s added; %s removed",
                 qc.getLogId(), repoFullName, changes.toAdd().size(), changes.toRemove().size());
@@ -412,6 +417,8 @@ public class GitHubTeamService {
         if (isDryRun) {
             sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
         } else {
+            Set<String> organizations = new HashSet<>();
+
             // Execute changes to team
             qc.execGitHubSync((gh, globalDryRunMode) -> {
                 if (globalDryRunMode || isDryRun) {
@@ -422,7 +429,7 @@ public class GitHubTeamService {
                     List<GHUser> toRemove = new ArrayList<>();
                     // Process removals first
                     for (String login : changes.toRemove()) {
-                        GHUser user = loginToUser(qc, gh, login);
+                        GHUser user = loginToUser(qc, gh, login, organizations);
                         if (user != null) {
                             toRemove.add(user);
                         }
@@ -433,7 +440,7 @@ public class GitHubTeamService {
                 if (!changes.toAdd().isEmpty()) {
                     List<GHUser> toAdd = new ArrayList<>();
                     for (String login : changes.toAdd()) {
-                        GHUser user = loginToUser(qc, gh, login);
+                        GHUser user = loginToUser(qc, gh, login, organizations);
                         if (user != null) {
                             toAdd.add(user);
                         }
@@ -443,11 +450,14 @@ public class GitHubTeamService {
                 return null;
             });
 
-            // invalidate cache to force refresh/re-fetch
-            refreshCollaborators(repoFullName);
+            changes.removeOrganizations(organizations);
+            if (!changes.isEmpty()) {
+                // invalidate cache to force refresh/re-fetch
+                refreshCollaborators(repoFullName);
 
-            // Send notification with results
-            sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
+                // Send notification with results
+                sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
+            }
         }
 
         Log.infof("[%s] syncCollaborators: finished syncing %s; %s added; %s removed",
@@ -455,7 +465,7 @@ public class GitHubTeamService {
     }
 
     // Only use from w/in execGitHubSync
-    private GHUser loginToUser(GitHubQueryContext qc, GitHub gh, String login) throws IOException {
+    private GHUser loginToUser(GitHubQueryContext qc, GitHub gh, String login, Set<String> organizations) throws IOException {
         GHUser user = gh.getUser(login);
         if (user == null) {
             Log.warnf("[%s] loginToUser: user %s not found", qc.getLogId(), login);
@@ -463,6 +473,7 @@ public class GitHubTeamService {
         }
         if ("Organization".equalsIgnoreCase(user.getType())) {
             Log.warnf("[%s] loginToUser: user %s is an organization", qc.getLogId(), login);
+            organizations.add(login);
             return null;
         }
         return user;
@@ -575,6 +586,16 @@ public class GitHubTeamService {
 
         public Set<String> toAdd() {
             return addedMembers;
+        }
+
+        public boolean isEmpty() {
+            return addedMembers.isEmpty() && removedMembers.isEmpty();
+        }
+
+        public void removeOrganizations(Set<String> organizations) {
+            addedMembers.removeAll(organizations);
+            removedMembers.removeAll(organizations);
+            finalMembers.removeAll(organizations);
         }
 
         public Set<String> toRemove() {
