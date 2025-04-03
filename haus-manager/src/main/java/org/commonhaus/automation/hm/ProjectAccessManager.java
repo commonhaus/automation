@@ -102,7 +102,7 @@ public class ProjectAccessManager extends GroupCoordinator {
         // Queue reconciliation for all known task groups
         for (ProjectConfigState state : taskGroupToState.values()) {
             ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
-            readProjectConfig(ME, qc);
+            readProjectConfig(state.taskGroup(), qc);
         }
     }
 
@@ -128,7 +128,7 @@ public class ProjectAccessManager extends GroupCoordinator {
                         .withExisting(repoEvent.github());
 
                 if (taskState.shouldRun(ME, Duration.ofHours(6))) {
-                    periodicSync.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+                    updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
                 } else {
                     Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates");
 
@@ -140,7 +140,7 @@ public class ProjectAccessManager extends GroupCoordinator {
                 // Register watcher to monitor for org config changes
                 // GHRepository is backed by a cached connection that can expire
                 // use the GitHub object from the event to ensure a fresh connection
-                fileEvents.watchFile(taskGroup,
+                fileWatcher.watchFile(taskGroup,
                         installationId, repoFullName, ProjectConfig.PATH,
                         (fileUpdate) -> processFileUpdate(taskGroup, fileUpdate));
 
@@ -175,10 +175,10 @@ public class ProjectAccessManager extends GroupCoordinator {
             Log.debugf("%s/processMembershipUpdate: empty state for %s", ME, taskGroup);
             ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
             readProjectConfig(taskGroup, qc);
+        } else {
+            // queue reconcile action: deal with bursty config updates
+            updateQueue.queueReconciliation(ME, () -> reconcile(taskGroup));
         }
-
-        // queue reconcile action: deal with bursty config updates
-        periodicSync.queueReconciliation(ME, () -> reconcile(taskGroup));
     }
 
     /**
@@ -186,15 +186,13 @@ public class ProjectAccessManager extends GroupCoordinator {
      * Called for file update events
      */
     protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
-        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
-
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
             String repoFullName = fileUpdate.repository().getFullName();
             Log.debugf("%s/processFileUpdate: %s deleted", taskGroup, repoFullName);
-            // The watcher will notify if the file is re-added
-            // TODO: clean up associated resources.
+            taskGroupToState.remove(taskGroup);
             return;
         }
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
         readProjectConfig(taskGroup, qc);
     }
 
@@ -245,7 +243,7 @@ public class ProjectAccessManager extends GroupCoordinator {
         taskGroupToState.put(taskGroup, newState);
 
         // queue reconcile action: deal with bursty config updates
-        periodicSync.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
     }
 
     /**
@@ -360,7 +358,7 @@ public class ProjectAccessManager extends GroupCoordinator {
      * This is useful for testing.
      */
     protected void reset() {
-        fileEvents.unwatchAll(ME);
+        fileWatcher.unwatchAll(ME);
         membershipEvents.unwatchAll(ME);
         resourceToTaskGroup.clear();
         taskGroupToState.clear();
@@ -377,12 +375,12 @@ public class ProjectAccessManager extends GroupCoordinator {
             return myAccess != null ? myAccess.sourceTeam() : null;
         }
 
-        public boolean sourceTeamHasChanged(ProjectConfigState other) {
+        public boolean sourceTeamHasChanged(ProjectConfigState newState) {
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             if (myAccess == null || myAccess.sourceTeam() == null) {
                 return false; // nothing to clean up
             }
-            CollaboratorSync otherAccess = other.projectConfig.collaboratorSync();
+            CollaboratorSync otherAccess = newState.projectConfig.collaboratorSync();
             return otherAccess == null || !myAccess.sourceTeam().equals(otherAccess.sourceTeam());
         }
 

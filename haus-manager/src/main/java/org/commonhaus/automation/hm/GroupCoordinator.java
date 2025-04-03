@@ -33,7 +33,7 @@ public abstract class GroupCoordinator {
     AppContextService ctx;
 
     @Inject
-    FileWatcher fileEvents;
+    FileWatcher fileWatcher;
 
     @Inject
     ManagerBotConfig mgrBotConfig;
@@ -45,7 +45,7 @@ public abstract class GroupCoordinator {
     MembershipWatcher membershipEvents;
 
     @Inject
-    PeriodicUpdateQueue periodicSync;
+    PeriodicUpdateQueue updateQueue;
 
     interface ConfigState {
         String taskGroup();

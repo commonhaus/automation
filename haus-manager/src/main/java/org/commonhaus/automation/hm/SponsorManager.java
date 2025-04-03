@@ -62,7 +62,7 @@ public class SponsorManager extends GroupCoordinator {
     }
 
     public void refreshSponsors() {
-        periodicSync.queueReconciliation(ME, () -> reconcile());
+        updateQueue.queueReconciliation(ME, () -> reconcile());
     }
 
     public void reconcile() {

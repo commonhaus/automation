@@ -101,7 +101,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 // Register watcher to monitor for org config changes
                 // GHRepository is backed by a cached connection that can expire
                 // use the GitHub object from the event to ensure a fresh connection
-                fileEvents.watchFile(ME,
+                fileWatcher.watchFile(ME,
                         installationId, repoFullName, OrganizationConfig.PATH,
                         (fileUpdate) -> processFileUpdate(fileUpdate));
             } else if (action.removed()) {
@@ -143,7 +143,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      */
     protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
         // queue reconcile action: deal with bursty config updates
-        periodicSync.queueReconciliation(ME, this::reconcile);
+        updateQueue.queueReconciliation(ME, this::reconcile);
     }
 
     /**
@@ -225,11 +225,11 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
     private void queueReconciliation() {
         // queue reconcile action: deal with bursty config updates
-        periodicSync.queueReconciliation(ME, this::reconcile);
+        updateQueue.queueReconciliation(ME, this::reconcile);
 
         // Queue callbacks for config consumers
         for (var callback : callbacks.entrySet()) {
-            periodicSync.queueReconciliation(callback.getKey(), callback.getValue());
+            updateQueue.queueReconciliation(callback.getKey(), callback.getValue());
         }
     }
 
@@ -268,7 +268,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      */
     protected void reset() {
         currentConfig.set(Optional.empty());
-        fileEvents.unwatchAll(ME);
+        fileWatcher.unwatchAll(ME);
         membershipEvents.unwatchAll(ME);
     }
 
