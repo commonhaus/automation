@@ -15,6 +15,7 @@ import org.yaml.snakeyaml.DumperOptions.ScalarStyle;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +57,10 @@ public interface ContextService {
     }
 
     default <T> T parseYamlFile(GHContent content, Class<T> type) throws IOException {
+        return yamlMapper().readValue(content.read(), type);
+    }
+
+    default <T> T parseYamlFile(GHContent content, TypeReference<T> type) throws IOException {
         return yamlMapper().readValue(content.read(), type);
     }
 

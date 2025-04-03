@@ -28,6 +28,7 @@ import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
 import org.kohsuke.github.ReactionContent;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkus.logging.Log;
@@ -669,6 +670,15 @@ public class GitHubQueryContext extends GraphQLQueryContext {
     }
 
     public <T> T readYamlContent(GHContent content, Class<T> type) {
+        try {
+            return ctx.parseYamlFile(content, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
+    }
+
+    public <T> T readYamlContent(GHContent content, TypeReference<T> type) {
         try {
             return ctx.parseYamlFile(content, type);
         } catch (IOException e) {
