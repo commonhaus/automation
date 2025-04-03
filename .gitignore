@@ -6,6 +6,10 @@ pom.xml.versionsBackup
 release.properties
 .flattened-pom.xml
 
+# MCP experiments
+*.toml
+.gpt-data
+
 # Eclipse
 .project
 .classpath
