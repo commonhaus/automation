@@ -5,8 +5,6 @@ import static org.commonhaus.automation.github.context.GitHubTeamService.refresh
 import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -16,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
@@ -31,7 +28,6 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
-import org.commonhaus.automation.queue.TaskStateService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -42,13 +38,8 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class ProjectAccessManager extends GroupCoordinator {
-    static final String ME = "projectAccess";
-
-    private static volatile String lastRun = "never";
+    static final String ME = "🌳-project";
     private static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
-
-    @Inject
-    TaskStateService taskState;
 
     // flat map of tracked resources to the task group that manages them
     final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
@@ -72,22 +63,23 @@ public class ProjectAccessManager extends GroupCoordinator {
         return resource.substring(5);
     }
 
-    private void recordRun() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
-        taskState.recordRun(ME);
-    }
-
     /**
      * Periodically refresh/re-synchronize team access lists.
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.projects:0 47 4 */3 * ?}")
     public void scheduledRefresh() {
-        Log.info("⏰ 🌳 Scheduled: begin refresh access lists");
-        refreshAccessLists();
-        Log.infof("⏰ 🌳 Scheduled: end refresh access lists");
+        try {
+            Log.infof("[%s] ⏰ Scheduled: begin refresh access lists", ME);
+            refreshAccessLists();
+        } catch (Throwable t) {
+            ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled access list refresh", t);
+        }
     }
 
+    /**
+     * Allow manual trigger from admin endpoint
+     */
     public void refreshAccessLists() {
         recordRun();
 
@@ -117,7 +109,7 @@ public class ProjectAccessManager extends GroupCoordinator {
         String repoFullName = repo.getFullName();
         String orgName = toOrganizationName(repoFullName);
 
-        Log.debugf("%s/repositoryDiscovered (%s): %s", ME, repoEvent.action(), repoFullName);
+        Log.debugf("[%s] repositoryDiscovered (%s): %s", ME, repoEvent.action(), repoFullName);
         long installationId = repoEvent.installationId();
 
         // We only read configuration files from repositories in the configured organization
@@ -165,15 +157,15 @@ public class ProjectAccessManager extends GroupCoordinator {
      * Queue a reconcilation. No-need to re-read config
      */
     protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
-        Log.debugf("%s/processMembershipUpdate: %s", ME, update);
+        Log.debugf("[%s] processMembershipUpdate: %s", ME, update);
         ProjectConfigState newState = taskGroupToState.get(taskGroup);
         if (newState == null) {
-            Log.warnf("%s/processMembershipUpdate: no state for %s", ME, taskGroup);
+            Log.warnf("[%s] processMembershipUpdate: no state for %s", ME, taskGroup);
             return;
         }
 
         if (newState == EMPTY) { // lazy discovery
-            Log.debugf("%s/processMembershipUpdate: empty state for %s", ME, taskGroup);
+            Log.debugf("[%s] processMembershipUpdate: empty state for %s", ME, taskGroup);
             ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
             readProjectConfig(taskGroup, qc);
         } else {
@@ -189,7 +181,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
             String repoFullName = fileUpdate.repository().getFullName();
-            Log.debugf("%s/processFileUpdate: %s deleted", taskGroup, repoFullName);
+            Log.debugf("[%s] processFileUpdate: %s %s deleted", ME, taskGroup, repoFullName);
             taskGroupToState.remove(taskGroup);
             return;
         }
@@ -207,14 +199,14 @@ public class ProjectAccessManager extends GroupCoordinator {
         // The repository containing the (added/modified) file must be present in the query context
         GHRepository repo = qc.getRepository();
         if (repo == null) {
-            Log.warnf("%s/readProjectConfig: repository not set in QueryContext", taskGroup);
+            Log.warnf("[%s] readProjectConfig %s: repository not set in QueryContext", ME, taskGroup);
             return;
         }
 
         GHContent content = qc.readSourceFile(repo, ProjectConfig.PATH);
         if (content == null || qc.hasErrors()) {
             // Normal
-            Log.debugf("%s/readProjectConfig: no %s in %s", ME, ProjectConfig.PATH, repo.getFullName());
+            Log.debugf("[%s] readProjectConfig %s: no %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
             return;
         }
 
@@ -230,13 +222,13 @@ public class ProjectAccessManager extends GroupCoordinator {
                     qc.getErrorAddresses(oldState == null ? null : oldState.emailNotifications()));
             return;
         }
-        Log.debugf("%s/readProjectConfig: found %s in %s", ME, ProjectConfig.PATH, repo.getFullName());
+        Log.debugf("[%s] readProjectConfig %s: found %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
 
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
                 repo.getFullName(), qc.getInstallationId(), projectConfig);
 
         if (oldState != null && oldState.sourceTeamHasChanged(newState)) {
-            Log.debugf("%s/readProjectConfig: remove old state source -- %s", taskGroup, oldState.sourceTeam());
+            Log.debugf("[%s] readProjectConfig %s: remove old state source -- %s", ME, taskGroup, oldState.sourceTeam());
             resourceToTaskGroup.remove(repoToResource(oldState.sourceTeam()));
             membershipEvents.unwatch(MembershipUpdateType.TEAM, oldState.sourceTeam());
         }
@@ -274,13 +266,13 @@ public class ProjectAccessManager extends GroupCoordinator {
         // Sync team memberships
         for (GroupMapping groupMapping : projectConfig.teamMembership()) {
             if (groupMapping == null || !groupMapping.performSync()) {
-                Log.debugf("[%s] %s: missing or empty group mapping: %s", ME, state.taskGroup(), groupMapping);
+                Log.debugf("[%s] %s: missing or empty group mapping: %s", ME, taskGroup, groupMapping);
                 continue;
             }
             processGroupMapping(state, groupMapping);
         }
 
-        Log.debugf("[%s] %s: team membership sync complete; %s", ME, state.taskGroup(), state.projectConfig());
+        Log.debugf("[%s] %s: team membership sync complete; %s", ME, taskGroup, state.projectConfig());
     }
 
     private void doSyncCollaborators(ProjectConfigState state, ProjectConfig projectConfig) {

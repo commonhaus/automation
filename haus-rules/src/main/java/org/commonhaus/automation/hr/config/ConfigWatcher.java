@@ -24,7 +24,7 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class ConfigWatcher {
-    static final String ME = "rulesConfig";
+    static final String ME = "⚙️ ";
 
     @Inject
     AppContextService ctx;
@@ -72,14 +72,14 @@ public class ConfigWatcher {
 
     protected void repositoryDiscovered(
             @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
-        Log.infof("⚙️ 🗳️ ConfigWatcher.repositoryDiscovered: %s", repoEvent.repository().getFullName());
+        Log.infof("[%s] ConfigWatcher.repositoryDiscovered: %s", ME, repoEvent.repository().getFullName());
 
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
         long installationId = repoEvent.installationId();
 
-        Log.debugf("%s/repoDiscovered: %s", ME, repoFullName);
+        Log.debugf("[%s] repoDiscovered: %s", ME, repoFullName);
         readConfiguration(repoEvent.installationId(), repoEvent.repository(), null);
 
         if (action.repository() && action.added()) {
@@ -93,17 +93,21 @@ public class ConfigWatcher {
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausRules.cron.config:0 17 2 * * ?}")
     void refreshConfig() {
-        Log.info("⏰ ⚙️ Scheduled: refresh config");
-        fileEvents.refresh(ctx, ME);
+        try {
+            Log.infof("[%s] ⏰ Scheduled: refresh config", ME);
+            fileEvents.refresh(ctx, ME);
+        } catch (Throwable t) {
+            ctx.logAndSendEmail(ME, "⚙️ ⏰ HausRules: Error running scheduled config refresh", t);
+        }
     }
 
     protected void readConfiguration(long installationId, GHRepository repo, FileUpdateType updateType) {
         if (repo == null) {
-            Log.warnf("%s/processConfigUpdate: repository not set in FileUpdate", ME);
+            Log.warnf("[%s] processConfigUpdate: repository not set in FileUpdate", ME);
             return;
         }
         if (updateType == FileUpdateType.REMOVED) {
-            Log.debugf("%s/processConfigUpdate: %s config deleted", repo.getFullName());
+            Log.debugf("[%s] processConfigUpdate: %s config deleted", repo.getFullName());
             repoConfig.remove(repo.getFullName());
             return;
         }
@@ -111,19 +115,19 @@ public class ConfigWatcher {
         ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo);
         GHContent content = qc.readSourceFile(repo, HausRulesConfig.PATH);
         if (content == null || qc.hasErrors()) {
-            Log.debugf("%s/readHausRulesConfig: no %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
+            Log.debugf("[%s] readHausRulesConfig: no %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
             repoConfig.remove(repo.getFullName());
             return;
         }
         HausRulesConfig hausRulesCfg = qc.readYamlContent(content, HausRulesConfig.class);
         if (hausRulesCfg == null || qc.hasErrors()) {
-            qc.logAndSendContextErrors("%s/readHausRulesConfig: unable to parse %s in %s"
+            qc.logAndSendContextErrors("[%s] readHausRulesConfig: unable to parse %s in %s"
                     .formatted(ME, HausRulesConfig.PATH, repo.getFullName()));
             repoConfig.remove(repo.getFullName());
             return;
         }
 
-        Log.debugf("%s/readHausRulesConfig: found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
+        Log.debugf("[%s] readHausRulesConfig: found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
         repoConfig.put(repo.getFullName(), hausRulesCfg);
     }
 }

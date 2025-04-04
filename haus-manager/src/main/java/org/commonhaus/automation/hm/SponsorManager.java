@@ -2,8 +2,6 @@ package org.commonhaus.automation.hm;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,8 +29,7 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class SponsorManager extends GroupCoordinator {
-    static final String ME = "sponsorManager";
-    private static volatile String lastRun = "";
+    static final String ME = "💸-sponsor";
 
     @Inject
     protected BotConfig baseBotConfig;
@@ -57,8 +54,12 @@ public class SponsorManager extends GroupCoordinator {
      */
     @Scheduled(cron = "${automation.hausManager.cron.sponsor:0 47 1 */3 * ?}")
     public void scheduledRefresh() {
-        Log.info("⏰ Scheduled: refresh sponsors");
-        refreshSponsors();
+        try {
+            Log.infof("[%s] ⏰ Scheduled: refresh sponsors", ME);
+            refreshSponsors();
+        } catch (Throwable t) {
+            ctx.logAndSendEmail(ME, "💸 ⏰ Error running scheduled sponsors refresh", t);
+        }
     }
 
     public void refreshSponsors() {
@@ -66,7 +67,7 @@ public class SponsorManager extends GroupCoordinator {
     }
 
     public void reconcile() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+        recordRun();
 
         OrganizationConfig config = latestOrgConfig.getConfig();
         if (config == null || config.sponsors() == null) {
@@ -158,5 +159,4 @@ public class SponsorManager extends GroupCoordinator {
 
         return sponsorLogins;
     }
-
 }

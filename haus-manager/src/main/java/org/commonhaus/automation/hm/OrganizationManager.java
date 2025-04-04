@@ -1,8 +1,6 @@
 package org.commonhaus.automation.hm;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -14,7 +12,6 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
@@ -29,7 +26,6 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
-import org.commonhaus.automation.queue.TaskStateService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
@@ -40,11 +36,7 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class OrganizationManager extends GroupCoordinator implements LatestOrgConfig {
-    static final String ME = "orgManager";
-    private static volatile String lastRun = "";
-
-    @Inject
-    TaskStateService taskState;
+    static final String ME = "🏡-org";
 
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
     private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
@@ -62,11 +54,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             return;
         }
         callbacks.put(id, callback);
-    }
-
-    private void recordRun() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
-        taskState.recordRun(ME);
     }
 
     /**
@@ -118,11 +105,17 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.organization:0 47 2 */3 * ?}")
     public void scheduledRefresh() {
-        Log.info("⏰ 🏡 Scheduled: begin refresh organization membership");
-        refreshOrganizationMembership();
-        Log.info("⏰ 🏡 Scheduled: end refresh organization membership");
+        try {
+            Log.infof("[%s] ⏰ Scheduled: begin refresh organization membership", ME);
+            refreshOrganizationMembership();
+        } catch (Throwable t) {
+            ctx.logAndSendEmail(ME, "⏰ 🏡 Error running scheduled refresh of org membership", t);
+        }
     }
 
+    /**
+     * Allow manual trigger from admin endpoint
+     */
     public void refreshOrganizationMembership() {
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
@@ -183,7 +176,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     protected boolean readOrgConfig(ScopedQueryContext qc) {
         GHRepository repo = qc.getRepository();
         if (repo == null) {
-            Log.warnf("%s/readOrgConfig: repository not set in QueryContext; errors: %s", ME,
+            Log.warnf("[%s] readOrgConfig: repository not set in QueryContext; errors: %s", ME,
                     qc.bundleExceptions());
             return false;
         }
@@ -195,7 +188,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
         OrganizationConfig orgCfg = qc.readYamlContent(content, OrganizationConfig.class);
         if (orgCfg == null || qc.hasErrors()) {
-            qc.logAndSendContextErrors("%s/readOrgConfig: unable to parse %s in %s"
+            qc.logAndSendContextErrors("[%s] readOrgConfig: unable to parse %s in %s"
                     .formatted(ME, OrganizationConfig.PATH, repo.getFullName()),
                     orgCfg.emailNotifications());
             return false;

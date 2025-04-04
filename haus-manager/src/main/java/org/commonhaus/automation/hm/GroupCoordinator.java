@@ -1,14 +1,19 @@
 package org.commonhaus.automation.hm;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
+import jakarta.annotation.Priority;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.context.GitHubTeamService;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.github.watchers.MembershipWatcher;
@@ -19,6 +24,7 @@ import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.OrgDefaults;
 import org.commonhaus.automation.hm.config.PushToTeams;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -26,8 +32,10 @@ import org.kohsuke.github.GHRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
 
 public abstract class GroupCoordinator {
+    protected static volatile String lastRun = "never";
 
     @Inject
     AppContextService ctx;
@@ -45,6 +53,9 @@ public abstract class GroupCoordinator {
     MembershipWatcher membershipEvents;
 
     @Inject
+    TaskStateService taskState;
+
+    @Inject
     PeriodicUpdateQueue updateQueue;
 
     interface ConfigState {
@@ -55,6 +66,16 @@ public abstract class GroupCoordinator {
         String repoName();
 
         EmailNotification emailNotifications();
+    }
+
+    void startup(@Observes @Priority(value = RdePriority.APP_DISCOVERY) StartupEvent startup) {
+        lastRun = Optional.ofNullable(taskState.lastRun(me()))
+                .map(Instant::toString)
+                .orElse("never");
+    }
+
+    protected void recordRun() {
+        lastRun = taskState.recordRun(me()).toString();
     }
 
     protected abstract void processMembershipUpdate(String taskGroup, MembershipUpdate update);

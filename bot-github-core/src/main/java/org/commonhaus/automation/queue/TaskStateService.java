@@ -75,9 +75,11 @@ public class TaskStateService {
         }
     }
 
-    public void recordRun(String taskId) {
-        lastRunTimes.put(taskId, Instant.now());
+    public Instant recordRun(String taskId) {
+        Instant now = Instant.now();
+        lastRunTimes.put(taskId, now);
         updateQueue.queueReconciliation(ME, () -> this.saveState(null));
+        return now;
     }
 
     public boolean shouldRun(String taskId, Duration maxAge) {
@@ -89,5 +91,12 @@ public class TaskStateService {
             return true;
         }
         return Duration.between(lastRun, Instant.now()).compareTo(maxAge) > 0;
+    }
+
+    public Instant lastRun(String taskId) {
+        if (LaunchMode.current() == LaunchMode.TEST) {
+            return Instant.now();
+        }
+        return lastRunTimes.get(taskId);
     }
 }

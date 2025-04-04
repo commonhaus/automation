@@ -49,7 +49,6 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class VoteProcessor {
-
     public final static String MANUAL_VOTE_RESULT = "vote::result";
 
     public static final String VOTE_DONE = "vote/done";
@@ -104,7 +103,7 @@ public class VoteProcessor {
     }
 
     public void repositoryDiscovered(@Observes @Priority(value = RdePriority.APP_EVENT) RepositoryDiscoveryEvent repoEvent) {
-        Log.infof("⚙️ 🗳️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
+        Log.infof("🗳️ ⚙️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
         lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 
         long ghiId = repoEvent.installationId();
@@ -123,9 +122,12 @@ public class VoteProcessor {
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausRules.cron.voting:0 23 */3 * * ?}")
     public void scheduledDiscovery() {
-        Log.info("⏰ 🗳️ Scheduled: begin count votes");
-        discoverVotes();
-        Log.info("⏰ 🗳️ Scheduled: end count votes");
+        try {
+            Log.info("🗳️ ⏰ Scheduled: begin count votes");
+            discoverVotes();
+        } catch (Throwable t) {
+            ctx.logAndSendEmail("🗳️ ", "🗳️ ⏰ Error running scheduled refresh", t);
+        }
     }
 
     public void discoverVotes() {
@@ -178,7 +180,7 @@ public class VoteProcessor {
             return;
         }
         if (!HAS_OPEN_VOTE.matches(qc, item.id)) {
-            Log.debugf("[%s] VoteProcessor.processVoteCount: item is not open", event.getLogId());
+            Log.debugf("[🗳️ %s] VoteProcessor.processVoteCount: item is not open", event.getLogId());
             return;
         }
 
