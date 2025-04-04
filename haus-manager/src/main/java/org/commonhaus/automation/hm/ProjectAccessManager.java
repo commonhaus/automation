@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -370,22 +371,29 @@ public class ProjectAccessManager extends GroupCoordinator {
             long installationId,
             ProjectConfig projectConfig) implements ConfigState {
 
+        // ProjectConfig is only unset when using an empty placeholder
         public String sourceTeam() {
+            if (this == EMPTY) {
+                return null;
+            }
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             return myAccess != null ? myAccess.sourceTeam() : null;
         }
 
         public boolean sourceTeamHasChanged(ProjectConfigState newState) {
+            if (this == EMPTY) {
+                return false; // nothing to clean up
+            }
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             if (myAccess == null || myAccess.sourceTeam() == null) {
                 return false; // nothing to clean up
             }
-            CollaboratorSync otherAccess = newState.projectConfig.collaboratorSync();
-            return otherAccess == null || !myAccess.sourceTeam().equals(otherAccess.sourceTeam());
+            CollaboratorSync newAccess = newState.projectConfig.collaboratorSync();
+            return newAccess == null || !Objects.equals(myAccess.sourceTeam(), newAccess.sourceTeam());
         }
 
         public String[] errors() {
-            return projectConfig().emailNotifications().errors();
+            return this == EMPTY ? null : projectConfig().emailNotifications().errors();
         }
 
         @Override
@@ -395,7 +403,7 @@ public class ProjectAccessManager extends GroupCoordinator {
 
         @Override
         public EmailNotification emailNotifications() {
-            return projectConfig().emailNotifications();
+            return this == EMPTY ? null : projectConfig().emailNotifications();
         }
     }
 }
