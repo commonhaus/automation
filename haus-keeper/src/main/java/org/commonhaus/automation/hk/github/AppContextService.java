@@ -16,8 +16,8 @@ import org.commonhaus.automation.github.context.BaseContextService;
 import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.AdminDataCache;
-import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.AdminBotConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
@@ -56,7 +56,7 @@ public class AppContextService extends BaseContextService {
     }
 
     public String getDataStore() {
-        return adminData.datastore();
+        return adminData.home().datastore();
     }
 
     public URI getMemberHome() {

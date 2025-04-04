@@ -8,7 +8,7 @@ import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
+import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.github.AppContextService;
 
 import io.quarkus.logging.Log;

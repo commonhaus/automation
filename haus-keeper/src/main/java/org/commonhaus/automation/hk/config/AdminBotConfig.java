@@ -7,9 +7,22 @@ import io.smallrye.config.ConfigMapping;
 
 @ConfigMapping(prefix = "automation.hausKeeper")
 public interface AdminBotConfig {
-    Optional<String> teamSyncCron();
-
-    String datastore();
 
     URI memberHome();
+
+    /** GitHub organization for configuration */
+    HomeConfig home();
+
+    SchedulerConfig cron();
+
+    interface HomeConfig {
+        String organization();
+
+        String datastore();
+    }
+
+    interface SchedulerConfig {
+        // Cron expression for periodic sync of sponsors
+        Optional<String> projectAliases();
+    }
 }
