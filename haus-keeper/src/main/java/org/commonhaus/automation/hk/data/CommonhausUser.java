@@ -124,6 +124,7 @@ public class CommonhausUser {
         history.add("%s %s".formatted(now(), message));
     }
 
+    @JsonIgnore
     public boolean isMemberUndefined() {
         return isMember == null;
     }
@@ -136,6 +137,10 @@ public class CommonhausUser {
 
     public void setIsMember(boolean isMember) {
         this.isMember = isMember;
+    }
+
+    public void addProject(String projectName) {
+        this.data.projects.add(projectName);
     }
 
     public MemberStatus status() {

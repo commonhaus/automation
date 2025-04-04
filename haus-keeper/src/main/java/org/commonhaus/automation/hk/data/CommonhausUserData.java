@@ -1,9 +1,12 @@
 package org.commonhaus.automation.hk.data;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.annotation.Nonnull;
 
@@ -17,6 +20,8 @@ public class CommonhausUserData {
     GoodStanding goodUntil = new GoodStanding();
 
     Services services = new Services();
+
+    List<String> projects = new ArrayList<>();
 
     public static class Discord {
         String id;
@@ -32,7 +37,7 @@ public class CommonhausUserData {
 
         /** Additional ForwardEmail aliases. Optional. */
         @JsonAlias("alt_alias")
-        List<String> altAlias;
+        Set<String> altAlias;
 
         public boolean hasDefaultAlias() {
             return hasDefaultAlias;
@@ -42,8 +47,15 @@ public class CommonhausUserData {
             hasDefaultAlias = true;
         }
 
-        public Collection<? extends String> altAlias() {
-            return altAlias == null ? List.of() : altAlias;
+        public Collection<String> altAlias() {
+            if (altAlias == null) {
+                altAlias = new HashSet<>();
+            }
+            return altAlias;
+        }
+
+        public void addAliases(List<String> validAliases) {
+            altAlias().addAll(validAliases);
         }
     }
 
