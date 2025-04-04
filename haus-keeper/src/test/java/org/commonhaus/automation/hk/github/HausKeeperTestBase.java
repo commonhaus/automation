@@ -122,7 +122,7 @@ public class HausKeeperTestBase extends ContextHelper {
         this.mocks = mocks;
 
         HausKeeperConfig config = ctx.yamlMapper().readValue(
-                ContextHelper.class.getResourceAsStream("/cf-admin.yml"), HausKeeperConfig.class);
+                ContextHelper.class.getResourceAsStream("/cf-haus-keeper.yml"), HausKeeperConfig.class);
         testConfig.initConfig(config);
 
         setupDefaultMocks(DEFAULTS);
@@ -228,7 +228,7 @@ public class HausKeeperTestBase extends ContextHelper {
 
     public void setUserManagementConfig() throws Exception {
         HausKeeperConfig config = ctx.yamlMapper().readValue(
-                ContextHelper.class.getResourceAsStream("/cf-admin.yml"), HausKeeperConfig.class);
+                ContextHelper.class.getResourceAsStream("/cf-haus-keeper.yml"), HausKeeperConfig.class);
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, datastoreInstallationId, dataMocks.repository());
         testConfig.testUpdate(qc, config);
