@@ -39,7 +39,7 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class ProjectAccessManager extends GroupCoordinator {
     static final String ME = "🌳-project";
-    private static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
+    static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
 
     // flat map of tracked resources to the task group that manages them
     final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
@@ -49,6 +49,14 @@ public class ProjectAccessManager extends GroupCoordinator {
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Project access refreshed", () -> lastRun);
+    }
+
+    private static String repoNametoTaskGroup(String repoFullName) {
+        return "%s-%s".formatted(ME, repoFullName);
+    }
+
+    private static String taskGroupToRepo(String taskGroup) {
+        return taskGroup.substring(ME.length() + 1);
     }
 
     private static String teamToResource(String teamFullName) {
@@ -82,7 +90,6 @@ public class ProjectAccessManager extends GroupCoordinator {
      */
     public void refreshAccessLists() {
         recordRun();
-
         for (String resourceKey : resourceToTaskGroup.keySet()) {
             String fullName = resourceToFullName(resourceKey);
             // Clear cache to force re-fetch on next access
@@ -93,9 +100,15 @@ public class ProjectAccessManager extends GroupCoordinator {
             }
         }
         // Queue reconciliation for all known task groups
-        for (ProjectConfigState state : taskGroupToState.values()) {
-            ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
-            readProjectConfig(state.taskGroup(), qc);
+        for (var entry : taskGroupToState.entrySet()) {
+            String taskGroup = entry.getKey();
+            String repoFullName = taskGroupToRepo(taskGroup);
+            ScopedQueryContext qc = ctx.getOrgScopedQueryContext(repoFullName);
+            if (qc == null) {
+                Log.warnf("[%s] %s: no org context for %s", ME, taskGroup, repoFullName);
+                continue;
+            }
+            readProjectConfig(taskGroup, qc);
         }
     }
 
@@ -114,7 +127,7 @@ public class ProjectAccessManager extends GroupCoordinator {
 
         // We only read configuration files from repositories in the configured organization
         if (action.repository() && orgName.equals(mgrBotConfig.home().organization())) {
-            final String taskGroup = "%s-%s".formatted(ME, repoFullName);
+            final String taskGroup = repoNametoTaskGroup(repoFullName);
 
             if (action.added()) {
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
@@ -204,9 +217,13 @@ public class ProjectAccessManager extends GroupCoordinator {
         }
 
         GHContent content = qc.readSourceFile(repo, ProjectConfig.PATH);
-        if (content == null || qc.hasErrors()) {
-            // Normal
+        if (qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] unable to read project config %s".formatted(ME, taskGroup));
+            return;
+        } else if (content == null) {
+            // Normal for lazy-discovery; this will be re-added if/when the file appears
             Log.debugf("[%s] readProjectConfig %s: no %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
+            taskGroupToState.remove(taskGroup);
             return;
         }
 
