@@ -36,7 +36,6 @@ public enum MemberStatus {
                 || this == CONTRIBUTOR;
     }
 
-
     public boolean missedUpdateToPending() {
         return this == UNKNOWN
                 || this == SPONSOR

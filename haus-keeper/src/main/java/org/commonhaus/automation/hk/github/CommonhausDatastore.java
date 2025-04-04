@@ -144,6 +144,26 @@ public class CommonhausDatastore {
         return result;
     }
 
+    public CommonhausUser primeFromFile(CommonhausUser filesytemUser) {
+        String userKey = getKey(filesytemUser.login(), filesytemUser.id());
+        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
+                .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+
+        CommonhausUser result = entry.getUserData();
+        if (result != null) {
+            // User data is already present, use latest (in case of pending updates)
+            return result;
+        }
+        // User hasn't been queried lately, prime with fetched data
+        entry.refreshUserData(filesytemUser);
+        return filesytemUser;
+    }
+
+    public void clearCachedUser(CommonhausUser user) {
+        String userKey = getKey(user.login(), user.id());
+        AdminDataCache.COMMONHAUS_DATA.invalidate(userKey);
+    }
+
     /**
      * Reconcile action driven from the single-threaded update queue.
      * This will lag behind user-driven events and can batch updates.

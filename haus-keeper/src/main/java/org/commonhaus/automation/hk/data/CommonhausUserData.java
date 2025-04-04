@@ -23,6 +23,10 @@ public class CommonhausUserData {
 
     List<String> projects = new ArrayList<>();
 
+    public List<String> projects() {
+        return projects;
+    }
+
     public static class Discord {
         String id;
         String username;

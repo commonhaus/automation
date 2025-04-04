@@ -22,7 +22,8 @@ public interface AdminBotConfig {
     }
 
     interface SchedulerConfig {
-        // Cron expression for periodic sync of sponsors
         Optional<String> projectAliases();
+
+        Optional<String> verifyLogins();
     }
 }
