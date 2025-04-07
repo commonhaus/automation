@@ -13,7 +13,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * DTO for User data returned to the web interface
  */
 @RegisterForReflection
-class GitHubUser {
+class LoggedInUser {
     final long id;
     final String login;
     final String nodeId;
@@ -24,13 +24,13 @@ class GitHubUser {
     Set<String> roles = new HashSet<>();
     boolean hasApplication = false;
 
-    public GitHubUser(long id, String login, String nodeId) {
+    public LoggedInUser(long id, String login, String nodeId) {
         this.id = id;
         this.login = login;
         this.nodeId = nodeId;
     }
 
-    public GitHubUser(JsonObject jsonObject) {
+    public LoggedInUser(JsonObject jsonObject) {
         this.id = JsonAttribute.id.longFrom(jsonObject);
         this.login = JsonAttribute.login.stringFrom(jsonObject);
         this.nodeId = JsonAttribute.node_id.stringFrom(jsonObject);
@@ -63,7 +63,7 @@ class GitHubUser {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        GitHubUser other = (GitHubUser) obj;
+        LoggedInUser other = (LoggedInUser) obj;
         if (id != other.id)
             return false;
         return true;

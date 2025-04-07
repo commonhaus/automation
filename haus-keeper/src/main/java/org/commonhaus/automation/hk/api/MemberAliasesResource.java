@@ -54,7 +54,7 @@ public class MemberAliasesResource {
         try {
             CommonhausUser user = getUser();
 
-            // API CALL: get alias mappings
+            // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
 
             // Return as map of string / alias
@@ -110,6 +110,7 @@ public class MemberAliasesResource {
     public Response generatePassword(AliasRequest request) {
         try {
             CommonhausUser user = getUser();
+            // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
             AliasKey key = AliasKey.fromCache(request.email());
             Alias alias = aliasMap.get(key);

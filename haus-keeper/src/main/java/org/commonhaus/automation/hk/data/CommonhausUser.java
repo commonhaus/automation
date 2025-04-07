@@ -29,7 +29,7 @@ public class CommonhausUser implements UserLogin {
     public static final String MEMBER_ROLE = "member";
 
     @Nonnull
-    final String login;
+    String login;
     @Nonnull
     final long id;
     @Nonnull
@@ -67,6 +67,11 @@ public class CommonhausUser implements UserLogin {
 
     public String login() {
         return login;
+    }
+
+    // Possible! Rare, but has happened
+    public void changeLogin(String login) {
+        this.login = login;
     }
 
     public long id() {

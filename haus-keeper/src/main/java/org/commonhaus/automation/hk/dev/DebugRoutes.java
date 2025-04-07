@@ -1,8 +1,5 @@
 package org.commonhaus.automation.hk.dev;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -12,6 +9,9 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.hk.github.AppContextService;
+import org.commonhaus.automation.hk.member.AccessRoleManager;
+import org.commonhaus.automation.hk.member.MemberInfo;
+import org.commonhaus.automation.hk.member.MemberInfoAdapter;
 import org.kohsuke.github.GHUser;
 
 import io.quarkus.arc.profile.IfBuildProfile;
@@ -27,6 +27,9 @@ public class DebugRoutes {
     @Inject
     AppContextService appCtx;
 
+    @Inject
+    AccessRoleManager roleManager;
+
     @GET
     @Path("/{login}/roles")
     public Response getRoles(@PathParam("login") String login) {
@@ -40,10 +43,9 @@ public class DebugRoutes {
         isTeamMember(qc, user, "commonhaus/members");
         isCollaborator(qc, user, "commonhaus/sponsors");
 
-        Set<String> roles = new HashSet<>();
-        appCtx.userIsKnown(qc, login, roles);
+        MemberInfo memberInfo = new MemberInfoAdapter(user, login);
+        roleManager.userIsKnown(qc, memberInfo);
 
-        // appCtx.userIsKnown(qc, login, roles);
         return Response.ok().build();
     }
 

@@ -6,6 +6,7 @@ import java.io.BufferedInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +74,11 @@ public class UserLoginVerifier {
     public void scheduledLoginVerification() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin login verification", ME);
+            // Check if we need to run based on configuration
+            if (!taskState.shouldRun(ME, Duration.ofHours(24))) {
+                Log.infof("[%s] Skipping login verification (ran recently)", ME);
+                return;
+            }
             verifyAllUserLogins();
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 👍 Error running scheduled login verification", t);
@@ -159,7 +165,7 @@ public class UserLoginVerifier {
                         dqc.getErrorAddresses(hkConfig.getAddresses()));
 
                 // Send event to notifiy project owners that login has changed
-                loginChangeEvent.fire(new LoginChangeEvent(user.login(), user.projects()));
+                loginChangeEvent.fire(new LoginChangeEvent(user.login(), Optional.empty(), user.projects()));
 
                 return;
             }
@@ -179,6 +185,6 @@ public class UserLoginVerifier {
         }
     }
 
-    public record LoginChangeEvent(String oldLogin, List<String> projects) {
+    public record LoginChangeEvent(String oldLogin, Optional<String> newLogin, List<String> projects) {
     }
 }

@@ -446,13 +446,13 @@ public class GitHubQueryContext extends GraphQLQueryContext {
 
     public DataCommonItem createItem(EventType eventType, String title, String description, Collection<DataLabel> labels) {
         if (hasErrors()) {
-            Log.debugf("[%s] getItem skipping due to errors", getLogId());
+            Log.debugf("[%s] createItem skipping due to errors", getLogId());
             return null;
         }
         return switch (eventType) {
             case issue -> DataCommonItem.createIssue(this, title, description, labels);
             default -> {
-                logAndSendEmail("getItem: Unknown event type " + eventType, null);
+                logAndSendEmail("createItem: Unknown event type " + eventType, null);
                 yield null;
             }
         };

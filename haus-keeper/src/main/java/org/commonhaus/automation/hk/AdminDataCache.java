@@ -5,6 +5,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import org.commonhaus.automation.QueryCache;
+import org.commonhaus.automation.hk.member.MemberInfo;
 
 import com.cronutils.Function;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -24,7 +25,6 @@ public enum AdminDataCache {
 
     /** Cache forward email aliases to reduce API calls */
     ALIASES(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
-
     ;
 
     private QueryCache cache = null;
@@ -60,5 +60,18 @@ public enum AdminDataCache {
 
     public void invalidate(String login) {
         cache.invalidate(login);
+    }
+
+    public static Boolean getKnownUser(MemberInfo info) {
+        return AdminDataCache.KNOWN_USER.get("user-" + info.id());
+    }
+
+    public static Boolean setKnownUser(MemberInfo info, Boolean value) {
+        AdminDataCache.KNOWN_USER.put("user-" + info.id(), value);
+        return value;
+    }
+
+    public static void forgetUser(MemberInfo info) {
+        AdminDataCache.KNOWN_USER.invalidate("user-" + info.id());
     }
 }
