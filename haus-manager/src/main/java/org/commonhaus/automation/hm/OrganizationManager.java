@@ -96,7 +96,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 currentConfig.set(Optional.empty());
             }
         }
-        recordRun();
     }
 
     /**
@@ -117,6 +116,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Allow manual trigger from admin endpoint
      */
     public void refreshOrganizationMembership() {
+        recordRun();
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
             Log.debugf("[%s] refreshAccessLists: no organization installation", ME);
@@ -135,6 +135,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Queue a reconciliation. No-need to re-read config
      */
     protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
+        recordRun();
         // queue reconcile action: deal with bursty config updates
         updateQueue.queueReconciliation(ME, this::reconcile);
     }
@@ -146,6 +147,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * @see #readOrgConfig(ScopedQueryContext)
      */
     protected void processFileUpdate(FileUpdate fileUpdate) {
+        recordRun();
+
         GitHub github = fileUpdate.github();
         GHRepository repo = fileUpdate.repository();
 
@@ -231,8 +234,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Review collected configuration and perform required actions
      */
     public void reconcile() {
-        recordRun();
-
         OrganizationConfigState configState = currentConfig.get().orElse(null);
         if (configState == null || !configState.performSync()) {
             Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);

@@ -27,7 +27,7 @@ import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.DatastoreQueryContext;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
-import org.commonhaus.automation.queue.TaskStateService;
+import org.commonhaus.automation.queue.ScheduledService;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 
@@ -36,9 +36,8 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class UserLoginVerifier {
+public class UserLoginVerifier extends ScheduledService {
     private static final String ME = "👍-login";
-    private static volatile String lastRun = "never";
 
     @Inject
     ActiveHausKeeperConfig hkConfig;
@@ -52,9 +51,6 @@ public class UserLoginVerifier {
     @Inject
     PeriodicUpdateQueue updateQueue;
 
-    @Inject
-    TaskStateService taskState;
-
     // Fire this event when a login change is detected
     @Inject
     Event<LoginChangeEvent> loginChangeEvent;
@@ -64,10 +60,6 @@ public class UserLoginVerifier {
                 .map(Instant::toString)
                 .orElse("never");
         RouteSupplier.registerSupplier("User logins verified", () -> lastRun);
-    }
-
-    private void recordRun() {
-        lastRun = taskState.recordRun(ME).toString();
     }
 
     @Scheduled(cron = "${automation.hausKeeper.cron.verifyLogins:0 15 3 * * ?}")
@@ -183,6 +175,11 @@ public class UserLoginVerifier {
                 Log.errorf(e, "[%s] Failed to delete temporary file %s: %s", ME, filePath, e);
             }
         }
+    }
+
+    @Override
+    protected String me() {
+        return ME;
     }
 
     public record LoginChangeEvent(String oldLogin, Optional<String> newLogin, List<String> projects) {

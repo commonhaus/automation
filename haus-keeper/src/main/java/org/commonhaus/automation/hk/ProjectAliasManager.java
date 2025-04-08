@@ -38,7 +38,7 @@ import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
-import org.commonhaus.automation.queue.TaskStateService;
+import org.commonhaus.automation.queue.ScheduledService;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
@@ -48,7 +48,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class ProjectAliasManager {
+public class ProjectAliasManager extends ScheduledService {
     private static final String ME = "📫-aliases";
     private static volatile String lastRun = "never";
     private static final AliasConfigState EMPTY = new AliasConfigState(null, null, null, 0, null);
@@ -70,9 +70,6 @@ public class ProjectAliasManager {
 
     @Inject
     PeriodicUpdateQueue updateQueue;
-
-    @Inject
-    TaskStateService taskState;
 
     @Inject
     GitHubTeamService teamService;
@@ -124,7 +121,6 @@ public class ProjectAliasManager {
      */
     protected void repositoryDiscovered(
             @Observes @Priority(value = RdePriority.APP_DISCOVERY + 2) RepositoryDiscoveryEvent repoEvent) {
-        recordRun();
 
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
@@ -227,8 +223,6 @@ public class ProjectAliasManager {
     }
 
     public void reconcile(String taskGroup) {
-        recordRun();
-
         // Always fetch latest state (in case of changes / skips)
         AliasConfigState state = taskGroupToState.get(taskGroup);
         if (state == null || state.projectConfig() == null) {
@@ -438,16 +432,17 @@ public class ProjectAliasManager {
         return map;
     }
 
-    private void recordRun() {
-        lastRun = taskState.recordRun(ME).toString();
-    }
-
     private String repoToTaskGroup(String repoFullName) {
         return "%s-%s".formatted(ME, repoFullName);
     }
 
     private String taskGroupToRepo(String taskGroup) {
         return taskGroup.substring(ME.length() + 1);
+    }
+
+    @Override
+    protected String me() {
+        return ME;
     }
 
     record AliasConfigState(

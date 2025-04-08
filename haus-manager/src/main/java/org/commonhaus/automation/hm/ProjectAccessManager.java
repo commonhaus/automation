@@ -90,6 +90,7 @@ public class ProjectAccessManager extends GroupCoordinator {
      */
     public void refreshAccessLists() {
         recordRun();
+
         for (String resourceKey : resourceToTaskGroup.keySet()) {
             String fullName = resourceToFullName(resourceKey);
             // Clear cache to force re-fetch on next access
@@ -162,7 +163,6 @@ public class ProjectAccessManager extends GroupCoordinator {
                 }
             }
         }
-        recordRun();
     }
 
     /**
@@ -192,6 +192,8 @@ public class ProjectAccessManager extends GroupCoordinator {
      * Called for file update events
      */
     protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
+        recordRun();
+
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
             String repoFullName = fileUpdate.repository().getFullName();
             Log.debugf("[%s] processFileUpdate: %s %s deleted", ME, taskGroup, repoFullName);
@@ -263,8 +265,6 @@ public class ProjectAccessManager extends GroupCoordinator {
      * @param taskGroup
      */
     public void reconcile(String taskGroup) {
-        recordRun();
-
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
         Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, state.projectConfig());

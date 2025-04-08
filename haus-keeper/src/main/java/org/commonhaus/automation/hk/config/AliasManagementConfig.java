@@ -43,4 +43,10 @@ public class AliasManagementConfig {
         }
         return repoName;
     }
+
+    @Override
+    public String toString() {
+        return "AliasManagementConfig [enabled=" + enabled + ", projectList=" + projectList + ", repoPrefix=" + repoPrefix
+                + "]";
+    }
 }

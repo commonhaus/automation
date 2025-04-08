@@ -63,12 +63,11 @@ public class SponsorManager extends GroupCoordinator {
     }
 
     public void refreshSponsors() {
+        recordRun();
         updateQueue.queueReconciliation(ME, () -> reconcile());
     }
 
     public void reconcile() {
-        recordRun();
-
         OrganizationConfig config = latestOrgConfig.getConfig();
         if (config == null || config.sponsors() == null) {
             Log.debugf("[%s] refreshSponsors: configuration not available or sponsors not enabled", ME);
@@ -158,5 +157,10 @@ public class SponsorManager extends GroupCoordinator {
         }
 
         return sponsorLogins;
+    }
+
+    @Override
+    public String me() {
+        return ME;
     }
 }
