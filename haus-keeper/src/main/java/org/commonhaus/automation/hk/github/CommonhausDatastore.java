@@ -29,7 +29,7 @@ public class CommonhausDatastore {
     PeriodicUpdateQueue updateQueue;
 
     /**
-     * Get or create Commonhaus user data using login and ID from the session.
+     * Get Commonhaus user data using login and ID from the session.
      * The cached record will not be refreshed, and the record will not be created if missing.
      *
      * @see #getCommonhausUser(MemberInfo, boolean, boolean)
@@ -84,6 +84,11 @@ public class CommonhausDatastore {
         // Get or create a _cache entry_ for this user
         DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
                 .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+
+        if (entry.hasUserData() && !event.refresh()) {
+            // User data is already present
+            return entry.getUserData();
+        }
 
         CommonhausUser result = null;
 
@@ -142,6 +147,26 @@ public class CommonhausDatastore {
 
         // Respond with the updated user data
         return result;
+    }
+
+    public CommonhausUser primeFromFile(CommonhausUser filesytemUser) {
+        String userKey = getKey(filesytemUser.login(), filesytemUser.id());
+        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
+                .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+
+        CommonhausUser result = entry.getUserData();
+        if (result != null) {
+            // User data is already present, use latest (in case of pending updates)
+            return result;
+        }
+        // User hasn't been queried lately, prime with fetched data
+        entry.refreshUserData(filesytemUser);
+        return filesytemUser;
+    }
+
+    public void clearCachedUser(CommonhausUser user) {
+        String userKey = getKey(user.login(), user.id());
+        AdminDataCache.COMMONHAUS_DATA.invalidate(userKey);
     }
 
     /**

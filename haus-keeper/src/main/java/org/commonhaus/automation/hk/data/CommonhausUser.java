@@ -25,11 +25,11 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  */
 @RegisterForReflection
 @JsonDeserialize(builder = CommonhausUser.Builder.class)
-public class CommonhausUser {
+public class CommonhausUser implements UserLogin {
     public static final String MEMBER_ROLE = "member";
 
     @Nonnull
-    final String login;
+    String login;
     @Nonnull
     final long id;
     @Nonnull
@@ -67,6 +67,11 @@ public class CommonhausUser {
 
     public String login() {
         return login;
+    }
+
+    // Possible! Rare, but has happened
+    public void changeLogin(String login) {
+        this.login = login;
     }
 
     public long id() {
@@ -124,6 +129,15 @@ public class CommonhausUser {
         history.add("%s %s".formatted(now(), message));
     }
 
+    public void addProject(String projectName) {
+        this.data.projects.add(projectName);
+    }
+
+    public List<String> projects() {
+        return data.projects();
+    }
+
+    @JsonIgnore
     public boolean isMemberUndefined() {
         return isMember == null;
     }

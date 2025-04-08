@@ -34,10 +34,12 @@ public class ForwardEmailService {
     AppContextService ctx;
 
     public Map<AliasKey, Alias> fetchAliases(MemberSession session, CommonhausUser user) {
+        // Find configured aliases for the user
         Set<AliasKey> emailAddresses = getConfiguredAliases(session, user);
         if (emailAddresses.isEmpty()) {
             return Map.of();
         }
+        // Cached API CALL: get alias mappings
         return fetchAliases(emailAddresses);
     }
 
@@ -50,7 +52,7 @@ public class ForwardEmailService {
      * @throws WebApplicationException on Rest Client error (including Not Found)
      * @see #getAlias(AliasKey, boolean)
      */
-    public Map<AliasKey, Alias> fetchAliases(Set<AliasKey> emails) {
+    Map<AliasKey, Alias> fetchAliases(Set<AliasKey> emails) {
         if (emailDisabled()) {
             return Map.of();
         }

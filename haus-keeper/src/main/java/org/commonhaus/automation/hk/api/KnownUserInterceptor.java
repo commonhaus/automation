@@ -6,10 +6,12 @@ import jakarta.inject.Inject;
 import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
-import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
+import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.github.AppContextService;
+import org.commonhaus.automation.hk.member.AccessRoleManager;
 
 import io.quarkus.logging.Log;
 
@@ -19,6 +21,9 @@ public class KnownUserInterceptor implements Serializable {
 
     @Inject
     AppContextService appCtx;
+
+    @Inject
+    AccessRoleManager roleManager;
 
     @Inject
     protected ActiveHausKeeperConfig hkConfig;
@@ -31,11 +36,18 @@ public class KnownUserInterceptor implements Serializable {
         if (!hkConfig.isReady()) {
             return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
         }
-        if (session.userIsKnown(appCtx)) {
-            Log.debugf("[%s] Known User %s / %s: %s", session.login(), session.id(), session.nodeId(), session.roles());
-
-            return ctx.proceed();
+        try {
+            if (session.userIsKnown(appCtx, roleManager)) {
+                Log.debugf("[%s] Known User %s / %s: %s", session.login(), session.id(), session.nodeId(), session.roles());
+                return ctx.proceed();
+            }
+            return Response.status(Response.Status.FORBIDDEN).build();
+        } catch (Exception e) {
+            appCtx.logAndSendEmail("😎-known", "[%s] Exception checking for known user", e);
+            if (e instanceof WebApplicationException) {
+                return ((WebApplicationException) e).getResponse();
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
-        return Response.status(Response.Status.FORBIDDEN).build();
     }
 }

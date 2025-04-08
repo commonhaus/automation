@@ -1,5 +1,7 @@
 package org.commonhaus.automation.hk.github;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -23,12 +25,13 @@ import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.AdminDataCache;
-import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.member.MemberApplicationProcess;
 import org.commonhaus.automation.hk.member.MemberInfo;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
@@ -105,12 +108,22 @@ public class HausKeeperTestBase extends ContextHelper {
         setLabels(datastoreRepoId, APP_LABELS);
     }
 
+    @AfterEach
+    void waitForQueue() {
+        // Make sure queue is drained between tests
+        await().atMost(5, SECONDS).until(() -> updateQueue.isEmpty());
+    }
+
     public void setupInstallationRepositories() throws IOException {
         setupInstallationRepositories(null);
     }
 
     public void setupInstallationRepositories(GitHubMockSetupContext mocks) throws IOException {
         this.mocks = mocks;
+
+        HausKeeperConfig config = ctx.yamlMapper().readValue(
+                ContextHelper.class.getResourceAsStream("/cf-haus-keeper.yml"), HausKeeperConfig.class);
+        testConfig.initConfig(config);
 
         setupDefaultMocks(DEFAULTS);
         updateConnection(DEFAULTS.installId(), hausMocks.github());
@@ -132,7 +145,7 @@ public class HausKeeperTestBase extends ContextHelper {
     }
 
     public void setUserAsUnknown(String login) {
-        AdminDataCache.KNOWN_USER.put(login, Boolean.FALSE);
+        AdminDataCache.KNOWN_USER.put("user-" + botId, Boolean.FALSE);
     }
 
     public void addCollaborator(String repoName, String login) {
@@ -215,7 +228,7 @@ public class HausKeeperTestBase extends ContextHelper {
 
     public void setUserManagementConfig() throws Exception {
         HausKeeperConfig config = ctx.yamlMapper().readValue(
-                ContextHelper.class.getResourceAsStream("/cf-admin.yml"), HausKeeperConfig.class);
+                ContextHelper.class.getResourceAsStream("/cf-haus-keeper.yml"), HausKeeperConfig.class);
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, datastoreInstallationId, dataMocks.repository());
         testConfig.testUpdate(qc, config);
@@ -324,12 +337,21 @@ public class HausKeeperTestBase extends ContextHelper {
     @Alternative
     @Priority(1)
     static class TestUserManagementConfig extends ActiveHausKeeperConfig {
+        @Inject
         public TestUserManagementConfig() {
             super();
         }
 
         public void addAttestation(String id) {
             attestationIds.add(id);
+        }
+
+        public void initConfig(HausKeeperConfig config) {
+            currentConfig.set(Optional.of(config));
+            // Queue callbacks for config consumers
+            for (var callback : callbacks.entrySet()) {
+                callback.getValue();
+            }
         }
 
         public void testUpdate(ScopedQueryContext qc, HausKeeperConfig config) {

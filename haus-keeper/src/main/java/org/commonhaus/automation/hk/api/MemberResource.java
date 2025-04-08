@@ -14,12 +14,14 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.ApiResponse;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
+import org.commonhaus.automation.hk.member.AccessRoleManager;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.quarkus.logging.Log;
@@ -35,6 +37,9 @@ public class MemberResource {
 
     @Inject
     AppContextService ctx;
+
+    @Inject
+    AccessRoleManager roleManager;
 
     @Inject
     CommonhausDatastore datastore;
@@ -112,9 +117,9 @@ public class MemberResource {
     public Response updateUserStatus(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
         if (refresh) {
             // reset all the things.
-            session.forgetUser(ctx);
+            AdminDataCache.forgetUser(session);
             // re-fetch the user
-            session.userIsKnown(ctx);
+            session.userIsKnown(ctx, roleManager);
             Log.debugf("[%s] REFRESH /member/commonhaus/status %s", session.login(), session.roles());
         }
 

@@ -1,9 +1,7 @@
 package org.commonhaus.automation.hk.github;
 
 import java.net.URI;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -13,11 +11,9 @@ import jakarta.ws.rs.core.Response;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.context.BaseContextService;
-import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
-import org.commonhaus.automation.hk.AdminDataCache;
-import org.commonhaus.automation.hk.UserManager.ActiveHausKeeperConfig;
+import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.api.MemberSession;
 import org.commonhaus.automation.hk.config.AdminBotConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
@@ -56,7 +52,7 @@ public class AppContextService extends BaseContextService {
     }
 
     public String getDataStore() {
-        return adminData.datastore();
+        return adminData.home().datastore();
     }
 
     public URI getMemberHome() {
@@ -77,78 +73,6 @@ public class AppContextService extends BaseContextService {
 
     public boolean isValidAttestation(String id) {
         return hkConfig.isValidAttestation(id);
-    }
-
-    public void forgetKnown(GHUser user) {
-        AdminDataCache.KNOWN_USER.invalidate(user.getLogin());
-    }
-
-    public void forgetKnown(MemberSession session) {
-        AdminDataCache.KNOWN_USER.invalidate(session.login());
-    }
-
-    public boolean userIsKnown(GitHubQueryContext initQc, String login, Set<String> roles) {
-        UserManagementConfig userConfig = getConfig();
-        if (userConfig.isDisabled()) {
-            return false;
-        }
-
-        Boolean result = AdminDataCache.KNOWN_USER.get(login);
-        if (result != null) {
-            return result;
-        }
-
-        GHUser ghUser = initQc.getUser(login);
-        if (ghUser == null) {
-            // do not cache this case
-            return false;
-        }
-
-        result = Boolean.FALSE;
-        if (!userConfig.collaboratorRoles().isEmpty()) {
-            Map<String, String> collabRoles = userConfig.collaboratorRoles();
-            Log.debugf("collaborators: %s", collabRoles);
-
-            for (Entry<String, String> entry : collabRoles.entrySet()) {
-                String repoName = entry.getKey();
-                String role = entry.getValue();
-
-                ScopedQueryContext qc = getScopedQueryContext(repoName);
-                if (qc == null) {
-                    Log.errorf("No context for %s", repoName);
-                } else {
-                    if (teamService.isCollaborator(qc, ghUser, repoName)) {
-                        roles.add(role);
-                        result = or(result, Boolean.TRUE);
-                    }
-                }
-            }
-        }
-        if (!userConfig.teamRoles().isEmpty()) {
-            Map<String, String> teamRoles = userConfig.teamRoles();
-            Log.debugf("teamRoles: %s", teamRoles);
-
-            for (Entry<String, String> entry : teamRoles.entrySet()) {
-                String teamFullName = entry.getKey();
-                String role = entry.getValue();
-
-                String orgName = ScopedQueryContext.toOrganizationName(teamFullName);
-                ScopedQueryContext qc = getScopedQueryContext(orgName);
-
-                if (qc == null) {
-                    Log.errorf("No context for %s", orgName);
-                } else if (teamService.isTeamMember(qc, ghUser, teamFullName)) {
-                    roles.add(role);
-                    result = or(result, Boolean.TRUE);
-                }
-            }
-        }
-        AdminDataCache.KNOWN_USER.put(login, result);
-        return result;
-    }
-
-    Boolean or(Boolean a, Boolean b) {
-        return Boolean.TRUE.equals(a) || Boolean.TRUE.equals(b);
     }
 
     public MemberStatus getStatusForRole(String role) {

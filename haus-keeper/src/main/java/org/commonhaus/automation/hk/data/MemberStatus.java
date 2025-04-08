@@ -29,6 +29,13 @@ public enum MemberStatus {
                 || this == INACTIVE;
     }
 
+    public boolean mayHaveAltEmail() {
+        return this == COMMITTEE
+                || this == ACTIVE
+                || this == INACTIVE
+                || this == CONTRIBUTOR;
+    }
+
     public boolean missedUpdateToPending() {
         return this == UNKNOWN
                 || this == SPONSOR

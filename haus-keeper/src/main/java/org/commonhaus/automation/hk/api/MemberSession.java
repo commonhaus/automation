@@ -9,6 +9,7 @@ import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.UserQueryContext;
+import org.commonhaus.automation.hk.member.AccessRoleManager;
 import org.commonhaus.automation.hk.member.MemberInfo;
 import org.kohsuke.github.GHMyself;
 import org.kohsuke.github.GitHub;
@@ -68,7 +69,7 @@ public class MemberSession implements MemberInfo {
     private transient GitHub connection;
     private transient IOException connectionError;
     private transient SecurityIdentity identity;
-    private GitHubUser userData;
+    private LoggedInUser userData;
 
     private MemberSession(UserInfo userInfo, SecurityIdentity identity) {
         this.userInfo = userInfo;
@@ -76,19 +77,15 @@ public class MemberSession implements MemberInfo {
         this.identity = identity;
     }
 
-    public void forgetUser(AppContextService ctx) {
-        ctx.forgetKnown(this);
-    }
-
-    public boolean userIsKnown(AppContextService ctx) {
+    public boolean userIsKnown(AppContextService ctx, AccessRoleManager roleManager) {
         UserQueryContext userQc = ctx.newUserQueryContext(this);
-        return ctx.userIsKnown(userQc, login(), roles());
+        return roleManager.userIsKnown(userQc, this);
     }
 
-    public GitHubUser getUserData() {
-        GitHubUser user = userData;
+    public LoggedInUser getUserData() {
+        LoggedInUser user = userData;
         if (user == null) {
-            userData = user = new GitHubUser(info().getJsonObject());
+            userData = user = new LoggedInUser(info().getJsonObject());
         }
         return user;
     }
@@ -154,8 +151,8 @@ public class MemberSession implements MemberInfo {
         return getUserData().url;
     }
 
-    public GitHubUser updateApplication(CommonhausUser user) {
-        GitHubUser userData = this.getUserData();
+    public LoggedInUser updateApplication(CommonhausUser user) {
+        LoggedInUser userData = this.getUserData();
         userData.hasApplication = user.hasApplication();
         return userData;
     }
