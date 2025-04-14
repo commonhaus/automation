@@ -4,6 +4,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.config.LocalRouteOnly;
+import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 
 import io.quarkus.logging.Log;
 import io.quarkus.vertx.web.Route;
@@ -23,15 +24,19 @@ public class AdminRoutes implements LocalRouteOnly {
     @Inject
     SponsorManager sponsorManager;
 
+    @Inject
+    PeriodicUpdateQueue updateQueue;
+
     @Route(path = "/org", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerOrgUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
         if (!isDirectConnection(routingExchange)) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-
-        Log.info("🚀 🏡 Organization update triggered");
-        organizationManager.refreshOrganizationMembership(true);
+        updateQueue.queue("triggerOrgUpdate", () -> {
+            Log.info("🚀 🏡 Organization update triggered");
+            organizationManager.refreshOrganizationMembership(true);
+        });
         routingExchange.ok();
     }
 
@@ -41,9 +46,10 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-
-        Log.info("🚀 🌳 Project update triggered");
-        projectManager.refreshAccessLists(true);
+        updateQueue.queue("triggerOrgUpdate", () -> {
+            Log.info("🚀 🌳 Project update triggered");
+            projectManager.refreshAccessLists(true);
+        });
         routingExchange.ok();
     }
 
@@ -53,9 +59,10 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-
-        Log.info("🚀 💸 Sponsors update triggered");
-        sponsorManager.refreshSponsors(true);
+        updateQueue.queue("triggerOrgUpdate", () -> {
+            Log.info("🚀 💸 Sponsors update triggered");
+            sponsorManager.refreshSponsors(true);
+        });
         routingExchange.ok();
     }
 }
