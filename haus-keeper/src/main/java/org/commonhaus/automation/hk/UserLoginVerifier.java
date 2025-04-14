@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -56,9 +55,6 @@ public class UserLoginVerifier extends ScheduledService {
     Event<LoginChangeEvent> loginChangeEvent;
 
     void startup(@Observes @Priority(value = RdePriority.APP_DISCOVERY) StartupEvent startup) {
-        lastRun = Optional.ofNullable(taskState.lastRun(ME))
-                .map(Instant::toString)
-                .orElse("never");
         RouteSupplier.registerSupplier("User logins verified", () -> lastRun);
     }
 

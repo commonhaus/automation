@@ -3,10 +3,8 @@ package org.commonhaus.automation.hk;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,7 +48,6 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class ProjectAliasManager extends ScheduledService {
     private static final String ME = "📫-aliases";
-    private static volatile String lastRun = "never";
     private static final AliasConfigState EMPTY = new AliasConfigState(null, null, null, 0, null);
 
     @Inject
@@ -79,11 +76,7 @@ public class ProjectAliasManager extends ScheduledService {
     final AtomicReference<Map<String, ProjectSourceConfig>> knownProjectDomains = new AtomicReference<>();
 
     void startup(@Observes @Priority(value = RdePriority.APP_DISCOVERY) StartupEvent startup) {
-        lastRun = Optional.ofNullable(taskState.lastRun(ME))
-                .map(Instant::toString)
-                .orElse("never");
         RouteSupplier.registerSupplier("Project aliases refreshed", () -> lastRun);
-
         hkConfig.notifyOnUpdate(ME, () -> {
             Log.infof("HausKeeper project aliases config updated: %s", hkConfig.getProjectAliasesConfig());
             updateDomainMap();

@@ -23,7 +23,7 @@ public abstract class ScheduledService {
     protected void bootstrapFinished(@Observes BootstrapDiscoveryEvent event) {
         lastRun = Optional.ofNullable(taskState.lastRun(me()))
                 .map(Instant::toString)
-                .orElse("never");
+                .orElse(Instant.now().toString());
         recordRun();
     }
 }

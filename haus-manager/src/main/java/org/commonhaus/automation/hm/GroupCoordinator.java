@@ -29,8 +29,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.quarkus.logging.Log;
 
 public abstract class GroupCoordinator extends ScheduledService {
-    protected static volatile String lastRun = "never";
-
     @Inject
     AppContextService ctx;
 

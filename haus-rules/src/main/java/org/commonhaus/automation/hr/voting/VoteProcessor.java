@@ -3,7 +3,6 @@ package org.commonhaus.automation.hr.voting;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -35,6 +34,7 @@ import org.commonhaus.automation.hr.config.VoteConfig;
 import org.commonhaus.automation.hr.rules.MatchLabel;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
+import org.commonhaus.automation.queue.ScheduledService;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.ReactionContent;
 
@@ -48,7 +48,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class VoteProcessor {
+public class VoteProcessor extends ScheduledService {
     public final static String MANUAL_VOTE_RESULT = "vote::result";
 
     public static final String VOTE_DONE = "vote/done";
@@ -76,8 +76,6 @@ public class VoteProcessor {
                     "\\(([^ )]+) ?(?:\"([^\"]+)\")?\\)\\.?", // the juicy part of the URL
             Pattern.CASE_INSENSITIVE);
 
-    private static volatile String lastRun = "never";
-
     private final ConcurrentHashMap<String, Long> votingRepositories = new ConcurrentHashMap<>();
 
     @Inject
@@ -104,7 +102,6 @@ public class VoteProcessor {
 
     public void repositoryDiscovered(@Observes @Priority(value = RdePriority.APP_EVENT) RepositoryDiscoveryEvent repoEvent) {
         Log.infof("🗳️ ⚙️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
 
         long ghiId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();
@@ -131,7 +128,6 @@ public class VoteProcessor {
     }
 
     public void discoverVotes() {
-        lastRun = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
         var i = votingRepositories.entrySet().iterator();
         while (i.hasNext()) {
             var e = i.next();
@@ -413,6 +409,10 @@ public class VoteProcessor {
                         issue.isPullRequest ? EventType.pull_request : EventType.issue);
             }
         });
+    }
+
+    protected String me() {
+        return "🗳️ ";
     }
 
     private void scheduleQueryItem(ScopedQueryContext qc, String repoFullName,
