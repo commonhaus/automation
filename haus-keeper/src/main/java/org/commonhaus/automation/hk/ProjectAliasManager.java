@@ -98,7 +98,7 @@ public class ProjectAliasManager extends ScheduledService {
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin refresh project aliases", ME);
-            refreshProjectAliases();
+            refreshProjectAliases(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "📫 ⏰ Error running scheduled refresh of project aliases", t);
         }
@@ -107,7 +107,14 @@ public class ProjectAliasManager extends ScheduledService {
     /**
      * Allow manual trigger by admin endpoint
      */
-    public void refreshProjectAliases() {
+    public void refreshProjectAliases(boolean userTriggered) {
+        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
+            Log.infof("[%s]: skip user-requested project refresh (last run: %s)", ME, lastRun);
+            return;
+        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+            Log.infof("[%s]: skip scheduled project refresh (last run: %s)", ME, lastRun);
+            return;
+        }
         recordRun();
         for (var entry : taskGroupToState.entrySet()) {
             String repoFullName = taskGroupToRepo(entry.getKey());

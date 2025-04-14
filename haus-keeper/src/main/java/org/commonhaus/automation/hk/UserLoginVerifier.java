@@ -66,12 +66,7 @@ public class UserLoginVerifier extends ScheduledService {
     public void scheduledLoginVerification() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin login verification", ME);
-            // Check if we need to run based on configuration
-            if (!taskState.shouldRun(ME, Duration.ofHours(24))) {
-                Log.infof("[%s] Skipping login verification (ran recently)", ME);
-                return;
-            }
-            verifyAllUserLogins();
+            verifyAllUserLogins(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 👍 Error running scheduled login verification", t);
         }
@@ -80,7 +75,14 @@ public class UserLoginVerifier extends ScheduledService {
     /**
      * Allow manual trigger by admin endpoint
      */
-    public void verifyAllUserLogins() {
+    public void verifyAllUserLogins(boolean userTriggered) {
+        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
+            Log.infof("[%s]: skip user-requested login verification (last run: %s)", ME, lastRun);
+            return;
+        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+            Log.infof("[%s]: skip scheduled login verification (last run: %s)", ME, lastRun);
+            return;
+        }
         recordRun();
 
         // Get all user IDs from datastore

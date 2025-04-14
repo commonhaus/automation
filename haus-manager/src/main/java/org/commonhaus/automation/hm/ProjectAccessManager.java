@@ -79,7 +79,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin refresh access lists", ME);
-            refreshAccessLists();
+            refreshAccessLists(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled access list refresh", t);
         }
@@ -88,7 +88,14 @@ public class ProjectAccessManager extends GroupCoordinator {
     /**
      * Allow manual trigger from admin endpoint
      */
-    public void refreshAccessLists() {
+    public void refreshAccessLists(boolean userTriggered) {
+        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
+            Log.infof("[%s]: skip user-requested project access update (last run: %s)", ME, lastRun);
+            return;
+        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+            Log.infof("[%s]: skip scheduled project access update (last run: %s)", ME, lastRun);
+            return;
+        }
         recordRun();
 
         for (String resourceKey : resourceToTaskGroup.keySet()) {

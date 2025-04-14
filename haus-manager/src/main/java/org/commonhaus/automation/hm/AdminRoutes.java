@@ -23,18 +23,6 @@ public class AdminRoutes implements LocalRouteOnly {
     @Inject
     SponsorManager sponsorManager;
 
-    @Route(path = "/projects", order = 99, produces = "text/html", methods = { HttpMethod.GET })
-    public void triggerProjectUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
-            rejectNonLocalAccess(routingExchange);
-            return;
-        }
-
-        Log.info("🚀 🌳 Project update triggered");
-        projectManager.refreshAccessLists();
-        routingExchange.ok();
-    }
-
     @Route(path = "/org", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerOrgUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
         if (!isDirectConnection(routingExchange)) {
@@ -43,7 +31,19 @@ public class AdminRoutes implements LocalRouteOnly {
         }
 
         Log.info("🚀 🏡 Organization update triggered");
-        organizationManager.refreshOrganizationMembership();
+        organizationManager.refreshOrganizationMembership(true);
+        routingExchange.ok();
+    }
+
+    @Route(path = "/projects", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerProjectUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+
+        Log.info("🚀 🌳 Project update triggered");
+        projectManager.refreshAccessLists(true);
         routingExchange.ok();
     }
 
@@ -55,7 +55,7 @@ public class AdminRoutes implements LocalRouteOnly {
         }
 
         Log.info("🚀 💸 Sponsors update triggered");
-        sponsorManager.refreshSponsors();
+        sponsorManager.refreshSponsors(true);
         routingExchange.ok();
     }
 }

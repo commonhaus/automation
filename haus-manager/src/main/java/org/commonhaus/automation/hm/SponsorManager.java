@@ -2,6 +2,7 @@ package org.commonhaus.automation.hm;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -56,13 +57,20 @@ public class SponsorManager extends GroupCoordinator {
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: refresh sponsors", ME);
-            refreshSponsors();
+            refreshSponsors(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "💸 ⏰ Error running scheduled sponsors refresh", t);
         }
     }
 
-    public void refreshSponsors() {
+    public void refreshSponsors(boolean userTriggered) {
+        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
+            Log.infof("[%s]: skip user-requested sponsor refresh (last run: %s)", ME, lastRun);
+            return;
+        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+            Log.infof("[%s]: skip scheduled sponsored refresh (last run: %s)", ME, lastRun);
+            return;
+        }
         recordRun();
         updateQueue.queueReconciliation(ME, () -> reconcile());
     }

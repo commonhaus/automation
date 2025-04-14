@@ -106,7 +106,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin refresh organization membership", ME);
-            refreshOrganizationMembership();
+            refreshOrganizationMembership(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 🏡 Error running scheduled refresh of org membership", t);
         }
@@ -115,7 +115,14 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     /**
      * Allow manual trigger from admin endpoint
      */
-    public void refreshOrganizationMembership() {
+    public void refreshOrganizationMembership(boolean userTriggered) {
+        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
+            Log.infof("[%s]: skip user-requested organization membership update (last run: %s)", ME, lastRun);
+            return;
+        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+            Log.infof("[%s]: skip scheduled organization membership update (last run: %s)", ME, lastRun);
+            return;
+        }
         recordRun();
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {

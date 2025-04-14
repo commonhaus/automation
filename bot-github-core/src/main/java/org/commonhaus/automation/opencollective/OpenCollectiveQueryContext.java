@@ -79,7 +79,6 @@ public class OpenCollectiveQueryContext extends GraphQLQueryContext {
     public List<Account> getContributors() {
         Map<String, Object> variables = new HashMap<>();
         variables.put("slug", config.collectiveSlug().get());
-        variables.put("offset", 0);
 
         int totalCount = 0;
         int offset = 0;

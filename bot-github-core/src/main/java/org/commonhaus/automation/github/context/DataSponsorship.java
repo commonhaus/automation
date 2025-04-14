@@ -17,11 +17,11 @@ public class DataSponsorship extends DataCommonType {
     static final String QUERY_RECENT_SPONSORS = """
             query($login: String!) {
                 organization(login: $login) {
-                sponsorshipsAsMaintainer(first: 50, activeOnly: false, orderBy: {field: CREATED_AT, direction: DESC}) {
-                    totalCount
-                    nodes {
-                        isActive
-                        isOneTimePayment
+                    sponsorshipsAsMaintainer(first: 50, activeOnly: false, orderBy: {field: CREATED_AT, direction: DESC}) {
+                        totalCount
+                        nodes {
+                            isActive
+                            isOneTimePayment
                             sponsorEntity {
                                 ... on User {
                                     login
