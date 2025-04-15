@@ -116,10 +116,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Allow manual trigger from admin endpoint
      */
     public void refreshOrganizationMembership(boolean userTriggered) {
-        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
-            Log.infof("[%s]: skip user-requested organization membership update (last run: %s)", ME, lastRun);
-            return;
-        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled organization membership update (last run: %s)", ME, lastRun);
             return;
         }

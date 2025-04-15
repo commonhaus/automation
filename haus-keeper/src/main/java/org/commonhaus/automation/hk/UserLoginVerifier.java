@@ -72,10 +72,7 @@ public class UserLoginVerifier extends ScheduledService {
      * Allow manual trigger by admin endpoint
      */
     public void verifyAllUserLogins(boolean userTriggered) {
-        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
-            Log.infof("[%s]: skip user-requested login verification (last run: %s)", ME, lastRun);
-            return;
-        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled login verification (last run: %s)", ME, lastRun);
             return;
         }

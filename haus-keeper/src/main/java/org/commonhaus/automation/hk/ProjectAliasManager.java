@@ -101,10 +101,7 @@ public class ProjectAliasManager extends ScheduledService {
      * Allow manual trigger by admin endpoint
      */
     public void refreshProjectAliases(boolean userTriggered) {
-        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
-            Log.infof("[%s]: skip user-requested project refresh (last run: %s)", ME, lastRun);
-            return;
-        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled project refresh (last run: %s)", ME, lastRun);
             return;
         }
@@ -112,6 +109,7 @@ public class ProjectAliasManager extends ScheduledService {
         for (var entry : taskGroupToState.entrySet()) {
             String repoFullName = taskGroupToRepo(entry.getKey());
             ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
+            qc.getRepository(repoFullName);
             readProjectConfig(entry.getKey(), qc, true);
         }
     }
@@ -167,22 +165,23 @@ public class ProjectAliasManager extends ScheduledService {
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc, boolean queueReconciliation) {
         AliasManagementConfig aliasMgmtConfig = hkConfig.getProjectAliasesConfig();
         if (aliasMgmtConfig.isDisabled()) {
-            Log.debugf("[%s] %s: project aliases sync disabled", ME, taskGroup);
+            Log.debugf("%s: project aliases sync disabled", taskGroup);
             return;
         }
 
         // The repository containing the (added/modified) file must be present in the query context
-        GHRepository repo = qc.getRepository();
+        String repoFullName = taskGroupToRepo(taskGroup);
+        GHRepository repo = qc.getRepository(repoFullName);
         if (repo == null) {
-            Log.warnf("[%s] %s readProjectConfig: repository not set in QueryContext", ME, taskGroup);
+            Log.warnf("%s readProjectConfig: repository not set in QueryContext", taskGroup);
             return;
         }
 
-        String projectName = aliasMgmtConfig.toProjectName(repo.getFullName());
+        String projectName = aliasMgmtConfig.toProjectName(repoFullName);
         ProjectSourceConfig projectConfig = getCentralProjectConfig(projectName);
         if (projectConfig == null) {
-            Log.debugf("[%s] %s readProjectConfig: Repository %s does not map to a known project", ME, taskGroup,
-                    repo.getFullName());
+            Log.debugf("%s readProjectConfig: Repository %s does not map to a known project (%s)", taskGroup,
+                    repoFullName, projectName);
             taskGroupToState.remove(taskGroup);
             return;
         }
@@ -190,8 +189,8 @@ public class ProjectAliasManager extends ScheduledService {
         GHContent content = qc.readSourceFile(repo, ProjectAliasMapping.CONFIG_FILE);
         if (content == null || qc.hasErrors()) {
             // Normal
-            Log.debugf("[%s] %s readProjectConfig: no %s in %s", ME, taskGroup, ProjectAliasMapping.CONFIG_FILE,
-                    repo.getFullName());
+            Log.debugf("%s readProjectConfig: no %s in %s", taskGroup, ProjectAliasMapping.CONFIG_FILE,
+                    repoFullName);
             return;
         }
 
@@ -207,7 +206,7 @@ public class ProjectAliasManager extends ScheduledService {
                     qc.getErrorAddresses());
             return;
         }
-        Log.debugf("[%s] %s readProjectConfig: found %s in %s", ME, taskGroup, ProjectAliasMapping.CONFIG_FILE,
+        Log.debugf("%s readProjectConfig: found %s in %s", taskGroup, ProjectAliasMapping.CONFIG_FILE,
                 repo.getFullName());
 
         AliasConfigState newState = new AliasConfigState(taskGroup,
@@ -226,15 +225,15 @@ public class ProjectAliasManager extends ScheduledService {
         // Always fetch latest state (in case of changes / skips)
         AliasConfigState state = taskGroupToState.get(taskGroup);
         if (state == null || state.projectConfig() == null) {
-            Log.debugf("[%s] %s: no state or project config to reconcile", ME, taskGroup);
+            Log.debugf("%s: no state or project config to reconcile", taskGroup);
             return;
         }
 
-        Log.debugf("[%s] %s: aliases sync; %s", ME, taskGroup, state.projectConfig());
+        Log.debugf("%s: aliases sync; %s", taskGroup, state.projectConfig());
 
         ProjectSourceConfig centralProjectConfig = getCentralProjectConfig(state.projectName());
         if (centralProjectConfig == null) {
-            Log.debugf("[%s] %s: project config not found for %s", ME, taskGroup, state.projectName());
+            Log.debugf("%s: project config not found for %s", taskGroup, state.projectName());
             taskGroupToState.remove(taskGroup);
             return;
         }
@@ -245,7 +244,7 @@ public class ProjectAliasManager extends ScheduledService {
         String definitiveMailDomain = centralProjectConfig.mailDomain();
         String projectDomain = projectAliasConfig.domain();
         if (!Objects.equals(definitiveMailDomain, projectDomain)) {
-            Log.debugf("[%s] %s: project domain mismatch; %s != %s", ME, taskGroup, projectDomain, definitiveMailDomain);
+            Log.debugf("%s: project domain mismatch; %s != %s", taskGroup, projectDomain, definitiveMailDomain);
             String title = "HausKeeper: project alias domain mismatch";
             String message = """
                     Project alias domain mismatch for %s
@@ -260,7 +259,7 @@ public class ProjectAliasManager extends ScheduledService {
         }
 
         if (projectAliasConfig.userMapping() == null || projectAliasConfig.userMapping().isEmpty()) {
-            Log.debugf("[%s] %s: no user mappings defined in project alias config", ME, taskGroup);
+            Log.debugf("%s: no user mappings defined in project alias config", taskGroup);
             return;
         }
 
@@ -268,7 +267,7 @@ public class ProjectAliasManager extends ScheduledService {
         for (UserAliasList userAliases : projectAliasConfig.userMapping()) {
             String login = userAliases.login();
             if (userAliases.aliases().isEmpty()) {
-                Log.debugf("[%s] %s: no aliases defined for login %s", ME, taskGroup, login);
+                Log.debugf("%s: no aliases defined for login %s", taskGroup, login);
                 continue;
             }
             GHUser ghUser = login == null ? null : qc.getUser(login);
@@ -279,7 +278,7 @@ public class ProjectAliasManager extends ScheduledService {
                         projectAliasConfig.emailNotifications());
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
             } else if (ghUser == null || !userAliases.isValid(projectDomain)) {
-                Log.debugf("[%s] %s: invalid aliases for login %s (%s)", ME, taskGroup, userAliases, ghUser);
+                Log.debugf("%s: invalid aliases for login %s (%s)", taskGroup, userAliases, ghUser);
                 String title = "Invalid alias defined";
                 String message = """
 
@@ -317,15 +316,15 @@ public class ProjectAliasManager extends ScheduledService {
                 qc.addException(e);
             }
             if (qc.hasErrors()) {
-                Log.debugf("[%s] %s: error updating user %s: %s", ME, taskGroup, login, qc.bundleExceptions());
+                Log.debugf("%s: error updating user %s: %s", taskGroup, login, qc.bundleExceptions());
                 qc.logAndSendContextErrors("Error adding project email aliases",
                         projectAliasConfig.emailNotifications());
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
             } else {
-                Log.debugf("[%s] %s: updated user %s with aliases %s", ME, taskGroup, login, userAliases.aliases());
+                Log.debugf("%s: updated user %s with aliases %s", taskGroup, login, userAliases.aliases());
             }
         }
-        Log.debugf("[%s] %s: project alias sync complete; %s", ME, taskGroup, state.projectConfig());
+        Log.debugf("%s: project alias sync complete; %s", taskGroup, state.projectConfig());
     }
 
     void notifyUserProjects(@Observes LoginChangeEvent loginChangeEvent) {
@@ -365,11 +364,11 @@ public class ProjectAliasManager extends ScheduledService {
         AliasConfigState state = taskGroupToState.get(taskGroup);
         if (state == null) {
             // It was empty. We read the config, and there was none; removed
-            Log.debugf("[%s] notifyProject: no state for %s", ME, taskGroup);
+            Log.debugf("%s: notifyProject: no state", taskGroup);
             return;
         }
         ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
-        Log.debugf("[%s] notifyProjectLeaders: notifying project %s", ME, state.projectName());
+        Log.debugf("%s notifyProjectLeaders: notifying project %s", taskGroup, state.projectName());
         String title = "haus-keeper: user login changed";
         String message = """
                 User %s has changed their login%s.
@@ -391,7 +390,7 @@ public class ProjectAliasManager extends ScheduledService {
         }
         ProjectSourceConfig config = map.get(projectName);
         if (config == null) {
-            Log.warnf("[%s] getCentralProjectConfig: no project list found for %s", ME, projectName);
+            Log.warnf("%s getCentralProjectConfig: no project list found for %s", ME, projectName);
         }
         return config;
     }
@@ -405,14 +404,16 @@ public class ProjectAliasManager extends ScheduledService {
             return map;
         }
         RepoSource projectList = aliasMgmtConfig.projectList();
-        ScopedQueryContext qc = ctx.getScopedQueryContext(projectList.repository());
-        if (qc == null || qc.getRepository() == null) {
+        String repoFullName = projectList.repository();
+        ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
+        GHRepository repo = qc == null ? null : qc.getRepository(repoFullName);
+        if (qc == null || repo == null) {
             Log.warnf("[%s] updateDomainMap: no query context for %s", ME, projectList);
             return map;
         }
-        GHContent content = qc.readSourceFile(qc.getRepository(), projectList.filePath());
+        GHContent content = qc.readSourceFile(repo, projectList.filePath());
         if (content == null || qc.hasErrors()) {
-            Log.debugf("[%s] processConfigUpdate: no %s in %s", ME, HausKeeperConfig.PATH, projectList.repository());
+            Log.debugf("[%s] processConfigUpdate: no %s in %s", ME, HausKeeperConfig.PATH, repoFullName);
             return map;
         }
         map = qc.readYamlContent(content, ProjectSourceConfig.TYPE_REF);

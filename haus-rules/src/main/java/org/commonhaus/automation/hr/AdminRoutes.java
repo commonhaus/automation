@@ -28,7 +28,7 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-        updateQueue.queue("triggerVoteCount", () -> {
+        updateQueue.queueReconciliation("triggerVoteCount", () -> {
             Log.info("🚀 🗳️ vote counting triggered");
             voteProcessor.discoverVotes();
         });

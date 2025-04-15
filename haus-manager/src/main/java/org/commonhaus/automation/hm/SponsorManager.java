@@ -64,10 +64,7 @@ public class SponsorManager extends GroupCoordinator {
     }
 
     public void refreshSponsors(boolean userTriggered) {
-        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
-            Log.infof("[%s]: skip user-requested sponsor refresh (last run: %s)", ME, lastRun);
-            return;
-        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled sponsored refresh (last run: %s)", ME, lastRun);
             return;
         }

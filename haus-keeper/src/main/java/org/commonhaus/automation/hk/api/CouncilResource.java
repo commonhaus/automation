@@ -44,7 +44,8 @@ public class CouncilResource {
     public Response triggerProjectAliasUpdate() {
         Log.debugf("[%s] Trigger project alias refresh for council members", session.login());
         if (session.roles().contains("cfc")) {
-            projectAliasManager.refreshProjectAliases(true);
+            updateQueue.queueReconciliation("refreshProjectAliases-user",
+                    () -> projectAliasManager.refreshProjectAliases(true));
         }
         return Response.ok().build();
     }
@@ -55,7 +56,8 @@ public class CouncilResource {
     public Response triggerVerifyLogins() {
         Log.debugf("[%s] Trigger user login verification", session.login());
         if (session.roles().contains("cfc")) {
-            userLoginVerifier.verifyAllUserLogins(true);
+            updateQueue.queueReconciliation("verifyAllUserLogins-user",
+                    () -> userLoginVerifier.verifyAllUserLogins(true));
         }
         return Response.ok().build();
     }

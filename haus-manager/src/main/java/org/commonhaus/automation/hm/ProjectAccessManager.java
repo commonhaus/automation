@@ -89,10 +89,7 @@ public class ProjectAccessManager extends GroupCoordinator {
      * Allow manual trigger from admin endpoint
      */
     public void refreshAccessLists(boolean userTriggered) {
-        if (userTriggered && !taskState.shouldRun(ME, Duration.ofMinutes(30))) {
-            Log.infof("[%s]: skip user-requested project access update (last run: %s)", ME, lastRun);
-            return;
-        } else if (!taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled project access update (last run: %s)", ME, lastRun);
             return;
         }

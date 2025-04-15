@@ -1,12 +1,13 @@
 package org.commonhaus.automation.hk.config;
 
-import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import org.commonhaus.automation.config.RepoSource;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -37,10 +38,11 @@ public class AliasManagementConfig {
 
     public String toProjectName(String repoFullName) {
         String orgName = toOrganizationName(repoFullName);
-        String repoName = toFullName(orgName, repoFullName);
+        String repoName = toRelativeName(orgName, repoFullName);
         if (repoPrefix != null && repoName.startsWith(repoPrefix)) {
-            return repoName.substring(repoPrefix.length());
+            repoName = repoName.substring(repoPrefix.length());
         }
+        Log.debugf("orgName: %s, repoPrefix: %s, repoName: %s", repoFullName, repoPrefix, repoName);
         return repoName;
     }
 

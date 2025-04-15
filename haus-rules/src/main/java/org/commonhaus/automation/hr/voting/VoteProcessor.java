@@ -187,8 +187,8 @@ public class VoteProcessor extends ScheduledService {
         countVotes(qc, votingConfig, item, event);
     }
 
-    private void countVotes(ScopedQueryContext qc, VoteConfig votingConfig, DataCommonItem item,
-            VoteEvent event) {
+    private void countVotes(ScopedQueryContext qc, VoteConfig votingConfig,
+            DataCommonItem item, VoteEvent event) {
 
         try {
             VoteInformation voteInfo = getVoteInformation(qc, votingConfig, item, event);
