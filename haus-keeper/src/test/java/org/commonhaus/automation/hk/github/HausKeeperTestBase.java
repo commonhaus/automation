@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +25,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataLabel;
+import org.commonhaus.automation.github.context.TestBotConfig;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
@@ -330,6 +333,55 @@ public class HausKeeperTestBase extends ContextHelper {
         @Override
         public long installationId() {
             return datastoreInstallationId;
+        }
+    }
+
+    @ApplicationScoped
+    @Alternative
+    @Priority(5) // Higher priority than the one in the core module
+    public static class HKTestBotConfig extends TestBotConfig {
+        private String tempJournalPath;
+
+        HKTestBotConfig() {
+            try {
+                // Create target directory if it doesn't exist
+                Path targetDir = Paths.get("target/test-state");
+                Files.createDirectories(targetDir);
+
+                // Create a temp file with a prefix and suffix in that directory
+                // Register for deletion on JVM exit
+                Path tempFile = Files.createTempFile(targetDir, "journal-test-", ".yaml");
+                tempFile.toFile().deleteOnExit();
+
+                tempJournalPath = tempFile.toString();
+                System.out.println("Using temp journal file: " + tempJournalPath);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to create temp journal file", e);
+            }
+        }
+
+        public Path getTempJournalPath() {
+            return Paths.get(tempJournalPath);
+        }
+
+        @Override
+        public QueueConfig queue() {
+            return new QueueConfig() {
+                @Override
+                public Duration initialDelay() {
+                    return Duration.ofMillis(1);
+                }
+
+                @Override
+                public Duration period() {
+                    return Duration.ofMillis(1);
+                }
+
+                @Override
+                public Optional<String> stateFilePath() {
+                    return Optional.of(tempJournalPath);
+                }
+            };
         }
     }
 

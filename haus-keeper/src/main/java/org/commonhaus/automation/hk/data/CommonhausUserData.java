@@ -32,6 +32,16 @@ public class CommonhausUserData {
         String username;
         String discriminator;
         boolean verified;
+
+        public void merge(Discord discord) {
+            if (discord == null) {
+                return;
+            }
+            this.id = discord.id;
+            this.username = discord.username;
+            this.discriminator = discord.discriminator;
+            this.verified = discord.verified;
+        }
     }
 
     public static class ForwardEmail {
@@ -61,6 +71,16 @@ public class CommonhausUserData {
         public void addAliases(List<String> validAliases) {
             altAlias().addAll(validAliases);
         }
+
+        public void merge(ForwardEmail forwardEmail) {
+            if (forwardEmail == null) {
+                return;
+            }
+            this.hasDefaultAlias = forwardEmail.hasDefaultAlias;
+            if (forwardEmail.altAlias != null) {
+                this.altAlias().addAll(forwardEmail.altAlias);
+            }
+        }
     }
 
     public static class Services {
@@ -81,6 +101,18 @@ public class CommonhausUserData {
             }
             return discord;
         }
+
+        public void merge(Services other) {
+            if (other == null) {
+                return;
+            }
+            if (other.forwardEmail != null) {
+                this.forwardEmail().merge(other.forwardEmail);
+            }
+            if (other.discord != null) {
+                this.discord().merge(other.discord);
+            }
+        }
     }
 
     public static class GoodStanding {
@@ -94,11 +126,36 @@ public class CommonhausUserData {
             }
             return attestation;
         }
+
+        public void merge(GoodStanding other) {
+            if (other == null) {
+                return;
+            }
+            other.attestation.forEach((key, value) -> {
+                attestation.put(key, value);
+            });
+            contribution = other.contribution;
+            dues = other.dues;
+        }
     }
 
     public record Attestation(
             @Nonnull @JsonAlias("with_status") MemberStatus withStatus,
             @Nonnull String date,
             @Nonnull String version) {
+    }
+
+    public void merge(CommonhausUserData other) {
+        if (other == null) {
+            return;
+        }
+        this.status = other.status;
+        this.goodUntil.merge(other.goodUntil);
+        this.services.merge(other.services);
+        if (other.projects != null) {
+            other.projects().stream()
+                    .filter(project -> !this.projects.contains(project))
+                    .forEach(this.projects::add);
+        }
     }
 }

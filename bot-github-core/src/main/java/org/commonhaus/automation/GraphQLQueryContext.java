@@ -1,5 +1,6 @@
 package org.commonhaus.automation;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +12,8 @@ import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.GitHubQueryContext.GitHubParameterApiCall;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.HttpException;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.GraphQLError;
@@ -233,6 +236,24 @@ public abstract class GraphQLQueryContext {
             addException(e);
         }
         return response;
+    }
+
+    public <T> T readYamlContent(String content, Class<T> type) {
+        try {
+            return ctx.parseYamlContent(content, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
+    }
+
+    public <T> T readYamlContent(String content, TypeReference<T> type) {
+        try {
+            return ctx.parseYamlContent(content, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
     }
 
     @Nonnull

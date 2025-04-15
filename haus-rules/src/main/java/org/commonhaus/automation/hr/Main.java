@@ -1,4 +1,4 @@
-package org.commonhaus.automation;
+package org.commonhaus.automation.hr;
 
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;

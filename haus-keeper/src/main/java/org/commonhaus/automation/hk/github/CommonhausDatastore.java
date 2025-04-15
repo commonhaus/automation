@@ -1,9 +1,18 @@
 package org.commonhaus.automation.hk.github;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.ContextService;
+import org.commonhaus.automation.config.BotConfig;
+import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.DatastoreEvent.QueryEvent;
@@ -17,16 +26,52 @@ import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.LaunchMode;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
 public class CommonhausDatastore {
+    static final String ME = "🗃️";
+    static final TypeReference<Map<String, CommonhausUser>> USER_JOURNAL_TYPE = new TypeReference<>() {
+    };
+
     @Inject
     AppContextService ctx;
 
     @Inject
+    BotConfig botConfig;
+
+    @Inject
     PeriodicUpdateQueue updateQueue;
+
+    private final Map<String, CommonhausUser> pendingJournal = new ConcurrentHashMap<>();
+    private Path journalPath;
+    private boolean journalInitialized = false;
+
+    protected void startup(@Observes StartupEvent ev) {
+        if (LaunchMode.current() == LaunchMode.TEST) {
+            return;
+        }
+        initializeJournal();
+    }
+
+    protected void shutdown(@Observes ShutdownEvent ev) {
+        if (!journalInitialized || LaunchMode.current() == LaunchMode.TEST) {
+            return;
+        }
+        persistJournal();
+    }
+
+    public void onBootstrapDiscoveryEvent(@Observes BootstrapDiscoveryEvent ev) {
+        if (!journalInitialized || LaunchMode.current() == LaunchMode.TEST) {
+            return;
+        }
+        processJournalEntries();
+    }
 
     /**
      * Get Commonhaus user data using login and ID from the session.
@@ -129,6 +174,7 @@ public class CommonhausDatastore {
         // Get or create a _cache entry_ for this user
         DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
                 .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+
         if (!entry.hasUserData()) {
             // we're being asked to store an update, create a user record if it is missing
             readCommonhausUser(dqc, userKey, new QueryEvent(updateEvent));
@@ -147,21 +193,6 @@ public class CommonhausDatastore {
 
         // Respond with the updated user data
         return result;
-    }
-
-    public CommonhausUser primeFromFile(CommonhausUser filesytemUser) {
-        String userKey = getKey(filesytemUser.login(), filesytemUser.id());
-        DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
-                .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
-
-        CommonhausUser result = entry.getUserData();
-        if (result != null) {
-            // User data is already present, use latest (in case of pending updates)
-            return result;
-        }
-        // User hasn't been queried lately, prime with fetched data
-        entry.refreshUserData(filesytemUser);
-        return filesytemUser;
     }
 
     public void clearCachedUser(CommonhausUser user) {
@@ -194,6 +225,7 @@ public class CommonhausDatastore {
             dqc.logAndSendContextErrors("Failed to flatten user data for persistence");
             return;
         }
+        pendingJournal.put(userKey, user);
 
         GHRepository repo = dqc.getRepository();
         GHContentBuilder update = repo.createContent()
@@ -219,6 +251,7 @@ public class CommonhausDatastore {
         if (updated != null) {
             updated.sha(responseContent.getSha()); // update sha in the user data
             entry.finishUpdate(updated);
+            pendingJournal.remove(userKey); // remove from journal
         } else {
             handlePersistenceError(dqc, entry, user, retryCount);
         }
@@ -300,6 +333,64 @@ public class CommonhausDatastore {
                     e);
         }
         return user;
+    }
+
+    void initializeJournal() {
+        String filePath = botConfig.queue().stateFilePath().orElse("state/user_journal.yaml");
+        journalPath = Path.of(filePath);
+        try {
+            // Ensure parent directory exists
+            Files.createDirectories(journalPath.getParent());
+            if (Files.exists(journalPath)) {
+                String yaml = Files.readString(journalPath);
+                if (yaml.isBlank()) {
+                    Log.debugf("%s journal / init: Journal is empty, no pending updates (%s)", ME, filePath);
+                } else {
+                    Map<String, CommonhausUser> journaledUsers = ctx.parseYamlContent(yaml, USER_JOURNAL_TYPE);
+                    pendingJournal.putAll(journaledUsers);
+                }
+            }
+            journalInitialized = true;
+        } catch (IOException e) {
+            ctx.logAndSendEmail(ME, "Datastore journal can not be read: %s".formatted(filePath), e);
+        }
+    }
+
+    void processJournalEntries() {
+        if (pendingJournal.isEmpty()) {
+            Log.debugf("%s journal / process: Journal is empty, no pending updates (%s)", ME);
+            return;
+        }
+        for (var entry : pendingJournal.entrySet()) {
+            String userKey = entry.getKey();
+            CommonhausUser pendingUser = entry.getValue();
+
+            // Prime the cache with journaled version before queueing update
+            DatastoreCacheEntry cacheEntry = AdminDataCache.COMMONHAUS_DATA
+                    .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
+            cacheEntry.refreshUserData(pendingUser);
+
+            updateQueue.queue(entry.getKey(), () -> {
+                setCommonhausUser(new UpdateEvent(pendingUser,
+                        (c, u) -> {
+                            u.merge(pendingUser);
+                        },
+                        "Apply pending updates",
+                        false,
+                        true));
+            });
+        }
+    }
+
+    void persistJournal() {
+        Log.debugf("%s journal / persist: %s pending updates", ME, pendingJournal.size());
+        try {
+            // Write the current state of the journal (including if empty)
+            String yaml = ContextService.yamlMapper.writeValueAsString(pendingJournal);
+            Files.writeString(journalPath, yaml);
+        } catch (IOException e) {
+            Log.errorf("%s Failed to save journal on shutdown: %s", ME, e);
+        }
     }
 
     public static String dataPath(long id) {

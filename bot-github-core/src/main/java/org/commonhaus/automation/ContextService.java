@@ -64,6 +64,14 @@ public interface ContextService {
         return yamlMapper().readValue(content.read(), type);
     }
 
+    default <T> T parseYamlContent(String content, Class<T> type) throws IOException {
+        return yamlMapper().readValue(content, type);
+    }
+
+    default <T> T parseYamlContent(String content, TypeReference<T> type) throws IOException {
+        return yamlMapper().readValue(content, type);
+    }
+
     default <T> String writeYamlValue(T user) throws IOException {
         return yamlMapper().writeValueAsString(user);
     }

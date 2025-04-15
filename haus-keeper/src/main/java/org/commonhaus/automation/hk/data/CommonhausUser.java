@@ -165,6 +165,29 @@ public class CommonhausUser implements UserLogin {
         return true;
     }
 
+    /**
+     * Merge another user into this one.
+     * This is used to resolve pending updates after a restart.
+     *
+     * @param other
+     */
+    public void merge(CommonhausUser other) {
+        if (other == null) {
+            return;
+        }
+        // Do not include sha or conflict flags.
+        // Those will have to be refreshed when the latest data is retrieved from GitHub
+        this.appIssue = other.appIssue;
+        this.isMember = other.isMember;
+        this.statusChange = other.statusChange;
+        other.projects().stream()
+                .filter(project -> !this.history.contains(project))
+                .forEach(this.history::add);
+        if (other.data != null) {
+            this.data.merge(other.data);
+        }
+    }
+
     MemberStatus refreshStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
         MemberStatus newStatus = oldStatus;
         if (isMember() && !roles.contains(MEMBER_ROLE)) {
