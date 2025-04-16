@@ -41,12 +41,16 @@ public class TaskStateService {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }
-        String filePath = botConfig.queue().stateFilePath().orElse(null);
-        if (filePath == null) {
+        String directory = botConfig.queue().stateDirectory().orElse(null);
+        if (directory == null) {
             return;
         }
-        Log.infof("[%s] Task state will be persisted to %s", ME, filePath);
-        stateFile = Path.of(filePath);
+        String fileName = botConfig.queue().stateFile().orElse(null);
+        if (fileName == null) {
+            return;
+        }
+        stateFile = Path.of(directory, fileName);
+        Log.infof("[%s] Task state will be persisted to %s", ME, stateFile);
 
         // Load state from file if it exists
         if (Files.exists(stateFile)) {

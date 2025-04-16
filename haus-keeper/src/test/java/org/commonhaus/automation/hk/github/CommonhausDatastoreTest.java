@@ -67,7 +67,7 @@ public class CommonhausDatastoreTest extends HausKeeperTestBase {
         user.setStatus(MemberStatus.PENDING);
         user.goodUntil().attestation().put("test", new Attestation(MemberStatus.PENDING, "2020-01-01", "test-only"));
 
-        Path journalPath = botConfig.getTempJournalPath();
+        Path journalPath = botConfig.getTempJournalFile();
         ctx.yamlMapper().writeValue(journalPath.toFile(), Map.of(CommonhausDatastore.getKey(botLogin, botId), user));
 
         // Custom mocks: create new user

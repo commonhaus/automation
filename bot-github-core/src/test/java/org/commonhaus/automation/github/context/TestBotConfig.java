@@ -105,7 +105,12 @@ public class TestBotConfig implements BotConfig {
             }
 
             @Override
-            public Optional<String> stateFilePath() {
+            public Optional<String> stateDirectory() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> stateFile() {
                 return Optional.empty();
             }
         };

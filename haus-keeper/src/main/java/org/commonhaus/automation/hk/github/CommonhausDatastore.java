@@ -49,7 +49,7 @@ public class CommonhausDatastore {
     PeriodicUpdateQueue updateQueue;
 
     private final Map<String, CommonhausUser> pendingJournal = new ConcurrentHashMap<>();
-    private Path journalPath;
+    private Path journalFile;
     private boolean journalInitialized = false;
 
     protected void startup(@Observes StartupEvent ev) {
@@ -336,15 +336,20 @@ public class CommonhausDatastore {
     }
 
     void initializeJournal() {
-        String filePath = botConfig.queue().stateFilePath().orElse("state/user_journal.yaml");
-        journalPath = Path.of(filePath);
+        String directory = botConfig.queue().stateDirectory().orElse(null);
+        if (directory == null) {
+            Log.debugf("%s journal / init: No state directory configured", ME);
+            return;
+        }
+        Path journalDir = Path.of(directory);
+        journalFile = journalDir.resolve("commonhaus-journal.yaml");
         try {
             // Ensure parent directory exists
-            Files.createDirectories(journalPath.getParent());
-            if (Files.exists(journalPath)) {
-                String yaml = Files.readString(journalPath);
+            Files.createDirectories(journalDir);
+            if (Files.exists(journalFile)) {
+                String yaml = Files.readString(journalFile);
                 if (yaml.isBlank()) {
-                    Log.debugf("%s journal / init: Journal is empty, no pending updates (%s)", ME, filePath);
+                    Log.debugf("%s journal / init: Journal is empty, no pending updates (%s)", ME, journalFile);
                 } else {
                     Map<String, CommonhausUser> journaledUsers = ctx.parseYamlContent(yaml, USER_JOURNAL_TYPE);
                     pendingJournal.putAll(journaledUsers);
@@ -352,13 +357,13 @@ public class CommonhausDatastore {
             }
             journalInitialized = true;
         } catch (IOException e) {
-            ctx.logAndSendEmail(ME, "Datastore journal can not be read: %s".formatted(filePath), e);
+            ctx.logAndSendEmail(ME, "Datastore journal can not be read: %s".formatted(journalFile), e);
         }
     }
 
     void processJournalEntries() {
         if (pendingJournal.isEmpty()) {
-            Log.debugf("%s journal / process: Journal is empty, no pending updates (%s)", ME);
+            Log.debugf("%s journal / process: Journal is empty, no pending updates", ME);
             return;
         }
         for (var entry : pendingJournal.entrySet()) {
@@ -387,7 +392,7 @@ public class CommonhausDatastore {
         try {
             // Write the current state of the journal (including if empty)
             String yaml = ContextService.yamlMapper.writeValueAsString(pendingJournal);
-            Files.writeString(journalPath, yaml);
+            Files.writeString(journalFile, yaml);
         } catch (IOException e) {
             Log.errorf("%s Failed to save journal on shutdown: %s", ME, e);
         }

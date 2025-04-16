@@ -341,27 +341,31 @@ public class HausKeeperTestBase extends ContextHelper {
     @Priority(5) // Higher priority than the one in the core module
     public static class HKTestBotConfig extends TestBotConfig {
         private String tempJournalPath;
+        private String tempJournalFile;
 
         HKTestBotConfig() {
             try {
                 // Create target directory if it doesn't exist
                 Path targetDir = Paths.get("target/test-state");
                 Files.createDirectories(targetDir);
+                Path tempDir = Files.createTempDirectory(targetDir, "test-");
+                tempJournalPath = tempDir.toString();
 
                 // Create a temp file with a prefix and suffix in that directory
                 // Register for deletion on JVM exit
-                Path tempFile = Files.createTempFile(targetDir, "journal-test-", ".yaml");
-                tempFile.toFile().deleteOnExit();
+                Path tempFile = tempDir.resolve("commonhaus-journal.yaml");
+                tempJournalFile = tempFile.toString();
 
-                tempJournalPath = tempFile.toString();
-                System.out.println("Using temp journal file: " + tempJournalPath);
+                tempFile.toFile().deleteOnExit();
+                tempDir.toFile().deleteOnExit();
+                System.out.println("Using temp journal directory: " + tempDir);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to create temp journal file", e);
             }
         }
 
-        public Path getTempJournalPath() {
-            return Paths.get(tempJournalPath);
+        public Path getTempJournalFile() {
+            return Paths.get(tempJournalFile);
         }
 
         @Override
@@ -378,8 +382,13 @@ public class HausKeeperTestBase extends ContextHelper {
                 }
 
                 @Override
-                public Optional<String> stateFilePath() {
+                public Optional<String> stateDirectory() {
                     return Optional.of(tempJournalPath);
+                }
+
+                @Override
+                public Optional<String> stateFile() {
+                    return Optional.empty();
                 }
             };
         }

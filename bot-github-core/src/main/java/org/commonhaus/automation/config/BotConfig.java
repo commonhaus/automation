@@ -113,10 +113,18 @@ public interface BotConfig {
         Duration period();
 
         /**
+         * Directory for state data used to persist
+         * some information across restarts.
+         *
+         * @return
+         */
+        Optional<String> stateDirectory();
+
+        /**
          * If set, task run state will be written to this file.
          * This is used to prevent tasks from running too frequently.
          */
-        Optional<String> stateFilePath();
+        Optional<String> stateFile();
     }
 
     public interface OpenCollectiveConfig {
