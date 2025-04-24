@@ -1,16 +1,17 @@
 package org.commonhaus.automation.hk.data;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import jakarta.annotation.Nonnull;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 public class CommonhausUserData {
     @Nonnull
@@ -21,9 +22,10 @@ public class CommonhausUserData {
 
     Services services = new Services();
 
-    List<String> projects = new ArrayList<>();
+    @JsonDeserialize(as = TreeSet.class)
+    Set<String> projects = new TreeSet<>();
 
-    public List<String> projects() {
+    public Collection<String> projects() {
         return projects;
     }
 
@@ -152,10 +154,6 @@ public class CommonhausUserData {
         this.status = other.status;
         this.goodUntil.merge(other.goodUntil);
         this.services.merge(other.services);
-        if (other.projects != null) {
-            other.projects().stream()
-                    .filter(project -> !this.projects.contains(project))
-                    .forEach(this.projects::add);
-        }
+        this.projects().addAll(other.projects());
     }
 }

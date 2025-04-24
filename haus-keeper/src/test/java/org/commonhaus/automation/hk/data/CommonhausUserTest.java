@@ -2,6 +2,8 @@ package org.commonhaus.automation.hk.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
@@ -52,5 +54,82 @@ public class CommonhausUserTest extends HausKeeperTestBase {
         assertThat(update).isTrue();
         user.updateMemberStatus(ctx, roles);
         assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
+    }
+
+    @Test
+    void testMergeCommonhausUser() {
+        // Create the first user with some history
+        CommonhausUser user1 = new CommonhausUser.Builder()
+                .withId(12345)
+                .withData(new CommonhausUserData())
+                .build();
+        user1.data.projects().add("user1-project");
+        user1.data.projects().add("other-project");
+        user1.history.addAll(List.of(
+                "2025-03-12T14:35:00Z Membership application accepted",
+                "2025-03-18T09:51:00Z Sign attestation (email|fe-2024-05-31)"));
+
+        // Create the second user with overlapping and new history
+        CommonhausUser user2 = new CommonhausUser.Builder()
+                .withId(12345)
+                .withData(new CommonhausUserData())
+                .build();
+        user2.data.projects().add("user2-project");
+        user2.data.projects().add("other-project");
+        user2.history.addAll(List.of(
+                "2025-03-18T09:51:00Z Sign attestation (email|fe-2024-05-31)", // Duplicate
+                "2025-03-18T09:54:00Z Sign attestation (coc|cf-2024-06-07)",
+                "2025-04-15T02:15:00Z Update user aliases for hibernate.org"));
+
+        // Merge user2 into user1
+        user1.merge(user2);
+
+        // Validate the merged history
+        assertThat(user1.history).containsExactly(
+                "2025-03-12T14:35:00Z Membership application accepted",
+                "2025-03-18T09:51:00Z Sign attestation (email|fe-2024-05-31)",
+                "2025-03-18T09:54:00Z Sign attestation (coc|cf-2024-06-07)",
+                "2025-04-15T02:15:00Z Update user aliases for hibernate.org");
+        assertThat(user1.projects()).containsExactly(
+                "other-project",
+                "user1-project",
+                "user2-project");
+    }
+
+    @Test
+    void testYamlSerializationDeserialization() throws Exception {
+        // Create a user with history
+        CommonhausUser user = new CommonhausUser.Builder()
+                .withId(12345)
+                .withData(new CommonhausUserData())
+                .build();
+        user.history.addAll(List.of(
+                "2025-03-12T14:35:00Z Membership application accepted",
+                "2025-03-18T09:51:00Z Sign attestation (email|fe-2024-05-31)"));
+        user.data.projects().add("test-project");
+        user.data.projects().add("other-project");
+
+        // Serialize to YAML
+        String yaml = ctx.yamlMapper().writeValueAsString(user);
+
+        // Deserialize back to object
+        CommonhausUser deserializedUser = ctx.yamlMapper().readValue(yaml, CommonhausUser.class);
+
+        // Validate the deserialized object
+        assertThat(deserializedUser.id).isEqualTo(user.id);
+        assertThat(deserializedUser.history).isEqualTo(user.history);
+        assertThat(deserializedUser.projects()).isEqualTo(user.projects());
+    }
+
+    @Test
+    void testGetCommonhausUserData() throws Exception {
+        Path userFile = Path.of(UserPath.WITH_ATTESTATION.filename());
+        CommonhausUser user = ctx.yamlMapper().readValue(userFile.toFile(), CommonhausUser.class);
+        assertThat(user).isNotNull();
+        assertThat(user.id).isEqualTo(156364140);
+        assertThat(user.login).isEqualTo("commonhaus-bot");
+        assertThat(user.data).isNotNull();
+        assertThat(user.data.goodUntil).isNotNull();
+        assertThat(user.data.goodUntil.dues).isEqualTo("2020-01-01");
     }
 }

@@ -217,7 +217,6 @@ public class MemberDataTest extends HausKeeperTestBase {
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
     void testGetCommonhausUser() throws Exception {
-
         mockExistingCommonhausData(UserPath.WITH_ATTESTATION);
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
