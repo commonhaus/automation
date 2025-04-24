@@ -373,7 +373,7 @@ public class ProjectAliasManager extends ScheduledService {
         String message = """
                 User %s has changed their login%s.
                 Please check the project alias configuration in %s.
-                """.formatted(ProjectAliasMapping.CONFIG_FILE,
+                """.formatted(
                 loginChangeEvent.oldLogin(),
                 loginChangeEvent.newLogin().map(l -> " to " + l).orElse(""),
                 state.repoFullName());
