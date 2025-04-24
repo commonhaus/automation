@@ -73,7 +73,7 @@ public class AccessRoleManager {
 
         DatastoreQueryContext dqc = ctx.getDatastoreContext();
         CommonhausUser user = datastore.getCommonhausUser(memberInfo);
-        if (user != null && !user.login().equals(login)) {
+        if (user != null && !user.login().equalsIgnoreCase(login)) {
             // This is an existing user (by id), but the GitHub login has changed.
             // Access and other permissions based on logins may be incorrect.
             ctx.sendEmail(ME, "GitHub user login has changed", """
