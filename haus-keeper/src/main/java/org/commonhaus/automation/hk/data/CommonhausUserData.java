@@ -3,7 +3,6 @@ package org.commonhaus.automation.hk.data;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -70,7 +69,7 @@ public class CommonhausUserData {
             return altAlias;
         }
 
-        public void addAliases(List<String> validAliases) {
+        public void addAliases(Collection<String> validAliases) {
             altAlias().addAll(validAliases);
         }
 

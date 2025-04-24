@@ -5,9 +5,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
@@ -138,6 +140,17 @@ public class CommonhausUser implements UserLogin {
         return data.projects();
     }
 
+    public boolean aliasesMatch(String projectName, String projectDomain, Set<String> newAliases) {
+        var currentAliases = services().forwardEmail.altAlias().stream()
+                .filter(a -> a.endsWith("@" + projectDomain))
+                .collect(Collectors.toSet());
+        var expectedAliases = new HashSet<>(newAliases);
+
+        // Test to see if user record is already up to date
+        return projects().contains(projectName)
+                && currentAliases.equals(expectedAliases);
+    }
+
     @JsonIgnore
     public boolean isMemberUndefined() {
         return isMember == null;
@@ -188,10 +201,7 @@ public class CommonhausUser implements UserLogin {
         }
 
         // Merge history, no duplicates
-        Set<String> mergedHistory = new TreeSet<>(this.history);
-        mergedHistory.addAll(other.history);
-        this.history.clear();
-        this.history.addAll(mergedHistory);
+        this.history.addAll(other.history);
     }
 
     MemberStatus refreshStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
@@ -255,6 +265,19 @@ public class CommonhausUser implements UserLogin {
 
         private ApplicationIssue appIssue;
         private List<String> history = new ArrayList<>();
+
+        public Builder copy(CommonhausUser user) {
+            this.login = user.login;
+            this.id = user.id;
+            this.isMember = user.isMember;
+            this.statusChange = user.statusChange;
+            this.appIssue = user.appIssue;
+            this.history.addAll(user.history);
+
+            this.data = new CommonhausUserData();
+            this.data.merge(user.data);
+            return this;
+        }
 
         public Builder withLogin(String login) {
             this.login = login;

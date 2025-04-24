@@ -69,9 +69,10 @@ public interface DatastoreEvent {
         }
 
         public void applyChanges(AppContextService ctx, CommonhausUser user) {
+            CommonhausUser original = CommonhausDatastore.deepCopy(user);
             updateUser.accept(ctx, user);
-            // Add to history if requested
-            if (history) {
+            // Add to history if requested and object was changed
+            if (history && !original.equals(user)) {
                 user.addHistory(message);
             }
         }

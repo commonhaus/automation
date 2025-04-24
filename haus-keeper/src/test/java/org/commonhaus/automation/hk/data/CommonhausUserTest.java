@@ -132,4 +132,47 @@ public class CommonhausUserTest extends HausKeeperTestBase {
         assertThat(user.data.goodUntil).isNotNull();
         assertThat(user.data.goodUntil.dues).isEqualTo("2020-01-01");
     }
+
+    @Test
+    void testAliasesMatch() {
+        CommonhausUser user = new CommonhausUser.Builder()
+                .withId(12345)
+                .withData(new CommonhausUserData())
+                .build();
+
+        user.services().forwardEmail().altAlias().addAll(List.of(
+                "alias@otherdomain.com",
+                "alias1@domain.com",
+                "alias2@domain.com",
+                "alias3@domain.com"));
+
+        var expected = Set.of(
+                "alias1@domain.com",
+                "alias3@domain.com",
+                "alias2@domain.com");
+
+        // Case 1: Project mismatch (project not set); should return false
+        boolean result = user.aliasesMatch("project", "domain.com", expected);
+        assertThat(result).isFalse();
+
+        // Case 2: Project and aliases match
+        user.addProject("project");
+        result = user.aliasesMatch("project", "domain.com", expected);
+        assertThat(result).isTrue();
+
+        // Case 3: Aliases mismatch - alias1 is missing from the user
+        user.services().forwardEmail().altAlias().remove("alias1@domain.com");
+        result = user.aliasesMatch("project", "domain.com", expected);
+        assertThat(result).isFalse();
+
+        // Update expected to match the current state
+        expected = Set.of(
+                "alias3@domain.com",
+                "alias2@domain.com");
+
+        // Case 4: Aliases mismatch - alias4 is extra in the user
+        user.services().forwardEmail().altAlias().add("alias4@domain.com");
+        result = user.aliasesMatch("project", "domain.com", expected);
+        assertThat(result).isFalse();
+    }
 }

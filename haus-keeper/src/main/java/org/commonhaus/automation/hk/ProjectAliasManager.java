@@ -172,8 +172,8 @@ public class ProjectAliasManager extends ScheduledService {
         // The repository containing the (added/modified) file must be present in the query context
         String repoFullName = taskGroupToRepo(taskGroup);
         GHRepository repo = qc.getRepository(repoFullName);
-        if (repo == null) {
-            Log.warnf("%s readProjectConfig: repository not set in QueryContext", taskGroup);
+        if (repo == null || qc.hasErrors()) {
+            Log.warnf("%s readProjectConfig: repository not set in QueryContext: %s", taskGroup, qc.bundleExceptions());
             return;
         }
 
@@ -189,8 +189,8 @@ public class ProjectAliasManager extends ScheduledService {
         GHContent content = qc.readSourceFile(repo, ProjectAliasMapping.CONFIG_FILE);
         if (content == null || qc.hasErrors()) {
             // Normal
-            Log.debugf("%s readProjectConfig: no %s in %s", taskGroup, ProjectAliasMapping.CONFIG_FILE,
-                    repoFullName);
+            Log.debugf("%s readProjectConfig: no %s in %s", taskGroup,
+                    ProjectAliasMapping.CONFIG_FILE, repoFullName);
             return;
         }
 
@@ -274,7 +274,9 @@ public class ProjectAliasManager extends ScheduledService {
 
             // If anything about the user alias is wrong, send an email and skip it
             if (qc.hasErrors()) {
-                qc.logAndSendContextErrors("Error fetching user %s".formatted(login),
+                qc.logAndSendEmail("Error fetching user from GitHub",
+                        "%s: error fetching user %s".formatted(taskGroup, login),
+                        qc.bundleExceptions(),
                         projectAliasConfig.emailNotifications());
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
             } else if (ghUser == null || !userAliases.isValid(projectDomain)) {
@@ -303,6 +305,11 @@ public class ProjectAliasManager extends ScheduledService {
                 // Create a new user object if it does not exist
                 CommonhausUser user = datastore.getCommonhausUser(login, ghUser.getId(), false, true);
 
+                if (user.aliasesMatch(state.projectName(), projectDomain, userAliases.aliases())) {
+                    Log.debugf("%s: user %s already has aliases %s", taskGroup, login, userAliases.aliases());
+                    continue; // skip
+                }
+
                 // Make changes to the user object within a retryable unit:
                 // add configured aliases and make sure project was added to user
                 datastore.setCommonhausUser(new UpdateEvent(user,
@@ -316,8 +323,9 @@ public class ProjectAliasManager extends ScheduledService {
                 qc.addException(e);
             }
             if (qc.hasErrors()) {
-                Log.debugf("%s: error updating user %s: %s", taskGroup, login, qc.bundleExceptions());
-                qc.logAndSendContextErrors("Error adding project email aliases",
+                qc.logAndSendEmail("Error adding project email aliases",
+                        "%s: error updating user %s".formatted(taskGroup, login),
+                        qc.bundleExceptions(),
                         projectAliasConfig.emailNotifications());
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
             } else {
