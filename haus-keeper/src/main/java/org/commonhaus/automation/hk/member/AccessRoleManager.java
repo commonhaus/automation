@@ -15,7 +15,6 @@ import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.UserLoginVerifier.LoginChangeEvent;
-import org.commonhaus.automation.hk.config.ProjectAliasMapping;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.MemberStatus;
@@ -80,11 +79,13 @@ public class AccessRoleManager {
             ctx.sendEmail(ME, "GitHub user login has changed", """
                     The login for user %s has changed:
 
-                    Expected login: %s
+                    Old login: %s
+                    New login: %s
+
                     GitHub user %s
 
                     %s
-                    """.formatted(ProjectAliasMapping.CONFIG_FILE,
+                    """.formatted(
                     id, user.login(), login, user, dqc.writeYamlValue(user)),
                     dqc.getErrorAddresses(hkConfig.getAddresses()));
 

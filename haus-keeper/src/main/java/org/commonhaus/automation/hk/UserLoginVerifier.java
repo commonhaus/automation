@@ -20,7 +20,6 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
-import org.commonhaus.automation.hk.config.ProjectAliasMapping;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
@@ -137,14 +136,14 @@ public class UserLoginVerifier extends ScheduledService {
                 dqc.logAndSendContextErrors("Unable to verify user login");
             } else if (ghUser == null || ghUser.getId() != user.id()) {
                 // Send email to administrator that login has changed
-                ctx.sendEmail(ME, "GitHub user not found or has mismatchd id", """
+                ctx.sendEmail(ME, "GitHub user not found or has mismatched id", """
                         User %s not found or has mismatched id
 
                         Expected user id: %s
                         GitHub user %s
 
                         %s
-                        """.formatted(ProjectAliasMapping.CONFIG_FILE,
+                        """.formatted(
                         user.login(),
                         user.id(),
                         ghUser == null ? "not found" : "id is %s".formatted(ghUser.getId()),
