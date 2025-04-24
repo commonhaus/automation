@@ -136,7 +136,7 @@ public class FileWatcher {
             return;
         }
 
-        Log.debugf("[%s-%s] push event in %s; %s commit(s)", ME,
+        Log.tracef("[%s-%s] push event in %s; %s commit(s)", ME,
                 fileEvent.installationId(), repo.getFullName(), pushEvent.getCommits().size());
 
         watcher.handlePush(fileEvent, updateQueue);
