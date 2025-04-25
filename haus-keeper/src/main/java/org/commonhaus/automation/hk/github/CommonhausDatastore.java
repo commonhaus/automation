@@ -18,14 +18,12 @@ import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.DatastoreEvent.QueryEvent;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 import org.commonhaus.automation.hk.member.MemberInfo;
-import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHRepository;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkus.logging.Log;
@@ -319,20 +317,9 @@ public class CommonhausDatastore {
         if (user == null) {
             return null;
         }
-        // create a disconnected copy of the essential data.
-        try {
-            String json = ContextService.yamlMapper.writeValueAsString(user);
-            CommonhausUser copy = ContextService.yamlMapper.readValue(json, CommonhausUser.class);
-            copy.sha(user.sha());
-            Log.debugf("Deep copy of %s", user, copy);
-            return copy;
-        } catch (JsonProcessingException e) {
-            LogMailer.instance().logAndSendEmail(
-                    "CommonhausDatastore.deepCopy",
-                    "Unable to copy Commonbaus user",
-                    e);
-        }
-        return user;
+        CommonhausUser copy = new CommonhausUser.Builder().copy(user).build();
+        copy.sha(user.sha());
+        return copy;
     }
 
     void initializeJournal() {

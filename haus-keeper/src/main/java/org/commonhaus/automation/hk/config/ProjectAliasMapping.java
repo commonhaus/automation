@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hk.config;
 
-import java.util.List;
+import java.util.Set;
 
 import org.commonhaus.automation.config.EmailNotification;
 
@@ -12,7 +12,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public record ProjectAliasMapping(
         String domain,
-        List<UserAliasList> userMapping,
+        Set<UserAliasList> userMapping,
         EmailNotification emailNotifications) {
 
     public static final String CONFIG_FILE = "project-mail-aliases.yml";
@@ -22,7 +22,7 @@ public record ProjectAliasMapping(
      */
     public record UserAliasList(
             String login,
-            List<String> aliases) {
+            Set<String> aliases) {
 
         public boolean isValid(String projectDomain) {
             return login != null && !login.isEmpty()

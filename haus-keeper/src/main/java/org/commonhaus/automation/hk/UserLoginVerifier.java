@@ -7,7 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -176,6 +176,6 @@ public class UserLoginVerifier extends ScheduledService {
         return ME;
     }
 
-    public record LoginChangeEvent(String oldLogin, Optional<String> newLogin, List<String> projects) {
+    public record LoginChangeEvent(String oldLogin, Optional<String> newLogin, Collection<String> projects) {
     }
 }

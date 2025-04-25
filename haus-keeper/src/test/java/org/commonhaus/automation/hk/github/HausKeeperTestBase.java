@@ -284,7 +284,7 @@ public class HausKeeperTestBase extends ContextHelper {
             this.filename = filename;
         }
 
-        String filename() {
+        public String filename() {
             return filename;
         }
     }

@@ -4,8 +4,12 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
@@ -35,7 +39,7 @@ public class CommonhausUser implements UserLogin {
     @Nonnull
     final CommonhausUserData data;
     @Nonnull
-    final List<String> history;
+    final Set<String> history = new TreeSet<>();
 
     Boolean isMember;
     String statusChange;
@@ -50,7 +54,7 @@ public class CommonhausUser implements UserLogin {
         this.login = builder.login;
         this.id = builder.id;
         this.data = builder.data == null ? new CommonhausUserData() : builder.data;
-        this.history = builder.history == null ? new ArrayList<>() : builder.history;
+        this.history.addAll(builder.history);
         this.appIssue = builder.appIssue;
         this.isMember = builder.isMember;
         this.statusChange = builder.statusChange;
@@ -60,7 +64,6 @@ public class CommonhausUser implements UserLogin {
         this.login = login;
         this.id = id;
         this.data = new CommonhausUserData();
-        this.history = new ArrayList<>();
         this.isMember = null;
         this.statusChange = null;
     }
@@ -133,8 +136,19 @@ public class CommonhausUser implements UserLogin {
         this.data.projects.add(projectName);
     }
 
-    public List<String> projects() {
+    public Collection<String> projects() {
         return data.projects();
+    }
+
+    public boolean aliasesMatch(String projectName, String projectDomain, Set<String> newAliases) {
+        var currentAliases = services().forwardEmail.altAlias().stream()
+                .filter(a -> a.endsWith("@" + projectDomain))
+                .collect(Collectors.toSet());
+        var expectedAliases = new HashSet<>(newAliases);
+
+        // Test to see if user record is already up to date
+        return projects().contains(projectName)
+                && currentAliases.equals(expectedAliases);
     }
 
     @JsonIgnore
@@ -175,17 +189,19 @@ public class CommonhausUser implements UserLogin {
         if (other == null) {
             return;
         }
-        // Do not include sha or conflict flags.
+
+        // Do not merge sha or conflict flags.
         // Those will have to be refreshed when the latest data is retrieved from GitHub
+
         this.appIssue = other.appIssue;
         this.isMember = other.isMember;
         this.statusChange = other.statusChange;
-        other.projects().stream()
-                .filter(project -> !this.history.contains(project))
-                .forEach(this.history::add);
         if (other.data != null) {
             this.data.merge(other.data);
         }
+
+        // Merge history, no duplicates
+        this.history.addAll(other.history);
     }
 
     MemberStatus refreshStatus(AppContextService ctx, Set<String> roles, MemberStatus oldStatus) {
@@ -248,7 +264,20 @@ public class CommonhausUser implements UserLogin {
         private String statusChange;
 
         private ApplicationIssue appIssue;
-        private List<String> history;
+        private List<String> history = new ArrayList<>();
+
+        public Builder copy(CommonhausUser user) {
+            this.login = user.login;
+            this.id = user.id;
+            this.isMember = user.isMember;
+            this.statusChange = user.statusChange;
+            this.appIssue = user.appIssue;
+            this.history.addAll(user.history);
+
+            this.data = new CommonhausUserData();
+            this.data.merge(user.data);
+            return this;
+        }
 
         public Builder withLogin(String login) {
             this.login = login;
@@ -265,8 +294,8 @@ public class CommonhausUser implements UserLogin {
             return this;
         }
 
-        public Builder withHistory(List<String> history) {
-            this.history = history;
+        public Builder withHistory(Collection<String> history) {
+            this.history.addAll(history);
             return this;
         }
 

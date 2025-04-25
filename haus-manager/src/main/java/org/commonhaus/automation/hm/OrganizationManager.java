@@ -195,8 +195,9 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
         OrganizationConfig orgCfg = qc.readYamlContent(content, OrganizationConfig.class);
         if (orgCfg == null || qc.hasErrors()) {
-            qc.logAndSendContextErrors("[%s] readOrgConfig: unable to parse %s in %s"
-                    .formatted(ME, OrganizationConfig.PATH, repo.getFullName()),
+            qc.logAndSendEmail("readOrgConfig: unable to parse configuraton",
+                    "Unable to parse %s in %s".formatted(OrganizationConfig.PATH, repo.getFullName()),
+                    qc.bundleExceptions(),
                     orgCfg.emailNotifications());
             return false;
         }
