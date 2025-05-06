@@ -235,7 +235,9 @@ public class ForwardEmailService {
 
     public Set<AliasKey> normalizeEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {
         List<String> addresses = new ArrayList<>();
-        addresses.add(session.login());
+        if (forwardEmail.hasDefaultAlias()) {
+            addresses.add(session.login());
+        }
         addresses.addAll(forwardEmail.altAlias());
         // Normalize email addresses using the default domain (server config)
         return addresses.stream().map(this::normalizeAlias).collect(Collectors.toSet());
@@ -254,7 +256,7 @@ public class ForwardEmailService {
     }
 
     public Set<AliasKey> getConfiguredAliases(MemberSession session, CommonhausUser user) {
-        if (!user.status().mayHaveEmail() || emailDisabled()) {
+        if (emailDisabled() || !(user.status().mayHaveEmail() || user.status().mayHaveAltEmail())) {
             return Set.of();
         }
         Services services = user.services();

@@ -43,11 +43,11 @@ public class KnownUserInterceptor implements Serializable {
             }
             return Response.status(Response.Status.FORBIDDEN).build();
         } catch (Exception e) {
-            appCtx.logAndSendEmail("😎-known", "Exception checking for known user",
-                    "Exception checking for user %s".formatted(session.login()), e);
             if (e instanceof WebApplicationException) {
                 return ((WebApplicationException) e).getResponse();
             }
+            appCtx.logAndSendEmail("😎-known", "Exception checking for known user",
+                    "Exception checking for user %s".formatted(session.login()), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

@@ -1,28 +1,28 @@
-domain: hibernate.org
+domain: project.org
 
 # Active user mappings
 userMapping:
   - login: jsmith
     aliases:
-      - john@hibernate.org
-      - support@hibernate.org
+      - john@project.org
+      - support@project.org
 
   - login: jdoe
     aliases:
-      - jane@hibernate.org
-      - jdoe@hibernate.org
+      - jane@project.org
+      - jdoe@project.org
 
 # Retired user mappings (for record keeping)
 retiredUsers:
   - login: olduser
     aliases:
-      - olduser@hibernate.org
+      - olduser@project.org
     retiredDate: 2024-12-15
 
   - login: formercontributor
     aliases:
-      - former@hibernate.org
-      - contributor@hibernate.org
+      - former@project.org
+      - contributor@project.org
     retiredDate: 2024-11-30
 
 # Email notification settings

@@ -52,7 +52,15 @@ public class MemberAliasesResource {
     @Produces("application/json")
     public Response getAliases() {
         try {
-            CommonhausUser user = getUser();
+            CommonhausUser user = datastore.getCommonhausUser(session);
+            if (user == null) {
+                throw new WebApplicationException(UNKNOWN_USER, Status.NOT_FOUND);
+            }
+            if (!user.status().mayHaveEmail() && !user.status().mayHaveAltEmail()) {
+                return user.toResponse()
+                        .responseStatus(Response.Status.FORBIDDEN)
+                        .finish();
+            }
 
             // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
@@ -77,7 +85,16 @@ public class MemberAliasesResource {
     @Produces("application/json")
     public Response updateAliases(Map<String, Set<String>> aliases) {
         try {
-            CommonhausUser user = getUser();
+            CommonhausUser user = datastore.getCommonhausUser(session);
+            if (user == null) {
+                throw new WebApplicationException(UNKNOWN_USER, Status.NOT_FOUND);
+            }
+            if (!user.status().mayHaveEmail() && !user.status().mayHaveAltEmail()) {
+                return user.toResponse()
+                        .responseStatus(Response.Status.FORBIDDEN)
+                        .finish();
+            }
+
             ForwardEmail emailConfig = user.services().forwardEmail();
 
             Map<AliasKey, Set<String>> sanitized = emailService.sanitizeInputAddresses(session, user, aliases);
@@ -109,7 +126,16 @@ public class MemberAliasesResource {
     @Produces("application/json")
     public Response generatePassword(AliasRequest request) {
         try {
-            CommonhausUser user = getUser();
+            CommonhausUser user = datastore.getCommonhausUser(session);
+            if (user == null) {
+                throw new WebApplicationException(UNKNOWN_USER, Status.NOT_FOUND);
+            }
+            if (!user.status().mayHaveEmail() && !user.status().mayHaveAltEmail()) {
+                return user.toResponse()
+                        .responseStatus(Response.Status.FORBIDDEN)
+                        .finish();
+            }
+
             // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
             AliasKey key = AliasKey.fromCache(request.email());
@@ -121,25 +147,6 @@ public class MemberAliasesResource {
         } catch (Throwable e) {
             return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
         }
-    }
-
-    protected CommonhausUser getUser() {
-        // throws to caller
-        CommonhausUser user = datastore.getCommonhausUser(session);
-        if (user == null) {
-            // should never happen
-            throw new WebApplicationException(UNKNOWN_USER, Status.FORBIDDEN);
-        }
-        if (!user.status().mayHaveEmail()) {
-            Log.infof("getAliases|%s User is not eligible for email", user.login());
-            throw new WebApplicationException(Status.FORBIDDEN);
-        }
-        if (!ctx.isValidAttestation(ID)) {
-            // Not the user's fault.. misconfiguration
-            Exception e = new Exception("Invalid attestation id");
-            ctx.logAndSendEmail("getUser", ID + " is an invalid attestation id", e);
-        }
-        return user;
     }
 
     /**

@@ -5,8 +5,13 @@ import static io.restassured.matcher.RestAssuredMatchers.detailedCookie;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -177,6 +182,15 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(200)
                 .body("HAUS.status", equalTo("UNKNOWN"));
+
+        given()
+                .log().all()
+                .when()
+                .get("/aliases")
+                .then()
+                .log().all()
+                .statusCode(403)
+                .body("HAUS.status", equalTo("UNKNOWN"));
     }
 
     @Test
@@ -230,6 +244,90 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .log().all()
                 .statusCode(200)
                 .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGetCommonhausUserWithEmail() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_MEMBER);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+
+        given()
+                .log().all()
+                .when()
+                .get("/aliases")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.status", equalTo("ACTIVE"))
+                .body("HAUS.services.forwardEmail.hasDefaultAlias", equalTo(true))
+                .body("HAUS.services.forwardEmail.altAlias", contains("here@project.org"))
+                .body("ALIAS", allOf(
+                        hasKey("commonhaus-bot@example.com"),
+                        hasKey("here@project.org")));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGetCommonhausSponsor() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_SPONSOR);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+
+        given()
+                .log().all()
+                .when()
+                .get("/aliases")
+                .then()
+                .log().all()
+                .statusCode(403)
+                .body("HAUS.status", equalTo("SPONSOR"))
+                .body("HAUS.services.forwardEmail.hasDefaultAlias", equalTo(false))
+                .body("ALIAS", nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGetCommonhausContributor() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_CONTRIBUTOR);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+
+        given()
+                .log().all()
+                .when()
+                .get("/aliases")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.status", equalTo("CONTRIBUTOR"))
+                .body("HAUS.services.forwardEmail.hasDefaultAlias", equalTo(false))
+                .body("HAUS.services.forwardEmail.altAlias", contains("here@project.org"))
+                .body("ALIAS", allOf(
+                        not(hasKey("commonhaus-bot@example.com")),
+                        hasKey("here@project.org")));
     }
 
     @Test

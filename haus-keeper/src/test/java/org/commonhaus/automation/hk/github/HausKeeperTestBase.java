@@ -193,6 +193,7 @@ public class HausKeeperTestBase extends ContextHelper {
 
         testConfig.addAttestation("member");
         testConfig.addAttestation("coc");
+        testConfig.addAttestation("email");
 
         mockMemberInfo = mock(MemberInfo.class);
         when(mockMemberInfo.id()).thenReturn(botId);
@@ -276,6 +277,9 @@ public class HausKeeperTestBase extends ContextHelper {
     public enum UserPath {
         WITH_APPLICATION("src/test/resources/commonhaus-user.application.unknown.yaml"),
         WITH_ATTESTATION("src/test/resources/commonhaus-user.attestation.yaml"),
+        WITH_EMAIL_CONTRIBUTOR("src/test/resources/commonhaus-user.email.contributor.yaml"),
+        WITH_EMAIL_MEMBER("src/test/resources/commonhaus-user.email.member.yaml"),
+        WITH_EMAIL_SPONSOR("src/test/resources/commonhaus-user.email.sponsor.yaml"),
         NEW_USER("src/test/resources/commonhaus-user.new.yaml");
 
         private String filename;
@@ -397,7 +401,7 @@ public class HausKeeperTestBase extends ContextHelper {
     @ApplicationScoped
     @Alternative
     @Priority(1)
-    static class TestUserManagementConfig extends ActiveHausKeeperConfig {
+    public static class TestUserManagementConfig extends ActiveHausKeeperConfig {
         @Inject
         public TestUserManagementConfig() {
             super();
