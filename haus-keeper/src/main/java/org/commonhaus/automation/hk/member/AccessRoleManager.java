@@ -143,7 +143,7 @@ public class AccessRoleManager {
         }
         if (userHasProjectRole(user)) {
             // add the contributor role if they are associated with a project
-            roles.add(MemberStatus.CONTRIBUTOR.name());
+            roles.add(MemberStatus.CONTRIBUTOR.name().toLowerCase());
             result = Boolean.TRUE;
         }
 

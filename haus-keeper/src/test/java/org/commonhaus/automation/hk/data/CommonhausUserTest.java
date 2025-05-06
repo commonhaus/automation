@@ -49,6 +49,13 @@ public class CommonhausUserTest extends HausKeeperTestBase {
         user.updateMemberStatus(ctx, roles);
         assertThat(user.status()).isEqualTo(MemberStatus.SPONSOR);
 
+        user.setStatus(MemberStatus.UNKNOWN); // reset
+        roles = Set.of("contributor");
+        update = user.statusUpdateRequired(ctx, roles);
+        assertThat(update).isTrue();
+        user.updateMemberStatus(ctx, roles);
+        assertThat(user.status()).isEqualTo(MemberStatus.CONTRIBUTOR);
+
         roles = Set.of("sponsor", "member", "egc");
         update = user.statusUpdateRequired(ctx, roles);
         assertThat(update).isTrue();
