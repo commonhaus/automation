@@ -1,0 +1,45 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: "deploy"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh/
+          ssh-keyscan -p ${SSH_PORT} ${SSH_HOST} > ~/.ssh/known_hosts
+          echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          sudo chmod 600 ~/.ssh/id_ed25519
+        shell: bash
+        env:
+          SSH_HOST: ${{secrets.SSH_HOST}}
+          SSH_PORT: ${{secrets.SSH_PORT}}
+          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+
+      - name: Update CF Bot
+        run: |
+          ssh -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} "${SSH_BOT_UPDATE}"
+        shell: bash
+        env:
+          SSH_USER: ${{secrets.SSH_USER}}
+          SSH_HOST: ${{secrets.SSH_HOST}}
+          SSH_PORT: ${{secrets.SSH_PORT}}
+          SSH_BOT_UPDATE: ${{secrets.SSH_BOT_UPDATE}}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_ed25519
+          rm -f ~/.ssh/known_hosts
+        shell: bash

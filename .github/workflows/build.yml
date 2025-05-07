@@ -177,37 +177,14 @@ jobs:
       run: find ~/.m2 -name \*-SNAPSHOT -type d -exec rm -rf {} +
 
   deploy:
-    needs: [main-root, build]
-    if: ${{needs.main-root.outputs.is-main}}
     runs-on: ubuntu-latest
+    needs: main-root
+    if: ${{needs.main-root.outputs.is-main}}
     permissions:
-      contents: read
-    concurrency:
-      group: "deploy"
-
+      actions: write
     steps:
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh/
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          sudo chmod 600 ~/.ssh/id_rsa
-        shell: bash
+      - # dispatch workflow
         env:
-          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
-          SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
-
-      - name: Update CF Bot
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh $SSH_PORT $SSH_USER_HOST "$SSH_BOT_UPDATE"
-        shell: bash
-        env:
-          SSH_USER_HOST: ${{secrets.SSH_USER_HOST}}
-          SSH_PORT: ${{secrets.SSH_PORT}}
-          SSH_BOT_UPDATE: ${{secrets.SSH_BOT_UPDATE}}
-
-      - name: Cleanup
-        run: |
-          rm ~/.ssh/id_rsa
-          rm ~/.ssh/known_hosts
-        shell: bash
+          gh workflow run -R 'commonhaus/automation' deploy.yml
