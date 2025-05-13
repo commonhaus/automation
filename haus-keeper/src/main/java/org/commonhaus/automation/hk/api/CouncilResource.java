@@ -8,9 +8,8 @@ import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.hk.ProjectAliasManager;
 import org.commonhaus.automation.hk.UserLoginVerifier;
+import org.commonhaus.automation.hk.council.AsyncCommonhausService;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -32,11 +31,8 @@ public class CouncilResource {
     @Inject
     UserLoginVerifier userLoginVerifier;
 
-    @RestClient
-    HausManagerClient hausManagerClient;
-
-    @RestClient
-    HausRulesClient hausRulesClient;
+    @Inject
+    AsyncCommonhausService asyncCommonhausService;
 
     @GET
     @KnownUser
@@ -47,7 +43,7 @@ public class CouncilResource {
             updateQueue.queueReconciliation("refreshProjectAliases-user",
                     () -> projectAliasManager.refreshProjectAliases(true));
         }
-        return Response.ok().build();
+        return Response.noContent().build();
     }
 
     @GET
@@ -59,73 +55,38 @@ public class CouncilResource {
             updateQueue.queueReconciliation("verifyAllUserLogins-user",
                     () -> userLoginVerifier.verifyAllUserLogins(true));
         }
-        return Response.ok().build();
+        return Response.noContent().build();
     }
 
     @GET
     @KnownUser
     @Path("/manager/org")
     public Response triggerOrgUpdate() {
-        Log.debugf("[%s] Trigger org update", session.login());
-        if (session.roles().contains("egc")) {
-            hausManagerClient.triggerOrgUpdate();
-        }
-        return Response.ok().build();
+        asyncCommonhausService.triggerOrgUpdate(session);
+        return Response.noContent().build();
     }
 
     @GET
     @KnownUser
     @Path("/manager/projects")
     public Response triggerProjectUpdate() {
-        Log.debugf("[%s] Trigger project update", session.login());
-        if (session.roles().contains("cfc")) {
-            hausManagerClient.triggerProjectUpdate();
-        }
-        return Response.ok().build();
+        asyncCommonhausService.triggerProjectUpdate(session);
+        return Response.noContent().build();
     }
 
     @GET
     @KnownUser
     @Path("/manager/sponsors")
     public Response triggerSponsorUpdate() {
-        Log.debugf("[%s] Trigger sponsor update", session.login());
-        if (session.roles().contains("cfc")) {
-            hausManagerClient.triggerSponsorUpdate();
-        }
-        return Response.ok().build();
+        asyncCommonhausService.triggerSponsorUpdate(session);
+        return Response.noContent().build();
     }
 
     @GET
     @KnownUser
     @Path("/rules/votes")
     public Response triggerVoteCount() {
-        Log.debugf("[%s] Trigger vote counting", session.login());
-        if (session.roles().contains("cfc")) {
-            // trigger immediate team sync
-            hausRulesClient.triggerVoteCount();
-        }
-        return Response.ok().build();
-    }
-
-    @RegisterRestClient(configKey = "haus-manager")
-    public interface HausManagerClient {
-        @GET
-        @Path("/projects")
-        Response triggerProjectUpdate();
-
-        @GET
-        @Path("/org")
-        Response triggerOrgUpdate();
-
-        @GET
-        @Path("/sponsors")
-        Response triggerSponsorUpdate();
-    }
-
-    @RegisterRestClient(configKey = "haus-rules")
-    public interface HausRulesClient {
-        @GET
-        @Path("/votes")
-        Response triggerVoteCount();
+        asyncCommonhausService.triggerVoteCount(session);
+        return Response.noContent().build();
     }
 }
