@@ -17,7 +17,7 @@ import io.smallrye.graphql.client.Response;
 public class DataRepository extends DataCommonType {
 
     private static final String RANGED_STATISTICS = """
-            query($query: String!, $searchType: SearchType!) {
+            query($query: String!, $searchType: SearchType!, $after: String) {
                 search(query: $query, type: $searchType, first: 100, after: $after) {
                     pageInfo {
                         endCursor
@@ -45,8 +45,8 @@ public class DataRepository extends DataCommonType {
             """.stripIndent();
 
     private static final String REPO_STATISTICS = """
-            query ($owner: String!, $name: String!) {
-                repository(owner: $owner, name: $name) {
+            query ($org: String!, $repo: String!) {
+                repository(owner: $org, name: $repo) {
                 collaborators (first:1) {
                   totalCount
                 }
@@ -89,11 +89,10 @@ public class DataRepository extends DataCommonType {
                 .formatted(repo.getFullName(), from, toExclusive.minusDays(1));
 
         Count issues = queryType(qc, baseQuery + " is:issue", "ISSUE", from, toExclusive);
-        Count prs = queryType(qc, baseQuery + " is:pr", "PULL_REQUEST", from, toExclusive);
+        Count prs = queryType(qc, baseQuery + " is:pr", "ISSUE", from, toExclusive);
         Count discussions = queryType(qc, baseQuery + " is:discussion", "DISCUSSION", from, toExclusive);
 
         return new ItemStatistics(
-                Instant.now(),
                 from,
                 toExclusive,
                 issues.newItem,
@@ -158,7 +157,6 @@ public class DataRepository extends DataCommonType {
         JsonObject latestRelease = JsonAttribute.latestRelease.jsonObjectFrom(repository);
 
         return new ActivitySnapshot(
-                Instant.now(),
                 JsonAttribute.description.stringFrom(repository),
                 JsonAttribute.collaborators.totalCountFrom(repository),
                 JsonAttribute.discussions.totalCountFrom(repository),
@@ -184,7 +182,6 @@ public class DataRepository extends DataCommonType {
 
     @RegisterForReflection
     public static record ItemStatistics(
-            Instant collected,
             LocalDate from,
             LocalDate toExclusive,
             int newIssues,
@@ -200,7 +197,6 @@ public class DataRepository extends DataCommonType {
 
     @RegisterForReflection
     public static record ActivitySnapshot(
-            Instant collected,
             String description,
             int collaborators,
             int openDiscussions,

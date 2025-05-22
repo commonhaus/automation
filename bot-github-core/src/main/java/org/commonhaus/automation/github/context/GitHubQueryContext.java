@@ -704,7 +704,9 @@ public class GitHubQueryContext extends GraphQLQueryContext {
     }
 
     public static String toRelativeName(String orgName, String fullName) {
-        return fullName.replace(orgName + "/", "");
+        return fullName.contains("/")
+                ? fullName.replace(orgName + "/", "")
+                : null;
     }
 
     public static String toFullName(String orgName, String relativeName) {
