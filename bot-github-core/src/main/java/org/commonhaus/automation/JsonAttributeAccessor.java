@@ -131,6 +131,16 @@ public interface JsonAttributeAccessor {
         return parseDate(timestamp);
     }
 
+    default Instant instantFrom(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        String timestamp = hasAlternateName()
+                ? object.getString(alternateName(), object.getString(name(), null))
+                : object.getString(alternateName(), null);
+        return parseInstant(timestamp);
+    }
+
     /** @return JsonObject with alternateName() (or name()) from object */
     default JsonObject jsonObjectFrom(JsonObject object) {
         JsonValue value = valueFrom(object);

@@ -338,7 +338,9 @@ public class GitHubQueryContext extends GraphQLQueryContext {
             JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
             return JsonAttribute.login.stringFrom(viewer);
         });
-        return botLogin.equals(login) || botLogin.replace("[bot]", "").equals(login);
+        return login.endsWith("[bot]")
+                || login.matches(".*-(ro)?bot")
+                || botLogin.equals(login);
     }
 
     /** Item-scoped comment lookup; doesn't always apply */

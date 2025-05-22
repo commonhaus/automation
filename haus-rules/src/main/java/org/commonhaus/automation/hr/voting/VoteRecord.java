@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hr.voting;
 
-import java.util.Date;
+import java.time.Instant;
 
 import org.commonhaus.automation.github.context.DataActor;
 import org.commonhaus.automation.github.context.DataReaction;
@@ -14,7 +14,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public class VoteRecord {
     public final String login;
     public final String url;
-    public final Date createdAt;
+    public final Instant createdAt;
     public final String reaction;
     boolean alternate = false;
 
@@ -25,7 +25,7 @@ public class VoteRecord {
         this.reaction = DataReaction.toEmoji(reaction);
     }
 
-    public VoteRecord(DataActor actor, Date createdAt) {
+    public VoteRecord(DataActor actor, Instant createdAt) {
         this.login = actor.login;
         this.url = actor.url;
         this.createdAt = createdAt;
