@@ -54,7 +54,24 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     repositories,
     repositoriesAdded("repositories_added"),
     repositoriesRemoved("repositories_removed"),
+
+    // Repository
     repository,
+    collaborators,
+    description,
+    discussions,
+    forkCount,
+    isArchived,
+    isPrivate,
+    issues,
+    latestRelease,
+    publishedAt,
+    pullRequests,
+    releases,
+    stargazerCount,
+    tagName,
+    vulnerabilityAlerts,
+    watchers,
 
     // Base GitHub GraphQL object type
     id,
@@ -154,6 +171,7 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     nodes,
     pageInfo,
     search,
+    totalCount,
     viewer,
     ;
 
@@ -183,6 +201,13 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     @Override
     public boolean hasAlternateName() {
         return alternateName;
+    }
+
+    public int totalCountFrom(JsonObject object) {
+        JsonObject field = jsonObjectFrom(object);
+        return field == null
+                ? 0
+                : JsonAttribute.totalCount.integerFrom(field);
     }
 
     /**

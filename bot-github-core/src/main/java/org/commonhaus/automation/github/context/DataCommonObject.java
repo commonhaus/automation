@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github.context;
 
-import java.util.Date;
+import java.time.Instant;
 
 import jakarta.json.JsonObject;
 
@@ -34,9 +34,9 @@ public class DataCommonObject extends DataCommonType {
     public final DataActor author;
 
     public final String url;
-    public final Date createdAt;
-    public final Date updatedAt;
-    public final Date lastEditedAt;
+    public final Instant createdAt;
+    public final Instant updatedAt;
+    public final Instant lastEditedAt;
 
     // allow modification for dry run
     public String body;
@@ -51,9 +51,9 @@ public class DataCommonObject extends DataCommonType {
             // GraphQL
             this.author = JsonAttribute.author.actorFrom(object);
         }
-        this.createdAt = JsonAttribute.createdAt.dateFrom(object);
-        this.updatedAt = JsonAttribute.updatedAt.dateFrom(object);
-        this.lastEditedAt = JsonAttribute.lastEditedAt.dateFrom(object);
+        this.createdAt = JsonAttribute.createdAt.instantFrom(object);
+        this.updatedAt = JsonAttribute.updatedAt.instantFrom(object);
+        this.lastEditedAt = JsonAttribute.lastEditedAt.instantFrom(object);
 
         this.url = JsonAttribute.url.stringFrom(object);
         this.body = JsonAttribute.body.stringFrom(object);
@@ -69,7 +69,7 @@ public class DataCommonObject extends DataCommonType {
         this.body = other.body;
     }
 
-    public Date mostRecentEdit() {
+    public Instant mostRecentEdit() {
         return lastEditedAt == null ? createdAt : lastEditedAt;
     }
 }
