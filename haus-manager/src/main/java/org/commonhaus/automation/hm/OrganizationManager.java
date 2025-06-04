@@ -49,6 +49,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         return currentConfig.get().map(OrganizationConfigState::orgConfig).orElse(null);
     }
 
+    @Override
     public void notifyOnUpdate(String id, Runnable callback) {
         if (callback == null) {
             return;
