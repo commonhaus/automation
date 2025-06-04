@@ -71,6 +71,7 @@ public class TaskStateService {
         }
         if (stateFile != null) {
             try {
+                Files.createDirectories(stateFile.getParent());
                 Files.writeString(stateFile, ContextService.yamlMapper.writeValueAsString(lastRunTimes));
                 Log.infof("[%s] Saved task state to %s", ME, stateFile);
             } catch (IOException e) {
