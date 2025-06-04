@@ -57,7 +57,8 @@ public abstract class GroupCoordinator extends ScheduledService {
         EmailNotification emailNotifications();
     }
 
-    protected abstract void processMembershipUpdate(String taskGroup, MembershipUpdate update);
+    protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
+    }
 
     void processGroupMapping(ConfigState configState, GroupMapping groupMapping) {
         Log.debugf("[%s] groupMapping begin %s", me(), groupMapping.source());

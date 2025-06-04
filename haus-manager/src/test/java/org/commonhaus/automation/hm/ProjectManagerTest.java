@@ -22,7 +22,6 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
-import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,11 +34,11 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @GitHubAppTest
-public class ProjectAccessManagerTest extends HausManagerTestBase {
-    final static String taskGroup = ProjectAccessManager.ME + "-" + PRIMARY.repoFullName();
+public class ProjectManagerTest extends HausManagerTestBase {
+    final static String taskGroup = ProjectManager.repoNametoTaskGroup(PRIMARY.repoFullName());
 
     @Inject
-    ProjectAccessManager projectAccessManager;
+    ProjectManager projectAccessManager;
 
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 
@@ -98,7 +97,7 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
                 .thenReturn(otherTeamLogins);
 
         projectAccessManager.processFileUpdate(taskGroup, new FileUpdate(
-                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+                ProjectConfig.PATH, FileUpdateType.MODIFIED,
                 hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
 
         waitForQueue();

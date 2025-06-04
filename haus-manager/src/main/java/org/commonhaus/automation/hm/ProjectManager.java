@@ -1,10 +1,9 @@
 package org.commonhaus.automation.hm;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.GitHubTeamService.refreshCollaborators;
-import static org.commonhaus.automation.github.context.GitHubTeamService.refreshTeam;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -26,6 +25,7 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.hm.config.GroupMapping;
+import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.kohsuke.github.GHContent;
@@ -37,38 +37,42 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class ProjectAccessManager extends GroupCoordinator {
+public class ProjectManager extends GroupCoordinator implements LatestProjectConfig {
     static final String ME = "🌳-project";
     static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
 
-    // flat map of tracked resources to the task group that manages them
-    final Map<String, String> resourceToTaskGroup = new ConcurrentHashMap<>();
-
     // flat map of task group to its current state
     final Map<String, ProjectConfigState> taskGroupToState = new ConcurrentHashMap<>();
+    private Map<String, ProjectConfigListener> callbacks = new ConcurrentHashMap<>();
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Project access refreshed", () -> lastRun);
     }
 
-    private static String repoNametoTaskGroup(String repoFullName) {
-        return "%s-%s".formatted(ME, repoFullName);
+    static String repoNametoTaskGroup(String repoFullName) {
+        return "cfg#" + repoFullName;
     }
 
-    private static String taskGroupToRepo(String taskGroup) {
-        return taskGroup.substring(ME.length() + 1);
+    static String taskGroupToRepo(String taskGroup) {
+        return taskGroup.substring(4);
     }
 
-    private static String teamToResource(String teamFullName) {
-        return "team-" + teamFullName;
+    public void notifyOnUpdate(String id, ProjectConfigListener listener) {
+        if (id == null || id.isBlank() || listener == null) {
+            return;
+        }
+        callbacks.put(id, listener);
     }
 
-    private static String repoToResource(String repoFullName) {
-        return "repo-" + repoFullName;
+    @Override
+    public Collection<ProjectConfigState> getAllProjects() {
+        return taskGroupToState.values();
     }
 
-    public static String resourceToFullName(String resource) {
-        return resource.substring(5);
+    @Override
+    public ProjectConfigState getProjectConfigState(String repoFullName) {
+        var taskGroup = repoNametoTaskGroup(repoFullName);
+        return taskGroupToState.get(taskGroup);
     }
 
     /**
@@ -78,42 +82,38 @@ public class ProjectAccessManager extends GroupCoordinator {
     @Scheduled(cron = "${automation.hausManager.cron.projects:0 47 4 */3 * ?}")
     public void scheduledRefresh() {
         try {
-            Log.infof("[%s] ⏰ Scheduled: begin refresh access lists", ME);
-            refreshAccessLists(false);
+            Log.infof("[%s] ⏰ Scheduled: begin refresh config", ME);
+            refreshConfig(false);
         } catch (Throwable t) {
-            ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled access list refresh", t);
+            ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled config refresh", t);
         }
     }
 
     /**
      * Allow manual trigger from admin endpoint
      */
-    public void refreshAccessLists(boolean userTriggered) {
+    public void refreshConfig(boolean userTriggered) {
         if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
-            Log.infof("[%s]: skip scheduled project access update (last run: %s)", ME, lastRun);
+            Log.infof("[%s]: skip scheduled project config update (last run: %s)", ME, lastRun);
             return;
         }
         recordRun();
 
-        for (String resourceKey : resourceToTaskGroup.keySet()) {
-            String fullName = resourceToFullName(resourceKey);
-            // Clear cache to force re-fetch on next access
-            if (resourceKey.startsWith("team-")) {
-                refreshTeam(fullName);
-            } else {
-                refreshCollaborators(fullName);
-            }
-        }
         // Queue reconciliation for all known task groups
         for (var entry : taskGroupToState.entrySet()) {
             String taskGroup = entry.getKey();
+            var state = entry.getValue();
+
             String repoFullName = taskGroupToRepo(taskGroup);
-            ScopedQueryContext qc = ctx.getOrgScopedQueryContext(repoFullName);
+            ScopedQueryContext qc = state == null || state == EMPTY
+                    ? ctx.getOrgScopedQueryContext(repoFullName)
+                    : new ScopedQueryContext(ctx, state.installationId(), repoFullName);
             if (qc == null) {
                 Log.warnf("[%s] %s: no org context for %s", ME, taskGroup, repoFullName);
                 continue;
             }
-            readProjectConfig(taskGroup, qc);
+            // do this in chunks to space the work out..
+            updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
         }
     }
 
@@ -130,6 +130,9 @@ public class ProjectAccessManager extends GroupCoordinator {
         Log.debugf("[%s] repositoryDiscovered (%s): %s", ME, repoEvent.action(), repoFullName);
         long installationId = repoEvent.installationId();
 
+        boolean runNow = taskState.shouldRun(ME, Duration.ofHours(6));
+        recordRun();
+
         // We only read configuration files from repositories in the configured organization
         if (action.repository() && orgName.equals(mgrBotConfig.home().organization())) {
             final String taskGroup = repoNametoTaskGroup(repoFullName);
@@ -138,35 +141,38 @@ public class ProjectAccessManager extends GroupCoordinator {
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                if (runNow) {
                     updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
                 } else {
-                    Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates");
-
-                    // Leave an outpost so we know it is interesting
-                    resourceToTaskGroup.put(repoToResource(repoFullName), taskGroup);
+                    Log.debug("Skip eager project discovery (ran recently); lazy population on updates");
                     taskGroupToState.put(taskGroup, EMPTY);
                 }
 
                 // Register watcher to monitor for org config changes
-                // GHRepository is backed by a cached connection that can expire
-                // use the GitHub object from the event to ensure a fresh connection
                 fileWatcher.watchFile(taskGroup,
                         installationId, repoFullName, ProjectConfig.PATH,
                         (fileUpdate) -> processFileUpdate(taskGroup, fileUpdate));
 
             } else if (action.removed()) {
                 // Remove any state associated with the repository (all watcher cleanup handled separately)
-                resourceToTaskGroup.remove(repoToResource(repoFullName));
-                ProjectConfigState state = taskGroupToState.remove(taskGroup);
-                if (state != null) {
-                    String sourceTeam = state.sourceTeam();
-                    if (sourceTeam != null) {
-                        resourceToTaskGroup.remove(teamToResource(sourceTeam));
-                    }
-                }
+                taskGroupToState.remove(taskGroup);
             }
         }
+    }
+
+    /**
+     * Read project configuration from repository.
+     * Called for file update events
+     */
+    protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
+        if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
+            String repoFullName = fileUpdate.repository().getFullName();
+            Log.debugf("[%s] processFileUpdate: %s %s deleted", ME, taskGroup, repoFullName);
+            taskGroupToState.remove(taskGroup);
+            return;
+        }
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
+        readProjectConfig(taskGroup, qc);
     }
 
     /**
@@ -186,26 +192,9 @@ public class ProjectAccessManager extends GroupCoordinator {
             ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
             readProjectConfig(taskGroup, qc);
         } else {
-            // queue reconcile action: deal with bursty config updates
+            // queue reconcile action
             updateQueue.queueReconciliation(ME, () -> reconcile(taskGroup));
         }
-    }
-
-    /**
-     * Read project configuration from repository.
-     * Called for file update events
-     */
-    protected void processFileUpdate(String taskGroup, FileUpdate fileUpdate) {
-        recordRun();
-
-        if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
-            String repoFullName = fileUpdate.repository().getFullName();
-            Log.debugf("[%s] processFileUpdate: %s %s deleted", ME, taskGroup, repoFullName);
-            taskGroupToState.remove(taskGroup);
-            return;
-        }
-        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
-        readProjectConfig(taskGroup, qc);
     }
 
     /**
@@ -251,16 +240,20 @@ public class ProjectAccessManager extends GroupCoordinator {
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
                 repo.getFullName(), qc.getInstallationId(), projectConfig);
 
-        if (oldState != null && oldState.sourceTeamHasChanged(newState)) {
-            Log.debugf("[%s] readProjectConfig %s: remove old state source -- %s", ME, taskGroup, oldState.sourceTeam());
-            resourceToTaskGroup.remove(repoToResource(oldState.sourceTeam()));
-            membershipEvents.unwatch(MembershipUpdateType.TEAM, oldState.sourceTeam());
-        }
-
         taskGroupToState.put(taskGroup, newState);
-
-        // queue reconcile action: deal with bursty config updates
         updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+
+        if (oldState != null) {
+            if (oldState.sourceTeamHasChanged(newState)) {
+                Log.debugf("[%s] readProjectConfig %s: remove old state source -- %s", ME, taskGroup, oldState.sourceTeam());
+                membershipEvents.unwatch(MembershipUpdateType.TEAM, oldState.sourceTeam());
+            }
+            if (oldState.healthCollectionHasChanged(newState)) {
+                for (var callback : callbacks.values()) {
+                    callback.onProjectConfigUpdate(callback.getTaskGroup(newState.repoName()), newState);
+                }
+            }
+        }
     }
 
     /**
@@ -304,7 +297,7 @@ public class ProjectAccessManager extends GroupCoordinator {
             Log.warnf("[%s] %s: No source team configured; skipping team sync", ME, state.taskGroup());
             return;
         }
-        String repoFullName = state.repoFullName();
+        String repoFullName = state.repoName();
         boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
 
         ScopedQueryContext projectQc = new ScopedQueryContext(ctx, state.installationId(), repoFullName);
@@ -350,8 +343,6 @@ public class ProjectAccessManager extends GroupCoordinator {
                 sourceLogins, teamAccess.ignoreUsers(),
                 isDryRun, projectConfig.emailNotifications());
 
-        // Update/keep references: sourceTeam -> taskGroup; taskGroup -> state
-        resourceToTaskGroup.put(sourceTeamName, state.taskGroup());
         taskGroupToState.put(state.taskGroup(), state);
 
         // Note: taskGroup is tied to the repo where the config file lives
@@ -374,13 +365,12 @@ public class ProjectAccessManager extends GroupCoordinator {
     protected void reset() {
         fileWatcher.unwatchAll(ME);
         membershipEvents.unwatchAll(ME);
-        resourceToTaskGroup.clear();
         taskGroupToState.clear();
     }
 
-    record ProjectConfigState(
+    public record ProjectConfigState(
             String taskGroup,
-            String repoFullName,
+            String repoName,
             long installationId,
             ProjectConfig projectConfig) implements ConfigState {
 
@@ -391,6 +381,26 @@ public class ProjectAccessManager extends GroupCoordinator {
             }
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             return myAccess != null ? myAccess.sourceTeam() : null;
+        }
+
+        public boolean healthCollectionHasChanged(ProjectConfigState newState) {
+            boolean oldEnabled = this != EMPTY && this.healthCollectionEnabled();
+            boolean newEnabled = newState != EMPTY && newState.healthCollectionEnabled();
+
+            // Health collection toggled on or off
+            if (oldEnabled != newEnabled) {
+                return newEnabled; // Only trigger collection if newly enabled
+            }
+
+            // Both enabled - check if health config changed
+            if (oldEnabled && newEnabled) {
+                return !Objects.equals(
+                        this.projectConfig.projectHealth(),
+                        newState.projectConfig.projectHealth());
+            }
+
+            // Neither enabled
+            return false;
         }
 
         public boolean sourceTeamHasChanged(ProjectConfigState newState) {
@@ -405,13 +415,18 @@ public class ProjectAccessManager extends GroupCoordinator {
             return newAccess == null || !Objects.equals(myAccess.sourceTeam(), newAccess.sourceTeam());
         }
 
-        public String[] errors() {
-            return this == EMPTY ? null : projectConfig().emailNotifications().errors();
+        public boolean healthCollectionEnabled() {
+            if (this == EMPTY) {
+                return false; // not configured yet (wait)
+            }
+            ProjectConfig config = projectConfig();
+            return config != null
+                    && config.projectHealth() != null
+                    && !config.projectHealth().trackedRepositories().isEmpty();
         }
 
-        @Override
-        public String repoName() {
-            return repoFullName;
+        public String[] errors() {
+            return this == EMPTY ? null : projectConfig().emailNotifications().errors();
         }
 
         @Override
