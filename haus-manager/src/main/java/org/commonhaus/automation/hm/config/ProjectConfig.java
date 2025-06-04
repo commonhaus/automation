@@ -33,7 +33,7 @@ public class ProjectConfig {
 
     /**
      * Return list of teams that should have membership
-     * syncnronized from a source team.
+     * synchronized from a source team.
      */
     public CollaboratorSync collaboratorSync() {
         return collaboratorSync;
