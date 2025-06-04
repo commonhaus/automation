@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github.context;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class DataSponsorship extends DataCommonType {
     // @formatter:on
 
     public final boolean isActive;
-    public final Date createdAt;
+    public final Instant createdAt;
     public final DataActor sponsorable;
     public final DataActor sponsorEntity;
     public final DataTier tier;
@@ -51,7 +51,7 @@ public class DataSponsorship extends DataCommonType {
         super(object);
 
         // common with webhook
-        this.createdAt = JsonAttribute.createdAt.dateFrom(object);
+        this.createdAt = JsonAttribute.createdAt.instantFrom(object);
         this.sponsorable = JsonAttribute.sponsorable.actorFrom(object);
         this.sponsorEntity = JsonAttribute.sponsorEntity.actorFrom(object);
         this.tier = JsonAttribute.tier.tierFrom(object);

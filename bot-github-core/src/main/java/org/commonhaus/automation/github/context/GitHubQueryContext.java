@@ -5,6 +5,9 @@ import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -338,7 +341,9 @@ public class GitHubQueryContext extends GraphQLQueryContext {
             JsonObject viewer = JsonAttribute.viewer.jsonObjectFrom(response.getData());
             return JsonAttribute.login.stringFrom(viewer);
         });
-        return botLogin.equals(login) || botLogin.replace("[bot]", "").equals(login);
+        return login.endsWith("[bot]")
+                || login.matches(".*-(ro)?bot")
+                || botLogin.equals(login);
     }
 
     /** Item-scoped comment lookup; doesn't always apply */
@@ -702,10 +707,17 @@ public class GitHubQueryContext extends GraphQLQueryContext {
     }
 
     public static String toRelativeName(String orgName, String fullName) {
-        return fullName.replace(orgName + "/", "");
+        return fullName.contains("/")
+                ? fullName.replace(orgName + "/", "")
+                : null;
     }
 
     public static String toFullName(String orgName, String relativeName) {
         return orgName + "/" + relativeName;
+    }
+
+    public static boolean isBetween(Instant d, LocalDate start, LocalDate end) {
+        return d != null && !d.isBefore(start.atStartOfDay().toInstant(ZoneOffset.UTC))
+                && d.isBefore(end.atStartOfDay().toInstant(ZoneOffset.UTC));
     }
 }

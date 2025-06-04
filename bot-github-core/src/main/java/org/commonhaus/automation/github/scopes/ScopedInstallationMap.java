@@ -1,7 +1,6 @@
 package org.commonhaus.automation.github.scopes;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import java.util.Map;
 import java.util.Optional;
@@ -38,12 +37,11 @@ public class ScopedInstallationMap {
 
     public ScopedQueryContext getOrgScopedQueryContext(ContextService ctx, String orgOrFullName) {
         String orgName = toOrganizationName(orgOrFullName);
-        String repoName = orgName.contains("/") ? toRelativeName(orgName, orgOrFullName) : null;
 
         AppInstallationState appInstallation = installationsByScope.get(orgName);
         return appInstallation == null
                 ? null
-                : new ScopedQueryContext(ctx, appInstallation, repoName);
+                : new ScopedQueryContext(ctx, appInstallation, orgOrFullName);
     }
 
     protected void updateInstallationMapping(
@@ -60,7 +58,7 @@ public class ScopedInstallationMap {
      * Specifically, ensure we have and can find the right app installation for
      * a repository or organization.
      */
-    protected void repositoryDiscovered(
+    public void repositoryDiscovered(
             @Observes @Priority(value = RdePriority.CORE_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
         DiscoveryAction action = repoEvent.action();
         long installationId = repoEvent.installationId();
@@ -79,7 +77,7 @@ public class ScopedInstallationMap {
         }
     }
 
-    private void updateInstallationMap(long installationId, String repoFullName) {
+    void updateInstallationMap(long installationId, String repoFullName) {
         String orgName = toOrganizationName(repoFullName);
         AppInstallationState appInstallation = new AppInstallationState(installationId, orgName);
 

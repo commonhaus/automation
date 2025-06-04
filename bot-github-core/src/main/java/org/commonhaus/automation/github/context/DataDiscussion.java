@@ -1,5 +1,6 @@
 package org.commonhaus.automation.github.context;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -85,6 +86,36 @@ public class DataDiscussion extends DataCommonItem {
 
         variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
                 qc.getRepository().getFullName(), labelName));
+
+        DataPageInfo pageInfo = new DataPageInfo(null, false);
+        do {
+            variables.put("after", pageInfo.cursor());
+            Response response = qc.execRepoQuerySync(QUERY_DISCUSSIONS_WITH_LABEL, variables);
+            if (qc.hasErrors()) {
+                qc.checkRemoveNotFound();
+                return null;
+            }
+
+            JsonObject search = JsonAttribute.search.jsonObjectFrom(response.getData());
+            JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(search);
+            allDiscussions.addAll(nodes.stream()
+                    .map(JsonObject.class::cast)
+                    .map(DataDiscussion::new)
+                    .toList());
+
+            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(search);
+        } while (pageInfo.hasNextPage());
+        return allDiscussions;
+    }
+
+    @Nonnull
+    public static List<DataDiscussion> findDiscussionsBetween(GitHubQueryContext qc,
+            LocalDate from, LocalDate toExclusive) {
+        List<DataDiscussion> allDiscussions = new ArrayList<>();
+        Map<String, Object> variables = new HashMap<>();
+
+        variables.put("query", String.format("repo:%s is:discussion created:%s..%s",
+                qc.getRepository().getFullName(), from, toExclusive.minusDays(1)));
 
         DataPageInfo pageInfo = new DataPageInfo(null, false);
         do {

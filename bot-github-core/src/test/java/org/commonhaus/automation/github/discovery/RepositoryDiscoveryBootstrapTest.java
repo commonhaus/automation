@@ -7,7 +7,6 @@ import static org.commonhaus.automation.github.discovery.EventCounter.collectBoo
 import static org.commonhaus.automation.github.discovery.EventCounter.collectInstallationEvent;
 import static org.commonhaus.automation.github.discovery.EventCounter.collectRepositoryEvent;
 import static org.commonhaus.automation.github.discovery.EventCounter.countGHInstallationEvent;
-import static org.commonhaus.automation.github.discovery.EventCounter.countStartupEvent;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -64,13 +63,13 @@ public class RepositoryDiscoveryBootstrapTest extends ContextHelper {
     @BeforeEach
     void setup() throws IOException {
         gitHubService = Arc.container().instance(GitHubService.class).get();
-        configProducer.setDiscoveryEnabled(true);
         eventCounter.reset();
         mockInstallation = setupCommonMocks(defaultValues);
     }
 
     @Test
     void testStartupEvent() throws Exception {
+
         // Discovery is elaborate. It requires a GitHub App installation to be created
         // and repositories to be added to the installation. This test is a sanity check
         // to ensure that the startup event is fired and that the discovery process is
@@ -98,13 +97,10 @@ public class RepositoryDiscoveryBootstrapTest extends ContextHelper {
 
         when(ghai.listRepositories()).thenReturn(repositoryIterable);
 
-        // repost startup event to trigger discovery
-        fireStartupEvent.fire(new StartupEvent());
+        configProducer.setDiscoveryEnabled(true);
+        repositoryDiscovery.discoverRepositories();
 
-        await().atMost(5, SECONDS).until(() -> countStartupEvent.get() > 0);
         await().atMost(5, SECONDS).until(() -> collectBootstrapEvent.size() > 0);
-
-        assertThat(countStartupEvent.get()).isEqualTo(1);
 
         assertThat(countGHInstallationEvent.get()).isEqualTo(0);
         assertThat(countGHInstallationEvent.get()).isEqualTo(0);

@@ -1,10 +1,10 @@
 package org.commonhaus.automation.hr.voting;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -433,7 +433,7 @@ public class VoteTally {
         @JsonSerialize(using = VoteTally.ActorSerializer.class)
         public final DataActor author;
 
-        public final Date createdAt;
+        public final Instant createdAt;
         public final String body;
         public final String url;
 
