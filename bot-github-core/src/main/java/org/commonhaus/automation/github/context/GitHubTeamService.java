@@ -19,6 +19,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.github.context.DataRepository.Collaborators;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHOrganization.RepositoryRole;
 import org.kohsuke.github.GHRepository;
@@ -61,11 +62,11 @@ public class GitHubTeamService {
         TEAM_MEMBERS.invalidate(teamFullName);
     }
 
-    static Set<String> getCachedCollaborators(String repoFullName) {
+    static Collaborators getCachedCollaborators(String repoFullName) {
         return COLLABORATORS.get(repoFullName);
     }
 
-    static Set<String> putCachedCollaborators(String repoFullName, Set<String> members) {
+    static Collaborators putCachedCollaborators(String repoFullName, Collaborators members) {
         if (members != null) {
             COLLABORATORS.put(repoFullName, members);
         }
@@ -253,9 +254,29 @@ public class GitHubTeamService {
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaborators(GitHubQueryContext qc, String repoFullName) {
-        GHRepository repo = qc.getRepository(repoFullName);
-        return repo == null ? Set.of() : getCollaborators(qc, repo);
+    public Collaborators getCollaborators(GitHubQueryContext qc, String repoFullName) {
+        Collaborators collaborators = getCachedCollaborators(repoFullName);
+        if (collaborators == null) {
+            collaborators = DataRepository.queryCollaborators(qc, repoFullName);
+            putCachedCollaborators(repoFullName, collaborators);
+        }
+        return collaborators;
+    }
+
+    /**
+     * Get repository collaborators.
+     *
+     * @param qc QueryContext
+     * @param repoFullName full repository name
+     * @return set of collaborator logins or null if repository not found
+     */
+    @Nonnull
+    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, String repoFullName) {
+        Collaborators collaborators = getCollaborators(qc, repoFullName);
+        if (collaborators == null) {
+            return Set.of();
+        }
+        return collaborators.logins();
     }
 
     /**
@@ -266,24 +287,16 @@ public class GitHubTeamService {
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaborators(GitHubQueryContext qc, GHRepository repository) {
-        if (repository == null) {
+    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, GHRepository repository) {
+        return getCollaboratorLogins(qc, repository.getFullName());
+    }
+
+    public Set<String> getOwnerAdministrators(GitHubQueryContext qc, String repoFullName) {
+        var collaborators = getCollaborators(qc, repoFullName);
+        if (collaborators == null) {
             return Set.of();
         }
-        String repoFullName = repository.getFullName();
-        Set<String> collaborators = getCachedCollaborators(repoFullName);
-        if (collaborators == null) {
-            collaborators = qc.execGitHubSync((gh, dryRun) -> {
-                return repository.getCollaboratorNames();
-            });
-            if (qc.hasErrors() || collaborators == null) {
-                qc.checkRemoveNotFound();
-                collaborators = Set.of();
-            }
-            Log.debugf("%s members: %s", repoFullName, collaborators);
-            putCachedCollaborators(repoFullName, collaborators);
-        }
-        return collaborators;
+        return collaborators.adminLogins();
     }
 
     /**
@@ -315,7 +328,7 @@ public class GitHubTeamService {
      * @return
      */
     public boolean isCollaborator(GitHubQueryContext qc, GHUser user, String repoName) {
-        Set<String> collaborators = getCollaborators(qc, repoName);
+        Set<String> collaborators = getCollaboratorLogins(qc, repoName);
         return collaborators.contains(user.getLogin());
     }
 
@@ -337,11 +350,14 @@ public class GitHubTeamService {
                 repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaborators(qc, repository);
+        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
                 repoFullName, currentLogins, expectedLogins, ignoreUsers);
+
+        Set<String> ownerLogins = getOwnerAdministrators(qc, repoFullName);
+        changes.removeOwners(ownerLogins); // no owners in changes
 
         changes.toRemove().clear(); // no removals
         if (changes.isEmpty()) {
@@ -396,17 +412,20 @@ public class GitHubTeamService {
      * @param addresses Email notification addresses
      */
     public void syncCollaborators(GitHubQueryContext qc, GHRepository repository, RepositoryRole role,
-            Set<String> expectedLogins, List<String> ignoreUsers,
+            Set<String> expectedLogins, Collection<String> ignoreUsers,
             boolean isDryRun, EmailNotification addresses) {
 
         Log.debugf("[%s] syncCollaborators: syncing collaborators for repository %s", qc.getLogId(), repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaborators(qc, repository);
+        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
                 repoFullName, currentLogins, expectedLogins, ignoreUsers);
+
+        Set<String> owners = getOwnerAdministrators(qc, repoFullName);
+        changes.removeOwners(owners); // no owners in changes
 
         if (changes.toAdd().isEmpty() && changes.toRemove().isEmpty()) {
             Log.debugf("[%s] syncCollaborators: No changes needed for repository %s",
@@ -559,7 +578,8 @@ public class GitHubTeamService {
     }
 
     private MembershipChanges computeMemberChanges(boolean collaborators, String resourceName,
-            Set<String> currentLogins, Set<String> expectedLogins, List<String> ignoreUsers) {
+            Set<String> currentLogins, Set<String> expectedLogins, Collection<String> ignoreUsers) {
+
         Set<String> toAdd = new HashSet<>(expectedLogins);
         toAdd.removeAll(currentLogins);
         toAdd.removeAll(ignoreUsers);
@@ -596,6 +616,12 @@ public class GitHubTeamService {
             addedMembers.removeAll(organizations);
             removedMembers.removeAll(organizations);
             finalMembers.removeAll(organizations);
+        }
+
+        public void removeOwners(Set<String> owners) {
+            addedMembers.removeAll(owners);
+            removedMembers.removeAll(owners);
+            finalMembers.removeAll(owners);
         }
 
         public Set<String> toRemove() {

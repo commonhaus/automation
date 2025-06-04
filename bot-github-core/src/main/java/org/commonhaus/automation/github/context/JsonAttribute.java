@@ -56,6 +56,13 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     repositoriesRemoved("repositories_removed"),
     repository,
 
+    // Repo collaborators and permissions
+    collaborators,
+    permission,
+    permissionSources,
+    source,
+    typeName("__typename"),
+
     // Base GitHub GraphQL object type
     id,
     node_id,
@@ -148,6 +155,7 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     team,
 
     // GraphQL Query attributes
+    edges,
     endCursor,
     hasNextPage,
     node,

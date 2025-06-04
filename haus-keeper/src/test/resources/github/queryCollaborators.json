@@ -1,0 +1,19 @@
+{
+  "repository": {
+    "collaborators": {
+      "edges": [
+        {
+          "node": {
+            "login": "commonhaus-bot"
+          },
+          "permission": "WRITE",
+          "permissionSources": []
+        }
+      ],
+      "pageInfo": {
+        "endCursor": "Y3Vyc29yOnYyOpHOAAxXCQ==",
+        "hasNextPage": false
+      }
+    }
+  }
+}

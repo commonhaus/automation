@@ -214,9 +214,10 @@ public class ProjectAccessManager extends GroupCoordinator {
      */
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc) {
         ProjectConfigState oldState = taskGroupToState.get(taskGroup);
+        String repoFullName = taskGroupToRepo(taskGroup);
 
         // The repository containing the (added/modified) file must be present in the query context
-        GHRepository repo = qc.getRepository();
+        GHRepository repo = qc.getRepository(repoFullName);
         if (repo == null) {
             Log.warnf("[%s] readProjectConfig %s: repository not set in QueryContext", ME, taskGroup);
             return;
