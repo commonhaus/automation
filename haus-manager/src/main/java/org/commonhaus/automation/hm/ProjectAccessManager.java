@@ -298,8 +298,7 @@ public class ProjectAccessManager extends GroupCoordinator {
 
     private void doSyncCollaborators(ProjectConfigState state, ProjectConfig projectConfig) {
         CollaboratorSync teamAccess = projectConfig.collaboratorSync();
-
-        String sourceTeamName = teamAccess.sourceTeam();
+        String sourceTeamName = teamAccess == null ? null : teamAccess.sourceTeam();
         if (sourceTeamName == null) {
             Log.warnf("[%s] %s: No source team configured; skipping team sync", ME, state.taskGroup());
             return;
