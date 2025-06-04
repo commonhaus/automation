@@ -25,6 +25,8 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.DataLabel;
+import org.commonhaus.automation.github.context.DataRepository.Collaborator;
+import org.commonhaus.automation.github.context.DataRepository.Collaborators;
 import org.commonhaus.automation.github.context.TestBotConfig;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
@@ -152,7 +154,12 @@ public class HausKeeperTestBase extends ContextHelper {
     }
 
     public void addCollaborator(String repoName, String login) {
-        BaseQueryCache.COLLABORATORS.put(repoName, Set.of(login));
+        Collaborator collaborator = new Collaborator(
+                login,
+                "WRITE",
+                List.of());
+        BaseQueryCache.COLLABORATORS.put(repoName,
+                new Collaborators(Set.of(collaborator)));
     }
 
     public GHUser setupBotLogin() throws IOException {
@@ -308,6 +315,9 @@ public class HausKeeperTestBase extends ContextHelper {
 
         QUERY_NO_COMMENTS("comments(first: 50",
                 "src/test/resources/github/queryComments.None.json"),
+
+        QUERY_COLLABORATORS("collaborators(first: 100",
+                "src/test/resources/github/queryCollaborators.json"),
 
         CREATE_ISSUE("createIssue(input: {",
                 "src/test/resources/github/mutableCreateIssue.json"),

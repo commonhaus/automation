@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
@@ -38,7 +37,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContentBuilder;
-import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -118,10 +116,6 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testUserInfoEndpoint() throws Exception {
         addCollaborator("commonhaus-test/sponsors-test", botLogin);
 
-        // Make known user: add to sponsors-test repository
-        GHRepository repo = sponsorMocks.repository();
-        when(repo.getCollaboratorNames()).thenReturn(Set.of(botLogin));
-
         // Simple retrieval of UserInfo data (provided above)
         // Parse/population of GitHubUser object
         given()
@@ -170,6 +164,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testGetCommonhausUserNotFound() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, "other");
 
         when(dataMocks.repository().getFileContent(anyString()))
                 .thenThrow(new TestFileNotFoundException("test ex"));
@@ -235,6 +230,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -259,6 +255,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -288,6 +285,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -314,6 +312,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -353,6 +352,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -398,6 +398,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testPutUnknownAttestation() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         AttestationPost attestation = new AttestationPost(
                 "unknown",
@@ -438,6 +439,7 @@ public class MemberDataTest extends HausKeeperTestBase {
 
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         given()
                 .log().all()
@@ -486,6 +488,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testGetApplication() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
         mockExistingCommonhausData(UserPath.WITH_APPLICATION); // getFileContent(anyString())
@@ -517,6 +520,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testGetInvalidApplication() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         // dataStore.getFileContent(anyString()))
         mockExistingCommonhausData(UserPath.WITH_APPLICATION);
@@ -560,6 +564,7 @@ public class MemberDataTest extends HausKeeperTestBase {
     void testSubmitApplication() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
+        addCollaborator(sponsorsRepo, botLogin);
 
         ApplicationPost application = new ApplicationPost("unknown", "draft");
         String applyJson = mapper.writeValueAsString(application);

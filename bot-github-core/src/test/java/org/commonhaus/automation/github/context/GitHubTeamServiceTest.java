@@ -161,13 +161,15 @@ public class GitHubTeamServiceTest extends ContextHelper {
         // Setup current team members
         Set<String> currentLogins = Set.of("user1", "user2", "user3");
 
-        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4 and user5 should be added)
+        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4
+        // and user5 should be added)
         Set<String> expectedLogins = Set.of("user2", "user4", "user5");
 
         // Setup GraphQL response for current members
         mockDataTeamQueryResponse(currentLogins);
 
-        // Test syncing members - this should add user4 and user5, and remove user1 and user3
+        // Test syncing members - this should add user4 and user5, and remove user1 and
+        // user3
         teamService.syncMembers(queryContext, TEAM_FULL_NAME, expectedLogins, List.of(),
                 defaultDryRun, emailNotification);
 
@@ -229,7 +231,8 @@ public class GitHubTeamServiceTest extends ContextHelper {
         teamService.syncMembers(queryContext, TEAM_FULL_NAME, expectedLogins, ignoreUsers,
                 defaultDryRun, emailNotification);
 
-        // Verify users were added and removed correctly - user1 should NOT be removed because it's in the ignore list
+        // Verify users were added and removed correctly - user1 should NOT be removed
+        // because it's in the ignore list
         ArgumentCaptor<GHUser> addCaptor = ArgumentCaptor.forClass(GHUser.class);
         ArgumentCaptor<GHUser> removeCaptor = ArgumentCaptor.forClass(GHUser.class);
 
@@ -265,7 +268,8 @@ public class GitHubTeamServiceTest extends ContextHelper {
         teamService.syncMembers(queryContext, TEAM_FULL_NAME, expectedLogins, ignoreUsers,
                 defaultDryRun, emailNotification);
 
-        // Verify users were added and removed correctly - user1 should NOT be removed because it's in the ignore list
+        // Verify users were added and removed correctly - user1 should NOT be removed
+        // because it's in the ignore list
         ArgumentCaptor<GHUser> addCaptor = ArgumentCaptor.forClass(GHUser.class);
         ArgumentCaptor<GHUser> removeCaptor = ArgumentCaptor.forClass(GHUser.class);
 
@@ -326,10 +330,10 @@ public class GitHubTeamServiceTest extends ContextHelper {
 
         // Verify error emails were sent
         // verify(ctx).sendEmail(
-        //         anyString(),
-        //         anyString(),
-        //         anyString(),
-        //         eq(emailNotification.audit()));
+        // anyString(),
+        // anyString(),
+        // anyString(),
+        // eq(emailNotification.audit()));
 
         verify(ctx).sendEmail(
                 anyString(),
@@ -340,7 +344,7 @@ public class GitHubTeamServiceTest extends ContextHelper {
     }
 
     @Test
-    void testSyncCollaborators() throws IOException {
+    void testSyncCollaborators() throws Exception {
         GHRepository repository = hausMocks.repository();
 
         // Mock repository and users
@@ -352,12 +356,14 @@ public class GitHubTeamServiceTest extends ContextHelper {
 
         // Setup current collaborators
         Set<String> currentCollaborators = Set.of("user1", "user2", "user3");
-        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4 and user5 should be added)
+        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4
+        // and user5 should be added)
         Set<String> expectedLogins = Set.of("user2", "user4", "user5");
 
-        when(repository.getCollaboratorNames()).thenReturn(currentCollaborators);
+        mockDataCollaboratorsQueryResponse(currentCollaborators, Set.of("user1"));
 
-        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole.from(GHOrganization.Permission.PUSH);
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
+                .from(GHOrganization.Permission.PUSH);
         // Test syncing collaborators
         teamService.syncCollaborators(queryContext, repository, collaboratorRole,
                 expectedLogins, List.of(), defaultDryRun, emailNotification);
@@ -383,8 +389,9 @@ public class GitHubTeamServiceTest extends ContextHelper {
 
             assertThat(addedUsers.stream().map(GHUser::getLogin))
                     .containsExactlyInAnyOrder("user4", "user5");
+            // user1 is an admin, and should not be removed
             assertThat(removedUsers.stream().map(GHUser::getLogin))
-                    .containsExactlyInAnyOrder("user1", "user3");
+                    .containsExactlyInAnyOrder("user3");
         }
 
         // Verify an audit email was sent
@@ -396,7 +403,7 @@ public class GitHubTeamServiceTest extends ContextHelper {
     }
 
     @Test
-    void testSyncCollaboratorsDryRun() throws IOException {
+    void testSyncCollaboratorsDryRun() throws Exception {
         defaultDryRun = true;
         testSyncCollaborators();
     }
@@ -418,6 +425,28 @@ public class GitHubTeamServiceTest extends ContextHelper {
                 .build();
 
         mockResponse("team(slug: $slug)", jsonObject);
+    }
+
+    private void mockDataCollaboratorsQueryResponse(Set<String> collaborators, Set<String> admins)
+            throws ExecutionException, InterruptedException {
+        JsonObject jsonObject = Json.createObjectBuilder()
+                .add("repository", Json.createObjectBuilder()
+                        .add("collaborators", Json.createObjectBuilder()
+                                .add("edges", Json.createArrayBuilder(
+                                        collaborators.stream()
+                                                .map(login -> Json.createObjectBuilder()
+                                                        .add("node", Json.createObjectBuilder()
+                                                                .add("login", login))
+                                                        .add("permission", admins.contains(login) ? "ADMIN" : "WRITE")
+                                                        .add("permissionSources", Json.createArrayBuilder(
+                                                                List.of())))
+                                                .toList()))
+                                .add("pageInfo", Json.createObjectBuilder()
+                                        .add("endCursor", "Y3Vyc29yOnYyOpHOAAxXCQ==")
+                                        .add("hasNextPage", false))))
+                .build();
+
+        mockResponse("collaborators(first: 100, after: $after)", jsonObject);
     }
 
     final static class MockContextService {
