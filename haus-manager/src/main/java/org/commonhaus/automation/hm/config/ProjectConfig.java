@@ -1,13 +1,11 @@
 package org.commonhaus.automation.hm.config;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import jakarta.annotation.Nonnull;
 
 import org.commonhaus.automation.config.EmailNotification;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
@@ -23,13 +21,10 @@ public class ProjectConfig {
     protected Boolean enabled;
     protected Boolean dryRun;
 
-    protected String gitHubResources;
     protected CollaboratorSync collaboratorSync;
     protected List<GroupMapping> teamMembership;
     protected EmailNotification emailNotifications;
-
-    @JsonIgnore
-    private Set<String> allResources;
+    protected ProjectHealth projectHealth;
 
     /**
      * Return list of teams that should have membership
@@ -59,6 +54,11 @@ public class ProjectConfig {
         return emailNotifications == null
                 ? EmailNotification.UNDEFINED
                 : emailNotifications;
+    }
+
+    /** Project health configuration */
+    public ProjectHealth projectHealth() {
+        return projectHealth;
     }
 
     @Override
@@ -100,6 +100,32 @@ public class ProjectConfig {
         public String toString() {
             return "TeamAccess{sourceTeam=%s, role=%s, logins=%s, ignoreUsers=%s}"
                     .formatted(sourceTeam(), role(), includeUsers(), ignoreUsers());
+        }
+    }
+
+    /**
+     * Project health configuration for foundation oversight
+     *
+     * @param status Current project lifecycle status
+     * @param description Brief description of what the project does
+     * @param expectedReleaseFrequency Repository with expected frequency of releases
+     * @param trackedRepositories List of repository patterns to include in health metrics
+     * @param lastUpdated Date when this configuration was last reviewed/updated
+     */
+    public record ProjectHealth(
+            String status,
+            String description,
+            Map<String, String> expectedReleaseFrequency,
+            List<String> trackedRepositories) {
+
+        @Override
+        public Map<String, String> expectedReleaseFrequency() {
+            return expectedReleaseFrequency != null ? expectedReleaseFrequency : Map.of();
+        }
+
+        @Override
+        public List<String> trackedRepositories() {
+            return trackedRepositories != null ? trackedRepositories : List.of();
         }
     }
 }
