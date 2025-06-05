@@ -6,6 +6,7 @@ public enum MemberStatus {
     DECLINED,
     COMMITTEE,
     ACTIVE,
+    OPS,
     INACTIVE,
     PENDING,
     SPONSOR,
