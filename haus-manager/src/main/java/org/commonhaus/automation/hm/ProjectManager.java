@@ -422,7 +422,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             ProjectConfig config = projectConfig();
             return config != null
                     && config.projectHealth() != null
-                    && !config.projectHealth().trackedRepositories().isEmpty();
+                    && !config.projectHealth().organizationRepositories().isEmpty();
         }
 
         public String[] errors() {

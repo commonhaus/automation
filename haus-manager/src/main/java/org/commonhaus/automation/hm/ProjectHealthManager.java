@@ -15,6 +15,7 @@ import org.commonhaus.automation.github.stats.ProjectHealthCollector;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.LatestProjectConfig.ProjectConfigListener;
+import org.commonhaus.automation.hm.config.ProjectConfig.RepositoryConfig;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -33,30 +34,33 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
     ProjectHealthCollector projectHealthCollector;
 
     void startup(@Observes StartupEvent startup) {
-        RouteSupplier.registerSupplier("Sponsor management refreshed", () -> lastRun);
+        RouteSupplier.registerSupplier("Project health refreshed", () -> lastRun);
         // Notify when project config changes
         latestProjectConfig.notifyOnUpdate(ME, this);
     }
 
     @Override
-    public void onProjectConfigUpdate(String healthTaskGroup, ProjectConfigState projectConfig) {
+    public void onProjectConfigUpdate(String healthTaskGroup, ProjectConfigState state) {
         Log.debugf("[%s] Project config updated for %s", ME, healthTaskGroup);
 
-        if (!projectConfig.healthCollectionEnabled()) {
+        if (!state.healthCollectionEnabled()) {
             Log.debugf("[%s] %s: Health collection disabled, skipping", ME, healthTaskGroup);
             return;
         }
 
         // Queue health collection for this specific project
         updateQueue.queueReconciliation(healthTaskGroup,
-                () -> doCollectProjectHealth(healthTaskGroup, false, LocalDate.now()));
+                () -> doCollectProjectHealth(healthTaskGroup, state.repoName(), false, LocalDate.now()));
     }
 
     @Scheduled(cron = "0 0 6 ? * SUN") // Sunday 6 AM
     public void weeklyHealthCollection() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin collection of project health data", ME);
-            LocalDate safeDay = LocalDateTime.now().with(TemporalAdjusters.previous(java.time.DayOfWeek.FRIDAY)).toLocalDate();
+            // Safe anchor ensures we always get the Sunday of the completed week
+            LocalDate safeDay = LocalDateTime.now().with(TemporalAdjusters.previous(java.time.DayOfWeek.FRIDAY))
+                    .toLocalDate();
+            // This will work from the Sunday before our safe day.
             collectHeathData(false, safeDay);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled config refresh", t);
@@ -73,14 +77,15 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         }
         recordRun();
         for (var state : latestProjectConfig.getAllProjects()) {
-            var taskGroup = repotoHealthGroup(state.repoName());
+            var healthTaskGroup = getTaskGroup(state.repoName());
             // do this in chunks to space the work out..
-            updateQueue.queueReconciliation(taskGroup, () -> doCollectProjectHealth(taskGroup, userTriggered, anchorDate));
+            updateQueue.queueReconciliation(healthTaskGroup,
+                    () -> doCollectProjectHealth(healthTaskGroup, state.repoName(), userTriggered, anchorDate));
         }
     }
 
-    private void doCollectProjectHealth(String healthTaskGroup, boolean userTriggered, LocalDate anchorDate) {
-        var repoFullName = healthGroupToRepo(healthTaskGroup);
+    private void doCollectProjectHealth(String healthTaskGroup, String repoFullName, boolean userTriggered,
+            LocalDate anchorDate) {
         var state = latestProjectConfig.getProjectConfigState(repoFullName);
         if (state == null) {
             Log.warnf("[%s] %s: No project config state found for %s", ME, healthTaskGroup, repoFullName);
@@ -93,37 +98,83 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
         var config = state.projectConfig();
         var projectHealth = config.projectHealth();
-        Log.debugf("[%s] %s: Collecting project health data for %s repositories",
-                ME, state.taskGroup(), projectHealth.trackedRepositories().size());
+        Log.debugf("[%s] %s: Collecting project health data for %s organizations",
+                ME, state.taskGroup(), projectHealth.organizationRepositories().size());
 
-        for (String repoPattern : projectHealth.trackedRepositories()) {
-            updateQueue.queueReconciliation("%s::%s".formatted(healthTaskGroup, repoPattern), () -> {
-                this.collectRepoHealth(anchorDate, state.installationId(), state.repoName());
+        // Collect health data for each configured organization
+        for (var orgEntry : projectHealth.organizationRepositories().entrySet()) {
+            String orgName = orgEntry.getKey();
+            var repoConfig = orgEntry.getValue();
+            String orgTaskGroup = orgRepoHealthReport(orgName);
+            ;
+
+            updateQueue.queueReconciliation(orgTaskGroup, () -> {
+                collectOrganizationHealth(anchorDate, state.installationId(), orgName, repoConfig);
             });
         }
     }
 
-    private void collectRepoHealth(LocalDate anchorDate, long installationId, String repoFullName) {
+    private void collectOrganizationHealth(LocalDate anchorDate, long installationId, String orgName,
+            RepositoryConfig repoConfig) {
+        ScopedQueryContext orgQc = new ScopedQueryContext(ctx, installationId, orgName, null);
+        var organization = orgQc.getOrganization();
+        if (organization == null || orgQc.hasErrors()) {
+            orgQc.logAndSendContextErrors("[%s] unable to list repositories for %s".formatted(ME, orgName));
+            return;
+        }
+
+        Log.debugf("[%s] Discovering repositories for organization %s", ME, orgName);
+
+        // Get all repositories in the organization
+        var allRepos = orgQc.execGitHubSync((gh, dr) -> {
+            return organization.listRepositories().toList();
+        });
+        if (orgQc.hasErrors()) {
+            orgQc.logAndSendContextErrors("[%s] unable to list repositories for %s".formatted(ME, orgName));
+            return;
+        }
+
+        // Filter repositories based on configuration
+        var trackedRepos = allRepos.stream()
+                .filter(repo -> !repoConfig.isExcluded(repo.getName()))
+                .filter(repo -> !repo.isArchived()) // Skip archived repositories
+                .toList();
+
+        Log.debugf("[%s] Found %d repositories to track in %s (excluded %d)",
+                ME, trackedRepos.size(), orgName, allRepos.size() - trackedRepos.size());
+
+        // Collect health data for each tracked repository
+        for (var repo : trackedRepos) {
+            String fullName = repo.getFullName();
+            String reportTaskGroup = orgRepoHealthReport(fullName);
+            String expectedFrequency = repoConfig.getReleaseFrequency(repo.getName());
+            updateQueue.queueReconciliation(reportTaskGroup, () -> {
+                collectRepoHealth(anchorDate, installationId, fullName, expectedFrequency);
+            });
+        }
+    }
+
+    private void collectRepoHealth(LocalDate anchorDate, long installationId, String repoFullName,
+            String expectedFrequency) {
         ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
-        Log.debugf("[%s] Collecting health data for %s", ME, repoFullName);
+        Log.debugf("[%s] Collecting health data for %s (expected frequency: %s)", ME, repoFullName, expectedFrequency);
         var report = projectHealthCollector.collect(qc, anchorDate);
+
+        // TODO: Write report to file, including expected frequency metadata
+        Log.debugf("[%s] Collected health report for %s: %s", ME, repoFullName, report);
     }
 
     @Override
-    public String getTaskGroup(String projectName) {
-        return repotoHealthGroup(projectName);
+    public String getTaskGroup(String repoFullName) {
+        return "health#" + repoFullName;
+    }
+
+    private static String orgRepoHealthReport(String orgOrRepoName) {
+        return "healthReport#" + orgOrRepoName;
     }
 
     @Override
     protected String me() {
         return ME;
-    }
-
-    private static String repotoHealthGroup(String repoFullName) {
-        return "health#" + repoFullName;
-    }
-
-    private static String healthGroupToRepo(String taskGroup) {
-        return taskGroup.substring(7);
     }
 }

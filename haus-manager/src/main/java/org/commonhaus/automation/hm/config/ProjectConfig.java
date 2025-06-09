@@ -106,26 +106,57 @@ public class ProjectConfig {
     /**
      * Project health configuration for foundation oversight
      *
-     * @param status Current project lifecycle status
-     * @param description Brief description of what the project does
-     * @param expectedReleaseFrequency Repository with expected frequency of releases
-     * @param trackedRepositories List of repository patterns to include in health metrics
-     * @param lastUpdated Date when this configuration was last reviewed/updated
+     * @param maturity Project maturity level (early, mature, experimental,
+     *        deprecated, etc.)
+     * @param organizationRepositories Map of organization to repository configuration.
      */
     public record ProjectHealth(
-            String status,
-            String description,
-            Map<String, String> expectedReleaseFrequency,
-            List<String> trackedRepositories) {
+            String maturity,
+            Map<String, RepositoryConfig> organizationRepositories) {
+
+        public RepositoryConfig repositoryConfig(String orgName) {
+            if (organizationRepositories == null || organizationRepositories.isEmpty()) {
+                return RepositoryConfig.EMPTY;
+            }
+            RepositoryConfig repositories = organizationRepositories.get(orgName);
+            return repositories != null ? repositories : RepositoryConfig.EMPTY;
+        }
+    }
+
+    /**
+     * Repository configuration for health tracking
+     *
+     * @param excludes List of repository names to exclude from health tracking
+     * @param releases Map of repository names to expected release frequency
+     */
+    public record RepositoryConfig(
+            List<String> excludes,
+            Map<String, String> releases) {
+
+        static final RepositoryConfig EMPTY = new RepositoryConfig(List.of(), Map.of());
 
         @Override
-        public Map<String, String> expectedReleaseFrequency() {
-            return expectedReleaseFrequency != null ? expectedReleaseFrequency : Map.of();
+        public List<String> excludes() {
+            return excludes != null ? excludes : List.of();
         }
 
         @Override
-        public List<String> trackedRepositories() {
-            return trackedRepositories != null ? trackedRepositories : List.of();
+        public Map<String, String> releases() {
+            return releases != null ? releases : Map.of();
+        }
+
+        /**
+         * Check if a repository should be excluded from health tracking
+         */
+        public boolean isExcluded(String repositoryName) {
+            return excludes().contains(repositoryName);
+        }
+
+        /**
+         * Get expected release frequency for a repository
+         */
+        public String getReleaseFrequency(String repositoryName) {
+            return releases().get(repositoryName);
         }
     }
 }
