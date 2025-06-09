@@ -46,3 +46,4 @@ logs
 
 # Plugin directory
 /.quarkus/cli/plugins/
+CLAUDE.md
