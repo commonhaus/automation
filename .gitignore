@@ -6,10 +6,6 @@ pom.xml.versionsBackup
 release.properties
 .flattened-pom.xml
 
-# MCP experiments
-*.toml
-.gpt-data
-
 # Eclipse
 .project
 .classpath
@@ -46,4 +42,7 @@ logs
 
 # Plugin directory
 /.quarkus/cli/plugins/
-CLAUDE.md
+
+# MCP experiments
+.claude
+repomix

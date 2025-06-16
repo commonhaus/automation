@@ -1,0 +1,40 @@
+project_prompt = """
+# Commonhaus Foundation Automation Bot
+
+Multi-module Java project providing GitHub automation tools for the Commonhaus Foundation.
+
+## Context Files for Module Details
+
+For comprehensive understanding of architecture and implementation details, refer to:
+- Module structure: [.gpt-data/pom-xml-overview.md]
+- Core functionality: [.gpt-data/common-overview.md]
+- HausKeeper: [.gpt-data/haus-keeper-overview.md]
+- HausManager: [.gpt-data/haus-manager-overview.md]  
+- HausRules: [.gpt-data/haus-rules-overview.md]
+
+See CLAUDE.md for complete architecture overview, build commands, and coding standards.
+"""
+
+[commands.format]
+command = ["./mvnw", "process-sources"]
+doc = "Format code using Maven process-sources target"
+
+[commands.common]
+command = ["./mvnw", "verify", "-am", "-pl", "bot-github-core"]
+doc = "Build and test the bot-github-core module"
+
+[commands.keeper]
+command = ["./mvnw", "verify", "-am", "-pl", "haus-keeper"]
+doc = "Build and test the haus-keeper submodule"
+
+[commands.manager]
+command = ["./mvnw", "verify", "-am", "-pl", "haus-manager"]
+doc = "Build and test the haus-manager submodule"
+
+[commands.rules]
+command = ["./mvnw", "verify", "-am", "-pl", "haus-rules"]
+doc = "Build and test the haus-rules submodule"
+
+[commands.all]
+command = ["quarkus", "build"]
+doc = "Build all modules using Quarkus CLI"
