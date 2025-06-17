@@ -41,7 +41,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerOrgUpdate();
                         return null;
                     });
-            eventBus.send(AsyncServiceEvent.ADDRESS, event);
+            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -55,7 +55,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerProjectUpdate();
                         return null;
                     });
-            eventBus.send(AsyncServiceEvent.ADDRESS, event);
+            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -69,7 +69,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerSponsorUpdate();
                         return null;
                     });
-            eventBus.send(AsyncServiceEvent.ADDRESS, event);
+            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -83,7 +83,7 @@ public class AsyncCommonhausService {
                         hausRulesClient.triggerVoteCount();
                         return null;
                     });
-            eventBus.send(AsyncServiceEvent.ADDRESS, event);
+            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
