@@ -141,6 +141,26 @@ public class CommonhausUserTest extends HausKeeperTestBase {
     }
 
     @Test
+    void testAutoEmailServiceOnStatusChange() throws Exception {
+        // Test that forwardEmail service is auto-configured when transitioning to email-eligible status
+        CommonhausUser user = CommonhausUser.create("testuser", 12345L);
+
+        // Initial state: UNKNOWN status, no email service
+        assertThat(user.status()).isEqualTo(MemberStatus.UNKNOWN);
+        assertThat(user.status().mayHaveEmail()).isFalse();
+        assertThat(user.services().forwardEmail().hasDefaultAlias()).isFalse();
+
+        // Change to COMMITTEE status - should auto-configure email service
+        user.setStatus(MemberStatus.COMMITTEE);
+        assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
+        assertThat(user.status().mayHaveEmail()).isTrue();
+        assertThat(user.services().forwardEmail().hasDefaultAlias()).isTrue();
+
+        user.setStatus(MemberStatus.ACTIVE);
+        assertThat(user.services().forwardEmail().hasDefaultAlias()).isTrue(); // Should remain true
+    }
+
+    @Test
     void testAliasesMatch() {
         CommonhausUser user = new CommonhausUser.Builder()
                 .withId(12345)

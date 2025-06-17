@@ -174,6 +174,12 @@ public class CommonhausUser implements UserLogin {
         if (data.status == status) {
             return false;
         }
+
+        // Auto-configure forwardEmail service for newly eligible users
+        if (!data.status.mayHaveEmail() && status.mayHaveEmail()) {
+            services().forwardEmail().enableDefaultAlias();
+        }
+
         data.status = status;
         statusChange = now();
         return true;
