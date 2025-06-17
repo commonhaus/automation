@@ -276,6 +276,7 @@ public class ForwardEmailService {
                 sanitized.put(address, x.getValue());
             }
         });
+        Log.debugf("sanitizeInputAddresses: permitted=%s, sanitized=%s", permitted, sanitized);
         return sanitized;
     }
 }

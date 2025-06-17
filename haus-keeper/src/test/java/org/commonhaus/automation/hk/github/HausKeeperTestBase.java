@@ -285,6 +285,7 @@ public class HausKeeperTestBase extends ContextHelper {
         WITH_APPLICATION("src/test/resources/commonhaus-user.application.unknown.yaml"),
         WITH_ATTESTATION("src/test/resources/commonhaus-user.attestation.yaml"),
         WITH_EMAIL_CONTRIBUTOR("src/test/resources/commonhaus-user.email.contributor.yaml"),
+        WITH_EMAIL_COMMITTEE("src/test/resources/commonhaus-user.email.committee-default.yaml"),
         WITH_EMAIL_MEMBER("src/test/resources/commonhaus-user.email.member.yaml"),
         WITH_EMAIL_SPONSOR("src/test/resources/commonhaus-user.email.sponsor.yaml"),
         NEW_USER("src/test/resources/commonhaus-user.new.yaml");

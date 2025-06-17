@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
@@ -270,6 +272,38 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .body("ALIAS", allOf(
                         hasKey("commonhaus-bot@example.com"),
                         hasKey("here@project.org")));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testUpdateCommonhausUserWithEmail() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        Map<String, Set<String>> input = Map.of(
+                botLogin, Set.of("target@example.com"));
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.status", equalTo("COMMITTEE"))
+                .body("HAUS.services.forwardEmail.hasDefaultAlias", equalTo(true))
+                .body("ALIAS", hasKey("commonhaus-bot@example.com"));
     }
 
     @Test

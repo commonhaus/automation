@@ -1,0 +1,14 @@
+---
+login: commonhaus-bot
+id: 156364140
+data:
+  status: "COMMITTEE"
+  goodUntil:
+    attestation:
+      test:
+        withStatus: UNKNOWN
+        date: 2020-01-01
+        version: test-only
+  services:
+    forwardEmail:
+      hasDefaultAlias: true
