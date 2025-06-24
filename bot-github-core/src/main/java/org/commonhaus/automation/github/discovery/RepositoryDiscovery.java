@@ -13,6 +13,7 @@ import org.commonhaus.automation.JsonAttributeAccessor;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.JsonAttribute;
+import org.commonhaus.automation.github.scopes.ScopedInstallationMap;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHAppInstallation;
@@ -26,6 +27,7 @@ import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkiverse.githubapp.event.RawEvent;
 import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
@@ -34,6 +36,9 @@ public class RepositoryDiscovery {
 
     @Inject
     BotConfig botConfig;
+
+    @Inject
+    ScopedInstallationMap scopedInstallationMap;
 
     @Inject
     PeriodicUpdateQueue periodicUpdateQueue;
@@ -58,12 +63,11 @@ public class RepositoryDiscovery {
      */
     void discoverRepositories(@Observes StartupEvent ev) {
         Log.info("Repository discovery is " + (botConfig.isDiscoveryEnabled() ? "enabled" : "disabled"));
-        if (!botConfig.isDiscoveryEnabled()) {
-            return;
-        }
 
         // Do the work from the queue
-        periodicUpdateQueue.queue("discovery", this::discoverRepositories);
+        if (LaunchMode.current() != LaunchMode.TEST) {
+            periodicUpdateQueue.queue("discovery", this::discoverRepositories);
+        }
     }
 
     protected void handleRepositoryChanges(GitHub github, DynamicGraphQLClient graphQLClient, long installationId,
@@ -87,7 +91,6 @@ public class RepositoryDiscovery {
     void discoverRepositories() {
         LogMailer mailer = Arc.container().instance(LogMailer.class).orElse(new LogMailer());
 
-        Log.info("Discovering repositories");
         List<Long> installations = new ArrayList<>();
         try {
             GitHub ac = gitHubService.getApplicationClient();
@@ -102,12 +105,21 @@ public class RepositoryDiscovery {
                 BaseQueryCache.putCachedGraphQLClient(ghiId, graphQLClient);
 
                 Log.debugf("[%s] Fire initial discovery events", ghiId);
+
+                Log.info("Discovering repositories");
                 for (GHRepository repo : ghai.listRepositories()) {
-                    fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
+                    var event = new RepositoryDiscoveryEvent(
                             DiscoveryAction.ADDED, github, graphQLClient, ghiId,
-                            repo, true));
+                            repo, true);
+                    if (botConfig.isDiscoveryEnabled()) {
+                        fireRepositoryDiscoveryEvent.fire(event);
+                    } else {
+                        scopedInstallationMap.repositoryDiscovered(event);
+                    }
                 }
+
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
+
                 fireInstallationDiscoveryEvent.fire(
                         new InstallationDiscoveryEvent(DiscoveryAction.ADDED, ghiId, github, graphQLClient));
                 installations.add(ghiId);
