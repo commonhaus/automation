@@ -43,7 +43,7 @@
         <!-- Build -->
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <flatten-maven-plugin.version>1.7.1</flatten-maven-plugin.version>
-        <formatter-plugin.version>2.26.0</formatter-plugin.version>
+        <formatter-plugin.version>2.27.0</formatter-plugin.version>
         <git-commit-id-plugin.version>4.9.10</git-commit-id-plugin.version>
         <htmlunit.version>3.0.0</htmlunit.version>
         <impsort-plugin.version>1.12.0</impsort-plugin.version>
