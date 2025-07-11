@@ -144,6 +144,9 @@ public class MemberApplicationState {
         // Indicate whether or not the user record needs to be updated
         // 1) the application data is not valid (issue not found or owner mismatch)
         // 2) the user status should move to pending (application exists and is valid)
+        if (appData == null && user.application() == null) {
+            return false;
+        }
         return !isValid() || user.status().missedUpdateToPending();
     }
 }

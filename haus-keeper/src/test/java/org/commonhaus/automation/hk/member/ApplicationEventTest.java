@@ -82,7 +82,6 @@ public class ApplicationEventTest extends HausKeeperTestBase {
 
     @Test
     void testApplicationApproved() throws Exception {
-
         final GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
 
         given()

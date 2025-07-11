@@ -152,7 +152,6 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
     public void testSetApplicationNotFoundCreate() throws Exception {
         mockExistingCommonhausData(UserPath.NEW_USER);
 
-        mockGraphQLNotFound(dataMocks, "query($id: ID!) {");
         setupGraphQLProcessing(dataMocks,
                 MemberQueryResponse.CREATE_ISSUE);
 
@@ -172,8 +171,6 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
         assertThat(apiResult.user().application()).isNotNull();
 
         verifyGraphQLProcessing(dataMocks, false);
-        verify(dataMocks.dql(), timeout(500))
-                .executeSync(contains("query($id: ID!) {"), anyMap());
         assertPersistedContentEquals(apiResult.user(), builder);
     }
 

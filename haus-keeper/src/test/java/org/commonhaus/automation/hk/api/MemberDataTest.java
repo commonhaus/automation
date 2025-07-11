@@ -519,6 +519,70 @@ public class MemberDataTest extends HausKeeperTestBase {
             @UserInfo(key = "node_id", value = botNodeId),
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
+    void testGetNewApplication() throws Exception {
+        sponsorMocks.github().getUser(botLogin);
+        addCollaborator(sponsorsRepo, botLogin);
+
+        mockExistingCommonhausData(UserPath.NEW_SPONSOR); // getFileContent(anyString())
+
+        given()
+                .log().all()
+                .when()
+                .get("/apply")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.status", equalTo("SPONSOR"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testPostNewApplication() throws Exception {
+        sponsorMocks.github().getUser(botLogin);
+        addCollaborator(sponsorsRepo, botLogin);
+
+        ApplicationPost application = new ApplicationPost("unknown", "draft");
+        String applyJson = mapper.writeValueAsString(application);
+
+        mockExistingCommonhausData(UserPath.NEW_SPONSOR); // getFileContent(anyString())
+
+        setupGraphQLProcessing(dataMocks,
+                MemberQueryResponse.CREATE_ISSUE);
+
+        GHContentBuilder builder = Mockito.mock(GHContentBuilder.class);
+        mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(applyJson)
+                .post("/apply")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("HAUS.status", equalTo("PENDING")) // mock response
+                .body("INFO.hasApplication", equalTo(Boolean.TRUE)) // mock response
+                .body("APPLY.created", notNullValue()) // from mutableUpdateIssue.json
+                .body("APPLY.updated", notNullValue()) // from mutableUpdateIssue.json
+                .body("APPLY.contributions", equalTo("testContrib")) // from mutableUpdateIssue.json
+                .body("APPLY.additionalNotes", equalTo("testNotes")); // from mutableUpdateIssue.json
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
     void testGetApplication() throws Exception {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);

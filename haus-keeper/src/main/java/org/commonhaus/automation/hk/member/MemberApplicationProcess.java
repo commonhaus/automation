@@ -203,7 +203,7 @@ public class MemberApplicationProcess {
         }
         try {
             DataCommonItem issue = applicationState.getIssue();
-            if (issue == null) {
+            if (issue == null && user.hasApplication()) {
                 issue = dqc.getItem(EventType.issue, applicationState.getIssueId());
                 if (dqc.hasErrors()) {
                     return null;
