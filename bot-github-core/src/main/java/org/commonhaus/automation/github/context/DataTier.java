@@ -1,6 +1,6 @@
 package org.commonhaus.automation.github.context;
 
-import java.util.Date;
+import java.time.Instant;
 
 import jakarta.json.JsonObject;
 
@@ -15,7 +15,7 @@ public class DataTier extends DataCommonType {
             isCustomAmount
             """.stripIndent();
 
-    public final Date createdAt;
+    public final Instant createdAt;
     public final Integer monthlyPriceInCents;
     public final Integer monthlyPriceInDollars;
     public final String name;
@@ -24,7 +24,7 @@ public class DataTier extends DataCommonType {
 
     DataTier(JsonObject object) {
         super(object);
-        this.createdAt = JsonAttribute.createdAt.dateFrom(object);
+        this.createdAt = JsonAttribute.createdAt.instantFrom(object);
         this.monthlyPriceInCents = JsonAttribute.monthlyPriceInCents.integerFrom(object);
         this.monthlyPriceInDollars = JsonAttribute.monthlyPriceInDollars.integerFrom(object);
         this.name = JsonAttribute.name.stringFrom(object);

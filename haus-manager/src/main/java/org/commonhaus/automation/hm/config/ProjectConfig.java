@@ -1,13 +1,11 @@
 package org.commonhaus.automation.hm.config;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import jakarta.annotation.Nonnull;
 
 import org.commonhaus.automation.config.EmailNotification;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
@@ -23,13 +21,10 @@ public class ProjectConfig {
     protected Boolean enabled;
     protected Boolean dryRun;
 
-    protected String gitHubResources;
     protected CollaboratorSync collaboratorSync;
     protected List<GroupMapping> teamMembership;
     protected EmailNotification emailNotifications;
-
-    @JsonIgnore
-    private Set<String> allResources;
+    protected ProjectHealth projectHealth;
 
     /**
      * Return list of teams that should have membership
@@ -59,6 +54,11 @@ public class ProjectConfig {
         return emailNotifications == null
                 ? EmailNotification.UNDEFINED
                 : emailNotifications;
+    }
+
+    /** Project health configuration */
+    public ProjectHealth projectHealth() {
+        return projectHealth;
     }
 
     @Override
@@ -100,6 +100,63 @@ public class ProjectConfig {
         public String toString() {
             return "TeamAccess{sourceTeam=%s, role=%s, logins=%s, ignoreUsers=%s}"
                     .formatted(sourceTeam(), role(), includeUsers(), ignoreUsers());
+        }
+    }
+
+    /**
+     * Project health configuration for foundation oversight
+     *
+     * @param maturity Project maturity level (early, mature, experimental,
+     *        deprecated, etc.)
+     * @param organizationRepositories Map of organization to repository configuration.
+     */
+    public record ProjectHealth(
+            String maturity,
+            Map<String, RepositoryConfig> organizationRepositories) {
+
+        public RepositoryConfig repositoryConfig(String orgName) {
+            if (organizationRepositories == null || organizationRepositories.isEmpty()) {
+                return RepositoryConfig.EMPTY;
+            }
+            RepositoryConfig repositories = organizationRepositories.get(orgName);
+            return repositories != null ? repositories : RepositoryConfig.EMPTY;
+        }
+    }
+
+    /**
+     * Repository configuration for health tracking
+     *
+     * @param excludes List of repository names to exclude from health tracking
+     * @param releases Map of repository names to expected release frequency
+     */
+    public record RepositoryConfig(
+            List<String> excludes,
+            Map<String, String> releases) {
+
+        static final RepositoryConfig EMPTY = new RepositoryConfig(List.of(), Map.of());
+
+        @Override
+        public List<String> excludes() {
+            return excludes != null ? excludes : List.of();
+        }
+
+        @Override
+        public Map<String, String> releases() {
+            return releases != null ? releases : Map.of();
+        }
+
+        /**
+         * Check if a repository should be excluded from health tracking
+         */
+        public boolean isExcluded(String repositoryName) {
+            return excludes().contains(repositoryName);
+        }
+
+        /**
+         * Get expected release frequency for a repository
+         */
+        public String getReleaseFrequency(String repositoryName) {
+            return releases().get(repositoryName);
         }
     }
 }

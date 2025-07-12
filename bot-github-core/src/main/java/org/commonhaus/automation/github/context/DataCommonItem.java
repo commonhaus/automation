@@ -1,8 +1,8 @@
 package org.commonhaus.automation.github.context;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +121,7 @@ public class DataCommonItem extends DataCommonObject {
     public final String title;
 
     // Closable
-    public final Date closedAt;
+    public final Instant closedAt;
     public final String state;
     public final boolean closed;
     public final boolean isPullRequest;
@@ -133,7 +133,7 @@ public class DataCommonItem extends DataCommonObject {
         this.title = JsonAttribute.title.stringFrom(object);
 
         this.state = JsonAttribute.state.stringFrom(object);
-        this.closedAt = JsonAttribute.closedAt.dateFrom(object);
+        this.closedAt = JsonAttribute.closedAt.instantFrom(object);
         this.closed = JsonAttribute.closed.booleanFromOrDefault(object,
                 state != null && state.equalsIgnoreCase("closed"));
 
