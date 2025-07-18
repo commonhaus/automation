@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.context;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -15,8 +16,10 @@ import io.quarkus.logging.Log;
 @Alternative
 @Priority(1)
 public class TestBotConfig implements BotConfig {
-    boolean discoveryEnabled;
-    boolean dryRun;
+    private static final AtomicBoolean DISCOVERY_ENABLED = new AtomicBoolean(false);
+    private static final AtomicBoolean DRY_RUN = new AtomicBoolean(false);
+    private static final AtomicBoolean OC_CONFIG_ENABLED = new AtomicBoolean(false);
+
     String errorEmail;
 
     protected TestBotConfig() {
@@ -24,8 +27,9 @@ public class TestBotConfig implements BotConfig {
     }
 
     public void reset() {
-        discoveryEnabled = false;
-        dryRun = false;
+        DISCOVERY_ENABLED.set(false);
+        DRY_RUN.set(false);
+        OC_CONFIG_ENABLED.set(false);
         errorEmail = "test-bot-error@example.org";
     }
 
@@ -36,12 +40,12 @@ public class TestBotConfig implements BotConfig {
 
     @Override
     public Optional<Boolean> discoveryEnabled() {
-        return Optional.of(discoveryEnabled);
+        return Optional.of(DISCOVERY_ENABLED.get());
     }
 
     @Override
     public Optional<Boolean> dryRun() {
-        return Optional.of(dryRun);
+        return Optional.of(DRY_RUN.get());
     }
 
     @Override
@@ -54,14 +58,21 @@ public class TestBotConfig implements BotConfig {
      */
     public void setDiscoveryEnabled(boolean discoveryEnabled) {
         Log.info("Setting discoveryEnabled to " + discoveryEnabled);
-        this.discoveryEnabled = discoveryEnabled;
+        DISCOVERY_ENABLED.set(discoveryEnabled);
     }
 
     /**
      * @param dryRun the dryRun to set
      */
     public void setDryRun(boolean dryRun) {
-        this.dryRun = dryRun;
+        DRY_RUN.set(dryRun);
+    }
+
+    /**
+     * @param dryRun the dryRun to set
+     */
+    public void ocConfigEnabled(boolean ocConfigEnabled) {
+        OC_CONFIG_ENABLED.set(ocConfigEnabled);
     }
 
     /**
@@ -118,6 +129,25 @@ public class TestBotConfig implements BotConfig {
 
     @Override
     public Optional<OpenCollectiveConfig> openCollective() {
-        return Optional.empty();
+        boolean isOcConfigEnabled = OC_CONFIG_ENABLED.get();
+        if (!isOcConfigEnabled) {
+            return Optional.empty();
+        }
+        return Optional.of(new OpenCollectiveConfig() {
+            @Override
+            public Optional<String> collectiveSlug() {
+                return Optional.of("commonhaus-foundation");
+            }
+
+            @Override
+            public Optional<String> personalToken() {
+                return Optional.empty();
+            }
+
+            @Override
+            public String apiEndpoint() {
+                return OpenCollectiveConfig.GRAPHQL_ENDPOINT;
+            }
+        });
     }
 }

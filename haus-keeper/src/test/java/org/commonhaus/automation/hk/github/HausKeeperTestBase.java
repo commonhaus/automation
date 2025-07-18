@@ -116,7 +116,9 @@ public class HausKeeperTestBase extends ContextHelper {
     @AfterEach
     void waitForQueue() {
         // Make sure queue is drained between tests
-        await().atMost(5, SECONDS).until(() -> updateQueue.isEmpty());
+        await().atMost(5, SECONDS)
+                .logging((s) -> System.out.println(s + "; " + updateQueue.toString()))
+                .until(() -> updateQueue.isEmpty());
     }
 
     public void setupInstallationRepositories() throws IOException {
