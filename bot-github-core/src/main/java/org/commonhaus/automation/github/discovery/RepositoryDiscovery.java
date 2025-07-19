@@ -102,6 +102,8 @@ public class RepositoryDiscovery {
                 BaseQueryCache.putCachedGraphQLClient(ghiId, graphQLClient);
 
                 Log.debugf("[%s] Fire initial discovery events", ghiId);
+                installations.add(ghiId);
+
                 for (GHRepository repo : ghai.listRepositories()) {
                     fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                             DiscoveryAction.ADDED, github, graphQLClient, ghiId,
@@ -110,7 +112,6 @@ public class RepositoryDiscovery {
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
                 fireInstallationDiscoveryEvent.fire(
                         new InstallationDiscoveryEvent(DiscoveryAction.ADDED, ghiId, github, graphQLClient));
-                installations.add(ghiId);
             }
         } catch (GHIOException e) {
             mailer.logAndSendEmail("discoverRepositories", "Error making GH Request", e, null);
