@@ -1,7 +1,6 @@
 package org.commonhaus.automation.github.scopes;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
-import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import java.util.Map;
 import java.util.Optional;
@@ -39,7 +38,7 @@ public class ScopedInstallationMap {
 
     public ScopedQueryContext getOrgScopedQueryContext(ContextService ctx, String orgOrFullName) {
         String orgName = toOrganizationName(orgOrFullName);
-        String repoName = orgName.contains("/") ? toRelativeName(orgName, orgOrFullName) : null;
+        String repoName = orgName.contains("/") ? orgOrFullName : null;
 
         AppInstallationState appInstallation = installationsByScope.get(orgName);
         return appInstallation == null
@@ -87,11 +86,6 @@ public class ScopedInstallationMap {
         AppInstallationState appInstallation = new AppInstallationState(installationId, orgName);
         installationsById.put(installationId, appInstallation);
         installationsByScope.put(orgName, appInstallation);
-
-        if (repoFullName.contains("/")) {
-            // Also store by full repo name
-            installationsByScope.put(repoFullName, appInstallation);
-        }
     }
 
     static record AppInstallationState(
