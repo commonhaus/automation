@@ -115,7 +115,9 @@ public class ActiveHausKeeperConfig {
         List<String> newIds = new ArrayList<>();
         JsonNode attestations = agreements.get("attestations");
         if (attestations != null && attestations.isObject()) {
-            attestations.fields().forEachRemaining(entry -> newIds.add(entry.getKey()));
+            for (var e : attestations.properties()) {
+                newIds.add(e.getKey());
+            }
         }
         attestationIds.addAll(newIds);
         attestationIds.retainAll(newIds);

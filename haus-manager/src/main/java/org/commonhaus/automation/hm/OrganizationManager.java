@@ -2,11 +2,13 @@ package org.commonhaus.automation.hm;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Priority;
@@ -14,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
 import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -68,7 +71,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
 
-        // We only read configuration files from repositories in the configured organization
+        // We only read configuration files from repositories in the configured
+        // organization
         if (action.repository()
                 && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
 
@@ -131,7 +135,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             queueReconciliation();
         } else if (qc.hasErrors()) {
             qc.logAndSendContextErrors(
-                    "Unable to read %s in %s".formatted(OrganizationConfig.PATH, mgrBotConfig.home().repositoryFullName()));
+                    "Unable to read %s in %s".formatted(OrganizationConfig.PATH,
+                            mgrBotConfig.home().repositoryFullName()));
         }
     }
 
@@ -143,6 +148,26 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         recordRun();
         // queue reconcile action: deal with bursty config updates
         updateQueue.queueReconciliation(ME, this::reconcile);
+    }
+
+    @Override
+    protected void processRepoSourceUpdate(String taskGroup, RepoSource repoSource) {
+        // queue reconcile action: deal with bursty config updates
+        updateQueue.queue(ME, () -> {
+            OrganizationConfigState configState = currentConfig.get().orElse(null);
+            if (configState == null || !configState.performSync() || configState.orgConfig().teamMembership() == null) {
+                Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
+                return;
+            }
+            Log.debugf("[%s] processRepoSourceUpdate: %s", ME, repoSource);
+            OrganizationConfig orgConfig = configState.orgConfig();
+            List<GroupMapping> mappings = orgConfig.teamMembership().stream()
+                    .filter(mapping -> repoSource.equals(mapping.source()))
+                    .toList();
+            for (var mapping : mappings) {
+                processGroupMapping(configState, mapping);
+            }
+        });
     }
 
     /**
@@ -204,7 +229,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
         Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
 
-        OrganizationConfigState newState = new OrganizationConfigState(qc.getInstallationId(), repo.getFullName(), orgCfg);
+        OrganizationConfigState newState = new OrganizationConfigState(
+                qc.getInstallationId(), repo.getFullName(), orgCfg);
         OrganizationConfigState oldState = currentConfig.get().orElse(null);
         if (oldState != null) {
             if (oldState.orgConfig().equals(newState.orgConfig())) {
@@ -219,6 +245,20 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             // Unregister watchers for removed teams
             for (String teamName : removedTeams) {
                 membershipEvents.unwatch(MembershipUpdateType.TEAM, teamName);
+            }
+
+            // Clean up GroupMapping source file watchers for changed/removed mappings
+            Set<RepoSource> oldSources = oldState.orgConfig().teamMembership().stream()
+                    .map(GroupMapping::source)
+                    .filter(x -> x != null && !x.isEmpty())
+                    .collect(Collectors.toSet());
+
+            for (GroupMapping groupMapping : newState.orgConfig().teamMembership()) {
+                oldSources.remove(groupMapping.source());
+            }
+
+            for (RepoSource oldSource : oldSources) {
+                unwatchRepoSource(oldState, oldSource);
             }
         }
         currentConfig.set(Optional.of(newState));
@@ -252,7 +292,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 Log.debugf("[%s] reconcile: missing or empty group mapping: %s", ME, groupMapping);
                 continue;
             }
-
+            // Register watcher for the source file so we get notified when it changes
+            watchRepoSource(configState, groupMapping.source());
             processGroupMapping(configState, groupMapping);
         }
         Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
@@ -276,10 +317,19 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             long installationId,
             String repoName,
             @Nonnull OrganizationConfig orgConfig,
+            Set<RepoSource> sources,
             AtomicReference<Set<String>> teamRef) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {
-            this(installationId, repoName, orgConfig, new AtomicReference<>(null));
+            this(installationId, repoName, orgConfig, new HashSet<>(), new AtomicReference<>(null));
+        }
+
+        public boolean add(RepoSource source) {
+            return sources.add(source);
+        }
+
+        public boolean remove(RepoSource source) {
+            return sources.remove(source);
         }
 
         public boolean performSync() {

@@ -6,16 +6,19 @@ import static org.commonhaus.automation.github.context.GitHubTeamService.refresh
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
 import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
@@ -191,6 +194,28 @@ public class ProjectAccessManager extends GroupCoordinator {
         }
     }
 
+    @Override
+    protected void processRepoSourceUpdate(String taskGroup, RepoSource repoSource) {
+        // queue reconcile action: deal with bursty config updates
+        updateQueue.queue(taskGroup, () -> {
+            ProjectConfigState configState = taskGroupToState.get(taskGroup);
+            if (configState == null) {
+                Log.warnf("[%s] processRepoSourceUpdate: no state for %s", ME, taskGroup);
+                return;
+            }
+            Log.debugf("[%s] processRepoSourceUpdate: %s %s", ME, taskGroup, repoSource);
+
+            ProjectConfig config = configState.projectConfig();
+            List<GroupMapping> mappings = config.teamMembership().stream()
+                    .filter(mapping -> repoSource.equals(mapping.source()))
+                    .toList();
+
+            for (var mapping : mappings) {
+                processGroupMapping(configState, mapping);
+            }
+        });
+    }
+
     /**
      * Read project configuration from repository.
      * Called for file update events
@@ -257,6 +282,24 @@ public class ProjectAccessManager extends GroupCoordinator {
             membershipEvents.unwatch(MembershipUpdateType.TEAM, oldState.sourceTeam());
         }
 
+        // Clean up GroupMapping source file watchers for changed/removed mappings
+        if (oldState != null && oldState != EMPTY) {
+            Set<RepoSource> oldSources = oldState.projectConfig().teamMembership().stream()
+                    .map(GroupMapping::source)
+                    .filter(x -> x != null && !x.isEmpty())
+                    .collect(Collectors.toSet());
+
+            for (GroupMapping mapping : newState.projectConfig().teamMembership()) {
+                if (mapping != null && mapping.source() != null && !mapping.source().isEmpty()) {
+                    oldSources.remove(mapping.source());
+                }
+            }
+
+            for (RepoSource oldSource : oldSources) {
+                unwatchRepoSource(newState, oldSource);
+            }
+        }
+
         taskGroupToState.put(taskGroup, newState);
 
         // queue reconcile action: deal with bursty config updates
@@ -291,6 +334,8 @@ public class ProjectAccessManager extends GroupCoordinator {
                 Log.debugf("[%s] %s: missing or empty group mapping: %s", ME, taskGroup, groupMapping);
                 continue;
             }
+            // Register watcher for the source file so we get notified when it changes
+            watchRepoSource(state, groupMapping.source());
             processGroupMapping(state, groupMapping);
         }
 
@@ -382,7 +427,20 @@ public class ProjectAccessManager extends GroupCoordinator {
             String taskGroup,
             String repoFullName,
             long installationId,
-            ProjectConfig projectConfig) implements ConfigState {
+            ProjectConfig projectConfig,
+            Set<RepoSource> sources) implements ConfigState {
+
+        public ProjectConfigState(String taskGroup, String repoFullName, long installationId, ProjectConfig projectConfig) {
+            this(taskGroup, repoFullName, installationId, projectConfig, new HashSet<>());
+        }
+
+        public boolean add(RepoSource source) {
+            return sources.add(source);
+        }
+
+        public boolean remove(RepoSource source) {
+            return sources.remove(source);
+        }
 
         // ProjectConfig is only unset when using an empty placeholder
         public String sourceTeam() {

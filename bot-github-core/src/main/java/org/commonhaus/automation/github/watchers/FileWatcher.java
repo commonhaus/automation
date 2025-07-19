@@ -77,13 +77,13 @@ public class FileWatcher {
      * @param taskGroupName Name of the task group to use for periodic updates
      * @param installationId Installation ID for the repository
      * @param repoName Name of the repository
-     * @param fileName Name of the file to watch
+     * @param filePath Name of the file to watch
      * @param callback Callback function to invoke when the file is updated (with FileUpdate object)
      */
-    public void watchFile(String taskGroupName, long installationId, String repoName, String fileName,
+    public void watchFile(String taskGroupName, long installationId, String repoName, String filePath,
             Consumer<FileUpdate> callback) {
         repositoryFiles.computeIfAbsent(repoName, k -> new WatchedFiles(repoName, installationId))
-                .add(fileName, new TaskCallback<FileUpdate>(taskGroupName, callback));
+                .add(filePath, new TaskCallback<FileUpdate>(taskGroupName, callback));
     }
 
     public void unwatchAll(String taskGroup) {
@@ -94,6 +94,22 @@ public class FileWatcher {
             });
         }
         repositoryFiles.values().removeIf(x -> x.filesByPath.isEmpty());
+    }
+
+    public void unwatchFile(String taskGroup, String repoName, String filePath) {
+        WatchedFiles watchedFiles = repositoryFiles.get(repoName);
+        if (watchedFiles != null) {
+            Set<TaskCallback<FileUpdate>> callbacks = watchedFiles.filesByPath.get(filePath);
+            if (callbacks != null) {
+                callbacks.removeIf(callback -> callback.taskGroupName().equals(taskGroup));
+                if (callbacks.isEmpty()) {
+                    watchedFiles.filesByPath.remove(filePath);
+                }
+            }
+            if (watchedFiles.filesByPath.isEmpty()) {
+                repositoryFiles.remove(repoName);
+            }
+        }
     }
 
     public void refresh(ContextService ctx, String taskGroup) {

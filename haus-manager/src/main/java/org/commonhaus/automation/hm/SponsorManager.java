@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.config.EmailNotification;
+import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.DataSponsorship;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
@@ -42,6 +43,12 @@ public class SponsorManager extends GroupCoordinator {
         RouteSupplier.registerSupplier("Sponsor management refreshed", () -> lastRun);
         // If the OrganizationConfig changes, we'll be notified
         latestOrgConfig.notifyOnUpdate(ME, this::reconcile);
+    }
+
+    @Override
+    protected void processRepoSourceUpdate(String taskGroup, RepoSource repoSource) {
+        // No action needed for sponsorship updates
+        Log.debugf("[%s] processRepoSourceUpdate: no action needed for %s", ME, repoSource);
     }
 
     @Override

@@ -54,10 +54,54 @@ public abstract class GroupCoordinator extends ScheduledService {
 
         String repoName();
 
+        boolean add(RepoSource repoSource);
+
+        boolean remove(RepoSource repoSource);
+
         EmailNotification emailNotifications();
     }
 
     protected abstract void processMembershipUpdate(String taskGroup, MembershipUpdate update);
+
+    protected abstract void processRepoSourceUpdate(String taskGroup, RepoSource repoSource);
+
+    /**
+     * Register a file watcher for the GroupMapping source file.
+     * This allows the system to react when team membership source files change.
+     */
+    protected void watchRepoSource(ConfigState configState, RepoSource repoSource) {
+        if (configState.add(repoSource)) {
+            Log.debugf("[%s] Watching source %s for taskGroup %s", me(), repoSource,
+                    configState.taskGroup());
+            fileWatcher.watchFile(configState.taskGroup(), configState.installationId(),
+                    repoSource.repository(), repoSource.filePath(),
+                    (fileUpdate) -> {
+                        Log.debugf("[%s] GroupMapping source file updated: %s", me(), fileUpdate.filePath());
+                        // Queue reconciliation when source file changes
+                        updateQueue.queueReconciliation(configState.taskGroup(), () -> {
+                            // The specific reconcile method will be called by the concrete class
+                            Log.debugf("[%s] Reconciling due to GroupMapping source change: %s", me(),
+                                    fileUpdate.filePath());
+                            processRepoSourceUpdate(configState.taskGroup(), repoSource);
+                        });
+                    });
+        }
+    }
+
+    /**
+     * Remove file watcher for a GroupMapping source file.
+     * Call this when GroupMapping is removed or its source changes.
+     */
+    protected void unwatchRepoSource(ConfigState configState, RepoSource repoSource) {
+        if (repoSource == null || repoSource.isEmpty()) {
+            return;
+        }
+        if (configState.remove(repoSource)) {
+            Log.debugf("[%s] Unwatching GroupMapping source %s for taskGroup %s",
+                    me(), repoSource, configState.taskGroup());
+            fileWatcher.unwatchFile(configState.taskGroup(), repoSource.repository(), repoSource.filePath());
+        }
+    }
 
     void processGroupMapping(ConfigState configState, GroupMapping groupMapping) {
         Log.debugf("[%s] groupMapping begin %s", me(), groupMapping.source());
@@ -174,6 +218,7 @@ public abstract class GroupCoordinator extends ScheduledService {
                 Log.debugf("[%s] groupMapping: group %s not found in %s", me(), groupName, sourceData);
             }
         }
+
         Log.debugf("[%s] groupMapping end %s", me(), groupMapping.source());
     }
 
