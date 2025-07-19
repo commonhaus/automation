@@ -12,6 +12,7 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import io.quarkus.logging.Log;
 import io.quarkus.vertx.ConsumeEvent;
+import io.smallrye.common.annotation.Blocking;
 import io.vertx.mutiny.core.eventbus.EventBus;
 import io.vertx.mutiny.core.eventbus.Message;
 
@@ -41,7 +42,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerOrgUpdate();
                         return null;
                     });
-            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
+            eventBus.send(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -55,7 +56,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerProjectUpdate();
                         return null;
                     });
-            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
+            eventBus.send(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -69,7 +70,7 @@ public class AsyncCommonhausService {
                         hausManagerClient.triggerSponsorUpdate();
                         return null;
                     });
-            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
+            eventBus.send(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -83,7 +84,7 @@ public class AsyncCommonhausService {
                         hausRulesClient.triggerVoteCount();
                         return null;
                     });
-            eventBus.requestAndForget(AsyncServiceEvent.ADDRESS, event);
+            eventBus.send(AsyncServiceEvent.ADDRESS, event);
         }
     }
 
@@ -94,6 +95,7 @@ public class AsyncCommonhausService {
      * @param msg Message containing the AsyncServiceEvent
      */
     @ConsumeEvent(AsyncServiceEvent.ADDRESS)
+    @Blocking
     protected void consume(Message<AsyncServiceEvent> msg) {
         AsyncServiceEvent event = msg.body();
         try {
