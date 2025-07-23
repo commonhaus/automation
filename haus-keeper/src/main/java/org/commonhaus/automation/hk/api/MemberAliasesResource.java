@@ -16,13 +16,11 @@ import jakarta.ws.rs.core.Response.Status;
 
 import org.commonhaus.automation.hk.data.ApiResponse;
 import org.commonhaus.automation.hk.data.CommonhausUser;
-import org.commonhaus.automation.hk.data.CommonhausUserData.ForwardEmail;
 import org.commonhaus.automation.hk.forwardemail.Alias;
 import org.commonhaus.automation.hk.forwardemail.AliasKey;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
-import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
 
 import io.quarkus.logging.Log;
 import io.quarkus.security.Authenticated;
@@ -95,8 +93,6 @@ public class MemberAliasesResource {
                         .finish();
             }
 
-            ForwardEmail emailConfig = user.services().forwardEmail();
-
             Map<AliasKey, Set<String>> sanitized = emailService.sanitizeInputAddresses(session, user, aliases);
             if (sanitized.isEmpty()) {
                 Log.debugf("[%s] updateAliases: No valid email addresses to update: %s", session.login(), aliases.keySet());
@@ -105,11 +101,6 @@ public class MemberAliasesResource {
 
             // API CALL: set/update alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.postAliases(sanitized, session.name());
-
-            if (!emailConfig.hasDefaultAlias()
-                    && aliasMap.keySet().stream().anyMatch(k -> emailService.isDefaultAlias(session.login(), k))) {
-                user = updateHasDefaultFlag(user);
-            }
 
             return user.toResponse()
                     .setData(ApiResponse.Type.ALIAS, aliasMap.entrySet().stream()
@@ -147,28 +138,6 @@ public class MemberAliasesResource {
         } catch (Throwable e) {
             return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
         }
-    }
-
-    /**
-     * Ensure the user has the default alias flag set if they have a default alias
-     *
-     * @param user
-     * @return user or null
-     * @throws Exception
-     */
-    CommonhausUser updateHasDefaultFlag(CommonhausUser user) {
-        if (user == null) {
-            return null;
-        }
-        // throws to caller
-        CommonhausUser result = datastore.setCommonhausUser(new UpdateEvent(user,
-                (c, u) -> {
-                    u.services().forwardEmail().enableDefaultAlias();
-                },
-                "Fix forward email service active flag",
-                false,
-                false));
-        return result == null ? user : result;
     }
 
     public record AliasRequest(String email) {

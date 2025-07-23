@@ -58,8 +58,8 @@ public class CommonhausUserData {
             return hasDefaultAlias;
         }
 
-        public void enableDefaultAlias() {
-            hasDefaultAlias = true;
+        public void toggleDefaultAlias(MemberStatus status) {
+            hasDefaultAlias = status.mayHaveEmail();
         }
 
         public Collection<String> altAlias() {

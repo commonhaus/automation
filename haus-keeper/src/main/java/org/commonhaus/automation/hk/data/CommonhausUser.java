@@ -174,13 +174,8 @@ public class CommonhausUser implements UserLogin {
         if (data.status == status) {
             return false;
         }
-
-        // Auto-configure forwardEmail service for newly eligible users
-        if (!data.status.mayHaveEmail() && status.mayHaveEmail()) {
-            services().forwardEmail().enableDefaultAlias();
-        }
-
         data.status = status;
+        data.services.forwardEmail().toggleDefaultAlias(status);
         statusChange = now();
         return true;
     }
@@ -205,6 +200,8 @@ public class CommonhausUser implements UserLogin {
         if (other.data != null) {
             this.data.merge(other.data);
         }
+        // Make sure default alias status is set
+        data.services.forwardEmail().toggleDefaultAlias(data.status);
 
         // Merge history, no duplicates
         this.history.addAll(other.history);
@@ -220,6 +217,7 @@ public class CommonhausUser implements UserLogin {
                     null);
             roles.add(MEMBER_ROLE);
         }
+
         if (!roles.isEmpty()) {
             List<MemberStatus> status = roles.stream()
                     .map(r -> ctx.getStatusForRole(r))

@@ -31,9 +31,7 @@ public enum MemberStatus {
     }
 
     public boolean mayHaveAltEmail() {
-        return this == COMMITTEE
-                || this == ACTIVE
-                || this == INACTIVE
+        return mayHaveEmail()
                 || this == CONTRIBUTOR;
     }
 

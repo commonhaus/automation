@@ -6,7 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
@@ -101,5 +103,22 @@ public class CommonhausDatastoreTest extends HausKeeperTestBase {
 
         var journalData = ctx.yamlMapper().readValue(journalPath.toFile(), CommonhausDatastore.USER_JOURNAL_TYPE);
         assertThat(journalData).isEmpty();
+    }
+
+    @Test
+    void testAltEmailToFullMember() throws Exception {
+        CommonhausUser user = CommonhausUser.create("testuser", 12345L);
+        user.setStatus(MemberStatus.CONTRIBUTOR);
+        assertThat(user.status().mayHaveAltEmail()).isTrue();
+        assertThat(user.status().mayHaveEmail()).isFalse();
+
+        user.services().forwardEmail().addAliases(List.of("alt@other.org"));
+        assertThat(user.services().forwardEmail().hasDefaultAlias()).isFalse();
+
+        var updated = user.updateMemberStatus(ctx, Set.of("egc"));
+        assertThat(updated).isTrue();
+        assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
+        assertThat(user.status().mayHaveAltEmail()).isTrue();
+        assertThat(user.status().mayHaveEmail()).isTrue();
     }
 }
