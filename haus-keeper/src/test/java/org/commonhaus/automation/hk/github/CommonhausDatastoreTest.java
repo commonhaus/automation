@@ -121,4 +121,18 @@ public class CommonhausDatastoreTest extends HausKeeperTestBase {
         assertThat(user.status().mayHaveAltEmail()).isTrue();
         assertThat(user.status().mayHaveEmail()).isTrue();
     }
+
+    @Test
+    void testUnknownToCommittee() throws Exception {
+        CommonhausUser user = CommonhausUser.create("testuser", 12345L);
+        user.setStatus(MemberStatus.UNKNOWN);
+        assertThat(user.status().mayHaveAltEmail()).isFalse();
+        assertThat(user.status().mayHaveEmail()).isFalse();
+
+        var updated = user.updateMemberStatus(ctx, Set.of("egc"));
+        assertThat(updated).isTrue();
+        assertThat(user.status()).isEqualTo(MemberStatus.COMMITTEE);
+        assertThat(user.status().mayHaveAltEmail()).isTrue();
+        assertThat(user.status().mayHaveEmail()).isTrue();
+    }
 }

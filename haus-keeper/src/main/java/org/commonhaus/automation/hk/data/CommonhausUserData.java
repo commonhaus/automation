@@ -46,8 +46,6 @@ public class CommonhausUserData {
     }
 
     public static class ForwardEmail {
-        /** Is an alias active for this user */
-        @JsonAlias({ "active", "configured" })
         boolean hasDefaultAlias;
 
         /** Additional ForwardEmail aliases. Optional. */
