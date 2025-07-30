@@ -123,7 +123,7 @@ public class AppContextService extends BaseContextService {
         if (t != null) {
             if (t instanceof WebApplicationException) {
                 WebApplicationException ex = (WebApplicationException) t;
-                if (ex.getResponse().getStatus() >= 500) {
+                if (ex.getResponse().getStatus() >= 500 || ex.getResponse().getStatus() == 400) {
                     logAndSendEmail(logId, message, t);
                 }
                 return ex.getResponse();

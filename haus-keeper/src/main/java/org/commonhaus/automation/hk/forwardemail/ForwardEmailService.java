@@ -164,6 +164,7 @@ public class ForwardEmailService {
                 throw new WebApplicationException("Alias not found: " + aliasKey, Status.NOT_FOUND);
             } else if (aliases.size() > 1) {
                 // should not happen, but...
+                Log.errorf("Multiple aliases found for %s: %s", aliasKey, aliases);
                 throw new WebApplicationException("Multiple aliases found for " + aliasKey, Status.BAD_REQUEST);
             } else {
                 alias = aliases.iterator().next();
