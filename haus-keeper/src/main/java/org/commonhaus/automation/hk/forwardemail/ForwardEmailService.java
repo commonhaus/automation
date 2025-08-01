@@ -157,9 +157,10 @@ public class ForwardEmailService {
         String lookup = aliasKey.toString();
         Alias alias = AdminDataCache.ALIASES.get(lookup);
         if (alias == null) {
-            // API CALL: will throw WebApplicationException if not found or error
-            // Will throw 404 on not found
+            // API CALL: will throw WebApplicationException if not found (404) or error
             Set<Alias> aliases = forwardEmailClient.findAliasByName(aliasKey.domain(), aliasKey.name());
+            // The name search is a fuzzy match, so we may get multiple results.
+            aliases.removeIf(x -> x.name == null || !x.name.equals(aliasKey.name()));
             if (aliases.isEmpty()) {
                 throw new WebApplicationException("Alias not found: " + aliasKey, Status.NOT_FOUND);
             } else if (aliases.size() > 1) {
