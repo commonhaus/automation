@@ -67,7 +67,6 @@ public class ScopedInstallationMap {
         String repoFullName = repoEvent.repository().getFullName();
 
         if (action.added()) {
-            Log.debugf("ADDED scopedInstallation %s (%s)", action, repoFullName, installationId);
             // Cross-reference by org name and repo name
             updateInstallationMap(installationId, repoFullName);
         } else if (action.removed()) {
@@ -83,8 +82,10 @@ public class ScopedInstallationMap {
     private void updateInstallationMap(long installationId, String repoFullName) {
         String orgName = toOrganizationName(repoFullName);
 
-        AppInstallationState appInstallation = new AppInstallationState(installationId, orgName);
-        installationsById.put(installationId, appInstallation);
+        AppInstallationState appInstallation = installationsById.computeIfAbsent(installationId, (k) -> {
+            Log.infof("🌞 ADDED %s to %s", orgName, installationId);
+            return new AppInstallationState(installationId, orgName);
+        });
         installationsByScope.put(orgName, appInstallation);
     }
 
