@@ -46,8 +46,6 @@ public abstract class HausRulesTestBase extends ContextHelper {
     public static final long installationId = 46053716;
     public static final long organizationId = 144493209;
 
-    protected static final ObjectMapper objectMapper = new ObjectMapper();
-
     protected static final DefaultValues TEST_ORG = new DefaultValues(
             installationId, // installationId
             new Resource(organizationId, "commonhaus"), // organization
@@ -83,6 +81,9 @@ public abstract class HausRulesTestBase extends ContextHelper {
 
     @Inject
     protected AppContextService ctx;
+
+    @Inject
+    protected ObjectMapper objectMapper;
 
     @BeforeEach
     protected void setupBase() throws Exception {

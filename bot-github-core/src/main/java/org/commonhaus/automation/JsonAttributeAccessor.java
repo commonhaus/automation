@@ -3,7 +3,6 @@ package org.commonhaus.automation;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
@@ -121,14 +120,14 @@ public interface JsonAttributeAccessor {
     /**
      * @return Date constructed from alternateName() (or name()) attribute of object
      */
-    default Date dateFrom(JsonObject object) {
+    default Instant instantFrom(JsonObject object) {
         if (object == null) {
             return null;
         }
         String timestamp = hasAlternateName()
                 ? object.getString(alternateName(), object.getString(name(), null))
                 : object.getString(alternateName(), null);
-        return parseDate(timestamp);
+        return parseInstant(timestamp);
     }
 
     /** @return JsonObject with alternateName() (or name()) from object */
@@ -200,14 +199,6 @@ public interface JsonAttributeAccessor {
             Log.debugf(e, "Unable to parse %s as %s", string, clazz);
             return null;
         }
-    }
-
-    /** Parses to Date as GitHubClient.parseDate does */
-    static Date parseDate(String timestamp) {
-        if (timestamp == null) {
-            return null;
-        }
-        return Date.from(parseInstant(timestamp));
     }
 
     /** Parses to Instant as GitHubClient.parseInstant does */

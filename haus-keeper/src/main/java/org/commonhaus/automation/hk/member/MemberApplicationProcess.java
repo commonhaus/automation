@@ -1,7 +1,7 @@
 package org.commonhaus.automation.hk.member;
 
+import java.time.Instant;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -399,7 +399,7 @@ public class MemberApplicationProcess {
         }
     }
 
-    MemberApplication.Feedback getFeedback(DatastoreQueryContext dqc, String nodeId, Date mostRecentEdit) {
+    MemberApplication.Feedback getFeedback(DatastoreQueryContext dqc, String nodeId, Instant mostRecentEdit) {
         List<DataCommonComment> comments = dqc.getComments(nodeId,
                 x -> isUserFeedback(x.body) && isNewer(x, mostRecentEdit));
 
@@ -451,9 +451,9 @@ public class MemberApplicationProcess {
         return isAccepted(label) || isDeclined(label);
     }
 
-    public static boolean isNewer(DataCommonComment x, Date issueMostRecent) {
+    public static boolean isNewer(DataCommonComment x, Instant issueMostRecent) {
         Log.debugf("isNewer: %s %s", x.mostRecentEdit(), issueMostRecent);
-        return x.mostRecentEdit().after(issueMostRecent);
+        return x.mostRecentEdit().isAfter(issueMostRecent);
     }
 
     public static String issueContent(MemberInfo session, ApplicationPost applicationPost) {

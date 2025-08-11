@@ -1,7 +1,7 @@
 package org.commonhaus.automation.github.context;
 
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,14 +80,14 @@ public class DataReaction {
     // @formatter:on
 
     public final DataActor user;
-    public final Date createdAt;
+    public final Instant createdAt;
     public final String content;
     public final ReactionContent reactionContent;
     public final String reactableId; // "parent" id
     public final int sortOrder;
 
     DataReaction(JsonObject object) {
-        this.createdAt = JsonAttribute.createdAt.dateFrom(object);
+        this.createdAt = JsonAttribute.createdAt.instantFrom(object);
         this.reactableId = JsonAttribute.reactableId.stringFrom(object);
         this.user = JsonAttribute.user.actorFrom(object);
         this.content = JsonAttribute.content.stringFrom(object);
@@ -95,7 +95,7 @@ public class DataReaction {
         this.sortOrder = sortOrderFor(this.reactionContent);
     }
 
-    public DataReaction(DataActor user, String content, Date createdAt) {
+    public DataReaction(DataActor user, String content, Instant createdAt) {
         this.user = user;
         this.content = content;
         this.reactionContent = reactionContentFrom(this.content);
@@ -124,7 +124,7 @@ public class DataReaction {
         };
     }
 
-    public Date date() {
+    public Instant date() {
         return this.createdAt;
     }
 

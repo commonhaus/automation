@@ -65,7 +65,7 @@ public class TaskStateService {
         }
     }
 
-    private void saveState(@Observes ShutdownEvent event) {
+    void saveState(@Observes ShutdownEvent event) {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }

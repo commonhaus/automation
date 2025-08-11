@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +48,7 @@ import io.quarkus.test.junit.QuarkusTest;
 public class VoteTallyTest extends HausRulesTestBase {
     static final String discussionId = "D_kwDOLDuJqs4AXteZ";
 
-    static final Date date = new Date();
+    static final Instant date = Instant.now();
 
     List<DataReaction> teamReactions = new ArrayList<>(51);
     Set<GHUser> teamUsers = new HashSet<>(51);
@@ -411,7 +411,7 @@ public class VoteTallyTest extends HausRulesTestBase {
         assertThat(json)
                 .contains(List.of("hasQuorum", "votingThreshold",
                         "group", "groupSize", "groupVotes", "countedVotes", "droppedVotes",
-                        "categories", "duplicates", "missingGroupActors"));
+                        "categories"));
 
         String markdown = voteTally.toMarkdown(false);
         assertThat(markdown)
@@ -434,10 +434,24 @@ public class VoteTallyTest extends HausRulesTestBase {
                     .doesNotContain("✅ ");
         }
 
-        if (!voteTally.duplicates.isEmpty()) {
+        if (voteTally.duplicates.isEmpty()) {
             assertThat(json)
-                    .as("json duplicate user should be present")
-                    .doesNotContain("{\"user\":{}");
+                    .as("json duplicates should not be present when empty")
+                    .doesNotContain("\"duplicates\":");
+        } else {
+            assertThat(json)
+                    .as("json duplicates should be present")
+                    .contains("\"duplicates\":");
+        }
+
+        if (voteTally.missingGroupActors.isEmpty()) {
+            assertThat(json)
+                    .as("json missingGroupActors user should not be present when empty")
+                    .doesNotContain("\"missingGroupActors\":");
+        } else {
+            assertThat(json)
+                    .as("json missingGroupActors user should be present")
+                    .contains("\"missingGroupActors\":");
         }
 
         if (voteInfo.voteType == CountingMethod.marthas) {
