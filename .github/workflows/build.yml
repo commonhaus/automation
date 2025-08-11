@@ -27,17 +27,17 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  main-root:
+  main_root:
     outputs:
-      is-main: ${{ steps.is-main-root.outputs.test }}
+      is_main: ${{ steps.is_main_root.outputs.test }}
     runs-on: ubuntu-latest
     steps:
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'commonhaus/automation'
-        id: is-main-root
+        id: is_main_root
         run: echo "test=true" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: main-root
+    needs: main_root
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -88,7 +88,7 @@ jobs:
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
-      if: ${{needs.main-root.outputs.is-main}}
+      if: needs.main_root.outputs.is_main
       with:
         languages: java-kotlin
 
@@ -104,7 +104,7 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@51f77329afa6477de8c49fc9c7046c15b9a4e79d # v3.29.5
-      if: ${{needs.main-root.outputs.is-main}}
+      if: needs.main_root.outputs.is_main
       with:
         category: "/language:java-kotlin"
 
@@ -119,8 +119,8 @@ jobs:
           -Dquarkus.container-image.build=true
 
     - name: Update release with snapshot artifact
-      if: ${{needs.main-root.outputs.is-main}}
       id: mvn-release-snapshot
+      if: needs.main_root.outputs.is_main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
@@ -152,16 +152,16 @@ jobs:
         gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
 
     - name: Log in to the Container registry
-      if: ${{needs.main-root.outputs.is-main}}
       uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+      if: needs.main_root.outputs.is_main
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Publish OCI (native)
-      if: ${{needs.main-root.outputs.is-main}}
       id: publish-oci
+      if: needs.main_root.outputs.is_main
       env:
         SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
       run: |
@@ -178,8 +178,8 @@ jobs:
         docker push "ghcr.io/${image}"
 
     - name: Mark snapshot release as non-draft
-      if: ${{needs.main-root.outputs.is-main}}
       id: update-snapshot-release
+      if: needs.main_root.outputs.is_main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SNAPSHOT: ${{ steps.metadata.outputs.snapshot }}
@@ -192,7 +192,7 @@ jobs:
 
     - name: Trigger deploy
       id: trigger-deploy
-      if: ${{needs.main-root.outputs.is-main}}
+      if: needs.main_root.outputs.is_main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
