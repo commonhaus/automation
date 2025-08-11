@@ -1,10 +1,6 @@
 enabled: true
 dryRun: true
 
-# Reference to YAML file in the same repository
-# as this config file
-gitHubResources: github-resources.yml
-
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
 collaboratorSync:

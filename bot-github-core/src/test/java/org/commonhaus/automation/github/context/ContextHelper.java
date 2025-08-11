@@ -34,7 +34,6 @@ import java.util.stream.Stream;
 
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 
@@ -56,16 +55,9 @@ import org.kohsuke.github.PagedIterator;
 import org.kohsuke.github.PagedSearchIterable;
 import org.mockito.Mockito;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.core.JsonGenerator.Feature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
-
 import io.quarkiverse.githubapp.testing.GitHubAppTesting;
 import io.quarkiverse.githubapp.testing.dsl.GitHubMockSetupContext;
 import io.quarkiverse.githubapp.testing.internal.GitHubAppTestingContext;
-import io.quarkus.jackson.ObjectMapperCustomizer;
 import io.quarkus.mailer.MockMailbox;
 import io.smallrye.graphql.client.GraphQLError;
 import io.smallrye.graphql.client.Response;
@@ -233,16 +225,6 @@ public class ContextHelper {
             GHOrganization organization,
             GHRepository repository,
             GitHubQueryContext queryContext) {
-    }
-
-    @Singleton
-    static class AppObjectMapperCustomizer implements ObjectMapperCustomizer {
-        public void customize(ObjectMapper mapper) {
-            mapper.enable(Feature.IGNORE_UNKNOWN)
-                    .setSerializationInclusion(Include.NON_EMPTY)
-                    .setVisibility(VisibilityChecker.Std.defaultInstance()
-                            .with(JsonAutoDetect.Visibility.ANY));
-        }
     }
 
     @Inject
