@@ -421,7 +421,7 @@ public class ProjectAliasManager extends ScheduledService {
         }
         GHContent content = qc.readSourceFile(repo, projectList.filePath());
         if (content == null || qc.hasErrors()) {
-            Log.debugf("[%s] processConfigUpdate: no %s in %s", ME, HausKeeperConfig.PATH, repoFullName);
+            Log.debugf("[%s] updateDomainMap: no %s in %s", ME, HausKeeperConfig.PATH, repoFullName);
             return map;
         }
         map = qc.readYamlContent(content, ProjectSourceConfig.TYPE_REF);

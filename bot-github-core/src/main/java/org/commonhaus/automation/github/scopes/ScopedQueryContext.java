@@ -36,9 +36,9 @@ public class ScopedQueryContext extends GitHubQueryContext {
             String repoFullName,
             String ownerName) {
         super(contextService, installationId);
-        this.repoFullName = repoFullName;
         this.ownerName = ownerName;
-        this.repository = (repository == null && repoFullName != null) ? getRepository(repoFullName) : repository;
+        this.repoFullName = (repoFullName != null && repoFullName.contains("/")) ? repoFullName : null;
+        this.repository = (repository == null && this.repoFullName != null) ? getRepository(this.repoFullName) : repository;
     }
 
     public ScopedQueryContext(

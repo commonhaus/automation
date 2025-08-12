@@ -103,11 +103,11 @@ public class ConfigWatcher {
 
     protected void readConfiguration(long installationId, GHRepository repo, FileUpdateType updateType) {
         if (repo == null) {
-            Log.warnf("[%s] processConfigUpdate: repository not set in FileUpdate", ME);
+            Log.warnf("[%s] readConfiguration: repository not set in FileUpdate", ME);
             return;
         }
         if (updateType == FileUpdateType.REMOVED) {
-            Log.debugf("[%s] processConfigUpdate: %s config deleted", repo.getFullName());
+            Log.debugf("[%s] readConfiguration: %s config deleted", repo.getFullName());
             repoConfig.remove(repo.getFullName());
             return;
         }

@@ -140,8 +140,12 @@ public class GitHubTeamService {
         String relativeName = toRelativeName(orgName, teamFullName);
 
         GHOrganization org = qc.getOrganization(orgName);
-        if (org == null) {
-            Log.debugf("[%s] getTeamMembers: %s organization not found", qc.getLogId(), teamFullName);
+        if (qc.hasErrors()) {
+            qc.logAndSendContextErrors(
+                    "[%s] getTeamMembers: unable to retrieve organization %s".formatted(qc.getLogId(), orgName));
+            return null;
+        } else if (org == null) {
+            Log.debugf("[%s] getTeamMembers: %s organization not found for %s", qc.getLogId(), orgName, teamFullName);
             return null;
         }
         Set<GHUser> members = getCachedTeamMembers(teamFullName);

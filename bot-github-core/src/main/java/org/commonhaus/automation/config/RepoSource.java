@@ -5,7 +5,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public record RepoSource(String repository, String filePath) {
     public boolean isEmpty() {
-        return filePath == null || filePath.isBlank();
+        return repository == null || repository.isBlank() || filePath == null || filePath.isBlank();
     }
 
     @Override

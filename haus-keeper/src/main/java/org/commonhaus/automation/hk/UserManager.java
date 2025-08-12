@@ -97,7 +97,7 @@ public class UserManager {
     protected void processConfigUpdate(ScopedQueryContext qc) {
         GHRepository repo = qc.getRepository();
         if (repo == null) {
-            Log.warnf("%s/readOrgConfig: repository not set in QueryContext", ME);
+            Log.warnf("%s/processConfigUpdate: repository not set in QueryContext", ME);
             return;
         }
         GHContent content = qc.readSourceFile(repo, HausKeeperConfig.PATH);

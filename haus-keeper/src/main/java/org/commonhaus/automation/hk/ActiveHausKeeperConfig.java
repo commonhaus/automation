@@ -92,11 +92,14 @@ public class ActiveHausKeeperConfig {
             return;
         }
 
-        String attestationRepository = userConfig.attestations().repository();
-        if (attestationRepository == null || attestationRepository.isBlank()) {
-            Log.debugf("%s/updateValidAttestations: no attestations repository defined", UserManager.ME);
+        if (userConfig.attestations().isEmpty()) {
+            Log.debugf("%s/updateValidAttestations: no attestations defined in %s", UserManager.ME, userConfig);
             return;
+        } else {
+            Log.debugf("%s/updateValidAttestations: validating attestations in %s", UserManager.ME,
+                    userConfig.attestations());
         }
+        String attestationRepository = userConfig.attestations().repository();
         ScopedQueryContext qc = homeQc.forPublicContent(attestationRepository);
         GHRepository repo = qc.getRepository(attestationRepository);
         if (repo == null || qc.hasErrors()) {
