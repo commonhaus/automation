@@ -99,6 +99,11 @@ public class ActiveHausKeeperConfig {
         }
         ScopedQueryContext qc = homeQc.forPublicContent(attestationRepository);
         GHRepository repo = qc.getRepository(attestationRepository);
+        if (repo == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] updateValidAttestations: unable to access repository %s"
+                    .formatted(UserManager.ME, attestationRepository));
+            return;
+        }
         GHContent content = qc.readSourceFile(repo, userConfig.attestations().filePath());
         if (content == null || qc.hasErrors()) {
             Log.debugf("%s/updateValidAttestations: filePath %s does not exist in %s", UserManager.ME,

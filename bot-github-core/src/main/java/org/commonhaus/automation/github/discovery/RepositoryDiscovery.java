@@ -117,7 +117,9 @@ public class RepositoryDiscovery {
                         scopedInstallationMap.repositoryDiscovered(event);
                     }
                 }
+
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
+
                 fireInstallationDiscoveryEvent.fire(
                         new InstallationDiscoveryEvent(DiscoveryAction.ADDED, ghiId, github, graphQLClient));
             }

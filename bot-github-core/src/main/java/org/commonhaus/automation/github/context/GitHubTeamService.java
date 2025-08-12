@@ -114,6 +114,9 @@ public class GitHubTeamService {
      * @return GHTeam or null if not found
      */
     public GHTeam getTeam(GitHubQueryContext qc, GHOrganization org, String relativeName) {
+        if (org == null || relativeName == null) {
+            return null;
+        }
         String fullName = toFullName(org.getLogin(), relativeName);
         GHTeam team = getCachedTeam(fullName);
         if (team == null) {
@@ -137,6 +140,10 @@ public class GitHubTeamService {
         String relativeName = toRelativeName(orgName, teamFullName);
 
         GHOrganization org = qc.getOrganization(orgName);
+        if (org == null) {
+            Log.debugf("[%s] getTeamMembers: %s organization not found", qc.getLogId(), teamFullName);
+            return null;
+        }
         Set<GHUser> members = getCachedTeamMembers(teamFullName);
         if (members == null) {
             GHTeam ghTeam = getTeam(qc, org, relativeName);
@@ -178,7 +185,7 @@ public class GitHubTeamService {
     public TeamList getTeamList(GitHubQueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
-        Log.debugf("[%s] %s members: %s", qc, qc.getLogId(), teamList.name, teamList.members);
+        Log.debugf("[%s] getTeamList: %s members: %s", qc.getLogId(), teamList.name, teamList.members);
         return teamList;
     }
 
@@ -190,7 +197,7 @@ public class GitHubTeamService {
      */
     public boolean isTeamMember(GitHubQueryContext qc, GHUser user, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
-        Log.debugf("%s members: %s", teamFullName, members.stream().map(GHUser::getLogin).toList());
+        Log.debugf("%s members: %s", teamFullName, members == null ? "null" : members.stream().map(GHUser::getLogin).toList());
         return members != null && members.contains(user);
     }
 
@@ -524,8 +531,8 @@ public class GitHubTeamService {
             Log.warnf("[%s] syncMembers: organization %s not found", qc.getLogId(), teamOrgName);
             return;
         }
-        GHTeam team = getTeam(qc, org, relativeTeamName);
-        if (team == null) {
+        GHTeam ghTeam = getTeam(qc, org, relativeTeamName);
+        if (ghTeam == null) {
             Log.warnf("[%s] syncMembers: team %s not found in %s", qc.getLogId(), relativeTeamName, teamOrgName);
             return;
         }
@@ -555,13 +562,13 @@ public class GitHubTeamService {
                 // Process removals first
                 for (String login : changes.toRemove()) {
                     GHUser user = gh.getUser(login);
-                    team.remove(user);
+                    ghTeam.remove(user);
                 }
 
                 // Then handle additions
                 for (String login : changes.toAdd()) {
                     GHUser user = gh.getUser(login);
-                    team.add(user);
+                    ghTeam.add(user);
                 }
                 return null;
             });

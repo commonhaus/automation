@@ -15,7 +15,7 @@ public class TeamList {
 
     public TeamList(String name, Collection<GHUser> members) {
         this(name, members == null
-                ? null
+                ? Set.of()
                 : members.stream().map(DataActor::new).collect(Collectors.toSet()));
     }
 

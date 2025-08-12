@@ -37,7 +37,7 @@ public class AdminRoutes implements LocalRouteOnly {
             Log.info("🚀 🏡 Organization update triggered");
             organizationManager.refreshOrganizationMembership(true);
         });
-        routingExchange.ok();
+        routingExchange.ok().end();
     }
 
     @Route(path = "/projects", order = 99, produces = "text/html", methods = { HttpMethod.GET })
@@ -46,11 +46,11 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-        updateQueue.queueReconciliation("triggerOrgUpdate", () -> {
+        updateQueue.queueReconciliation("triggerProjectUpdate", () -> {
             Log.info("🚀 🌳 Project update triggered");
             projectManager.refreshAccessLists(true);
         });
-        routingExchange.ok();
+        routingExchange.ok().end();
     }
 
     @Route(path = "/sponsors", order = 99, produces = "text/html", methods = { HttpMethod.GET })
@@ -59,10 +59,10 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-        updateQueue.queueReconciliation("triggerOrgUpdate", () -> {
+        updateQueue.queueReconciliation("triggerSponsorUpdate", () -> {
             Log.info("🚀 💸 Sponsors update triggered");
             sponsorManager.refreshSponsors(true);
         });
-        routingExchange.ok();
+        routingExchange.ok().end();
     }
 }
