@@ -35,11 +35,11 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @GitHubAppTest
-public class ProjectAccessManagerTest extends HausManagerTestBase {
-    final static String taskGroup = ProjectAccessManager.ME + "-" + PRIMARY.repoFullName();
+public class ProjectManagerTest extends HausManagerTestBase {
+    final static String taskGroup = ProjectManager.ME + "-" + PRIMARY.repoFullName();
 
     @Inject
-    ProjectAccessManager projectAccessManager;
+    ProjectManager projectAccessManager;
 
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 

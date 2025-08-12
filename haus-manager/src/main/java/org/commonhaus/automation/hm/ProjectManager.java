@@ -40,7 +40,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class ProjectAccessManager extends GroupCoordinator {
+public class ProjectManager extends GroupCoordinator {
     static final String ME = "🌳-project";
     static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
 
@@ -82,7 +82,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: begin refresh access lists", ME);
-            refreshAccessLists(false);
+            refreshConfig(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled access list refresh", t);
         }
@@ -91,7 +91,7 @@ public class ProjectAccessManager extends GroupCoordinator {
     /**
      * Allow manual trigger from admin endpoint
      */
-    public void refreshAccessLists(boolean userTriggered) {
+    public void refreshConfig(boolean userTriggered) {
         if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
             Log.infof("[%s]: skip scheduled project access update (last run: %s)", ME, lastRun);
             return;

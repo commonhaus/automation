@@ -76,7 +76,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         if (action.repository()
                 && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
 
-            Log.debugf("[%s] repoDiscovered: %s main=%s", ME, action.name(), repoFullName);
+            Log.debugf("[%s] repositoryDiscovered: %s main=%s", ME, action.name(), repoFullName);
             if (action.added()) {
                 // main repository for configuration
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
@@ -128,7 +128,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         recordRun();
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
-            Log.debugf("[%s] refreshAccessLists: no organization installation", ME);
+            Log.debugf("[%s] refreshOrganizationMembership: no organization installation", ME);
             return;
         }
         if (readOrgConfig(qc)) {
@@ -156,7 +156,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         updateQueue.queue(ME, () -> {
             OrganizationConfigState configState = currentConfig.get().orElse(null);
             if (configState == null || !configState.performSync() || configState.orgConfig().teamMembership() == null) {
-                Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
+                Log.debugf("[%s] processRepoSourceUpdate: configuration not available or team sync not enabled: %s", ME,
+                        configState);
                 return;
             }
             Log.debugf("[%s] processRepoSourceUpdate: %s", ME, repoSource);
