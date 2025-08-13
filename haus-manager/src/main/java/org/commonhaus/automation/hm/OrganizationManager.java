@@ -286,7 +286,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
             return;
         }
-        Log.debugf("[%s] reconcile: start %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("[%s] reconcile: start %s::%s", ME, configState.repoFullName(), OrganizationConfig.PATH);
 
         for (GroupMapping groupMapping : configState.orgConfig().teamMembership()) {
             if (groupMapping == null || !groupMapping.performSync()) {
@@ -297,7 +297,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             watchRepoSource(configState, groupMapping.source());
             processGroupMapping(configState, groupMapping);
         }
-        Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoFullName(), OrganizationConfig.PATH);
     }
 
     protected String me() {
@@ -316,7 +316,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
     record OrganizationConfigState(
             long installationId,
-            String repoName,
+            String repoFullName,
             @Nonnull OrganizationConfig orgConfig,
             Set<RepoSource> sources,
             AtomicReference<Set<String>> teamRef) implements ConfigState {
@@ -343,7 +343,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             if (teams == null) {
                 teams = new HashSet<>();
                 teams.addAll(orgConfig.teamMembership().stream()
-                        .flatMap(x -> x.watchedTeams(repoName).stream())
+                        .flatMap(x -> x.watchedTeams(repoFullName).stream())
                         .toList());
                 this.teamRef.set(teams);
             }
@@ -360,8 +360,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         @Override
         public String toString() {
-            return "OrgConfigState{installationId=%d, repoName='%s', orgConfig=%s}"
-                    .formatted(installationId, repoName, orgConfig);
+            return "OrgConfigState{installationId=%d, repoFullName='%s', orgConfig=%s}"
+                    .formatted(installationId, repoFullName, orgConfig);
         }
     }
 }

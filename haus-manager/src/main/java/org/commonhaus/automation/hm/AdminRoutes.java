@@ -7,6 +7,7 @@ import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.config.LocalRouteOnly;
 import org.commonhaus.automation.github.stats.ProjectHealthCollector;
+import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 

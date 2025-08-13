@@ -18,6 +18,7 @@ import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.OrgDefaults;
 import org.commonhaus.automation.hm.config.PushToTeams;
+import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.queue.ScheduledService;
 import org.kohsuke.github.GHContent;
@@ -52,7 +53,7 @@ public abstract class GroupCoordinator extends ScheduledService {
 
         long installationId();
 
-        String repoName();
+        String repoFullName();
 
         boolean add(RepoSource repoSource);
 
@@ -61,7 +62,8 @@ public abstract class GroupCoordinator extends ScheduledService {
         EmailNotification emailNotifications();
     }
 
-    protected abstract void processMembershipUpdate(String taskGroup, MembershipUpdate update);
+    protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
+    }
 
     protected abstract void processRepoSourceUpdate(String taskGroup, RepoSource repoSource);
 
@@ -110,12 +112,12 @@ public abstract class GroupCoordinator extends ScheduledService {
         boolean isDryRun = groupMapping.dryRun() || ctx.isDryRun();
 
         ScopedQueryContext orgQc = new ScopedQueryContext(ctx,
-                configState.installationId(), configState.repoName());
+                configState.installationId(), configState.repoFullName());
 
         // Find and read the source file (CONTACTS.yaml)
         // First: find the repository
         RepoSource source = groupMapping.source();
-        String sourceRepoName = source.repository() == null ? configState.repoName() : source.repository();
+        String sourceRepoName = source.repository() == null ? configState.repoFullName() : source.repository();
 
         ScopedQueryContext sourceQc = orgQc.forPublicContent(sourceRepoName);
         GHRepository sourceRepo = sourceQc == null ? null : sourceQc.getRepository(sourceRepoName);
