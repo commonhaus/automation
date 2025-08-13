@@ -70,6 +70,9 @@ public class PeriodicUpdateQueue {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final Map<String, RetryTask> retryTasks = new ConcurrentHashMap<>();
 
+    // Background tasks: low priority; choose after main tasks quiesce
+    private final Map<String, Runnable> backgroundTasks = new ConcurrentHashMap<>();
+
     void startup(@Observes StartupEvent startup) {
         Log.debugf("🧵 Starting PeriodicUpdateQueue");
 
@@ -97,6 +100,11 @@ public class PeriodicUpdateQueue {
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 
+    public void queueBackground(String name, Runnable task) {
+        Log.debugf("🧵 QUEUE BACKGROUND task %s", name);
+        backgroundTasks.put(name, task);
+    }
+
     /**
      * Schedule a reconciliation event.
      * <p>
@@ -114,7 +122,11 @@ public class PeriodicUpdateQueue {
     private void runTask() {
         Task task = taskQueue.poll();
         if (task != null) {
+            // Remove from background tasks if same group exists
+            backgroundTasks.remove(task.name());
             run(task);
+        } else if (!backgroundTasks.isEmpty()) {
+            runBackgroundTask();
         }
     }
 
@@ -149,6 +161,27 @@ public class PeriodicUpdateQueue {
             logMailer.logAndSendEmail("queue",
                     "🧵 Error running %s %s task".formatted(task.type(), task.name()),
                     e, logMailer.botErrorEmailAddress());
+        }
+    }
+
+    private void runBackgroundTask() {
+        Iterator<Map.Entry<String, Runnable>> iterator = backgroundTasks.entrySet().iterator();
+        if (iterator.hasNext()) {
+            // we don't actually care about the order. Just grab one.
+            var entry = iterator.next();
+            iterator.remove();
+
+            String taskName = entry.getKey();
+            Runnable bgTask = entry.getValue();
+            Log.debugf("🧵 BACKGROUND [begin] %s task", taskName);
+            try {
+                bgTask.run();
+            } catch (Throwable e) {
+                logMailer.logAndSendEmail("queue",
+                        "🧵 Error running BACKGROUND %s task".formatted(taskName),
+                        e, logMailer.botErrorEmailAddress());
+            }
+            Log.debugf("🧵 BACKGROUND [end] %s task", taskName);
         }
     }
 
