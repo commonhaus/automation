@@ -164,7 +164,7 @@ public class DataRepository extends DataCommonType {
             boolean includeStargazers, boolean includeReleases) {
 
         // Git date ranges are inclusive, so we need to adjust the end date
-        String baseQuery = "repo:%s created:%s..%s"
+        String baseQuery = "repo:%s updated:%s..%s"
                 .formatted(repo.getFullName(), from, toExclusive.minusDays(1));
 
         Count issues = queryType(qc, baseQuery + " is:issue", "ISSUE", from, toExclusive);

@@ -9,6 +9,7 @@ import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.ContextHelper;
 import org.commonhaus.automation.github.context.GitHubTeamService;
+import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
