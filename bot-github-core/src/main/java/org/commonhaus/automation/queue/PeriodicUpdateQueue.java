@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import jakarta.enterprise.event.Observes;
@@ -68,10 +69,15 @@ public class PeriodicUpdateQueue {
 
     private final BlockingQueue<Task> taskQueue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+
+    /** Retry tasks: tasks that failed due to network or authentication issues that should be retried */
     private final Map<String, RetryTask> retryTasks = new ConcurrentHashMap<>();
 
-    // Background tasks: low priority; choose after main tasks quiesce
+    /** Background tasks: low priority; choose after main tasks quiesce */
     private final Map<String, Runnable> backgroundTasks = new ConcurrentHashMap<>();
+
+    /** Pending reconcile tasks (by group) */
+    private final Map<String, AtomicInteger> reconcileCounters = new ConcurrentHashMap<>();
 
     void startup(@Observes StartupEvent startup) {
         Log.debugf("🧵 Starting PeriodicUpdateQueue");
@@ -91,17 +97,18 @@ public class PeriodicUpdateQueue {
     }
 
     public void queue(String name, Runnable task) {
-        Log.debugf("🧵 QUEUE CHANGE task %s", name);
+        Log.debugf("🧵 ❇️ CHANGE task %s", name);
         taskQueue.add(new Task(TaskType.CHANGE, name, task));
     }
 
     public void queueReconciliation(String name, Runnable task) {
-        Log.debugf("🧵 QUEUE RECONCILE task %s", name);
+        Log.debugf("🧵 ❇️ RECONCILE task %s", name);
+        reconcileCounters.computeIfAbsent(name, k -> new AtomicInteger()).incrementAndGet();
         taskQueue.add(new Task(TaskType.RECONCILE, name, task));
     }
 
     public void queueBackground(String name, Runnable task) {
-        Log.debugf("🧵 QUEUE BACKGROUND task %s", name);
+        Log.debugf("🧵 ❇️ BACKGROUND task %s", name);
         backgroundTasks.put(name, task);
     }
 
@@ -115,7 +122,7 @@ public class PeriodicUpdateQueue {
      * @param retryCount Previous retry count (0 for initial attempt)
      */
     public void scheduleReconciliationRetry(String name, Consumer<Integer> retryRunnable, int retryCount) {
-        Log.debugf("🧵 SCHEDULE task %s", name);
+        Log.debugf("🧵 ❇️ SCHEDULE task %s", name);
         retryTasks.putIfAbsent(name, new RetryTask(name, retryRunnable, retryCount));
     }
 
@@ -135,28 +142,26 @@ public class PeriodicUpdateQueue {
             boolean tryNext;
             do {
                 // skip or collapse reconciliation task?
-                Task next = taskQueue.peek();
                 tryNext = false;
 
                 // Defer reconciliation if changes of the same group are pending
-                if (task.type() == TaskType.RECONCILE && next != null && next.name().equals(task.name())) {
-                    if (next.type() == TaskType.CHANGE) {
-                        // There is another pending related change; postpone this reconciliation
-                        taskQueue.add(task);
-                        Log.debugf("🧵 RECONCILE [postpone] %s task; same-group changes", task.name());
-                    } else {
+                if (task.type() == TaskType.RECONCILE) {
+                    int pendingCount = reconcileCounters.getOrDefault(task.name(), new AtomicInteger()).decrementAndGet();
+                    if (pendingCount > 0) {
                         // There is another pending reconciliation for the same group; skip this one
-                        Log.debugf("🧵 RECONCILE [skip] %s task; duplicate next", task.name());
+                        Log.debugf("🧵 ❎ RECONCILE [skip] %s task; %s of this task remaining", task.name(), pendingCount);
+                        task = taskQueue.poll(); // Get the next task
+                        tryNext = true;
+                    } else {
+                        reconcileCounters.remove(task.name());
                     }
-                    task = taskQueue.poll(); // Get the next task
-                    tryNext = true;
                 }
             } while (tryNext);
 
             // Execute the task
-            Log.debugf("🧵 %s [begin] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
+            Log.debugf("🧵 ➡️ %s %s task; %s tasks remaining", task.type(), task.name(), taskQueue.size());
             task.task().run();
-            Log.debugf("🧵 %s [end] %s task; %s remaining", task.type(), task.name(), taskQueue.size());
+            Log.debugf("🧵 ⬅️ %s %s task; %s tasks remaining", task.type(), task.name(), taskQueue.size());
         } catch (Throwable e) {
             logMailer.logAndSendEmail("queue",
                     "🧵 Error running %s %s task".formatted(task.type(), task.name()),
