@@ -14,6 +14,8 @@ import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.quarkus.test.InjectMock;
 
 public class HausManagerTestBase extends ContextHelper {
@@ -26,7 +28,12 @@ public class HausManagerTestBase extends ContextHelper {
     static final DefaultValues PROJECT_ORG = new DefaultValues(
             569084570,
             new Resource(123456789, "other-org"),
-            new Resource("other-org/other-repo"));
+            new Resource("other-org/primary-repo"));
+
+    static final DefaultValues PROJECT_TWO = new DefaultValues(
+            569084570,
+            new Resource(123456789, "other-org"),
+            new Resource("other-org/project"));
 
     @Inject
     TestManagerBotConfig configProducer;
@@ -40,11 +47,18 @@ public class HausManagerTestBase extends ContextHelper {
     @InjectMock
     GitHubTeamService teamService;
 
+    @Inject
+    protected ObjectMapper objectMapper;
+
+    @Inject
+    TeamConflictResolver conflictResolver;
+
     MockInstallation project_org;
 
     @BeforeEach
     void setup() throws IOException {
         reset(); // reset all mocks
+        conflictResolver.reset(); // reset conflict resolver
 
         setupDefaultMocks(PRIMARY);
         project_org = setupInstallationMocks(PROJECT_ORG);
