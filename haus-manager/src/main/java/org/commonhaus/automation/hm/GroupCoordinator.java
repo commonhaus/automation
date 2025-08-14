@@ -46,6 +46,9 @@ public abstract class GroupCoordinator extends ScheduledService {
     MembershipWatcher membershipEvents;
 
     @Inject
+    TeamConflictResolver teamConflictResolver;
+
+    @Inject
     PeriodicUpdateQueue updateQueue;
 
     interface ConfigState {
@@ -58,6 +61,9 @@ public abstract class GroupCoordinator extends ScheduledService {
         boolean add(RepoSource repoSource);
 
         boolean remove(RepoSource repoSource);
+
+        /** Teams that can not be synced due to conflicts */
+        Set<String> blockedTeams();
 
         EmailNotification emailNotifications();
     }
@@ -206,6 +212,10 @@ public abstract class GroupCoordinator extends ScheduledService {
                 }
 
                 for (String targetTeam : sync.teams()) {
+                    if (configState.blockedTeams().contains(targetTeam)) {
+                        Log.warnf("[%s] groupMapping: team %s is blocked; skipping sync", me(), targetTeam);
+                        continue;
+                    }
                     try {
                         doSyncTeamMembers(configState.taskGroup(), sourceQc, targetTeam,
                                 expectedLogins, sync.ignoreUsers(defaults),

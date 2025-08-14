@@ -40,6 +40,7 @@ import jakarta.json.JsonObject;
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.GitHubQueryContext.GitHubParameterApiCall;
+import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
@@ -229,6 +230,9 @@ public class ContextHelper {
 
     @Inject
     public Event<RepositoryDiscoveryEvent> fireRepositoryDiscoveryEvent;
+
+    @Inject
+    public Event<BootstrapDiscoveryEvent> fireBootstrapDiscoveryEvent;
 
     @Inject
     public ContextService ctx;
@@ -808,6 +812,10 @@ public class ContextHelper {
                 repo,
                 bootstrap);
         fireRepositoryDiscoveryEvent.fire(repoEvent);
+    }
+
+    public void triggerBootstrapDiscovery(MockInstallation mockInstallation) {
+        fireBootstrapDiscoveryEvent.fire(new BootstrapDiscoveryEvent(List.of(mockInstallation.installationId())));
     }
 
     /**

@@ -19,6 +19,7 @@ import jakarta.enterprise.event.Observes;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
+import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
@@ -42,7 +43,7 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class ProjectManager extends GroupCoordinator implements LatestProjectConfig {
     static final String ME = "🌳-project";
-    static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, 0, null);
+    static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, null, 0, null);
 
     // flat map of task group to its current state
     final Map<String, ProjectConfigState> taskGroupToState = new ConcurrentHashMap<>();
@@ -118,6 +119,10 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             // do this in chunks to space the work out..
             updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
         }
+        // After queuing all project config reads,
+        // queue reconciliation tasks to sync team membership
+        // this grouping matters: avoid management conflicts
+        queueReconciliation();
     }
 
     /**
@@ -147,6 +152,11 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
                 if (runNow) {
                     updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+
+                    if (!repoEvent.bootstrap()) {
+                        // If this is after bootstrap phase, also queue reconcile event
+                        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+                    }
                 } else {
                     Log.debug("Skip eager project discovery (ran recently); lazy population on updates");
                     taskGroupToState.put(taskGroup, EMPTY);
@@ -171,6 +181,25 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 }
             }
         }
+    }
+
+    /** All repositories have been discovered: Organization and project config have been detected */
+    protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
+        if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+            queueReconciliation();
+        } else {
+            Log.debugf("[%s] bootstrapComplete: Skip eager team sync", ME);
+        }
+    }
+
+    protected void queueReconciliation() {
+        // Add this to the queue so it occurs after project configurations are read
+        updateQueue.queue(ME, () -> {
+            Log.debugf("[%s] queueReconciliation: Reconcile all project configurations", ME);
+            for (String taskGroup : taskGroupToState.keySet()) {
+                updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+            }
+        });
     }
 
     /**
@@ -230,6 +259,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
         readProjectConfig(taskGroup, qc);
+        updateQueue.queueReconciliation(ME, () -> reconcile(taskGroup));
     }
 
     /**
@@ -274,6 +304,10 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         Log.debugf("[%s] readProjectConfig %s: found %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
 
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
+                () -> {
+                    ScopedQueryContext taskQc = new ScopedQueryContext(ctx, qc.getInstallationId(), repo);
+                    readProjectConfig(taskGroup, taskQc);
+                },
                 repo.getFullName(), qc.getInstallationId(), projectConfig);
 
         if (oldState != null) {
@@ -301,14 +335,16 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 for (RepoSource oldSource : oldSources) {
                     unwatchRepoSource(newState, oldSource);
                 }
+
+                Set<String> removedTeams = oldState.targetTeams();
+                removedTeams.removeAll(newState.targetTeams());
+                teamConflictResolver.releaseProjectTeams(newState, removedTeams);
             }
         }
 
+        teamConflictResolver.registerProjectTeams(newState);
         // Add the source file to the state
         taskGroupToState.put(taskGroup, newState);
-
-        // queue reconcile action: deal with bursty config updates
-        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
     }
 
     /**
@@ -320,9 +356,9 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
     public void reconcile(String taskGroup) {
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
-        Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, state.projectConfig());
-
         ProjectConfig projectConfig = state.projectConfig();
+        Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, projectConfig);
+
         boolean nothingToDo = projectConfig.collaboratorSync() == null && projectConfig.teamMembership().isEmpty();
         if (!projectConfig.enabled() || nothingToDo) {
             Log.infof("[%s] %s: configuration disabled or nothing to do; skipping %s", ME, taskGroup,
@@ -430,14 +466,25 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
     public record ProjectConfigState(
             String taskGroup,
+            Runnable refresh,
             String repoFullName,
             long installationId,
             ProjectConfig projectConfig,
-            Set<RepoSource> sources) implements ConfigState {
+            Set<RepoSource> sources,
+            Set<String> blockedTeams) implements ConfigState {
 
-        public ProjectConfigState(String taskGroup, String repoFullName, long installationId,
+        public ProjectConfigState(String taskGroup, Runnable refresh, String repoFullName, long installationId,
                 ProjectConfig projectConfig) {
-            this(taskGroup, repoFullName, installationId, projectConfig, new HashSet<>());
+            this(taskGroup, refresh, repoFullName, installationId, projectConfig, new HashSet<>(), new HashSet<>());
+        }
+
+        public Set<String> targetTeams() {
+            return projectConfig == null
+                    ? Set.of()
+                    : projectConfig.teamMembership().stream()
+                            .flatMap(gm -> gm.pushMembers().values().stream())
+                            .flatMap(pts -> pts.teams().stream())
+                            .collect(Collectors.toSet());
         }
 
         public boolean add(RepoSource source) {
@@ -446,6 +493,14 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
         public boolean remove(RepoSource source) {
             return sources.remove(source);
+        }
+
+        public boolean addBlockedTeam(String teamName) {
+            return blockedTeams.add(teamName);
+        }
+
+        public Set<String> blockedTeams() {
+            return blockedTeams;
         }
 
         // ProjectConfig is only unset when using an empty placeholder
@@ -506,6 +561,25 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         @Override
         public EmailNotification emailNotifications() {
             return this == EMPTY ? null : projectConfig().emailNotifications();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ProjectConfigState other = (ProjectConfigState) o;
+            return installationId == other.installationId &&
+                    repoFullName.equals(other.repoFullName) &&
+                    taskGroup.equals(other.taskGroup);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(installationId, repoFullName, taskGroup);
         }
     }
 }

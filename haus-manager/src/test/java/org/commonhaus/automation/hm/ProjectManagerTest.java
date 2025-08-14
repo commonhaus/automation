@@ -54,6 +54,9 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project_org, true);
+
+        // Trigger bootstrap completion to execute deferred reconciliation
+        triggerBootstrapDiscovery(hausMocks);
     }
 
     @AfterEach
@@ -73,12 +76,14 @@ public class ProjectManagerTest extends HausManagerTestBase {
         mockTeam("test-org/team-quorum", null);
 
         // Trigger discovery to initialize manager
-        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, false);
 
         waitForQueue();
 
         // Trigger discovery to remove configuration
-        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, true);
+        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, false);
+
+        waitForQueue();
 
         // This should be called only once (first event); second event cleans state
         verify(teamService, times(1)).syncCollaborators(any(),
