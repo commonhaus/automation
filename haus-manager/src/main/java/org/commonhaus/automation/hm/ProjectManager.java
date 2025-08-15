@@ -138,9 +138,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         Log.debugf("[%s] repositoryDiscovered (%s): %s", ME, repoEvent.action(), repoFullName);
         long installationId = repoEvent.installationId();
 
-        boolean runNow = taskState.shouldRun(ME, Duration.ofHours(6));
-        recordRun();
-
         // We only read configuration files from repositories in the configured
         // organization
         if (action.repository() && orgName.equals(mgrBotConfig.home().organization())) {
@@ -150,16 +147,11 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                if (runNow) {
-                    updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+                updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
 
-                    if (!repoEvent.bootstrap()) {
-                        // If this is after bootstrap phase, also queue reconcile event
-                        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
-                    }
-                } else {
-                    Log.debug("Skip eager project discovery (ran recently); lazy population on updates");
-                    taskGroupToState.put(taskGroup, EMPTY);
+                if (!repoEvent.bootstrap()) {
+                    // If this is after bootstrap phase, also queue reconcile event
+                    updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
                 }
 
                 // Register watcher to monitor for org config changes
