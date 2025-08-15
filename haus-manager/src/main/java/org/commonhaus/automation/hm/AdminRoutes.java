@@ -41,6 +41,9 @@ public class AdminRoutes implements LocalRouteOnly {
     ProjectHealthCollector projectHealthCollector;
 
     @Inject
+    ProjectHealthManager projectHealthManager;
+
+    @Inject
     LogMailer logMailer;
 
     @Inject
@@ -108,7 +111,7 @@ public class AdminRoutes implements LocalRouteOnly {
             routingExchange.response().setStatusCode(400).end();
             return;
         }
-        var fullName = routingContext.request().getParam("fullName");
+        var fullName = request.getParam("fullName");
         if (fullName == null || fullName.isBlank()) {
             Log.info("Statistics request without fullName");
             routingExchange.response().setStatusCode(400).end();
@@ -121,7 +124,7 @@ public class AdminRoutes implements LocalRouteOnly {
             return;
         }
 
-        var dateString = routingContext.request().getParam("startDate");
+        var dateString = request.getParam("startDate");
         var startDate = parseDate(dateString);
 
         updateQueue.queueReconciliation("triggerStatistics/" + fullName, () -> {
@@ -141,6 +144,18 @@ public class AdminRoutes implements LocalRouteOnly {
             }
 
         });
+        routingExchange.ok().end();
+    }
+
+    @Route(path = "/healthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
+        var dateString = routingContext.request().getParam("startDate");
+        var startDate = parseDate(dateString);
+
+        updateQueue.queueReconciliation("healthReport", () -> {
+            projectHealthManager.collectHealthData(true, startDate);
+        });
+
         routingExchange.ok().end();
     }
 
