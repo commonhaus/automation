@@ -1,0 +1,92 @@
+# Sample Project Health Configuration for cf-haus-manager.yml
+# Place this file at .github/cf-haus-manager.yml in your project repository
+
+enabled: true
+dryRun: false  # Set to true for testing
+
+# Optional: Synchronize collaborators from a source team
+collaboratorSync:
+  role: push  # triage, push, maintain, admin
+  sourceTeam: commonhaus/project-leads
+  includeUsers:
+    - project-maintainer
+    - release-manager
+  ignoreUsers:
+    - dependabot[bot]
+    - github-actions[bot]
+
+# Optional: Synchronize team memberships from source files
+teamMembership:
+  - dryRun: false
+    source:
+      repository: commonhaus/foundation
+      filePath: CONTACTS.yaml
+    mapPointer: /contacts
+    defaults:
+      field: github
+      preserveUsers:
+        - existing-team-member
+    pushMembers:
+      # Map source data groups to target teams
+      committers:
+        teams:
+          - commonhaus/project-committers
+          - commonhaus/all-contributors
+      steering:
+        teams:
+          - commonhaus/project-steering
+
+# Project Health Monitoring Configuration
+projectHealth:
+  # Project maturity level for foundation oversight
+  maturity: mature  # early, mature, experimental, deprecated
+  
+  # Organizations and repositories to monitor
+  organizationRepositories:
+    # Monitor repositories in the main project organization
+    hibernate:
+      dryRun: false
+      # Option 1: Include specific repositories only
+      includes:
+        - hibernate-orm
+        - hibernate-search
+        - hibernate-validator
+        - hibernate-reactive
+      # Option 2: Exclude specific repositories (use includes OR excludes, not both)
+      # excludes:
+      #   - archived-repo
+      #   - private-tooling
+      
+      # Expected release frequency for health tracking
+      releaseFrequency:
+        hibernate-orm: monthly
+        hibernate-search: quarterly
+        hibernate-validator: biannually
+        hibernate-reactive: monthly
+    
+    # Monitor related projects in other organizations
+    quarkusio:
+      includes:
+        - quarkus
+        - quarkus-platform
+      releaseFrequency:
+        quarkus: monthly
+        quarkus-platform: monthly
+    
+    # Monitor community projects
+    commonhaus:
+      excludes:
+        - internal-tooling
+        - .github
+      releaseFrequency:
+        automation-bot: quarterly
+
+# Email notifications for errors and audit trails
+emailNotifications:
+  errors:
+    - project-admin@example.org
+    - foundation-admin@commonhaus.org
+  dryRun:
+    - project-admin@example.org
+  audit:
+    - foundation-audit@commonhaus.org
