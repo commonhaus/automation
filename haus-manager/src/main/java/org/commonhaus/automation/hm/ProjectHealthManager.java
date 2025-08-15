@@ -62,7 +62,6 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
             Log.debugf("[%s] %s: Health collection disabled, skipping", ME, healthTaskGroup);
             return;
         }
-
         // Queue health collection for this specific project
         updateQueue.queueReconciliation(healthTaskGroup,
                 () -> collectAndCommitProjectHealth(healthTaskGroup, state, false, LocalDate.now()));
@@ -90,9 +89,19 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
             Log.infof("[%s]: skip scheduled project health update (last run: %s)", ME, lastRun);
             return;
         }
+        Log.infof("[%s]: collect health data (last run: %s)", ME, lastRun);
         recordRun();
-        for (var state : latestProjectConfig.getAllProjects()) {
+
+        var allProjects = latestProjectConfig.getAllProjects();
+        Log.debugf("[%s]: found %d total projects", ME, allProjects.size());
+        for (var state : allProjects) {
             var healthTaskGroup = getTaskGroup(state.repoFullName());
+            if (!state.healthCollectionEnabled()) {
+                Log.debugf("[%s] %s: Health collection is disabled for %s", ME, healthTaskGroup, state.repoFullName());
+                continue;
+            }
+
+            Log.debugf("[%s]: processing project %s: %s", ME, state.repoFullName(), state.projectConfig());
             final var taskState = state;
             Runnable task = () -> collectAndCommitProjectHealth(healthTaskGroup, taskState, userTriggered, anchorDate);
             if (userTriggered) {
@@ -108,11 +117,6 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
     void collectAndCommitProjectHealth(String healthTaskGroup, ProjectConfigState state, boolean userTriggered,
             LocalDate anchorDate) {
-        if (!state.healthCollectionEnabled()) {
-            Log.debugf("[%s] %s: Health collection is disabled for %s", ME, healthTaskGroup, state.repoFullName());
-            return;
-        }
-
         var config = state.projectConfig();
         var projectHealth = config.projectHealth();
         var repositories = projectHealth.organizationRepositories();
@@ -133,14 +137,6 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
         // Commit all collected reports in a single operation
         batch.commitAllReports();
-
-        if (rqc.hasErrors()) {
-            rqc.logAndSendContextErrors(
-                    String.format("[%s] Errors occurred during health collection for %s", ME, state.repoFullName()));
-        } else {
-            Log.infof("[%s] Successfully collected and committed %d health reports for %s",
-                    ME, batch.getReportCount(), state.repoFullName());
-        }
     }
 
     private void collectOrganizationHealth(ProjectHealthBatch batch, LocalDate anchorDate,
@@ -165,7 +161,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
         // Filter repositories based on configuration
         var trackedRepos = allRepos.stream()
-                .filter(repo -> repoConfig.isExcluded(repo.getName()))
+                .filter(repo -> repoConfig.isIncluded(repo.getName()))
                 .filter(repo -> !repo.isArchived()) // Skip archived repositories
                 .toList();
 
