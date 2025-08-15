@@ -83,7 +83,6 @@ public class TaskStateService {
     public Instant recordRun(String taskId) {
         Instant now = Instant.now();
         lastRunTimes.put(taskId, now);
-        updateQueue.queueReconciliation(ME, () -> this.saveState(null));
         return now;
     }
 
