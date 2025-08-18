@@ -65,7 +65,7 @@
         <quarkus.mailpit.version>1.6.4</quarkus.mailpit.version>
         <quarkus.platform.version>3.25.3</quarkus.platform.version>
         <!-- Libraries -->
-        <assertj.version>3.27.3</assertj.version>
+        <assertj.version>3.27.4</assertj.version>
         <awaitility.version>4.3.0</awaitility.version>
         <commonmark.version>0.25.1</commonmark.version>
         <glob.version>0.9.0</glob.version>
