@@ -185,8 +185,10 @@ public class VoteTally {
                         new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
                 case "CHANGES_REQUESTED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.MINUS_ONE.getContent(), review.submittedAt));
-                case "COMMENTED" -> reactions.add(
-                        new DataReaction(review.author, ReactionContent.EYES.getContent(), review.submittedAt));
+                default -> {
+                    // Do not count comments as a vote. They are often requests
+                    // for clarifications or suggestions.
+                }
             }
         }
         votes.addAll(0, reactions);
