@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.scopes;
 
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,6 +87,10 @@ public class ScopedInstallationMap {
             return new AppInstallationState(installationId, orgName);
         });
         installationsByScope.put(orgName, appInstallation);
+    }
+
+    public Collection<String> orgs() {
+        return installationsByScope.keySet();
     }
 
     static record AppInstallationState(

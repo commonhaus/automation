@@ -29,6 +29,7 @@ import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
+import io.quarkus.scheduler.Scheduled;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 @Singleton
@@ -45,6 +46,9 @@ public class RepositoryDiscovery {
 
     @Inject
     GitHubClientProvider gitHubService;
+
+    @Inject
+    LogMailer mailer;
 
     @Inject
     Event<RepositoryDiscoveryEvent> fireRepositoryDiscoveryEvent;
@@ -224,5 +228,20 @@ public class RepositoryDiscovery {
                     added == null ? List.of() : added,
                     removed == null ? List.of() : removed);
         }
+    }
+
+    /**
+     * Periodically refresh/re-synchronize team access lists.
+     */
+    // Quartz cron expression: s m h dom mon dow year(optional)
+    @Scheduled(cron = "${automation.scope-notification.cron:0 43 2 * 3 ?}")
+    public void scheduledRefresh() {
+        if (LaunchMode.current() == LaunchMode.TEST) {
+            return;
+        }
+        mailer.sendEmail("RepositoryDiscovery",
+                "Configured installations",
+                String.join("\n", scopedInstallationMap.orgs()),
+                mailer.botErrorEmailAddress());
     }
 }

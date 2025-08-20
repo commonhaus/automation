@@ -149,4 +149,9 @@ public class TestBotConfig implements BotConfig {
             }
         });
     }
+
+    @Override
+    public ScopeNotificationConfig scopeNotification() {
+        return null;
+    }
 }

@@ -56,6 +56,14 @@ public interface BotConfig {
     QueueConfig queue();
 
     /**
+     * Configuration to send notification for registered
+     * organizations.
+     *
+     * @return {@link ScopeNotificationConfig}
+     */
+    ScopeNotificationConfig scopeNotification();
+
+    /**
      * @return true if discoveryEnabled is unset or is set to true
      */
     default boolean isDiscoveryEnabled() {
@@ -67,6 +75,11 @@ public interface BotConfig {
      */
     default boolean isDryRun() {
         return dryRun().orElse(false);
+    }
+
+    interface ScopeNotificationConfig {
+        // Cron expression for periodic notification for registered organizations
+        Optional<String> cron();
     }
 
     default String display() {
