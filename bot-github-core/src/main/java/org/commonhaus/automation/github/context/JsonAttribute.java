@@ -109,11 +109,13 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     // Discussion extends Common Item
     discussion,
     answer,
+    answerChosenAt("answer_chosen_at"),
     category,
 
     // Issue or Pull Request extends Common Item
     createIssue,
     issue,
+    merged,
     pullRequest("pull_request"),
     reviewDecision,
     updateIssue,

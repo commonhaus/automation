@@ -20,37 +20,34 @@ public class ProjectHealthCollector {
      * Potentially expensive operation.
      * Manual only.
      *
-     * @param qc
+     * @param orgQc
      * @return
      */
-    public List<ProjectHealthReport> createHistory(GitHubQueryContext qc) {
-        var repo = qc.getRepository();
+    public List<ProjectHealthReport> createHistory(GitHubQueryContext orgQc, String repoFullName) {
+        var repo = orgQc.getRepository(repoFullName);
         Map<LocalDate, WeeklyStatisticsBuilder> history = new HashMap<>();
 
-        List<Instant> startgazerHistory = DataRepository.starHistory(qc, repo);
+        DataRepository.itemHistory(orgQc, repo, history);
+
+        List<Instant> startgazerHistory = DataRepository.starHistory(orgQc, repo);
         for (Instant start : startgazerHistory) {
             LocalDate weekStart = start.atZone(ZoneOffset.UTC).toLocalDate();
             history.computeIfAbsent(weekStart, k -> {
-                var report = collect(qc, weekStart, false, false);
-                return new WeeklyStatisticsBuilder(weekStart, report.statistics);
+                return new WeeklyStatisticsBuilder(weekStart);
             }).addStar();
         }
 
-        List<Instant> releaseHistory = DataRepository.releaseHistory(qc, repo);
+        List<Instant> releaseHistory = DataRepository.releaseHistory(orgQc, repo);
         releaseHistory.stream()
                 .map(instant -> startOfWeekSunday(instant.atZone(ZoneOffset.UTC).toLocalDate()))
                 .forEach(weekStart -> {
                     history.computeIfAbsent(weekStart, k -> {
-                        var report = collect(qc, weekStart, false, false);
-                        return new WeeklyStatisticsBuilder(weekStart, report.statistics);
+                        return new WeeklyStatisticsBuilder(weekStart);
                     }).addRelease();
                 });
 
-        return history.entrySet().stream()
-                .map(entry -> {
-                    WeeklyStatisticsBuilder builder = entry.getValue();
-                    return new ProjectHealthReport(repo, builder);
-                })
+        return history.values().stream()
+                .map(builder -> new ProjectHealthReport(repo, builder))
                 .toList();
     }
 

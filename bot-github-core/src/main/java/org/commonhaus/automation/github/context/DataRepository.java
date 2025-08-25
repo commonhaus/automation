@@ -6,6 +6,7 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.toRela
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -78,8 +79,10 @@ public class DataRepository extends DataCommonType {
                             closed
                             createdAt
                             closedAt
+                            merged
                         }
                         ... on Discussion {
+                            answerChosenAt
                             closed
                             createdAt
                             closedAt
@@ -157,6 +160,50 @@ public class DataRepository extends DataCommonType {
         return (int) list.stream()
                 .filter(releaseTime -> isBetween(releaseTime, from, toExclusive))
                 .count();
+    }
+
+    public static void itemHistory(GitHubQueryContext qc, GHRepository repo,
+            Map<LocalDate, WeeklyStatisticsBuilder> history) {
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("query", "repo:" + repo.getFullName());
+
+        for (var type : List.of("ISSUE", "DISCUSSION")) {
+            variables.put("searchType", type);
+            DataPageInfo pageInfo = new DataPageInfo(null, false);
+            do {
+                variables.put("after", pageInfo.cursor());
+                Response response = qc.execQuerySync(RANGED_ITEM_STATISTICS, variables);
+                if (qc.hasErrors()) {
+                    break;
+                }
+                JsonObject search = JsonAttribute.search.jsonObjectFrom(response.getData());
+                JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(search);
+
+                for (var node : nodes) {
+                    var createdAt = instantToStartDate(JsonAttribute.createdAt.instantFrom(node.asJsonObject()));
+                    var closedAt = instantToStartDate(JsonAttribute.closedAt.instantFrom(node.asJsonObject()));
+                    boolean closed = JsonAttribute.closed.booleanFromOrFalse(node.asJsonObject());
+
+                    history.computeIfAbsent(createdAt, WeeklyStatisticsBuilder::new).addNewItem(node.asJsonObject());
+
+                    // count active weeks
+                    LocalDate endDate = closed ? closedAt : startOfWeekSunday(LocalDate.now());
+                    for (LocalDate week = createdAt; !week.isAfter(endDate); week = week.plusDays(7)) {
+                        if (week.equals(createdAt) || (closed && week.equals(endDate))) {
+                            continue;
+                        }
+                        history.computeIfAbsent(week, WeeklyStatisticsBuilder::new).addActiveItem(node.asJsonObject());
+                    }
+
+                    if (closed) {
+                        history.computeIfAbsent(closedAt, WeeklyStatisticsBuilder::new).addClosedItem(node.asJsonObject());
+                    }
+                }
+
+                pageInfo = JsonAttribute.pageInfo.pageInfoFrom(search);
+            } while (pageInfo.hasNextPage());
+        }
     }
 
     public static WeeklyStatistics collectStatistics(GitHubQueryContext qc, GHRepository repo,
@@ -331,17 +378,54 @@ public class DataRepository extends DataCommonType {
 
     public static class WeeklyStatisticsBuilder {
         public final LocalDate weekStart;
-        WeeklyStatistics initial;
-        int stargazerCount;
+        int newIssues;
+        int activeIssues;
+        int closedIssues;
+        int newPRs;
+        int activePRs;
+        int closedPRs;
+        int newDiscussions;
+        int activeDiscussions;
+        int closedDiscussions;
+        int stargazers;
         int releaseCount;
 
-        public WeeklyStatisticsBuilder(LocalDate weekStart, WeeklyStatistics initial) {
+        public WeeklyStatisticsBuilder(LocalDate weekStart) {
             this.weekStart = weekStart;
-            this.initial = initial;
+        }
+
+        public void addClosedItem(JsonObject node) {
+            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+                this.closedDiscussions++;
+            } else if (JsonAttribute.merged.existsIn(node)) {
+                this.closedPRs++;
+            } else {
+                this.closedIssues++;
+            }
+        }
+
+        public void addActiveItem(JsonObject node) {
+            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+                this.activeDiscussions++;
+            } else if (JsonAttribute.merged.existsIn(node)) {
+                this.activePRs++;
+            } else {
+                this.activeIssues++;
+            }
+        }
+
+        public void addNewItem(JsonObject node) {
+            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+                this.newDiscussions++;
+            } else if (JsonAttribute.merged.existsIn(node)) {
+                this.newPRs++;
+            } else {
+                this.newIssues++;
+            }
         }
 
         public WeeklyStatisticsBuilder addStar() {
-            this.stargazerCount++;
+            this.stargazers++;
             return this;
         }
 
@@ -352,19 +436,30 @@ public class DataRepository extends DataCommonType {
 
         public WeeklyStatistics build() {
             return new WeeklyStatistics(
-                    initial.from,
-                    initial.toExclusive,
-                    initial.newIssues,
-                    initial.activeIssues,
-                    initial.closedIssues,
-                    initial.newPRs,
-                    initial.activePRs,
-                    initial.closedPRs,
-                    initial.newDiscussions,
-                    initial.activeDiscussions,
-                    initial.closedDiscussions,
-                    stargazerCount,
+                    weekStart,
+                    weekStart.plusDays(7),
+                    newIssues,
+                    activeIssues,
+                    closedIssues,
+                    newPRs,
+                    activePRs,
+                    closedPRs,
+                    newDiscussions,
+                    activeDiscussions,
+                    closedDiscussions,
+                    stargazers,
                     releaseCount);
         }
+    }
+
+    private static LocalDate instantToStartDate(Instant date) {
+        if (date == null) {
+            return null;
+        }
+        return startOfWeekSunday(date.atZone(ZoneOffset.UTC).toLocalDate());
+    }
+
+    private static LocalDate startOfWeekSunday(LocalDate date) {
+        return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.SUNDAY));
     }
 }

@@ -4,6 +4,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -14,6 +18,7 @@ import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.stats.ProjectHealthCollector;
+import org.commonhaus.automation.github.stats.ProjectHealthReport;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.LatestProjectConfig.ProjectConfigListener;
@@ -64,7 +69,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         }
         // Queue health collection for this specific project
         updateQueue.queueReconciliation(healthTaskGroup,
-                () -> collectAndCommitProjectHealth(healthTaskGroup, state, false, LocalDate.now()));
+                () -> collectAndCommitProjectHealth(healthTaskGroup, state, LocalDate.now()));
     }
 
     @Scheduled(cron = "0 0 6 ? * SUN") // Sunday 6 AM
@@ -78,6 +83,71 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
             collectHealthData(false, safeDay);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "⏰ 🌳 Error running scheduled config refresh", t);
+        }
+    }
+
+    public void collectHistoricalProjectHealthData(String projectName) {
+        var state = latestProjectConfig.getProjectConfigState(projectName);
+        if (state != null && state.healthCollectionEnabled()) {
+            var healthTaskGroup = getTaskGroup(state.repoFullName());
+            updateQueue.queueBackground(healthTaskGroup, () -> {
+                var config = state.projectConfig();
+                var projectHealth = config.projectHealth();
+                var repositories = projectHealth.organizationRepositories();
+
+                // Create source context for writing reports to the source repository
+                ReportQueryContext rqc = ctx.getReportQueryContext(state.repoFullName());
+                Map<LocalDate, List<ProjectHealthReport>> healthReports = new HashMap<>();
+
+                // Synchronously collect health data for repositories in each configured
+                // organization
+                for (var orgEntry : repositories.entrySet()) {
+                    String orgName = orgEntry.getKey();
+                    var repoConfig = orgEntry.getValue();
+
+                    ScopedQueryContext orgQc = ctx.getOrgScopedQueryContext(orgName);
+                    var organization = orgQc.getOrganization();
+                    if (organization == null || orgQc.hasErrors()) {
+                        orgQc.logAndSendContextErrors("[%s] unable to list repositories for %s".formatted(ME, orgName));
+                        continue;
+                    }
+
+                    // Get all repositories in the organization
+                    var allRepos = orgQc.execGitHubSync((gh, dr) -> {
+                        return organization.listRepositories().toList();
+                    });
+                    if (orgQc.hasErrors()) {
+                        orgQc.logAndSendContextErrors("[%s] unable to list repositories for %s".formatted(ME, orgName));
+                        continue;
+                    }
+
+                    // Filter repositories based on configuration
+                    var trackedRepos = allRepos.stream()
+                            .filter(repo -> repoConfig.isIncluded(repo.getName()))
+                            .filter(repo -> !repo.isArchived()) // Skip archived repositories
+                            .toList();
+
+                    // Synchronously collect health data for each tracked repository
+                    for (var repo : trackedRepos) {
+                        String fullName = repo.getFullName();
+                        var reports = projectHealthCollector.createHistory(orgQc, fullName);
+                        for (var report : reports) {
+                            healthReports.computeIfAbsent(report.weekOf, k -> new ArrayList<>()).add(report);
+                        }
+                    }
+                }
+
+                // Process health reports
+                for (var entry : healthReports.entrySet()) {
+                    LocalDate week = entry.getKey();
+                    List<ProjectHealthReport> reports = entry.getValue();
+
+                    // Commit all collected reports in a single operation
+                    ProjectHealthBatch batch = new ProjectHealthBatch(state, week, rqc, objectMapper);
+                    batch.addReports(reports);
+                    batch.commitAllReports();
+                }
+            });
         }
     }
 
@@ -103,7 +173,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
             Log.debugf("[%s]: processing project %s: %s", ME, state.repoFullName(), state.projectConfig());
             final var taskState = state;
-            Runnable task = () -> collectAndCommitProjectHealth(healthTaskGroup, taskState, userTriggered, anchorDate);
+            Runnable task = () -> collectAndCommitProjectHealth(healthTaskGroup, taskState, anchorDate);
             if (userTriggered) {
                 // User triggered: add batch to work queue
                 updateQueue.queueReconciliation(healthTaskGroup, task);
@@ -115,8 +185,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         }
     }
 
-    void collectAndCommitProjectHealth(String healthTaskGroup, ProjectConfigState state, boolean userTriggered,
-            LocalDate anchorDate) {
+    void collectAndCommitProjectHealth(String healthTaskGroup, ProjectConfigState state, LocalDate startDate) {
         var config = state.projectConfig();
         var projectHealth = config.projectHealth();
         var repositories = projectHealth.organizationRepositories();
@@ -125,14 +194,15 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         ReportQueryContext rqc = ctx.getReportQueryContext(state.repoFullName());
 
         // Create batch for this project's health collection
-        ProjectHealthBatch batch = new ProjectHealthBatch(state, anchorDate, rqc, objectMapper);
+        ProjectHealthBatch batch = new ProjectHealthBatch(state, startDate, rqc, objectMapper);
 
-        // Synchronously collect health data for repositories in each configured organization
+        // Synchronously collect health data for repositories in each configured
+        // organization
         for (var orgEntry : repositories.entrySet()) {
             String orgName = orgEntry.getKey();
             var repoConfig = orgEntry.getValue();
 
-            collectOrganizationHealth(batch, anchorDate, orgName, repoConfig);
+            collectOrganizationHealth(batch, startDate, orgName, repoConfig);
         }
 
         // Commit all collected reports in a single operation
@@ -189,7 +259,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         }
 
         // Add the report to the batch (batch handles dry run internally)
-        batch.addReport(repoFullName, report);
+        batch.addReport(report);
         Log.debugf("[%s] Added health report for %s to batch", ME, repoFullName);
     }
 
