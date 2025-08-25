@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +19,7 @@ import jakarta.enterprise.event.Observes;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
+import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
@@ -40,6 +42,7 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class OrganizationManager extends GroupCoordinator implements LatestOrgConfig {
     static final String ME = "🏡-org";
+    static final OrganizationConfigState EMPTY = new OrganizationConfigState(0, "", null);
 
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
     private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
@@ -76,7 +79,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         if (action.repository()
                 && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
 
-            Log.debugf("[%s] repoDiscovered: %s main=%s", ME, action.name(), repoFullName);
+            Log.debugf("[%s] repositoryDiscovered: %s main=%s", ME, action.name(), repoFullName);
             if (action.added()) {
                 // main repository for configuration
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
@@ -84,10 +87,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
                 // READ ORG CONFIG from Main repository immediately.
                 readOrgConfig(qc);
-                if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                if (!repoEvent.bootstrap() && taskState.shouldRun(ME, Duration.ofHours(6))) {
                     queueReconciliation();
-                } else {
-                    Log.debugf("[%s] repoDiscovered: Skip eager team discovery", ME);
                 }
 
                 // Register watcher to monitor for org config changes
@@ -100,6 +101,18 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 // main repository for configuration
                 currentConfig.set(Optional.empty());
             }
+        }
+    }
+
+    /**
+     * All repositories have been discovered:
+     * Organization and project config have been detected
+     */
+    protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
+        if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+            queueReconciliation();
+        } else {
+            Log.debugf("[%s] bootstrapComplete: Defer reconciliation", ME);
         }
     }
 
@@ -128,7 +141,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         recordRun();
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
-            Log.debugf("[%s] refreshAccessLists: no organization installation", ME);
+            Log.debugf("[%s] refreshOrganizationMembership: no organization installation", ME);
             return;
         }
         if (readOrgConfig(qc)) {
@@ -156,7 +169,8 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         updateQueue.queue(ME, () -> {
             OrganizationConfigState configState = currentConfig.get().orElse(null);
             if (configState == null || !configState.performSync() || configState.orgConfig().teamMembership() == null) {
-                Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
+                Log.debugf("[%s] processRepoSourceUpdate: configuration not available or team sync not enabled: %s", ME,
+                        configState);
                 return;
             }
             Log.debugf("[%s] processRepoSourceUpdate: %s", ME, repoSource);
@@ -241,6 +255,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             // Find teams that were removed
             Set<String> removedTeams = new HashSet<>(oldState.teams());
             removedTeams.removeAll(newState.teams());
+            teamConflictResolver.releaseOrgTeams(removedTeams);
 
             // Unregister watchers for removed teams
             for (String teamName : removedTeams) {
@@ -261,6 +276,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 unwatchRepoSource(oldState, oldSource);
             }
         }
+        teamConflictResolver.registerOrgTeams(newState);
         currentConfig.set(Optional.of(newState));
         return true;
     }
@@ -285,7 +301,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);
             return;
         }
-        Log.debugf("[%s] reconcile: start %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("[%s] reconcile: start %s::%s", ME, configState.repoFullName(), OrganizationConfig.PATH);
 
         for (GroupMapping groupMapping : configState.orgConfig().teamMembership()) {
             if (groupMapping == null || !groupMapping.performSync()) {
@@ -296,7 +312,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             watchRepoSource(configState, groupMapping.source());
             processGroupMapping(configState, groupMapping);
         }
-        Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoName(), OrganizationConfig.PATH);
+        Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoFullName(), OrganizationConfig.PATH);
     }
 
     protected String me() {
@@ -315,13 +331,12 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
     record OrganizationConfigState(
             long installationId,
-            String repoName,
+            String repoFullName,
             @Nonnull OrganizationConfig orgConfig,
-            Set<RepoSource> sources,
-            AtomicReference<Set<String>> teamRef) implements ConfigState {
+            Set<RepoSource> sources) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {
-            this(installationId, repoName, orgConfig, new HashSet<>(), new AtomicReference<>(null));
+            this(installationId, repoName, orgConfig, new HashSet<>());
         }
 
         public boolean add(RepoSource source) {
@@ -338,15 +353,13 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
 
         public Set<String> teams() {
-            Set<String> teams = this.teamRef.get();
-            if (teams == null) {
-                teams = new HashSet<>();
-                teams.addAll(orgConfig.teamMembership().stream()
-                        .flatMap(x -> x.watchedTeams(repoName).stream())
-                        .toList());
-                this.teamRef.set(teams);
-            }
-            return teams;
+            return orgConfig.teamMembership().stream()
+                    .flatMap(x -> x.watchedTeams(repoFullName).stream())
+                    .collect(Collectors.toSet());
+        }
+
+        public Set<String> blockedTeams() {
+            return Set.of();
         }
 
         public EmailNotification emailNotifications() {
@@ -359,8 +372,26 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         @Override
         public String toString() {
-            return "OrgConfigState{installationId=%d, repoName='%s', orgConfig=%s}"
-                    .formatted(installationId, repoName, orgConfig);
+            return "OrgConfigState{installationId=%d, repoFullName='%s', orgConfig=%s}"
+                    .formatted(installationId, repoFullName, orgConfig);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            OrganizationConfigState other = (OrganizationConfigState) o;
+            return installationId == other.installationId &&
+                    repoFullName.equals(other.repoFullName);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(installationId, repoFullName);
         }
     }
 }

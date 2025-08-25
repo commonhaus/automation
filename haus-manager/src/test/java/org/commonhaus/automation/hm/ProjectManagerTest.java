@@ -22,7 +22,6 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
-import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,11 +34,11 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @GitHubAppTest
-public class ProjectAccessManagerTest extends HausManagerTestBase {
-    final static String taskGroup = ProjectAccessManager.ME + "-" + PRIMARY.repoFullName();
+public class ProjectManagerTest extends HausManagerTestBase {
+    final static String taskGroup = ProjectManager.repoNametoTaskGroup(PRIMARY.repoFullName());
 
     @Inject
-    ProjectAccessManager projectAccessManager;
+    ProjectManager projectManager;
 
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 
@@ -47,7 +46,7 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
     @Override
     void setup() throws IOException {
         super.setup();
-        Log.info("START: ProjectAccessManagerTest.setup()");
+        Log.info("START: ProjectManagerTest.setup()");
 
         // Mock the file content for organization config in primary repo
         mockFileContent(hausMocks, ProjectConfig.PATH,
@@ -55,12 +54,15 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
 
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project_org, true);
+
+        // Trigger bootstrap completion to execute deferred reconciliation
+        triggerBootstrapDiscovery(hausMocks);
     }
 
     @AfterEach
     void clear() {
         // Reset any internal state if the class has a reset method
-        projectAccessManager.reset();
+        projectManager.reset();
     }
 
     @Test
@@ -74,12 +76,14 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
         mockTeam("test-org/team-quorum", null);
 
         // Trigger discovery to initialize manager
-        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, false);
 
         waitForQueue();
 
         // Trigger discovery to remove configuration
-        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, true);
+        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, false);
+
+        waitForQueue();
 
         // This should be called only once (first event); second event cleans state
         verify(teamService, times(1)).syncCollaborators(any(),
@@ -97,14 +101,14 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
         when(teamService.getTeamLogins(any(), any()))
                 .thenReturn(otherTeamLogins);
 
-        projectAccessManager.processFileUpdate(taskGroup, new FileUpdate(
-                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+        projectManager.processFileUpdate(taskGroup, new FileUpdate(
+                ProjectConfig.PATH, FileUpdateType.MODIFIED,
                 hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
 
         waitForQueue();
 
         // A change to watched memebership should trigger a sync
-        projectAccessManager.processMembershipUpdate(taskGroup,
+        projectManager.processMembershipUpdate(taskGroup,
                 new MembershipUpdate(MembershipUpdateType.COLLABORATOR, PRIMARY.orgName(),
                         new RepositoryEvent(
                                 hausMocks.github(),
@@ -132,7 +136,7 @@ public class ProjectAccessManagerTest extends HausManagerTestBase {
     void testMembershipUpdated() throws IOException {
         // A change to watched memebership should not trigger a sync if the
         // state has been cleared (e.g. after config removed)
-        projectAccessManager.processMembershipUpdate(taskGroup,
+        projectManager.processMembershipUpdate(taskGroup,
                 new MembershipUpdate(MembershipUpdateType.COLLABORATOR, PRIMARY.orgName(),
                         new RepositoryEvent(
                                 hausMocks.github(),

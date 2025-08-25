@@ -1,13 +1,11 @@
 package org.commonhaus.automation.hm.config;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import jakarta.annotation.Nonnull;
 
 import org.commonhaus.automation.config.EmailNotification;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
@@ -23,13 +21,10 @@ public class ProjectConfig {
     protected Boolean enabled;
     protected Boolean dryRun;
 
-    protected String gitHubResources;
     protected CollaboratorSync collaboratorSync;
     protected List<GroupMapping> teamMembership;
     protected EmailNotification emailNotifications;
-
-    @JsonIgnore
-    private Set<String> allResources;
+    protected ProjectHealth projectHealth;
 
     /**
      * Return list of teams that should have membership
@@ -59,6 +54,11 @@ public class ProjectConfig {
         return emailNotifications == null
                 ? EmailNotification.UNDEFINED
                 : emailNotifications;
+    }
+
+    /** Project health configuration */
+    public ProjectHealth projectHealth() {
+        return projectHealth;
     }
 
     @Override
@@ -100,6 +100,90 @@ public class ProjectConfig {
         public String toString() {
             return "TeamAccess{sourceTeam=%s, role=%s, logins=%s, ignoreUsers=%s}"
                     .formatted(sourceTeam(), role(), includeUsers(), ignoreUsers());
+        }
+    }
+
+    /**
+     * Project health configuration for foundation oversight
+     *
+     * @param maturity Project maturity level (early, mature, experimental,
+     *        deprecated, etc.)
+     * @param organizationRepositories Map of organization to repository configuration.
+     */
+    public record ProjectHealth(
+            String maturity,
+            Map<String, RepositoryHealthConfig> organizationRepositories) {
+
+        public RepositoryHealthConfig repositoryConfig(String orgName) {
+            if (organizationRepositories == null || organizationRepositories.isEmpty()) {
+                return RepositoryHealthConfig.EMPTY;
+            }
+            RepositoryHealthConfig repositories = organizationRepositories.get(orgName);
+            return repositories != null ? repositories : RepositoryHealthConfig.EMPTY;
+        }
+    }
+
+    /**
+     * Repository configuration for health tracking.
+     * Will either use the specified list of repositories to include,
+     * or will use all repositories except those in the exclude list.
+     *
+     * Always skips archived repositories.
+     *
+     * @param dryRun If true, do not write statistics files
+     * @param includes List of repository names to include in health tracking; preferred over excludes
+     * @param excludes List of repository names to exclude from health tracking; ignored if includes is not empty
+     * @param releaseFrequency Map of repository names to expected release frequency
+     */
+    public record RepositoryHealthConfig(
+            boolean dryRun,
+            List<String> excludes,
+            List<String> includes,
+            Map<String, String> releaseFrequency) {
+
+        static final RepositoryHealthConfig EMPTY = new RepositoryHealthConfig(true, List.of(), List.of(), Map.of());
+
+        @Override
+        public List<String> includes() {
+            return includes != null ? includes : List.of();
+        }
+
+        @Override
+        public List<String> excludes() {
+            return excludes != null ? excludes : List.of();
+        }
+
+        public Map<String, String> getReleaseFrequency() {
+            return releaseFrequency != null ? releaseFrequency : Map.of();
+        }
+
+        /**
+         * Check if a repository should be excluded from health tracking
+         */
+        public boolean isExcluded(String repositoryName) {
+            if (includes().isEmpty()) {
+                // If includes is empty, use excludes
+                return excludes().contains(repositoryName);
+            }
+            return !includes().contains(repositoryName);
+        }
+
+        /**
+         * Check if a repository should be included in health tracking
+         */
+        public boolean isIncluded(String repositoryName) {
+            if (includes().isEmpty()) {
+                // If includes is empty, use excludes
+                return !excludes().contains(repositoryName);
+            }
+            return includes().contains(repositoryName);
+        }
+
+        /**
+         * Get expected release frequency for a repository
+         */
+        public String getReleaseFrequency(String repositoryName) {
+            return getReleaseFrequency().get(repositoryName);
         }
     }
 }

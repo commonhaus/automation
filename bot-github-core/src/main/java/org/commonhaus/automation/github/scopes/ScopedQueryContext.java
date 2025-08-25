@@ -70,11 +70,11 @@ public class ScopedQueryContext extends GitHubQueryContext {
     public ScopedQueryContext(
             @Nonnull ContextService contextService,
             @Nonnull AppInstallationState installState,
-            String repoFullName) {
+            String orgOrFullName) {
         this(contextService,
                 installState.installationId(),
                 null,
-                repoFullName,
+                orgOrFullName,
                 installState.orgName());
     }
 

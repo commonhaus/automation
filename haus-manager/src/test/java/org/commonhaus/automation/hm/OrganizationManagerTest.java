@@ -68,6 +68,9 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         // Trigger discovery to initialize manager
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
 
+        // Trigger bootstrap completion to execute deferred reconciliation
+        triggerBootstrapDiscovery(hausMocks);
+
         waitForQueue();
 
         OrganizationConfig config = organizationManager.getConfig();
@@ -77,7 +80,7 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         System.out.println("Config teams: " + teamNames);
         assertThat(teamNames).isNotEmpty();
 
-        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, true);
+        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, false);
 
         waitForQueue();
 

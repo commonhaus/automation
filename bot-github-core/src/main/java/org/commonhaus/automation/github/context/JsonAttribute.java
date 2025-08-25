@@ -54,7 +54,25 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     repositories,
     repositoriesAdded("repositories_added"),
     repositoriesRemoved("repositories_removed"),
+
+    // Repository
     repository,
+    description,
+    discussions,
+    forkCount,
+    isArchived,
+    isPrivate,
+    issues,
+    latestRelease,
+    publishedAt,
+    pullRequests,
+    releases,
+    stargazerCount,
+    stargazers,
+    starredAt("starred_at"),
+    tagName,
+    vulnerabilityAlerts,
+    watchers,
 
     // Repo collaborators and permissions
     collaborators,
@@ -91,11 +109,13 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     // Discussion extends Common Item
     discussion,
     answer,
+    answerChosenAt("answer_chosen_at"),
     category,
 
     // Issue or Pull Request extends Common Item
     createIssue,
     issue,
+    merged,
     pullRequest("pull_request"),
     reviewDecision,
     updateIssue,
@@ -162,6 +182,7 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     nodes,
     pageInfo,
     search,
+    totalCount,
     viewer,
     ;
 
@@ -191,6 +212,13 @@ public enum JsonAttribute implements JsonAttributeAccessor {
     @Override
     public boolean hasAlternateName() {
         return alternateName;
+    }
+
+    public int totalCountFrom(JsonObject object) {
+        JsonObject field = jsonObjectFrom(object);
+        return field == null
+                ? 0
+                : JsonAttribute.totalCount.integerFrom(field);
     }
 
     /**
