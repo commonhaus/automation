@@ -11,15 +11,17 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
 public class ProjectHealthReport {
-    final String organization;
-    final String repository;
-    final LocalDate weekOf;
-    final Instant collected;
+    public final String organization;
+    public final String repository;
+    public final String fullName;
+    public final LocalDate weekOf;
+    public final Instant collected;
     public WeeklyStatistics statistics;
 
-    ProjectHealthReport(GHRepository repository, LocalDate weekOf, Instant collected) {
-        this.organization = repository.getOwnerName();
-        this.repository = repository.getName();
+    ProjectHealthReport(GHRepository repo, LocalDate weekOf, Instant collected) {
+        this.organization = repo.getOwnerName();
+        this.repository = repo.getName();
+        this.fullName = repo.getFullName();
         this.weekOf = weekOf;
         this.collected = collected;
     }
@@ -29,6 +31,7 @@ public class ProjectHealthReport {
 
         this.organization = repo.getOwnerName();
         this.repository = repo.getName();
+        this.fullName = repo.getFullName();
         this.weekOf = builder.weekStart;
 
         this.statistics = builder.build();

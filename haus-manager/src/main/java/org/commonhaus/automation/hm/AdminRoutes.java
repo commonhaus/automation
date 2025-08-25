@@ -147,6 +147,23 @@ public class AdminRoutes implements LocalRouteOnly {
         routingExchange.ok().end();
     }
 
+    @Route(path = "/projectHealthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerProjectHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
+
+        var fullName = routingContext.request().getParam("fullName");
+        if (fullName == null || fullName.isBlank()) {
+            Log.info("Statistics request without fullName");
+            routingExchange.response().setStatusCode(400).end();
+            return;
+        }
+
+        updateQueue.queueReconciliation("projectHealthReport#" + fullName, () -> {
+            projectHealthManager.collectHistoricalProjectHealthData(fullName);
+        });
+
+        routingExchange.ok().end();
+    }
+
     @Route(path = "/healthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
         var dateString = routingContext.request().getParam("startDate");

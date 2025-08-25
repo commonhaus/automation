@@ -3,6 +3,7 @@ package org.commonhaus.automation.hm.github;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -34,9 +35,15 @@ public class ProjectHealthBatch {
         this.objectMapper = objectMapper;
     }
 
-    public void addReport(String repoFullName, ProjectHealthReport report) {
-        Log.debugf("[%s] Adding health report for %s to batch", ME, repoFullName);
-        reports.put(repoFullName, report);
+    public void addReport(ProjectHealthReport report) {
+        Log.debugf("[%s] Adding health report for %s to batch", ME, report.fullName);
+        reports.put(report.fullName, report);
+    }
+
+    public void addReports(List<ProjectHealthReport> newReports) {
+        for (var report : newReports) {
+            addReport(report);
+        }
     }
 
     public void commitAllReports() {
