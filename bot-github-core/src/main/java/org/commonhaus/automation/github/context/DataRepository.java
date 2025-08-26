@@ -395,7 +395,7 @@ public class DataRepository extends DataCommonType {
         }
 
         public void addClosedItem(JsonObject node) {
-            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+            if (JsonAttribute.answerChosenAt.valueFrom(node) != null) {
                 this.closedDiscussions++;
             } else if (JsonAttribute.merged.existsIn(node)) {
                 this.closedPRs++;
@@ -405,7 +405,7 @@ public class DataRepository extends DataCommonType {
         }
 
         public void addActiveItem(JsonObject node) {
-            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+            if (JsonAttribute.answerChosenAt.valueFrom(node) != null) {
                 this.activeDiscussions++;
             } else if (JsonAttribute.merged.existsIn(node)) {
                 this.activePRs++;
@@ -415,7 +415,7 @@ public class DataRepository extends DataCommonType {
         }
 
         public void addNewItem(JsonObject node) {
-            if (JsonAttribute.answerChosenAt.jsonObjectFrom(node) != null) {
+            if (JsonAttribute.answerChosenAt.valueFrom(node) != null) {
                 this.newDiscussions++;
             } else if (JsonAttribute.merged.existsIn(node)) {
                 this.newPRs++;

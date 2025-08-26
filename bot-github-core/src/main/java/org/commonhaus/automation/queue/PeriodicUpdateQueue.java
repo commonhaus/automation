@@ -159,9 +159,11 @@ public class PeriodicUpdateQueue {
             } while (tryNext);
 
             // Execute the task
-            Log.debugf("🧵 ➡️ %s %s task; %s tasks remaining", task.type(), task.name(), taskQueue.size());
+            Log.debugf("🧵 ➡️ %s %s task; %s tasks and %s background tasks remaining", task.type(), task.name(),
+                    taskQueue.size(), backgroundTasks.size());
             task.task().run();
-            Log.debugf("🧵 ⬅️ %s %s task; %s tasks remaining", task.type(), task.name(), taskQueue.size());
+            Log.debugf("🧵 ⬅️ %s %s task; %s tasks and %s background tasks remaining", task.type(), task.name(),
+                    taskQueue.size(), backgroundTasks.size());
         } catch (Throwable e) {
             logMailer.logAndSendEmail("queue",
                     "🧵 Error running %s %s task".formatted(task.type(), task.name()),
