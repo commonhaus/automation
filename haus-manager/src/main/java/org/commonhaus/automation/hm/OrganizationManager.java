@@ -87,7 +87,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
                 // READ ORG CONFIG from Main repository immediately.
                 readOrgConfig(qc);
-                if (!repoEvent.bootstrap() && taskState.shouldRun(ME, Duration.ofHours(6))) {
+                if (!repoEvent.bootstrap() && taskState.shouldRun(ME, Duration.ofHours(12))) {
                     queueReconciliation();
                 }
 
@@ -109,7 +109,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Organization and project config have been detected
      */
     protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
-        if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (taskState.shouldRun(ME, Duration.ofHours(12))) {
             queueReconciliation();
         } else {
             Log.debugf("[%s] bootstrapComplete: Defer reconciliation", ME);
@@ -134,7 +134,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Allow manual trigger from admin endpoint
      */
     public void refreshOrganizationMembership(boolean userTriggered) {
-        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(12))) {
             Log.infof("[%s]: skip scheduled organization membership update (last run: %s)", ME, lastRun);
             return;
         }

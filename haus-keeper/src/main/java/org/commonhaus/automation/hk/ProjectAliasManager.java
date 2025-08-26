@@ -101,7 +101,7 @@ public class ProjectAliasManager extends ScheduledService {
      * Allow manual trigger by admin endpoint
      */
     public void refreshProjectAliases(boolean userTriggered) {
-        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(12))) {
             Log.infof("[%s]: skip scheduled project refresh (last run: %s)", ME, lastRun);
             return;
         }
@@ -138,7 +138,7 @@ public class ProjectAliasManager extends ScheduledService {
 
                 if (!hkConfig.isReady()) {
                     updateQueue.queue(taskGroup, () -> repositoryDiscovered(repoEvent));
-                } else if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+                } else if (taskState.shouldRun(ME, Duration.ofHours(12))) {
                     updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc, true));
                 } else {
                     Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates/cron");

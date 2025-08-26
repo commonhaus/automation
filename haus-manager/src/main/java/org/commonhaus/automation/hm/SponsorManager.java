@@ -42,7 +42,7 @@ public class SponsorManager extends GroupCoordinator {
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Sponsor management refreshed", () -> lastRun);
         // If the OrganizationConfig changes, we'll be notified
-        latestOrgConfig.notifyOnUpdate(ME, this::reconcile);
+        latestOrgConfig.notifyOnUpdate(ME, () -> refreshSponsors(false));
     }
 
     @Override
@@ -60,6 +60,7 @@ public class SponsorManager extends GroupCoordinator {
     /**
      * Periodically refresh/re-synchronize sponsor collaborators
      */
+    // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.sponsor:0 47 1 */3 * ?}")
     public void scheduledRefresh() {
         try {
@@ -71,15 +72,15 @@ public class SponsorManager extends GroupCoordinator {
     }
 
     public void refreshSponsors(boolean userTriggered) {
-        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(12))) {
             Log.infof("[%s]: skip scheduled sponsored refresh (last run: %s)", ME, lastRun);
             return;
         }
-        recordRun();
         updateQueue.queueReconciliation(ME, () -> reconcile());
     }
 
-    public void reconcile() {
+    private void reconcile() {
+        recordRun();
         OrganizationConfig config = latestOrgConfig.getConfig();
         if (config == null || config.sponsors() == null) {
             Log.debugf("[%s] refreshSponsors: configuration not available or sponsors not enabled", ME);

@@ -97,7 +97,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
      * Allow manual trigger from admin endpoint
      */
     public void refreshConfig(boolean userTriggered) {
-        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(12))) {
             Log.infof("[%s]: skip scheduled project config update (last run: %s)", ME, lastRun);
             return;
         }
@@ -177,7 +177,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
     /** All repositories have been discovered: Organization and project config have been detected */
     protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
-        if (taskState.shouldRun(ME, Duration.ofHours(6))) {
+        if (taskState.shouldRun(ME, Duration.ofHours(12))) {
             queueReconciliation();
         } else {
             Log.debugf("[%s] bootstrapComplete: Skip eager team sync", ME);
