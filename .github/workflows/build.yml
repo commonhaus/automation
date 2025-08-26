@@ -9,13 +9,13 @@ on:
       - '.gitignore'
       - 'CODEOWNERS'
       - 'LICENSE'
-      - '*.md'
+      - '**/*.md'
   pull_request:
     paths-ignore:
       - '.gitignore'
       - 'CODEOWNERS'
       - 'LICENSE'
-      - '*.md'
+      - '**/*.md'
 
 env:
   JAVA_VERSION: 21

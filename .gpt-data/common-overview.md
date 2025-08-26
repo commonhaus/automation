@@ -2,17 +2,20 @@ This section provides additional information that provides context and explains 
 
 Base file system directory for source: `bot-github-core/src/main/java`
 
-There are four packages in the common bot module:
+There are six packages in the common bot module:
 
 1. `org.commonhaus.automation.config` is the base bot config (shared by all bots) and common config types (POJO)
-2. `org.commonhaus.automation.github` contains a few subpackages: 
+2. `org.commonhaus.automation.github` contains a few subpackages to manage interactions with GitHub: 
     - `context`: utilities for parsing and retaining context across queries during a session
-    - `discovery`: special installation/repository discovery event handling
-    - `queue`: A queue mechanism that creates a rate-limited thread for processing events and updates. All CHANGE events are processed. RECONCILE events can be skipped/grouped if the taskGroup matches.
+    - `discovery`: installation/repository discovery with priority-based event processing (CONNECTED → CORE_DISCOVERY → 
+  WATCHER_DISCOVERY → APP_DISCOVERY → APP_EVENT)
+    - `scopes`: utility to map GitHub organizations to the correct app installation to ensure correct permissions are used when making queries
+    - `stats`: project health metrics collection including repository statistics, star history, and release tracking. See [Health metrics collection](#health-metrics-collection)
     - `watchers`: File and Team monitors that convert GitHub events (completely async and whenever) into notifications for bot-specific listeners (who then add appropriate CHANGE or RECONCILE events to the queue).
 3. `org.commonhaus.automation.mail` provides common code for working with the Quarkus mail extension to send mail notifications using SMTP
 4. `org.commonhaus.automation.markdown` provides a common markdown converter
-
+5. `org.commonhaus.automation.opencollective` provides a service to interact with OpenCollective GraphQL APIs
+6. `org.commonhaus.automation.queue` provides a queue to manage the flow of work, see [Workflow and task management](#workflow-and-task-management)
 
 **JsonAttribute Design Pattern**: The project uses two different JSON libraries with completely different object models:
 - **Java GitHub SDK**: Jackson for REST API responses
@@ -66,6 +69,8 @@ This approach provides straightforward parsing that easily maps onto GraphQL que
 
 **Usage Pattern**: Short-lived context objects created per operation that accumulate errors, handle authentication, manage installation scoping, and provide comprehensive error reporting to callers for intelligent retry/fail decisions.
 
+## Workflow and task management
+
 `org.commonhaus.automation.queue.PeriodicUpdateQueue` functions as a rate-limiting queue that processes GitHub events and CDI tasks with controlled pacing:
 
 **Task Processing Rules**:
@@ -73,6 +78,9 @@ This approach provides straightforward parsing that easily maps onto GraphQL que
 - **RECONCILE tasks**: Can be collapsed by `taskGroup` to avoid redundant expensive operations
   - If multiple RECONCILE tasks with the same `taskGroup` are queued, only the latest is processed
   - This allows changes to "quiesce" before triggering expensive summary/reactive processing
+- **BACKGROUND tasks**: Always processed but with lower priority to prevent starvation of main queue
+    - Executed one at a time only when no CHANGE/RECONCILE tasks are pending
+    - Can spawn CHANGE/RECONCILE tasks, creating interleaved execution where background work triggers priority work
 
 **Task Group Assignment** (programmatically defined by each bot):
 - **HausRules**: Uses issue/discussion ID (e.g., vote counting for a specific discussion)
@@ -81,7 +89,11 @@ This approach provides straightforward parsing that easily maps onto GraphQL que
 
 **Purpose**: Rate limiting ensures sustained GitHub API usage without overwhelming the service, while task collapsing prevents redundant work when multiple rapid changes occur.
 
-## Event Flow Through the System
+**Retry Mechanism**: Failed tasks can be automatically retried using `scheduleReconciliationRetry()` with exponential
+backoff (5s → 30s → 2min → 10min → 30min). Retry tasks are processed separately via a scheduled job every 30 seconds,
+allowing recovery from transient network or authentication failures beyond the GitHub SDK's built-in retries.
+
+### Event Flow Through the System
 
 ```mermaid
 flowchart TD
@@ -106,3 +118,20 @@ flowchart TD
 - **Queue** provides rate limiting and task collapsing (CHANGE tasks always process, RECONCILE tasks collapse by task group)
 - **QueryContext** ensures all GitHub operations have consistent error handling, authentication retry, and dryRun support
 - **Event-driven architecture** decouples GitHub's timing from bot processing pace while maintaining reliable multi-organization operation
+
+## Health Metrics Collection
+
+The `org.commonhaus.automation.github.stats` package provides repository health monitoring:
+
+**ProjectHealthCollector**: Collects weekly statistics including:
+- Issue/PR creation and closure rates
+- Star history tracking
+- Release frequency analysis
+- Repository activity metrics
+
+**ProjectHealthReport**: Structured health data for individual repositories, supporting both:
+- **Historical analysis**: `createHistory()` generates complete repository timeline (expensive, manual-only operation)
+- **Current metrics**: `collect()` gathers statistics for specific time periods with configurable data inclusion
+
+**Usage Pattern**: Health collection is typically triggered as BACKGROUND tasks to avoid impacting real-time event
+processing, with results used for dashboards, trend analysis, and project health monitoring across the organization.
