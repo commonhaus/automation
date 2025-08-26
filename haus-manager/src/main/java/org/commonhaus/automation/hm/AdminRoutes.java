@@ -149,6 +149,10 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/projectHealthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerProjectHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
 
         var fullName = routingContext.request().getParam("fullName");
         if (fullName == null || fullName.isBlank()) {
@@ -166,6 +170,11 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/healthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+
         var dateString = routingContext.request().getParam("startDate");
         var startDate = parseDate(dateString);
 
