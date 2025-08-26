@@ -161,9 +161,8 @@ public class AdminRoutes implements LocalRouteOnly {
             return;
         }
 
-        updateQueue.queueReconciliation("projectHealthReport#" + fullName, () -> {
-            projectHealthManager.collectHistoricalProjectHealthData(fullName);
-        });
+        // Queues background task
+        projectHealthManager.collectHistoricalProjectHealthData(fullName);
 
         routingExchange.ok().end();
     }

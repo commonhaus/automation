@@ -90,6 +90,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         var state = latestProjectConfig.getProjectConfigState(projectName);
         if (state != null && state.healthCollectionEnabled()) {
             var healthTaskGroup = getTaskGroup(state.repoFullName());
+
             updateQueue.queueBackground(healthTaskGroup, () -> {
                 var config = state.projectConfig();
                 var projectHealth = config.projectHealth();
@@ -145,7 +146,9 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
                     // Commit all collected reports in a single operation
                     ProjectHealthBatch batch = new ProjectHealthBatch(state, week, rqc, objectMapper);
                     batch.addReports(reports);
-                    batch.commitAllReports();
+
+                    // Spread out commit
+                    updateQueue.queueBackground("batch#%s/%s".formatted(healthTaskGroup, week), batch::commitAllReports);
                 }
             });
         }
