@@ -28,7 +28,7 @@ public class DataRepository extends DataCommonType {
     static final String QUERY_ADMINS = """
             query($owner: String!, $name: String!, $after: String) {
                 repository(owner: $owner, name: $name) {
-                    collaborators(first: 100, after: $after) {
+                    collaborators(affiliation: $affiliation, first: 100, after: $after) {
                         edges {
                             node {
                                 login
@@ -279,12 +279,14 @@ public class DataRepository extends DataCommonType {
         return count;
     }
 
-    public static Collaborators queryCollaborators(GitHubQueryContext qc, String repoFullName) {
+    public static Collaborators queryCollaborators(GitHubQueryContext qc, String repoFullName,
+            GHRepository.CollaboratorAffiliation affiliation) {
         Map<String, Object> variables = new HashMap<>();
         String org = toOrganizationName(repoFullName);
         String name = toRelativeName(org, repoFullName);
         variables.putIfAbsent("owner", org);
         variables.putIfAbsent("name", name);
+        variables.putIfAbsent("affiliation", affiliation.name());
 
         Set<Collaborator> members = new HashSet<>();
         DataPageInfo pageInfo = new DataPageInfo(null, false);

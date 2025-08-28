@@ -1,7 +1,7 @@
 package org.commonhaus.automation.github.context;
 
-import static org.commonhaus.automation.github.context.BaseQueryCache.COLLABORATORS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.TEAM_MEMBERS;
+import static org.commonhaus.automation.github.context.BaseQueryCache.getCollaboratorsCache;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
@@ -62,19 +62,22 @@ public class GitHubTeamService {
         TEAM_MEMBERS.invalidate(teamFullName);
     }
 
-    static Collaborators getCachedCollaborators(String repoFullName) {
-        return COLLABORATORS.get(repoFullName);
+    static Collaborators getCachedCollaborators(String repoFullName, GHRepository.CollaboratorAffiliation affiliation) {
+        return getCollaboratorsCache(affiliation).get(repoFullName);
     }
 
-    static Collaborators putCachedCollaborators(String repoFullName, Collaborators members) {
+    static Collaborators putCachedCollaborators(String repoFullName, GHRepository.CollaboratorAffiliation affiliation,
+            Collaborators members) {
         if (members != null) {
-            COLLABORATORS.put(repoFullName, members);
+            getCollaboratorsCache(affiliation).put(repoFullName, members);
         }
         return members;
     }
 
     public static void refreshCollaborators(String repoFullName) {
-        COLLABORATORS.invalidate(repoFullName);
+        for (GHRepository.CollaboratorAffiliation affiliation : GHRepository.CollaboratorAffiliation.values()) {
+            getCollaboratorsCache(affiliation).invalidate(repoFullName);
+        }
     }
 
     /**
@@ -262,14 +265,16 @@ public class GitHubTeamService {
      *
      * @param qc QueryContext
      * @param repoFullName full repository name
+     * @param affiliation Direct or all.
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Collaborators getCollaborators(GitHubQueryContext qc, String repoFullName) {
-        Collaborators collaborators = getCachedCollaborators(repoFullName);
+    public Collaborators getCollaborators(GitHubQueryContext qc, String repoFullName,
+            GHRepository.CollaboratorAffiliation affiliation) {
+        Collaborators collaborators = getCachedCollaborators(repoFullName, affiliation);
         if (collaborators == null) {
-            collaborators = DataRepository.queryCollaborators(qc, repoFullName);
-            putCachedCollaborators(repoFullName, collaborators);
+            collaborators = DataRepository.queryCollaborators(qc, repoFullName, affiliation);
+            putCachedCollaborators(repoFullName, affiliation, collaborators);
         }
         return collaborators;
     }
@@ -282,8 +287,9 @@ public class GitHubTeamService {
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, String repoFullName) {
-        Collaborators collaborators = getCollaborators(qc, repoFullName);
+    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, String repoFullName,
+            GHRepository.CollaboratorAffiliation affiliation) {
+        Collaborators collaborators = getCollaborators(qc, repoFullName, affiliation);
         if (collaborators == null) {
             return Set.of();
         }
@@ -295,15 +301,17 @@ public class GitHubTeamService {
      *
      * @param qc QueryContext
      * @param repository GH repository
+     * @param affiliation Direct or all.
      * @return set of collaborator logins or null if repository not found
      */
     @Nonnull
-    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, GHRepository repository) {
-        return getCollaboratorLogins(qc, repository.getFullName());
+    public Set<String> getCollaboratorLogins(GitHubQueryContext qc, GHRepository repository,
+            GHRepository.CollaboratorAffiliation affiliation) {
+        return getCollaboratorLogins(qc, repository.getFullName(), affiliation);
     }
 
     public Set<String> getOwnerAdministrators(GitHubQueryContext qc, String repoFullName) {
-        var collaborators = getCollaborators(qc, repoFullName);
+        var collaborators = getCollaborators(qc, repoFullName, GHRepository.CollaboratorAffiliation.ALL);
         if (collaborators == null) {
             return Set.of();
         }
@@ -339,7 +347,7 @@ public class GitHubTeamService {
      * @return
      */
     public boolean isCollaborator(GitHubQueryContext qc, GHUser user, String repoName) {
-        Set<String> collaborators = getCollaboratorLogins(qc, repoName);
+        Set<String> collaborators = getCollaboratorLogins(qc, repoName, GHRepository.CollaboratorAffiliation.ALL);
         return collaborators.contains(user.getLogin());
     }
 
@@ -361,7 +369,7 @@ public class GitHubTeamService {
                 repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
+        Set<String> currentLogins = getCollaboratorLogins(qc, repository, GHRepository.CollaboratorAffiliation.ALL);
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
@@ -429,7 +437,7 @@ public class GitHubTeamService {
         Log.debugf("[%s] syncCollaborators: syncing collaborators for repository %s", qc.getLogId(), repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
+        Set<String> currentLogins = getCollaboratorLogins(qc, repository, GHRepository.CollaboratorAffiliation.DIRECT);
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
@@ -526,8 +534,8 @@ public class GitHubTeamService {
 
         Log.debugf("[%s] syncMembers: syncing members of team %s", qc.getLogId(), targetTeam);
 
-        String teamOrgName = GitHubQueryContext.toOrganizationName(targetTeam);
-        String relativeTeamName = GitHubQueryContext.toRelativeName(teamOrgName, targetTeam);
+        String teamOrgName = toOrganizationName(targetTeam);
+        String relativeTeamName = toRelativeName(teamOrgName, targetTeam);
 
         // Get the org and team
         GHOrganization org = qc.getOrganization(teamOrgName);

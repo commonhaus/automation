@@ -446,7 +446,7 @@ public class GitHubTeamServiceTest extends ContextHelper {
                                         .add("hasNextPage", false))))
                 .build();
 
-        mockResponse("collaborators(first: 100, after: $after)", jsonObject);
+        mockResponse("collaborators(affiliation: $affiliation, first: 100, after: $after)", jsonObject);
     }
 
     final static class MockContextService {

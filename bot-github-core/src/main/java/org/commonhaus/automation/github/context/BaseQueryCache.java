@@ -5,6 +5,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import org.commonhaus.automation.QueryCache;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import com.cronutils.Function;
@@ -18,10 +19,20 @@ public enum BaseQueryCache {
     LABELS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
     TEAM_MEMBERS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
     COLLABORATORS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
+    DIRECT_COLLABORATORS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
+    OUTSIDE_COLLABORATORS(b -> b.expireAfterWrite(1, TimeUnit.DAYS)),
 
     BOT_LOGIN(b -> b.expireAfterWrite(6, TimeUnit.HOURS)),
 
     RECENT_BOT_CONTENT(b -> b.expireAfterWrite(6, TimeUnit.HOURS));
+
+    public static BaseQueryCache getCollaboratorsCache(GHRepository.CollaboratorAffiliation affiliation) {
+        return switch (affiliation) {
+            case DIRECT -> DIRECT_COLLABORATORS;
+            case ALL -> COLLABORATORS;
+            case OUTSIDE -> OUTSIDE_COLLABORATORS;
+        };
+    }
 
     private QueryCache cache = null;
 
