@@ -19,13 +19,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.ContextService;
+import org.commonhaus.automation.github.context.DataRepository.Collaborator;
+import org.commonhaus.automation.github.context.DataRepository.CollaboratorPermission;
+import org.commonhaus.automation.github.context.DataRepository.Collaborators;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -354,19 +359,42 @@ public class GitHubTeamServiceTest extends ContextHelper {
         mockUser("user4");
         mockUser("user5");
 
-        // Setup current collaborators
-        Set<String> currentCollaborators = Set.of("user1", "user2", "user3");
-        // Setup expected logins (user2 stays, user1 and user3 should be removed, user4
-        // and user5 should be added)
-        Set<String> expectedLogins = Set.of("user2", "user4", "user5");
+        Set<Collaborator> testCollaborators = Set.of(
+                // user1: Team + Direct access (mixed - manageable)
+                new Collaborator("user1", "WRITE", List.of(
+                        new CollaboratorPermission("READ", "Organization"),
+                        new CollaboratorPermission("WRITE", "Repository"))),
 
-        mockDataCollaboratorsQueryResponse(currentCollaborators, Set.of("user1"));
+                // user2: Team-only access (protected from removal)
+                new Collaborator("user2", "READ", List.of(
+                        new CollaboratorPermission("READ", "Organization"))),
+
+                // user3: Direct-only access (fully manageable, will be removed)
+                new Collaborator("user3", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))),
+
+                // user5: expected collaborator
+                new Collaborator("user5", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))));
+
+        // Logins received as members of team
+        Set<String> teamLogins = Set.of("user4", "user5");
+
+        mockDataCollaboratorsQueryResponse(new Collaborators(testCollaborators));
 
         GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
                 .from(GHOrganization.Permission.PUSH);
+
         // Test syncing collaborators
         teamService.syncCollaborators(queryContext, repository, collaboratorRole,
-                expectedLogins, List.of(), defaultDryRun, emailNotification);
+                teamLogins, List.of(), defaultDryRun, emailNotification);
+
+        // Expected changes:
+        // - user1: Mixed access (team and org) -> Remove repo access (not in expected)
+        // - user2: Org only -> protected, org-level access cannot be removed
+        // - user3: Repo only → Remove direct access (not in expected)
+        // - user4: Not current, but in expected → Add direct access
+        // - user5: Current collaborator also in expected → untouched
 
         if (defaultDryRun) {
             // Verify no changes were made
@@ -388,10 +416,10 @@ public class GitHubTeamServiceTest extends ContextHelper {
             List<GHUser> removedUsers = removeCaptor.getValue();
 
             assertThat(addedUsers.stream().map(GHUser::getLogin))
-                    .containsExactlyInAnyOrder("user4", "user5");
+                    .containsExactlyInAnyOrder("user4");
             // user1 is an admin, and should not be removed
             assertThat(removedUsers.stream().map(GHUser::getLogin))
-                    .containsExactlyInAnyOrder("user3");
+                    .containsExactlyInAnyOrder("user1", "user3");
         }
 
         // Verify an audit email was sent
@@ -427,26 +455,36 @@ public class GitHubTeamServiceTest extends ContextHelper {
         mockResponse("team(slug: $slug)", jsonObject);
     }
 
-    private void mockDataCollaboratorsQueryResponse(Set<String> collaborators, Set<String> admins)
+    private void mockDataCollaboratorsQueryResponse(Collaborators collaborators)
             throws ExecutionException, InterruptedException {
         JsonObject jsonObject = Json.createObjectBuilder()
                 .add("repository", Json.createObjectBuilder()
                         .add("collaborators", Json.createObjectBuilder()
-                                .add("edges", Json.createArrayBuilder(
-                                        collaborators.stream()
-                                                .map(login -> Json.createObjectBuilder()
-                                                        .add("node", Json.createObjectBuilder()
-                                                                .add("login", login))
-                                                        .add("permission", admins.contains(login) ? "ADMIN" : "WRITE")
-                                                        .add("permissionSources", Json.createArrayBuilder(
-                                                                List.of())))
-                                                .toList()))
+                                .add("edges", collaboratorsToJson(collaborators))
                                 .add("pageInfo", Json.createObjectBuilder()
                                         .add("endCursor", "Y3Vyc29yOnYyOpHOAAxXCQ==")
                                         .add("hasNextPage", false))))
                 .build();
 
         mockResponse("collaborators(first: 100, after: $after)", jsonObject);
+    }
+
+    private JsonArray collaboratorsToJson(Collaborators collaborators) {
+        return Json.createArrayBuilder(
+                collaborators.members().stream()
+                        .map(c -> Json.createObjectBuilder()
+                                .add("node", Json.createObjectBuilder()
+                                        .add("login", c.login()))
+                                .add("permission", c.permission())
+                                .add("permissionSources", Json.createArrayBuilder(
+                                        c.permissionSources().stream()
+                                                .map(ps -> Json.createObjectBuilder()
+                                                        .add("source", Json.createObjectBuilder()
+                                                                .add("__typename", ps.permissionSourceType()))
+                                                        .add("permission", ps.permission()))
+                                                .collect(Collectors.toList()))))
+                        .toList())
+                .build();
     }
 
     final static class MockContextService {

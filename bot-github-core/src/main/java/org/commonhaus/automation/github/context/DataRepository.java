@@ -346,7 +346,23 @@ public class DataRepository extends DataCommonType {
 
         public Set<String> adminLogins() {
             return members.stream()
-                    .filter(c -> "ADMIN".equals(c.permission))
+                    .filter(c -> "ADMIN".equalsIgnoreCase(c.permission))
+                    .map(Collaborator::login)
+                    .collect(Collectors.toSet());
+        }
+
+        public Set<String> teamGrantedAccessLogins() {
+            return members.stream()
+                    .filter(collaborator -> collaborator.permissionSources().stream()
+                            .noneMatch(source -> "Repository".equalsIgnoreCase(source.permissionSourceType())))
+                    .map(Collaborator::login)
+                    .collect(Collectors.toSet());
+        }
+
+        public Set<String> directCollaboratorLogins() {
+            return members.stream()
+                    .filter(collaborator -> collaborator.permissionSources().stream()
+                            .anyMatch(source -> "Repository".equalsIgnoreCase(source.permissionSourceType())))
                     .map(Collaborator::login)
                     .collect(Collectors.toSet());
         }

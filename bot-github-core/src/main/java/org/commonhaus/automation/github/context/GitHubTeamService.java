@@ -365,7 +365,7 @@ public class GitHubTeamService {
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
-                repoFullName, currentLogins, expectedLogins, ignoreUsers);
+                repoFullName, currentLogins, expectedLogins, new HashSet<>(ignoreUsers));
 
         Set<String> ownerLogins = getOwnerAdministrators(qc, repoFullName);
         changes.removeOwners(ownerLogins); // no owners in changes
@@ -429,11 +429,18 @@ public class GitHubTeamService {
         Log.debugf("[%s] syncCollaborators: syncing collaborators for repository %s", qc.getLogId(), repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
+
+        Collaborators collaborators = getCollaborators(qc, repoFullName);
+
+        // Ignore direct collaborators that are also team-based collaborators
+        var teamCollaborators = collaborators.teamGrantedAccessLogins();
+        var doNotRemoveUsers = new HashSet<String>(ignoreUsers);
+        doNotRemoveUsers.addAll(teamCollaborators);
 
         // Determine logins to add and remove
+        var currentLogins = collaborators.logins();
         MembershipChanges changes = computeMemberChanges(true,
-                repoFullName, currentLogins, expectedLogins, ignoreUsers);
+                repoFullName, currentLogins, expectedLogins, doNotRemoveUsers);
 
         Set<String> owners = getOwnerAdministrators(qc, repoFullName);
         changes.removeOwners(owners); // no owners in changes
@@ -546,7 +553,7 @@ public class GitHubTeamService {
                 teamOrgName, relativeTeamName);
 
         MembershipChanges changes = computeMemberChanges(false,
-                targetTeam, new HashSet<>(currentLogins), expectedLogins, ignoreUsers);
+                targetTeam, new HashSet<>(currentLogins), expectedLogins, new HashSet<>(ignoreUsers));
 
         if (changes.toAdd().isEmpty() && changes.toRemove().isEmpty()) {
             Log.debugf("[%s] syncMembers: No changes needed for team %s", qc.getLogId(), targetTeam);
@@ -589,7 +596,7 @@ public class GitHubTeamService {
     }
 
     private MembershipChanges computeMemberChanges(boolean collaborators, String resourceName,
-            Set<String> currentLogins, Set<String> expectedLogins, Collection<String> ignoreUsers) {
+            Set<String> currentLogins, Set<String> expectedLogins, Set<String> ignoreUsers) {
 
         Set<String> toAdd = new HashSet<>(expectedLogins);
         toAdd.removeAll(currentLogins);
@@ -603,7 +610,7 @@ public class GitHubTeamService {
         finalLogins.addAll(toAdd);
         finalLogins.removeAll(toRemove);
 
-        return new MembershipChanges(collaborators, resourceName, currentLogins, toAdd, toRemove, finalLogins);
+        return new MembershipChanges(collaborators, resourceName, currentLogins, toAdd, toRemove, finalLogins, ignoreUsers);
     }
 
     // Record for team changes
@@ -613,7 +620,8 @@ public class GitHubTeamService {
             Set<String> previousMembers,
             Set<String> addedMembers,
             Set<String> removedMembers,
-            Set<String> finalMembers) {
+            Set<String> finalMembers,
+            Set<String> ignoredUsers) {
 
         public Set<String> toAdd() {
             return addedMembers;

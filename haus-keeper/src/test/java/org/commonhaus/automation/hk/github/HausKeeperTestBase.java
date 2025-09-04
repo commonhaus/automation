@@ -3,6 +3,7 @@ package org.commonhaus.automation.hk.github;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -178,7 +179,7 @@ public class HausKeeperTestBase extends ContextHelper {
         GHMyself myself = mock(GHMyself.class);
         when(myself.getEmails2()).thenReturn(List.of(email));
 
-        when(sponsorMocks.github().getMyself()).thenReturn(myself);
+        doReturn(myself).when(sponsorMocks.github()).getMyself();
 
         // Pre-set the connection for the bot user session
 
@@ -186,11 +187,12 @@ public class HausKeeperTestBase extends ContextHelper {
 
         // Make sure the same bot user is returned everywhere
 
-        when(dataMocks.github().getUser(botLogin)).thenReturn(bot);
-        when(dataMocks.github().getMyself()).thenReturn(myself);
+        doReturn(bot).when(dataMocks.github()).getUser(botLogin);
+        doReturn(bot).when(dataMocks.github()).getUser(botLogin);
+        doReturn(myself).when(dataMocks.github()).getMyself();
 
-        when(hausMocks.github().getUser(botLogin)).thenReturn(bot);
-        when(hausMocks.github().getMyself()).thenReturn(myself);
+        doReturn(bot).when(hausMocks.github()).getUser(botLogin);
+        doReturn(myself).when(hausMocks.github()).getMyself();
 
         // Special token is used for r/w to datastore repo
 
