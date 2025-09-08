@@ -9,7 +9,8 @@
 - REVIEW THOROUGHLY, using file system access when available
     - Analyze information flow and cross-module interactions
     - ASK FOR CLARIFICATION if implementation choices are unclear
-- DO NOT WASTE TOKENS, be succinct and concise.
+- DO NOT WASTE TOKENS, be succinct and concise
+- DO NOT READ .env* files unless instructed to do so
 - NEVER make up code unless asked
 
 ### Context Gathering Strategy
