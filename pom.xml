@@ -61,9 +61,9 @@
         <!-- Quarkus -->
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus-github-app.version>2.11.0</quarkus-github-app.version>
-        <quarkus.mailpit.version>1.6.4</quarkus.mailpit.version>
         <quarkus.platform.version>3.26.2</quarkus.platform.version>
+        <quarkus-github-app.version>2.11.0</quarkus-github-app.version>
+        <quarkus.mailpit.version>1.7.0</quarkus.mailpit.version>
         <!-- Libraries -->
         <assertj.version>3.27.4</assertj.version>
         <awaitility.version>4.3.0</awaitility.version>
