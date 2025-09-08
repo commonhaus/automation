@@ -61,7 +61,7 @@
         <!-- Quarkus -->
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus-github-app.version>2.10.1</quarkus-github-app.version>
+        <quarkus-github-app.version>2.11.0</quarkus-github-app.version>
         <quarkus.mailpit.version>1.6.4</quarkus.mailpit.version>
         <quarkus.platform.version>3.25.4</quarkus.platform.version>
         <!-- Libraries -->
