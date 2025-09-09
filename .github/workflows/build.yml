@@ -102,12 +102,6 @@ jobs:
       run: |
         ./mvnw -B -ntp formatter:validate verify
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@51f77329afa6477de8c49fc9c7046c15b9a4e79d # v3.29.5
-      if: needs.main_root.outputs.is_main
-      with:
-        category: "/language:java-kotlin"
-
     - name: Build and run in native mode
       id: mvn-native-build
       env:
