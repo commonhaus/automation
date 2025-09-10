@@ -4,7 +4,7 @@ import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
 
 import java.io.IOException;
 import java.util.List;
@@ -215,7 +215,7 @@ public class FileWatcherTest extends ContextHelper {
         ScopedQueryContext qc = new ScopedQueryContext(ctx, hausMocks.installationId(), hausMocks.repository())
                 .withExisting(hausMocks.github()).withExisting(hausMocks.dql());
 
-        when(ctx.getOrgScopedQueryContext(anyString())).thenReturn(qc);
+        doReturn(qc).when(ctx).getOrgScopedQueryContext(anyString());
 
         // Register file watchers
         fileWatcher.watchFile("testGroup", myMocks.installationId(),

@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -202,8 +203,9 @@ public class MemberDataTest extends HausKeeperTestBase {
         GHUser botUser = sponsorMocks.github().getUser(botLogin);
         appendCachedTeam(sponsorsOrgName + "/team-quorum-default", botUser);
 
-        when(dataMocks.repository().getFileContent(anyString()))
-                .thenThrow(new IOException("Badness"));
+        doThrow(new IOException("Badness"))
+                .when(dataMocks.repository())
+                .getFileContent(anyString());
 
         given()
                 .log().all()

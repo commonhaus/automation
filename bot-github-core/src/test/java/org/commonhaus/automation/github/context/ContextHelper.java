@@ -10,6 +10,7 @@ import static org.commonhaus.automation.github.context.GitHubTeamService.putCach
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -329,7 +330,7 @@ public class ContextHelper {
             return gh;
         }
         visited.put(key, true);
-        when(gh.isCredentialValid()).thenReturn(true);
+        doReturn(true).when(gh).isCredentialValid();
         BaseQueryCache.putCachedGithubClient(installationId, gh);
         return gh;
     }
@@ -556,13 +557,13 @@ public class ContextHelper {
         } else {
             long id = fullName.hashCode();
             team = mocks.team(id);
-            when(org.getTeamByName(teamName)).thenReturn(team);
-            when(team.getName()).thenReturn(teamName);
-            when(team.getId()).thenReturn(id);
+            doReturn(team).when(org).getTeamByName(teamName);
+            doReturn(teamName).when(team).getName();
+            doReturn(id).when(team).getId();
             visited.put(teamName, true);
         }
 
-        when(team.getMembers()).thenReturn(userSet);
+        doReturn(userSet).when(team).getMembers();
         if (cache) {
             // preload cache to avoid GH lookup
             putCachedTeamMembers(fullName, userSet);
@@ -620,8 +621,8 @@ public class ContextHelper {
     public void mockResponse(String cue, JsonObject jsonObject) throws ExecutionException, InterruptedException {
         Response mockResponse = Mockito.mock(Response.class);
         when(mockResponse.getData()).thenReturn(jsonObject);
-        when(hausMocks.dql().executeSync(contains(cue), anyMap()))
-                .thenReturn(mockResponse);
+
+        doReturn(mockResponse).when(hausMocks.dql()).executeSync(contains(cue), anyMap());
     }
 
     public Response mockGraphQLNotFound(MockInstallation mocks, String cue) throws ExecutionException, InterruptedException {
@@ -632,9 +633,9 @@ public class ContextHelper {
         Response mockResponse = mock(Response.class);
         when(mockResponse.hasError()).thenReturn(true);
         when(mockResponse.getErrors()).thenReturn(List.of(error));
-        when(mocks.dql()
-                .executeSync(contains(cue), anyMap()))
-                .thenReturn(mockResponse);
+
+        doReturn(mockResponse).when(mocks.dql())
+                .executeSync(contains(cue), anyMap());
         return mockResponse;
     }
 
@@ -687,8 +688,8 @@ public class ContextHelper {
      */
     public GHContent mockFileContent(GHRepository repo, String repoPath, Path contentFilePath) throws IOException {
         GHContent content = mock(GHContent.class);
-        when(content.read()).thenReturn(Files.newInputStream(contentFilePath));
-        when(repo.getFileContent(repoPath)).thenReturn(content);
+        doReturn(Files.newInputStream(contentFilePath)).when(content).read();
+        doReturn(content).when(repo).getFileContent(repoPath);
         return content;
     }
 
@@ -861,9 +862,10 @@ public class ContextHelper {
 
             long installationId = response.installationId();
             Response mockResponse = mockResponse(response.path());
-            when(mocks.installationGraphQLClient(installationId)
-                    .executeSync(contains(cue), anyMap()))
-                    .thenReturn(mockResponse);
+
+            doReturn(mockResponse)
+                    .when(mocks.installationGraphQLClient(installationId))
+                    .executeSync(contains(cue), anyMap());
         }
     }
 
@@ -881,9 +883,8 @@ public class ContextHelper {
             graphQueries.add(cue);
 
             Response mockResponse = mockResponse(response.path());
-            when(mocks.dql()
-                    .executeSync(contains(cue), anyMap()))
-                    .thenReturn(mockResponse);
+            doReturn(mockResponse).when(mocks.dql())
+                    .executeSync(contains(cue), anyMap());
         }
     }
 

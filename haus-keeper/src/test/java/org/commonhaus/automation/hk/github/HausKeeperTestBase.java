@@ -267,19 +267,21 @@ public class HausKeeperTestBase extends ContextHelper {
 
     public GHContentBuilder mockUpdateCommonhausData(GHContentBuilder builder, UserPath userPath,
             GHContent content, GHContentUpdateResponse response) throws IOException {
-        when(content.read()).thenReturn(Files.newInputStream(Path.of(userPath.filename())));
-        when(content.getSha()).thenReturn("1234567890adefgh");
+        doReturn(Files.newInputStream(Path.of(userPath.filename())))
+                .when(content).read();
 
-        when(response.getContent()).thenReturn(content);
-        when(builder.commit()).thenReturn(response);
+        doReturn("1234567890adefgh").when(content).getSha();
 
-        when(builder.content(anyString())).thenReturn(builder);
-        when(builder.message(anyString())).thenReturn(builder);
-        when(builder.path(anyString())).thenReturn(builder);
-        when(builder.sha(anyString())).thenReturn(builder);
+        doReturn(content).when(response).getContent();
+        doReturn(response).when(builder).commit();
+
+        doReturn(builder).when(builder).content(anyString());
+        doReturn(builder).when(builder).message(anyString());
+        doReturn(builder).when(builder).path(anyString());
+        doReturn(builder).when(builder).sha(anyString());
 
         GHRepository dataStore = dataMocks.repository();
-        when(dataStore.createContent()).thenReturn(builder);
+        doReturn(builder).when(dataStore).createContent();
 
         // Return updated data
         return builder;
