@@ -2,6 +2,7 @@ package org.commonhaus.automation.hk.council;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.Response;
@@ -110,6 +111,7 @@ public class AsyncCommonhausService {
         }
     }
 
+    @Singleton
     @RegisterRestClient(configKey = "haus-manager")
     public interface HausManagerClient {
         @GET
@@ -125,6 +127,7 @@ public class AsyncCommonhausService {
         Response triggerSponsorUpdate();
     }
 
+    @Singleton
     @RegisterRestClient(configKey = "haus-rules")
     public interface HausRulesClient {
         @GET
