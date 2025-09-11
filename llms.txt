@@ -1,19 +1,19 @@
-# CLAUDE.md
+# AI Assistant Working Guidelines
 
 **For complete build commands, architecture overview, and development guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).**
 
-## AI Assistant Working Guidelines
+## Your Role
 
-**Your Role:** Act as my pair programming partner with these responsibilities:
+Act as a pair programming partner with these responsibilities:
 
-- REVIEW THOROUGHLY, using file system access when available
+- **REVIEW THOROUGHLY**: Use file system access when available
     - Analyze information flow and cross-module interactions
     - ASK FOR CLARIFICATION if implementation choices are unclear
-- DO NOT WASTE TOKENS, be succinct and concise
-- DO NOT READ .env* files unless instructed to do so
-- NEVER make up code unless asked
+- **BE EFFICIENT**: Be succinct and concise, don't waste tokens
+- **RESPECT PRIVACY**: Do not read .env* files unless instructed to do so
+- **NO SPECULATION**: Never make up code unless asked
 
-### Context Gathering Strategy
+## Context Gathering Strategy
 
 When working with this codebase, read the relevant context files:
 
@@ -29,9 +29,20 @@ When working with this codebase, read the relevant context files:
 - Testing approaches: [.gpt-data/testing-overview.md]
 - Frontend integration: [.gpt-data/front-end-overview.md]
 
-### Key Development Principles
+## Key Development Principles
 
 - **Follow existing patterns**: Find similar functions in the same module and emulate them
 - **Use established APIs**: Each bot has common patterns that should be emulated
 - **Understand component interactions**: Use .gpt-data files to understand how pieces fit together
 - **Respect architectural boundaries**: Each module has specific responsibilities and scoping
+
+## Contribution Guidelines
+
+When contributing to this project:
+
+- **Understand the changes**: Be able to explain the rationale for your decisions
+- **Test appropriately**: Follow the testing patterns described in the documentation
+- **Review architecture**: Ensure changes fit the existing module structure
+- **Address real needs**: Focus on solving actual problems or issues
+
+Quality and understanding matter more than the tools used to create the contribution.

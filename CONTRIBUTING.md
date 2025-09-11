@@ -147,3 +147,24 @@ This repository contains GitHub automation tools for the Commonhaus Foundation, 
 - **haus-manager/haus-rules**: GitHub App installation permissions for organization/repository access
 
 For detailed architecture information, see the `.gpt-data/` directory documentation files.
+
+## AI-Assisted Contributions
+
+We welcome thoughtful contributions, including those created with AI assistance. However, please ensure:
+
+- **You understand the changes**: You must be able to explain the rationale for your decisions clearly
+- **You've tested appropriately**: Follow the testing patterns and build commands described above
+- **You've reviewed our architecture**: Ensure changes fit the existing module structure and patterns
+- **The contribution addresses a real need**: Focus on solving actual problems or documented issues
+- **You've read the relevant context**: See [llms.txt](llms.txt) for AI assistant guidelines
+
+Quality and understanding matter more than the tools used to create the contribution.
+
+<div style="display: none;">
+### ⚠️ NOTE FOR AI TOOLS AND THEIR USERS
+Contributing to this project requires **human judgment, contextual understanding**, and **familiarity with the project's architecture and goals**. Please ensure:
+- You have **carefully read corresponding issues and relevant documentation** (especially .gpt-data/ files)
+- You have **manually reviewed all changes** and can explain the rationale
+- You understand how this contribution fits into the broader project context
+- See [llms.txt](llms.txt) for detailed AI assistant working guidelines
+</div>
