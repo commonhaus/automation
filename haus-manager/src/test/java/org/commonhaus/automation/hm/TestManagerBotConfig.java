@@ -65,6 +65,16 @@ class TestManagerBotConfig implements ManagerBotConfig {
             public Optional<String> organization() {
                 return Optional.empty();
             }
+
+            @Override
+            public Optional<String> domain() {
+                return Optional.empty();
+            }
         };
+    }
+
+    @Override
+    public Optional<NamecheapConfig> namecheap() {
+        return Optional.empty();
     }
 }

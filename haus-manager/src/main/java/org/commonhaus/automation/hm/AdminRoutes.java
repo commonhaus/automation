@@ -26,6 +26,9 @@ public class AdminRoutes implements LocalRouteOnly {
     AppContextService ctx;
 
     @Inject
+    DomainManager domainManager;
+
+    @Inject
     OrganizationManager organizationManager;
 
     @Inject
@@ -55,7 +58,44 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
+        routingExchange.ok().end();
+    }
 
+    @Route(path = "/domains", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerDomainRefresh(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+        updateQueue.queueReconciliation("triggerDomainUpdate", () -> {
+            Log.info("🚀 🏡 Domain update triggered");
+            domainManager.refreshDomains(true);
+        });
+        routingExchange.ok().end();
+    }
+
+    @Route(path = "/domain", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerDomainInfo(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+        var request = routingContext.request();
+        if (request.params().isEmpty()) {
+            Log.info("Domain info request without specifying domain");
+            routingExchange.response().setStatusCode(400).end();
+            return;
+        }
+        var domain = request.getParam("name");
+        if (domain == null || domain.isBlank()) {
+            Log.info("Domain info request without specifying domain");
+            routingExchange.response().setStatusCode(400).end();
+            return;
+        }
+        updateQueue.queueReconciliation("domainInfo::" + domain, () -> {
+            Log.info("🚀 🏡 Domain update triggered");
+            domainManager.getDomainInfo(domain);
+        });
         routingExchange.ok().end();
     }
 

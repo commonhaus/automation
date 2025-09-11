@@ -15,6 +15,8 @@ public interface ManagerBotConfig {
 
     SchedulerConfig cron();
 
+    Optional<NamecheapConfig> namecheap();
+
     interface HomeConfig {
 
         String organization();
@@ -31,6 +33,9 @@ public interface ManagerBotConfig {
 
     interface SchedulerConfig {
 
+        // Cron expression for periodic sync of domains
+        Optional<String> domain();
+
         // Cron expression for periodic sync of sponsors
         Optional<String> sponsor();
 
@@ -39,5 +44,21 @@ public interface ManagerBotConfig {
 
         // Cron expression for periodic sync of members
         Optional<String> organization();
+    }
+
+    interface NamecheapConfig {
+        String url();
+
+        String username();
+
+        String apiKey();
+
+        String ipv4Addr();
+
+        /** Repository for domain list workflow dispatch */
+        String workflowRepository();
+
+        /** Workflow name for domain list updates */
+        String workflowName();
     }
 }
