@@ -5,6 +5,7 @@ import static org.commonhaus.automation.ContextService.yamlMapper;
 import java.io.BufferedInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Collection;
@@ -36,6 +37,7 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class UserLoginVerifier extends ScheduledService {
     private static final String ME = "👍-login";
+    private static final String DATA_ROOT = "data/users";
 
     @Inject
     ActiveHausKeeperConfig hkConfig;
@@ -85,27 +87,30 @@ public class UserLoginVerifier extends ScheduledService {
             return;
         }
 
+        Path tempDir = null;
         try {
             // Create a temporary directory for the files
-            Path tempDir = Files.createTempDirectory(ME);
+            tempDir = Files.createTempDirectory(ME).normalize();
+            final var target = tempDir;
 
             // Read files from the input stream
-            try (ZipInputStream zs = repo.readZip((inputstream) -> new ZipInputStream(new BufferedInputStream(inputstream)),
+            try (ZipInputStream zs = repo.readZip(
+                    (inputstream) -> new ZipInputStream(new BufferedInputStream(inputstream)),
                     null)) {
                 ZipEntry entry;
                 while ((entry = zs.getNextEntry()) != null) {
-                    String entryName = entry.getName();
+                    var entryPath = Paths.get(entry.getName()).normalize();
                     try {
-                        if (entryName.startsWith("data/users/") && entryName.endsWith(".yaml")) {
-                            String fileName = entryName.substring(entryName.lastIndexOf('/') + 1);
-                            // Create a file path for this entry
+                        if (isValidZipEntry(entryPath)) {
+                            String fileName = entryPath.getFileName().toString();
                             Path filePath = tempDir.resolve(fileName);
+
                             // Write the entry to a file
                             Files.copy(zs, filePath, StandardCopyOption.REPLACE_EXISTING);
 
                             // queue verification; last file out will clean up the temp dir
                             updateQueue.queueReconciliation(fileName,
-                                    () -> verifyUser(tempDir, filePath, fileName));
+                                    () -> verifyUser(target, filePath, fileName));
                         }
                     } finally {
                         zs.closeEntry();
@@ -113,10 +118,28 @@ public class UserLoginVerifier extends ScheduledService {
                 }
             }
         } catch (Exception e) {
-            Log.errorf(e, "[%s] Failed to create temporary directory for user login verification: %s", ME, e);
-            // FIXME: cleanup temp dir
-            return;
+            ctx.logAndSendEmail(ME, "Failed to create temporary directory for user login verification", e);
+        } finally {
+            if (tempDir != null) {
+                final var target = tempDir;
+                updateQueue.queueReconciliation("cleanup-" + target.getFileName(),
+                        () -> cleanupTempDir(target));
+            }
         }
+    }
+
+    private boolean isValidZipEntry(Path entryPath) {
+        var pathString = entryPath.toString();
+        if (!entryPath.toString().startsWith(DATA_ROOT)) {
+            Log.warnf("[%s] Skipping zip entry that would escape %s: %s", ME, DATA_ROOT, entryPath);
+            return false;
+        }
+
+        if (!pathString.endsWith(".yaml")) {
+            return false;
+        }
+
+        return true;
     }
 
     private void verifyUser(Path tempDir, Path filePath, String fileName) {
@@ -159,15 +182,23 @@ public class UserLoginVerifier extends ScheduledService {
             dqc.addException(e);
             dqc.logAndSendContextErrors("Unable to verify user login");
         } finally {
-            // Cleanup the temporary directory
+            // Cleanup the temporary directory after all user checks
             try {
                 Files.deleteIfExists(filePath);
-                if (Files.list(tempDir).count() == 0) {
-                    Files.deleteIfExists(tempDir);
-                }
             } catch (Exception e) {
                 Log.errorf(e, "[%s] Failed to delete temporary file %s: %s", ME, filePath, e);
             }
+        }
+    }
+
+    private void cleanupTempDir(Path tempDir) {
+        // Cleanup the temporary directory after all user checks
+        try {
+            if (Files.list(tempDir).count() == 0) {
+                Files.deleteIfExists(tempDir);
+            }
+        } catch (Exception e) {
+            Log.errorf(e, "[%s] Failed to delete temporary directory %s: %s", ME, tempDir, e);
         }
     }
 
