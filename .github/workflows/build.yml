@@ -49,7 +49,7 @@ jobs:
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
     - name: Set up JDK 21
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
       with:
         java-version: 21
         distribution: 'temurin'
@@ -62,7 +62,7 @@ jobs:
 
     - name: Restore cached build image
       id: cache-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: build-image/mandrel.tar
         key: ${{ steps.image-cache-key.outputs.cache_key }}
@@ -74,7 +74,7 @@ jobs:
         docker pull quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
         docker save quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 -o build-image/mandrel.tar
 
-    - uses: actions/cache/save@v4
+    - uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       id: cache-save
       if: always()
       with:
@@ -85,12 +85,6 @@ jobs:
       id: load-build-image
       run: |
         docker load -i build-image/mandrel.tar
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      if: needs.main_root.outputs.is_main
-      with:
-        languages: java-kotlin
 
     - name: Project metadata
       id: metadata
