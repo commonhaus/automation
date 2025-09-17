@@ -121,6 +121,12 @@ public class ForwardEmailService {
             return false;
         }
 
+        // Check for null domain or id which would cause NullPointerException in REST client
+        if (alias.domain == null || alias.domain.name == null || alias.id == null) {
+            Log.errorf("generatePassword: Invalid alias data: %s", alias);
+            return false;
+        }
+
         // API CALL: will throw WebApplicationException if not found or error
         String targetEmail = alias.verified_recipients.iterator().next();
         forwardEmailClient.generatePassword(
@@ -169,6 +175,7 @@ public class ForwardEmailService {
                 throw new WebApplicationException("Multiple aliases found for " + aliasKey, Status.BAD_REQUEST);
             } else {
                 alias = aliases.iterator().next();
+                Log.debugf("Cache retrieved alias: %s", alias);
                 AdminDataCache.ALIASES.put(lookup, alias);
             }
         }
@@ -210,6 +217,7 @@ public class ForwardEmailService {
             // API CALL: will throw WebApplicationException on error
             alias = forwardEmailClient.updateAlias(aliasKey.domain(), alias.id, alias);
         }
+        Log.debugf("Update alias %s", alias);
         AdminDataCache.ALIASES.put(aliasKey.toString(), alias);
         return alias;
     }

@@ -37,7 +37,7 @@ public class Alias {
     @Override
     public String toString() {
         return "Alias [name=" + name + ", is_enabled=" + is_enabled + ", id=" + id
-                + ", has_recipient_verification=" + has_recipient_verification + ", recipients=" + recipients
+                + ", has_recipient_verification=" + has_recipient_verification
                 + ", created_at=" + created_at + ", updated_at=" + updated_at + "]";
     }
 
