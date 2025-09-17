@@ -390,6 +390,14 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
         // Find the repository where the configuration file is located
         GHRepository repo = projectQc.getRepository(repoFullName);
+        if (repo == null || projectQc.hasErrors()) {
+            Log.warnf("[%s] %s: Repository not found or GitHub API errors occurred: %s; skipping collaborator sync", ME,
+                    state.taskGroup(), repoFullName);
+            if (projectQc.hasErrors()) {
+                projectQc.logAndSendContextErrors("Failed to retrieve repository for collaborator sync");
+            }
+            return;
+        }
 
         // Include any hard-coded collaborators from the configuration
         Set<String> sourceLogins = new HashSet<>(teamAccess.includeUsers());
@@ -401,18 +409,23 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         } else {
             // Get team members
             Set<String> teamLogins = teamService.getTeamLogins(teamQc, sourceTeamName);
-            if (teamLogins == null) {
-                Log.warnf("[%s] %s: team was not found %s", ME, state.taskGroup(), sourceTeamName);
-            } else {
-                sourceLogins.addAll(teamLogins);
-
-                // Watch for changes on the source team
-                membershipEvents.watchMembers(state.taskGroup(),
-                        teamQc.getInstallationId(),
-                        MembershipUpdateType.TEAM,
-                        sourceTeamName,
-                        (update) -> processMembershipUpdate(state.taskGroup(), update));
+            if (teamLogins == null || teamQc.hasErrors()) {
+                Log.warnf("[%s] %s: Team not found or GitHub API errors occurred: %s; skipping collaborator sync", ME,
+                        state.taskGroup(), sourceTeamName);
+                if (teamQc.hasErrors()) {
+                    teamQc.logAndSendContextErrors("Failed to retrieve team members for collaborator sync");
+                }
+                return;
             }
+
+            sourceLogins.addAll(teamLogins);
+
+            // Watch for changes on the source team
+            membershipEvents.watchMembers(state.taskGroup(),
+                    teamQc.getInstallationId(),
+                    MembershipUpdateType.TEAM,
+                    sourceTeamName,
+                    (update) -> processMembershipUpdate(state.taskGroup(), update));
         }
 
         // We got nobody. Skip the sync.
