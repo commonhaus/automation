@@ -141,7 +141,7 @@ public class CommonhausUser implements UserLogin {
     }
 
     public boolean aliasesMatch(String projectName, String projectDomain, Set<String> newAliases) {
-        var currentAliases = services().forwardEmail.altAlias().stream()
+        var currentAliases = services().forwardEmail().altAlias().stream()
                 .filter(a -> a.endsWith("@" + projectDomain))
                 .collect(Collectors.toSet());
         var expectedAliases = new HashSet<>(newAliases);
