@@ -130,7 +130,10 @@ public class UserLoginVerifier extends ScheduledService {
 
     private boolean isValidZipEntry(Path entryPath) {
         var pathString = entryPath.toString();
-        if (!entryPath.toString().startsWith(DATA_ROOT)) {
+
+        // Check if the path contains the data/users directory structure
+        // (handles zip entries with prefix directories like "repo-name/data/users/file.yaml")
+        if (!pathString.contains("/" + DATA_ROOT + "/")) {
             Log.warnf("[%s] Skipping zip entry that would escape %s: %s", ME, DATA_ROOT, entryPath);
             return false;
         }
