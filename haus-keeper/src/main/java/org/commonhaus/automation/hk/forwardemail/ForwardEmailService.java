@@ -64,7 +64,10 @@ public class ForwardEmailService {
                 aliases.put(key, alias);
             } catch (WebApplicationException e) {
                 if (e.getResponse().getStatus() == 404) {
-                    Log.debugf("getAliases: Alias not found: %s", key);
+                    Log.debugf("getAliases: Alias not found: %s, creating placeholder", key);
+                    // Create a placeholder alias so the frontend can display the input form
+                    Alias placeholder = key.toAlias();
+                    aliases.put(key, placeholder);
                     continue;
                 }
                 throw e;
@@ -199,7 +202,8 @@ public class ForwardEmailService {
         }
 
         Alias alias = existing;
-        if (alias == null) {
+        if (alias == null || alias.id == null) {
+            // Create a new alias if no existing alias or if it's a placeholder without an id
             alias = aliasKey.toAlias();
             alias.description = description;
             alias.recipients = recipients;
