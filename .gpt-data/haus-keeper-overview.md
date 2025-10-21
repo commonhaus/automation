@@ -23,7 +23,8 @@ The Haus Keeper provides comprehensive member self-service capabilities includin
 
 ```yaml
 # project-mail-aliases.yml in individual project repositories
-domain: "project.example.com"
+domains:
+  - "project.example.com"
 userMapping:
   - login: "username"
     aliases:
@@ -166,7 +167,7 @@ application: # Only present when a membership application is pending
 userManagement:
   defaultAliasDomain: example.com
   emailDisabled: false
-  
+
   attestations:
     repo: commonhaus/foundation
     path: ATTESTATIONS.yaml
@@ -197,7 +198,6 @@ projectAliases:
 **Central Project Configuration** (PROJECTS.yaml):
 ```yaml
 project-name:
-  mailDomain: "project.example.com"
   displayName: "Project Name"
   description: "Project description"
 ```

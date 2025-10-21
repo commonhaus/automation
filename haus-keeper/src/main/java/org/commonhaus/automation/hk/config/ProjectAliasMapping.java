@@ -12,10 +12,18 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public record ProjectAliasMapping(
         String domain,
+        Set<String> domains,
         Set<UserAliasList> userMapping,
         EmailNotification emailNotifications) {
 
     public static final String CONFIG_FILE = "project-mail-aliases.yml";
+
+    public ProjectAliasMapping {
+        if (domain != null && (domains == null || domains.isEmpty())) {
+            domains = Set.of(domain);
+        }
+        domain = null; // Always set to null after migration to domains
+    }
 
     /**
      * User alias mapping within ProjectMailConfig
@@ -24,10 +32,16 @@ public record ProjectAliasMapping(
             String login,
             Set<String> aliases) {
 
-        public boolean isValid(String projectDomain) {
+        public boolean isValid(Set<String> domains) {
             return login != null && !login.isEmpty()
                     && aliases != null && !aliases.isEmpty()
-                    && aliases.stream().allMatch(a -> a != null && a.endsWith("@" + projectDomain));
+                    && aliases.stream().allMatch(a -> {
+                        if (a == null) {
+                            return false;
+                        }
+                        String domain = a.substring(a.indexOf("@") + 1);
+                        return domains.contains(domain);
+                    });
         }
 
         @Override
@@ -36,8 +50,16 @@ public record ProjectAliasMapping(
         }
     }
 
+    public boolean hasDomains() {
+        return domains != null && !domains.isEmpty();
+    }
+
+    public boolean hasUserMapping() {
+        return userMapping != null && !userMapping.isEmpty();
+    }
+
     public boolean isEnabled() {
-        return domain != null && !domain.isEmpty() && userMapping != null && !userMapping.isEmpty();
+        return hasDomains() && hasUserMapping();
     }
 
     /**
@@ -51,7 +73,7 @@ public record ProjectAliasMapping(
 
     @Override
     public String toString() {
-        return String.format("ProjectMailConfig[domain=%s, userMapping=%s]",
-                domain, userMapping);
+        return String.format("ProjectMailConfig[domains=%s, userMapping=%s]",
+                domains, userMapping);
     }
 }
