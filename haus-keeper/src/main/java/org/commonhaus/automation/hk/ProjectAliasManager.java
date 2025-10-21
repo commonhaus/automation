@@ -4,7 +4,7 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrga
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -240,25 +240,9 @@ public class ProjectAliasManager extends ScheduledService {
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
         ProjectAliasMapping projectAliasConfig = state.projectConfig();
+        Set<String> domains = projectAliasConfig.domains();
 
-        String definitiveMailDomain = centralProjectConfig.mailDomain();
-        String projectDomain = projectAliasConfig.domain();
-        if (!Objects.equals(definitiveMailDomain, projectDomain)) {
-            Log.debugf("%s: project domain mismatch; %s != %s", taskGroup, projectDomain, definitiveMailDomain);
-            String title = "HausKeeper: project alias domain mismatch";
-            String message = """
-                    Project alias domain mismatch for %s
-
-                    Project alias domain: %s
-                    Central project alias domain: %s
-                    """.formatted(state.repoFullName(), projectDomain, definitiveMailDomain);
-            ctx.sendEmail(ME, title, message,
-                    qc.getErrorAddresses(projectAliasConfig.emailNotifications()));
-            qc.createItem(EventType.issue, title, message, null);
-            return;
-        }
-
-        if (projectAliasConfig.userMapping() == null || projectAliasConfig.userMapping().isEmpty()) {
+        if (!projectAliasConfig.hasUserMapping()) {
             Log.debugf("%s: no user mappings defined in project alias config", taskGroup);
             return;
         }
@@ -279,7 +263,7 @@ public class ProjectAliasManager extends ScheduledService {
                         qc.bundleExceptions(),
                         projectAliasConfig.emailNotifications());
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
-            } else if (ghUser == null || !userAliases.isValid(projectDomain)) {
+            } else if (ghUser == null || !userAliases.isValid(domains)) {
                 Log.debugf("%s: invalid aliases for login %s (%s)", taskGroup, userAliases, ghUser);
                 String title = "Invalid alias defined";
                 String message = """
@@ -287,14 +271,16 @@ public class ProjectAliasManager extends ScheduledService {
                         Login: %s
                         Aliases: %s
 
-                        Aliases should be fully qualified email addresses ending with @%s.
+                        Aliases should be fully qualified email addresses for one of the following:
+                        %s.
 
                         Project config: %s
-                        """.formatted(state.repoFullName(),
+                        """.formatted(
                         userAliases.login(),
                         userAliases.aliases(),
-                        projectDomain,
+                        domains,
                         projectAliasConfig);
+
                 ctx.sendEmail(ME, title, message,
                         qc.getErrorAddresses(projectAliasConfig.emailNotifications()));
                 qc.createItem(EventType.issue, title, message, null);
@@ -305,7 +291,7 @@ public class ProjectAliasManager extends ScheduledService {
                 // Create a new user object if it does not exist
                 CommonhausUser user = datastore.getCommonhausUser(login, ghUser.getId(), false, true);
 
-                if (user.aliasesMatch(state.projectName(), projectDomain, userAliases.aliases())) {
+                if (user.aliasesMatch(state.projectName(), domains, userAliases.aliases())) {
                     Log.debugf("%s: user %s already has aliases %s", taskGroup, login, userAliases.aliases());
                     continue; // skip
                 }
@@ -317,7 +303,7 @@ public class ProjectAliasManager extends ScheduledService {
                             u.addProject(state.projectName());
                             u.services().forwardEmail().addAliases(userAliases.aliases());
                         },
-                        "Update user aliases for " + projectDomain,
+                        "Update user aliases",
                         true, true));
             } catch (Exception e) {
                 qc.addException(e);

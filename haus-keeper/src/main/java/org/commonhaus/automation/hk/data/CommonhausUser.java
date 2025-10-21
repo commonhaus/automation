@@ -140,9 +140,12 @@ public class CommonhausUser implements UserLogin {
         return data.projects();
     }
 
-    public boolean aliasesMatch(String projectName, String projectDomain, Set<String> newAliases) {
+    public boolean aliasesMatch(String projectName, Set<String> projectDomains, Set<String> newAliases) {
         var currentAliases = services().forwardEmail().altAlias().stream()
-                .filter(a -> a.endsWith("@" + projectDomain))
+                .filter(a -> {
+                    String domain = a.substring(a.indexOf("@") + 1);
+                    return projectDomains.contains(domain);
+                })
                 .collect(Collectors.toSet());
         var expectedAliases = new HashSet<>(newAliases);
 
