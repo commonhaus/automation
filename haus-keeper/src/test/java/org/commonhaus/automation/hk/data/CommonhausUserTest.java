@@ -178,18 +178,20 @@ public class CommonhausUserTest extends HausKeeperTestBase {
                 "alias3@domain.com",
                 "alias2@domain.com");
 
+        Set<String> domains = Set.of("domain.com");
+
         // Case 1: Project mismatch (project not set); should return false
-        boolean result = user.aliasesMatch("project", "domain.com", expected);
+        boolean result = user.aliasesMatch("project", domains, expected);
         assertThat(result).isFalse();
 
         // Case 2: Project and aliases match
         user.addProject("project");
-        result = user.aliasesMatch("project", "domain.com", expected);
+        result = user.aliasesMatch("project", domains, expected);
         assertThat(result).isTrue();
 
         // Case 3: Aliases mismatch - alias1 is missing from the user
         user.services().forwardEmail().altAlias().remove("alias1@domain.com");
-        result = user.aliasesMatch("project", "domain.com", expected);
+        result = user.aliasesMatch("project", domains, expected);
         assertThat(result).isFalse();
 
         // Update expected to match the current state
@@ -199,7 +201,32 @@ public class CommonhausUserTest extends HausKeeperTestBase {
 
         // Case 4: Aliases mismatch - alias4 is extra in the user
         user.services().forwardEmail().altAlias().add("alias4@domain.com");
-        result = user.aliasesMatch("project", "domain.com", expected);
+        result = user.aliasesMatch("project", domains, expected);
         assertThat(result).isFalse();
+
+        // Case 5: Multiple domains - aliases from different domains
+        user.services().forwardEmail().altAlias().clear();
+        user.services().forwardEmail().altAlias().addAll(List.of(
+                "alias1@domain1.com",
+                "alias2@domain2.com",
+                "alias3@domain1.com"));
+
+        Set<String> multiDomains = Set.of("domain1.com", "domain2.com");
+        expected = Set.of(
+                "alias1@domain1.com",
+                "alias2@domain2.com",
+                "alias3@domain1.com");
+
+        result = user.aliasesMatch("project", multiDomains, expected);
+        assertThat(result).isTrue();
+
+        // Case 6: Multiple domains - but only filtering one domain
+        expected = Set.of(
+                "alias1@domain1.com",
+                "alias3@domain1.com");
+
+        Set<String> singleDomain = Set.of("domain1.com");
+        result = user.aliasesMatch("project", singleDomain, expected);
+        assertThat(result).isTrue();
     }
 }
