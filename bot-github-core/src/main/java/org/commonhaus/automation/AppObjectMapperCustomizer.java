@@ -20,7 +20,7 @@ class AppObjectMapperCustomizer implements ObjectMapperCustomizer {
         Log.debug("Customizing ObjectMapper");
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .registerModule(new JavaTimeModule())
-                .setSerializationInclusion(Include.NON_EMPTY)
+                .setDefaultPropertyInclusion(Include.NON_EMPTY)
                 .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
     }
 }

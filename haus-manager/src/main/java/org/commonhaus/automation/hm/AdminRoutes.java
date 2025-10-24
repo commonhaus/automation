@@ -94,7 +94,7 @@ public class AdminRoutes implements LocalRouteOnly {
         }
         updateQueue.queueReconciliation("domainInfo::" + domain, () -> {
             Log.info("🚀 🏡 Domain update triggered");
-            domainManager.getDomainInfo(domain);
+            //domainManager.getDomainInfo(domain);
         });
         routingExchange.ok().end();
     }
