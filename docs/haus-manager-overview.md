@@ -1,8 +1,8 @@
-This section provides additional information that provides context and explains design and implementation choices.
-
-Base file system directory for source: `haus-manager/src/main/java`
-
 # Haus Manager: Organization/Team/Project Management
+
+This document explains the design and implementation of the Haus Manager module.
+
+Source directory: `haus-manager/src/main/java`
 
 The Haus Manager provides comprehensive management of GitHub organizations, teams, collaborators, sponsors, and project health monitoring based on configuration files.
 
@@ -111,14 +111,41 @@ sponsors:
 - **Email Notifications**: Alerts administrators about conflicts with resolution guidance
 - **Automatic Cleanup**: Removes stale entries after bootstrap discovery
 
+### DomainManager
+
+**Single instance**: Manages domain synchronization with Namecheap registrar.
+
+- Fetches domain list from Namecheap API and dispatches to configured workflow repository
+- Uses `NamecheapService` abstraction (real implementation or no-op based on configuration)
+- Scheduled: Weekly on Thursday at 1:25 PM (`27 25 13 ? * THU *`)
+
+**Namecheap API Integration**: The Namecheap API is notably awkward to work with:
+
+- **All operations use GET** (even mutations like `setContacts`)
+- **Returns XML responses** (not JSON)
+- **Requires 40+ query parameters** for contact updates (all 4 contact types × ~10 fields each)
+- **Global parameters** (ApiUser, ApiKey, UserName, ClientIp) required on every request
+
+Design patterns used to manage this complexity:
+
+- **@BeanParam pattern**: Request classes like `SetContactsRequest` wrap complex parameter lists with annotated getters
+- **ClientRequestFilter**: `NamecheapClientFilter` injects global parameters automatically
+- **Clean domain models**: `ContactInfo` and `DomainContacts` hide API ugliness from business logic
+- **Dedicated XML parser**: `NamecheapResponseParser` handles XML responses and structured error handling via `NamecheapException`
+- **Producer pattern**: NamecheapServiceProducer` provides no-op implementation when not configured
+
+Namecheap API documentation available in `docs/api-reference/`
+
 ## Discovery and Lifecycle
 
 **Repository Discovery**: Uses priority-based discovery events (`RdePriority.APP_DISCOVERY`) to:
+
 - OrganizationManager: Watches for main repository containing `cf-haus-organization.yml`
 - ProjectManager: Discovers any repository in primary org with `cf-haus-manager.yml`
 - Both register FileWatcher and MembershipWatcher during discovery
 
 **Bootstrap vs Runtime**: Different behavior during initial discovery vs live updates:
+
 - Bootstrap: Defers reconciliation until all repositories discovered
 - Runtime: Immediate reconciliation on config changes
 
@@ -133,7 +160,7 @@ graph TD
     TCR -->|conflict resolution| OM
     TCR -->|conflict resolution| PM
     PHM -->|health collection| BG[Background Tasks]
-    
+
     OM -.->|watches| FW[FileWatcher]
     PM -.->|watches| FW
     OM -.->|watches| MW[MembershipWatcher]
@@ -150,6 +177,7 @@ graph TD
 **Task Queue Integration**: Uses PeriodicUpdateQueue for rate-limited operations and BACKGROUND tasks for health collection
 
 **Task Group Strategy**: Each manager uses specific task group naming for fine-grained queue management and conflict resolution:
+
 - OrganizationManager: `"🏡-org"` (single group)
 - ProjectManager: `"cfg#" + repoFullName` (per-repository groups)
 - SponsorManager: `"💸-sponsor"` (single group)
@@ -161,12 +189,14 @@ graph TD
 **State Persistence**: Critical state (team conflicts) persisted to disk for reliability across restarts
 
 **Error Handling**: All managers use consistent error handling:
+
 - Configuration parsing errors → Email notifications to configured addresses
 - GitHub API errors → Context accumulation with retry logic
 - Team conflicts → Email notifications with resolution guidance
 - Health collection errors → Logged but don't block other operations
 
 **Scheduled Operations**:
+
 - OrganizationManager: Every 3 days at 2:47 AM (`0 47 2 */3 * ?`)
 - ProjectManager: Every 3 days at 4:47 AM (`0 47 4 */3 * ?`)
 - SponsorManager: Every 3 days at 1:47 AM (`0 47 1 */3 * ?`)

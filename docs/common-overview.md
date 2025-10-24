@@ -1,6 +1,8 @@
-This section provides additional information that provides context and explains design and implementation choices.
+# bot-github-core: Common Bot Framework
 
-Base file system directory for source: `bot-github-core/src/main/java`
+This document explains the design and implementation of the shared bot framework used by all automation modules.
+
+Source directory: `bot-github-core/src/main/java`
 
 There are six packages in the common bot module:
 

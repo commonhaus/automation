@@ -1,6 +1,6 @@
-This section provides additional information that provides context and explains design and implementation choices.
-
 # Frontend Integration Overview
+
+This document explains the design and implementation of frontend integration in the automation bots.
 
 ## Architecture Pattern
 

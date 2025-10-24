@@ -1,8 +1,8 @@
-This section provides additional information that provides context and explains design and implementation choices.
-
-Base file system directory for source: `haus-keeper/src/main/java`
-
 # Haus Keeper: Member Self-Service & Project Management
+
+This document explains the design and implementation of the Haus Keeper module.
+
+Source directory: `haus-keeper/src/main/java`
 
 The Haus Keeper provides comprehensive member self-service capabilities including membership applications, email alias management, attestations, and project-specific email forwarding. Built on Quarkus with OAuth authentication and GitHub-based data storage.
 

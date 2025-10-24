@@ -1,6 +1,6 @@
-This section provides additional information about testing infrastructure and patterns used across all modules.
-
 # Testing Overview
+
+This document explains the testing infrastructure and patterns used across all modules.
 
 ## Test Infrastructure Architecture
 

@@ -15,25 +15,28 @@ Act as a pair programming partner with these responsibilities:
 
 ## Context Gathering Strategy
 
-When working with this codebase, read the relevant context files:
+When working with this codebase, read the relevant context files from `docs/`:
 
 **Always start with:**
-- Module structure: [.gpt-data/pom-xml-overview.md]
-- Core functionality: [.gpt-data/common-overview.md]
+- Module structure: [docs/pom-xml-overview.md](docs/pom-xml-overview.md)
+- Core functionality: [docs/common-overview.md](docs/common-overview.md)
 
 **For specific modules, also review:**
-- HausKeeper: [.gpt-data/haus-keeper-overview.md]
-- HausManager: [.gpt-data/haus-manager-overview.md]
-- HausRules: [.gpt-data/haus-rules-overview.md]
-- Configuration patterns: [.gpt-data/configuration-overview.md]
-- Testing approaches: [.gpt-data/testing-overview.md]
-- Frontend integration: [.gpt-data/front-end-overview.md]
+- HausKeeper: [docs/haus-keeper-overview.md](docs/haus-keeper-overview.md)
+- HausManager: [docs/haus-manager-overview.md](docs/haus-manager-overview.md)
+- HausRules: [docs/haus-rules-overview.md](docs/haus-rules-overview.md)
+- Configuration patterns: [docs/configuration-overview.md](docs/configuration-overview.md)
+- Testing approaches: [docs/testing-overview.md](docs/testing-overview.md)
+- Frontend integration: [docs/front-end-overview.md](docs/front-end-overview.md)
+
+**Additional resources:**
+- API reference documentation: [docs/api-reference/](docs/api-reference/)
 
 ## Key Development Principles
 
 - **Follow existing patterns**: Find similar functions in the same module and emulate them
 - **Use established APIs**: Each bot has common patterns that should be emulated
-- **Understand component interactions**: Use .gpt-data files to understand how pieces fit together
+- **Understand component interactions**: Use the docs/ architecture files to understand how pieces fit together
 - **Respect architectural boundaries**: Each module has specific responsibilities and scoping
 
 ## Contribution Guidelines

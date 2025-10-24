@@ -1,5 +1,3 @@
-This section provides additional information that provides context and explains design and implementation choices.
-
 # Maven Module Structure
 
 This repository contains a multi-module Maven project using Quarkus framework for GitHub automation.

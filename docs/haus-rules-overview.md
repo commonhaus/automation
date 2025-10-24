@@ -1,8 +1,8 @@
-This section provides additional information that provides context and explains design and implementation choices.
-
-Base file system directory for source: `haus-rules/src/main/java`
-
 # Haus Rules: Voting and Notices
+
+This document explains the design and implementation of the Haus Rules module.
+
+Source directory: `haus-rules/src/main/java`
 
 Haus Rules provides automation for vote counting and notifications (as required by organization bylaws)
 

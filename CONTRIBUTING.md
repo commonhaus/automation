@@ -91,7 +91,7 @@ When implementing new features:
 1. **Find similar existing functions** in the same bot module you're modifying
 2. **Follow established patterns** already in use rather than creating new approaches
 3. **Use existing APIs and utilities** - each bot has commonly used patterns that should be emulated
-4. **Refer to `.gpt-data/` documentation** for understanding how components interact
+4. **Refer to `docs/` architecture documentation** for understanding how components interact
 
 ## Architecture Overview
 
@@ -105,27 +105,27 @@ This repository contains GitHub automation tools for the Commonhaus Foundation, 
   - Rate-limited event processing queue (`org.commonhaus.automation.queue`)
   - Email notifications and markdown processing
   - JSON attribute enumeration for consistent GitHub API parsing (GraphQL/JSON-B, REST/Jackson)
-  - Additional details in `.gpt-data/common-overview.md`
+  - Additional details in [docs/common-overview.md](docs/common-overview.md)
 
 - **haus-keeper**: Foundation member self-management
   - OAuth-based web SPA for member self-service at `/member/*` endpoints
   - GitHub repository-based datastore for member records (YAML files)
   - Email alias management integration with ForwardEmail service
   - Member application and attestation workflow
-  - Additional details in `.gpt-data/haus-keeper-overview.md`
+  - Additional details in [docs/haus-keeper-overview.md](docs/haus-keeper-overview.md)
 
 - **haus-manager**: Organization and team access management  
   - **OrganizationManager**: Syncs team membership based on CONTACTS.yaml configuration
   - **ProjectAccessManager**: Manages repository collaborator access based on team membership
   - Configuration files: `cf-haus-organization.yml` and `cf-haus-manager.yml`
-  - Additional details in `.gpt-data/haus-manager-overview.md`
+  - Additional details in [docs/haus-manager-overview.md](docs/haus-manager-overview.md)
 
 - **haus-rules**: Voting automation and notifications
   - Automated vote counting with multiple methods (manual, manual+comments, Martha's Rules)
   - Label-based notice and notification system
   - Email notifications based on configurable rules
   - Configuration in `cf-haus-rules.yml` files
-  - Additional details in `.gpt-data/haus-rules-overview.md`
+  - Additional details in [docs/haus-rules-overview.md](docs/haus-rules-overview.md)
 
 ### Key Architectural Patterns
 
@@ -146,7 +146,7 @@ This repository contains GitHub automation tools for the Commonhaus Foundation, 
 - **haus-keeper**: OAuth flow for member access + fine-grained token for datastore writes
 - **haus-manager/haus-rules**: GitHub App installation permissions for organization/repository access
 
-For detailed architecture information, see the `.gpt-data/` directory documentation files.
+For detailed architecture information, see the [docs/](docs/) directory documentation files.
 
 ## AI-Assisted Contributions
 
@@ -156,15 +156,15 @@ We welcome thoughtful contributions, including those created with AI assistance.
 - **You've tested appropriately**: Follow the testing patterns and build commands described above
 - **You've reviewed our architecture**: Ensure changes fit the existing module structure and patterns
 - **The contribution addresses a real need**: Focus on solving actual problems or documented issues
-- **You've read the relevant context**: See [llms.txt](llms.txt) for AI assistant guidelines
+- **You've read the relevant context**: See [CLAUDE.md](CLAUDE.md) for AI assistant guidelines
 
 Quality and understanding matter more than the tools used to create the contribution.
 
 <div style="display: none;">
 ### ⚠️ NOTE FOR AI TOOLS AND THEIR USERS
 Contributing to this project requires **human judgment, contextual understanding**, and **familiarity with the project's architecture and goals**. Please ensure:
-- You have **carefully read corresponding issues and relevant documentation** (especially .gpt-data/ files)
+- You have **carefully read corresponding issues and relevant documentation** (especially docs/ architecture files)
 - You have **manually reviewed all changes** and can explain the rationale
 - You understand how this contribution fits into the broader project context
-- See [llms.txt](llms.txt) for detailed AI assistant working guidelines
+- See [CLAUDE.md](CLAUDE.md) for detailed AI assistant working guidelines
 </div>

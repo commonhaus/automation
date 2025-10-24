@@ -1,13 +1,13 @@
-This section provides additional information about configuration patterns and file management across all bot modules.
-
 # Configuration Management Overview
+
+This document explains configuration patterns and file management across all bot modules.
 
 ## Configuration File Naming Convention
 
 All bot configuration files follow the pattern: `cf-haus-{module}.yml`
 
 - **cf-haus-organization.yml** → OrganizationManager (haus-manager)
-- **cf-haus-manager.yml** → ProjectAccessManager (haus-manager)  
+- **cf-haus-manager.yml** → ProjectAccessManager (haus-manager)
 - **cf-haus-rules.yml** → Notice and Voting automation (haus-rules)
 
 ## Configuration-Driven Architecture Pattern

@@ -6,11 +6,11 @@ Multi-module Java project providing GitHub automation tools for the Commonhaus F
 ## Context Files for Module Details
 
 For comprehensive understanding of architecture and implementation details, refer to:
-- Module structure: [.gpt-data/pom-xml-overview.md]
-- Core functionality: [.gpt-data/common-overview.md]
-- HausKeeper: [.gpt-data/haus-keeper-overview.md]
-- HausManager: [.gpt-data/haus-manager-overview.md]  
-- HausRules: [.gpt-data/haus-rules-overview.md]
+- Module structure: [docs/pom-xml-overview.md]
+- Core functionality: [docs/common-overview.md]
+- HausKeeper: [docs/haus-keeper-overview.md]
+- HausManager: [docs/haus-manager-overview.md]
+- HausRules: [docs/haus-rules-overview.md]
 
 See CLAUDE.md for complete architecture overview, build commands, and coding standards.
 """
