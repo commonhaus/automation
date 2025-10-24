@@ -68,7 +68,7 @@ public class VoteEvent {
     }
 
     public String getLogId() {
-        return String.format("%d-%s-%d", installationId, repoFullName, number);
+        return "%d-%s-%d".formatted(installationId, repoFullName, number);
     }
 
     public static EventType eventToType(EventData eventData) {

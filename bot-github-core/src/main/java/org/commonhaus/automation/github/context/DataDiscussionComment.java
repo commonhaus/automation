@@ -58,7 +58,7 @@ public class DataDiscussionComment extends DataCommonComment {
     }
 
     public String toString() {
-        return String.format("Comment [%s] on discussion [%s] %s", this.id, this.discussion_id, this.discussion);
+        return "Comment [%s] on discussion [%s] %s".formatted(this.id, this.discussion_id, this.discussion);
     }
 
     /** package private. See QueryHelper / QueryContext */

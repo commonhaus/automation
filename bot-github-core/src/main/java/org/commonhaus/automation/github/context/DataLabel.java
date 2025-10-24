@@ -113,7 +113,7 @@ public class DataLabel extends DataCommonType {
     }
 
     public String toString() {
-        return String.format("Label[%s:%s]", this.id, this.name);
+        return "Label[%s:%s]".formatted(this.id, this.name);
     }
 
     public static class Builder {

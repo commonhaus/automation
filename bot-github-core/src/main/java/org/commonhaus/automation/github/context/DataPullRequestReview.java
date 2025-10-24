@@ -50,7 +50,7 @@ public class DataPullRequestReview extends DataCommonObject {
     }
 
     public String toString() {
-        return String.format("Review [%s] by %s", this.state, this.author);
+        return "Review [%s] by %s".formatted(this.state, this.author);
     }
 
     static List<DataPullRequestReview> queryReviews(GitHubQueryContext qc,

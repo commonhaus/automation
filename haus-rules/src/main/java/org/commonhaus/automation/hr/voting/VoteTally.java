@@ -153,17 +153,17 @@ public class VoteTally {
         // GH Markdown likes \r\n line endings
         String markdown = "";
         if (manualCloseComments != null) {
-            markdown += String.format("This vote has been [closed](%s) by [%s](%s):\r\n\r\n",
-                    manualCloseComments.url, manualCloseComments.author.login, manualCloseComments.author.url)
-                    + "> " + manualCloseComments.body
-                            .replaceAll("\\r\\n", "\r\n> ")
-                    + "\r\n\r\n---\r\n\r\n";
+            markdown += "This vote has been [closed](%s) by [%s](%s):\r\n\r\n> %s\r\n\r\n---\r\n\r\n"
+                    .formatted(
+                            manualCloseComments.url,
+                            manualCloseComments.author.login,
+                            manualCloseComments.author.url,
+                            manualCloseComments.body.replaceAll("\\r\\n", "\r\n> "));
         } else if (isClosed) {
-            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed."
-                    + "\r\n\r\n---\r\n\r\n";
+            markdown += "\r\n\r\n> [!NOTE]\r\n> This item has been closed.\r\n\r\n---\r\n\r\n";
         }
 
-        markdown += "\r\n" + summarizeResults();
+        markdown += summarizeResults();
         return markdown;
     }
 
@@ -271,36 +271,35 @@ public class VoteTally {
         String result = "";
 
         if (countedVotes == 0) {
-            result += "\r\nNo votes (non-bot %s) found on this item.".formatted(
+            result += "No votes (non-bot %s) found on this item.\r\n".formatted(
                     useComments ? "comments" : "reactions");
         } else {
-            result += String.format("\r\n%s%d of %d members of @%s have voted (%s%s, quorum=%s).",
-                    (hasQuorum ? "✅ " : "🗳️"),
-                    groupVotes, groupSize, group,
-                    voteType != CountingMethod.manualComments ? "reaction" : "comment",
-                    isPullRequest ? " or review" : "",
-                    votingThreshold.label());
+            result += "%s%d of %d members of @%s have voted (%s%s, quorum=%s).\r\n\r\n"
+                    .formatted(
+                            (hasQuorum ? "✅ " : "🗳️ "),
+                            groupVotes, groupSize, group,
+                            voteType != CountingMethod.manualComments ? "reaction" : "comment",
+                            isPullRequest ? " or review" : "",
+                            votingThreshold.label());
 
             if (useComments) {
                 Category c = categories.get("comment");
-                result += "\r\n"
-                        + "The following members have commented:  \r\n"
-                        + actorsToString(c.team);
+                result += "The following members have commented:  \r\n%s"
+                        .formatted(actorsToString(c.team));
             } else {
-                result += "\r\n"
-                        + "| Reaction | Total | Team | Voting members |\r\n"
-                        + "| --- | --- | --- | --- |\r\n"
-                        + categoriesToRows()
-                        + "\r\n"
-                        + othersToString()
-                        + duplicatesToString()
-                        + ignoredToString();
+                result += """
+                        | Reaction | Total | Team | Voting members |\r
+                        | --- | --- | --- | --- |\r
+                        %s\r
+                        %s%s%s\r
+                        """.formatted(
+                        categoriesToRows(),
+                        othersToString(),
+                        duplicatesToString(),
+                        ignoredToString());
             }
             if (!isDone) {
-                result += """
-                        \r\nA vote manager comment containing `vote::result` will close the vote.
-                        \r\n\r\n[^alt]: Alternate representative
-                        """.stripIndent();
+                result += "A vote manager comment containing `vote::result` will close the vote.\r\n\r\n[^alt]: Alternate representative";
             }
         }
 
@@ -310,9 +309,12 @@ public class VoteTally {
     String categoriesToRows() {
         return categories.entrySet().stream()
                 .filter(e -> !"ignored".equals(e.getKey())) // Skip ignored votes here
-                .map(e -> String.format("| %s | %d | %d | %s |",
-                        e.getKey(), e.getValue().getTotal(), e.getValue().getTeamTotal(),
-                        actorsToString(e.getValue().team)))
+                .map(e -> "| %s | %d | %d | %s |"
+                        .formatted(
+                                e.getKey(),
+                                e.getValue().getTotal(),
+                                e.getValue().getTeamTotal(),
+                                actorsToString(e.getValue().team)))
                 .collect(Collectors.joining("\r\n"));
     }
 
@@ -320,24 +322,22 @@ public class VoteTally {
         if (otherVotes.isEmpty()) {
             return "";
         }
-        return "\r\nAdditional input (🙏 🥰 🙌):\r\n"
-                + otherVotes.stream()
-                        .map(d -> String.format("[%s](%s)(%s)",
+        return "\r\nAdditional input (🙏 🥰 🙌):\r\n%s\r\n"
+                .formatted(otherVotes.stream()
+                        .map(d -> "[%s](%s)(%s)".formatted(
                                 d.login, d.url, d.reaction))
-                        .collect(Collectors.joining(", "))
-                + "\r\n";
+                        .collect(Collectors.joining(", ")));
     }
 
     String duplicatesToString() {
         if (duplicates.isEmpty()) {
             return "";
         }
-        return "\r\nThe following votes were not counted (duplicates):\r\n"
-                + duplicates.stream()
-                        .map(d -> String.format("[%s](%s)(%s)",
+        return "\r\nThe following votes were not counted (duplicates):\r\n%s\r\n"
+                .formatted(duplicates.stream()
+                        .map(d -> "[%s](%s)(%s)".formatted(
                                 d.login, d.url, d.reaction))
-                        .collect(Collectors.joining(", "))
-                + "\r\n";
+                        .collect(Collectors.joining(", ")));
     }
 
     String ignoredToString() {
@@ -345,11 +345,10 @@ public class VoteTally {
         if (ignored == null || ignored.getTotal() == 0) {
             return "";
         }
-        return "\r\nThe following reactions were not counted:\r\n"
-                + ignored.reactions.stream()
+        return "\r\nThe following reactions were not counted:\r\n%s\r\n"
+                .formatted(ignored.reactions.stream()
                         .map(DataReaction::toEmoji)
-                        .collect(Collectors.joining(", "))
-                + "\r\n";
+                        .collect(Collectors.joining(", ")));
     }
 
     String actorsToString(Collection<VoteRecord> actors) {
@@ -359,7 +358,7 @@ public class VoteTally {
                     if (actor.isAlternate()) {
                         format = "[%s](%s)[^alt]";
                     }
-                    return String.format(format, actor.login, actor.url);
+                    return format.formatted(actor.login, actor.url);
                 })
                 .collect(Collectors.joining(", "));
     }

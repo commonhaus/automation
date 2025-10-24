@@ -80,7 +80,7 @@ public class EmailAction extends Action {
                             : payload.issue;
 
                     sender = item.author.login;
-                    title = String.format("%s[%s] #%s %s",
+                    title = "%s[%s] #%s %s".formatted(
                             status,
                             eventData.getRepoFullName(),
                             item.number, item.title);
@@ -98,7 +98,7 @@ public class EmailAction extends Action {
                     DataCommonComment comment = payload.comment;
 
                     sender = comment.author.login;
-                    title = String.format("Re: [%s] #%s %s",
+                    title = "Re: [%s] #%s %s".formatted(
                             eventData.getRepoFullName(),
                             item.number, item.title);
 
@@ -113,7 +113,7 @@ public class EmailAction extends Action {
                     DataDiscussion discussion = payload.discussion;
 
                     sender = discussion.author.login;
-                    title = String.format("%s[%s] #%s %s",
+                    title = "%s[%s] #%s %s".formatted(
                             status,
                             eventData.getRepoFullName(),
                             discussion.number, discussion.title);
@@ -129,7 +129,7 @@ public class EmailAction extends Action {
                     DataDiscussionComment comment = payload.comment;
 
                     sender = comment.author.login;
-                    title = String.format("Re: [%s] #%s %s",
+                    title = "Re: [%s] #%s %s".formatted(
                             eventData.getRepoFullName(),
                             discussion.number, discussion.title);
 

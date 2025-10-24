@@ -84,7 +84,7 @@ public class DataDiscussion extends DataCommonItem {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
-        variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
+        variables.put("query", "repo:%s label:%s sort:updated-desc".formatted(
                 qc.getRepository().getFullName(), labelName));
 
         DataPageInfo pageInfo = new DataPageInfo(null, false);
@@ -114,7 +114,7 @@ public class DataDiscussion extends DataCommonItem {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
-        variables.put("query", String.format("repo:%s is:discussion created:%s..%s",
+        variables.put("query", "repo:%s is:discussion created:%s..%s".formatted(
                 qc.getRepository().getFullName(), from, toExclusive.minusDays(1)));
 
         DataPageInfo pageInfo = new DataPageInfo(null, false);

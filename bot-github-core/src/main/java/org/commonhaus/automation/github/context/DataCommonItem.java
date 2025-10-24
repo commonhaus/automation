@@ -201,8 +201,9 @@ public class DataCommonItem extends DataCommonObject {
         List<DataCommonItem> allIssues = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
 
-        variables.put("query", String.format("repo:%s label:%s sort:updated-desc",
-                qc.getRepository().getFullName(), labelName));
+        variables.put("query",
+                "repo:%s label:%s sort:updated-desc".formatted(
+                        qc.getRepository().getFullName(), labelName));
 
         DataPageInfo pageInfo = new DataPageInfo(null, false);
 

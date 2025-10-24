@@ -257,7 +257,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
         var report = projectHealthCollector.collect(qc, anchorDate, true, true);
         if (qc.hasErrors()) {
-            qc.logAndSendContextErrors(String.format("[%s] Failed to collect health data for %s", ME, repoFullName));
+            qc.logAndSendContextErrors("[%s] Failed to collect health data for %s".formatted(ME, repoFullName));
             return;
         }
 

@@ -46,7 +46,7 @@ public record ProjectAliasMapping(
 
         @Override
         public String toString() {
-            return String.format("UserAlias[login=%s, aliases=%s]", login, aliases);
+            return "UserAlias[login=%s, aliases=%s]".formatted(login, aliases);
         }
     }
 
@@ -73,7 +73,7 @@ public record ProjectAliasMapping(
 
     @Override
     public String toString() {
-        return String.format("ProjectMailConfig[domains=%s, userMapping=%s]",
+        return "ProjectMailConfig[domains=%s, userMapping=%s]".formatted(
                 domains, userMapping);
     }
 }

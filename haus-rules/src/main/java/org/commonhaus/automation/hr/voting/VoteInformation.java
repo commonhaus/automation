@@ -191,19 +191,13 @@ public class VoteInformation {
 
     public String getErrorContent() {
         // GH Markdown likes \r\n line endings
-        return String.format("""
-                Configuration for item is invalid:\r
-                \r
-                - Team for specified group (%s) must exist (%s)\r
-                %s\r
-                %s\r
-                %s\r
-                """,
-                group,
-                teamList != null,
-                invalidGroup() ? validTeamComment : "",
-                explainVoteCounting(),
-                invalidReactions() ? validReactionsComment : "");
+        return "Configuration for item is invalid:\r\n\r\n- Team for specified group (%s) must exist (%s)\r\n%s\r\n%s\r\n%s\r\n"
+                .formatted(
+                        group,
+                        teamList != null,
+                        invalidGroup() ? validTeamComment : "",
+                        explainVoteCounting(),
+                        invalidReactions() ? validReactionsComment : "");
     }
 
     private String explainVoteCounting() {
@@ -220,15 +214,12 @@ public class VoteInformation {
                 ? "Counting non-empty valid reactions and review responses in the following categories:"
                 : "Counting non-empty valid reactions in the following categories:";
 
-        return String.format("""
-                - %s:\r
-                - approve: %s\r
-                - ok: %s\r
-                - revise: %s""",
-                description,
-                showReactions(approve) + (isPullRequest() ? ", PR review approved" : ""),
-                showReactions(ok) + (isPullRequest() ? ", PR review closed with comments" : ""),
-                showReactions(revise) + (isPullRequest() ? ", PR review requires changes" : ""));
+        return "\r\n- %s:\r\n- approve: %s\r\n- ok: %s\r\n- revise: %s"
+                .formatted(
+                        description,
+                        showReactions(approve) + (isPullRequest() ? ", PR review approved" : ""),
+                        showReactions(ok) + (isPullRequest() ? ", PR review closed with comments" : ""),
+                        showReactions(revise) + (isPullRequest() ? ", PR review requires changes" : ""));
     }
 
     private static final String validTeamComment = """

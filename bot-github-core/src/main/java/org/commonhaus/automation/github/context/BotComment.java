@@ -67,7 +67,7 @@ public class BotComment {
     }
 
     public String markdownLink(String linkText) {
-        return String.format("[%s](%s \"%s\")", linkText, url, id);
+        return "[%s](%s \"%s\")".formatted(linkText, url, id);
     }
 
     public static String getCommentId(Pattern botCommentPattern, String itemBody) {

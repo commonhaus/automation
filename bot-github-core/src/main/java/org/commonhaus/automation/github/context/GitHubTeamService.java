@@ -662,7 +662,7 @@ public class GitHubTeamService {
 
         String unit = changes.collaborators() ? "Outside collaborators for repository" : "Team";
 
-        String title = String.format("%s %s changes for %s (%s)",
+        String title = "%s %s changes for %s (%s)".formatted(
                 ex == null ? "✅" : "⚠️",
                 changes.collaborators() ? "Outside collaborator" : "Team membership",
                 changes.fullName(),
@@ -670,12 +670,12 @@ public class GitHubTeamService {
 
         StringBuilder txtBody = new StringBuilder();
         if (isDryRun) {
-            txtBody.append(String.format("%s %s would have the following changes:\n\n", unit, changes.fullName()));
+            txtBody.append("%s %s would have the following changes:\n\n".formatted(unit, changes.fullName()));
         } else {
-            txtBody.append(String.format("%s %s has been updated with the following changes:\n\n", unit, changes.fullName()));
+            txtBody.append("%s %s has been updated with the following changes:\n\n".formatted(unit, changes.fullName()));
         }
 
-        txtBody.append(String.format("""
+        txtBody.append("""
                 Members %s (%d):
                 %s
 
@@ -687,7 +687,7 @@ public class GitHubTeamService {
 
                 %s membership (%d):
                 %s
-                """,
+                """.formatted(
                 isDryRun ? "to be added" : "added",
                 changes.addedMembers().size(),
                 formatMembers(changes.addedMembers()),
