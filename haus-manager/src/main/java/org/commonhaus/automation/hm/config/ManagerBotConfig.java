@@ -60,5 +60,24 @@ public interface ManagerBotConfig {
 
         /** Workflow name for domain list updates */
         String workflowName();
+
+        /**
+         * Default contact for Registrant and Admin roles.
+         * This typically represents the foundation's legal entity.
+         * REQUIRED - must be fully specified in application.properties.
+         */
+        ContactConfig registrant();
+
+        /**
+         * Default Tech contact.
+         * If not specified, falls back to registrant.
+         */
+        Optional<ContactConfig> tech();
+
+        /**
+         * Default Billing contact.
+         * If not specified, falls back to registrant.
+         */
+        Optional<ContactConfig> billing();
     }
 }

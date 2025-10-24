@@ -25,6 +25,7 @@ public class ProjectConfig {
     protected List<GroupMapping> teamMembership;
     protected EmailNotification emailNotifications;
     protected ProjectHealth projectHealth;
+    protected DomainManagementConfig domainManagement;
 
     /**
      * Return list of teams that should have membership
@@ -59,6 +60,11 @@ public class ProjectConfig {
     /** Project health configuration */
     public ProjectHealth projectHealth() {
         return projectHealth;
+    }
+
+    /** Domain management configuration */
+    public DomainManagementConfig domainManagement() {
+        return domainManagement;
     }
 
     @Override

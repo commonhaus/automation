@@ -10,9 +10,12 @@ import org.commonhaus.automation.github.context.ContextHelper.DefaultValues;
 import org.commonhaus.automation.github.context.ContextHelper.Resource;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 
+import io.quarkus.arc.profile.UnlessBuildProfile;
+
 @ApplicationScoped
 @Alternative
 @Priority(1)
+@UnlessBuildProfile("dev")
 class TestManagerBotConfig implements ManagerBotConfig {
 
     static final DefaultValues DEFAULT = new DefaultValues(

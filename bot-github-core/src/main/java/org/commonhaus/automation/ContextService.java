@@ -43,7 +43,7 @@ public interface ContextService {
                     .dumperOptions(options).build())
                     .findAndRegisterModules()
                     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                    .setSerializationInclusion(Include.NON_EMPTY)
+                    .setDefaultPropertyInclusion(Include.NON_EMPTY)
                     .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.NON_PRIVATE);
         }
     }.get();

@@ -1,4 +1,4 @@
-package org.commonhaus.automation.hm.namecheap;
+package org.commonhaus.automation.hm.namecheap.models;
 
 import java.time.LocalDate;
 
