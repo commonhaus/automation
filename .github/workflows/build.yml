@@ -66,7 +66,7 @@ jobs:
 
     - name: Restore cached build image
       id: cache-restore
-      uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: build-image/mandrel.tar
         key: ${{ steps.image-cache-key.outputs.cache_key }}
@@ -78,7 +78,7 @@ jobs:
         docker pull quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21
         docker save quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 -o build-image/mandrel.tar
 
-    - uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+    - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       id: cache-save
       if: always()
       with:
