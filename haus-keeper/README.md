@@ -37,7 +37,7 @@ userMapping:
 
 ### Email Notifications
 
-You can configure who receives error notifications:
+You can (and should!) configure who receives error notifications:
 
 ```yaml
 domains:
