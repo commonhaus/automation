@@ -147,12 +147,12 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
-
-                if (!repoEvent.bootstrap()) {
-                    // If this is after bootstrap phase, also queue reconcile event
-                    updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
-                }
+                updateQueue.queue(taskGroup, () -> {
+                    readProjectConfig(taskGroup, qc);
+                    if (!repoEvent.bootstrap() && taskGroupToState.get(taskGroup) != null) {
+                        reconcile(taskGroup);
+                    }
+                });
 
                 // Register watcher to monitor for org config changes
                 fileWatcher.watchFile(taskGroup,
@@ -348,6 +348,11 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
     public void reconcile(String taskGroup) {
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
+        if (state == null || state == EMPTY) {
+            Log.debugf("[%s] %s: no state for reconcile; skipping", ME, taskGroup);
+            return;
+        }
+
         ProjectConfig projectConfig = state.projectConfig();
         Log.debugf("[%s] %s: team membership sync; %s", ME, taskGroup, projectConfig);
 
