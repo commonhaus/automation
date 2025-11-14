@@ -74,8 +74,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
 
-        // We only read configuration files from repositories in the configured
-        // organization
+        // We only read configuration files from repositories in the configured organization
         if (action.repository()
                 && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
 
@@ -333,18 +332,20 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             long installationId,
             String repoFullName,
             @Nonnull OrganizationConfig orgConfig,
-            Set<RepoSource> sources) implements ConfigState {
+            Set<RepoSource> groupMapSources) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {
             this(installationId, repoName, orgConfig, new HashSet<>());
         }
 
+        @Override
         public boolean add(RepoSource source) {
-            return sources.add(source);
+            return groupMapSources.add(source);
         }
 
+        @Override
         public boolean remove(RepoSource source) {
-            return sources.remove(source);
+            return groupMapSources.remove(source);
         }
 
         public boolean performSync() {

@@ -1,6 +1,21 @@
-projects:
-  source:
-    filePath: PROJECTS.yaml
+domainManagement:
+  enabled: false
+  dryRun: true
+  domains:
+    - name: test.org
+    - name: test.dev
+
+githubOrgVerification:
+  enabled: false
+  dryRun: true
+
+sponsors:
+  enabled: true
+  dryRun: true
+  sponsorable: test-org
+  targetRepository: test-org/sponsors
+  ignoreUsers:
+    - test-bot
 
 teamMembership:
   - dryRun: true
@@ -25,3 +40,14 @@ emailNotifications:
     - test@test.org
   dryRun:
     - test@test.org
+
+projects:
+  test-project:
+    domainAssociation:
+      - test-project.org
+      - test-project.io
+    githubOrganizations: []
+  another-project:
+    domainAssociation:
+      - another.dev
+    githubOrganizations: []

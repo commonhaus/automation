@@ -1,4 +1,5 @@
-domain: project.org
+domains:
+  - project.org
 
 # Active user mappings
 userMapping:
@@ -9,8 +10,8 @@ userMapping:
 
   - login: jdoe
     aliases:
-      - jane@project.org
       - jdoe@project.org
+      - support@project.org
 
 # Retired user mappings (for record keeping)
 retiredUsers:
