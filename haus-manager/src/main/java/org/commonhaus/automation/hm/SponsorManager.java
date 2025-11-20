@@ -139,6 +139,7 @@ public class SponsorManager extends GroupCoordinator {
         ScopedQueryContext qc = ctx.getOrgScopedQueryContext(sponsorableAccount);
         if (qc == null) {
             Log.warnf("[%s] getSponsors: no query context for %s", ME, sponsorable);
+            return Set.of();
         } else {
             // Query for GitHub sponsors
             List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);

@@ -375,11 +375,11 @@ public class TeamConflictResolver {
             this.org = org;
             this.projects = projects == null ? Map.of() : projects;
 
-            if (org != null) {
+            if (this.org != null) {
                 this.type = OwnershipType.ORGANIZATION;
-            } else if (projects.isEmpty()) {
+            } else if (this.projects.isEmpty()) {
                 this.type = OwnershipType.EMPTY;
-            } else if (projects.size() == 1) {
+            } else if (this.projects.size() == 1) {
                 this.type = OwnershipType.PROJECT;
             } else {
                 this.type = OwnershipType.PROJECT_CONFLICT;

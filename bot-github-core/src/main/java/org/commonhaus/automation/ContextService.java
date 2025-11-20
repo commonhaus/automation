@@ -1,7 +1,10 @@
 package org.commonhaus.automation;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.function.Supplier;
+
+import jakarta.annotation.Nonnull;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
@@ -52,6 +55,10 @@ public interface ContextService {
         return yamlMapper;
     }
 
+    default <T> T parseYamlFile(File file, Class<T> type) throws IOException {
+        return yamlMapper().readValue(file, type);
+    }
+
     default JsonNode parseYamlFile(GHContent content) throws IOException {
         return yamlMapper().readTree(content.read());
     }
@@ -80,8 +87,10 @@ public interface ContextService {
 
     boolean isDiscoveryEnabled();
 
+    @Nonnull
     String[] botErrorEmailAddress();
 
+    @Nonnull
     String[] getErrorAddresses(EmailNotification notifications);
 
     GitHub getInstallationClient(long installationId);

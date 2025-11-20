@@ -63,7 +63,7 @@ public class ProjectAssetList {
     /**
      * Configuration for an individual project's assets.
      *
-     * @param domainAssociation   List of domains associated with this project
+     * @param domainAssociation List of domains associated with this project
      * @param githubOrganizations List of GitHub organizations for this project
      */
     @RegisterForReflection
