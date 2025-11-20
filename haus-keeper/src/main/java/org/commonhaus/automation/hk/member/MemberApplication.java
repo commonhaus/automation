@@ -26,7 +26,7 @@ public class MemberApplication {
 
     public MemberApplication(String login, DataCommonItem issue) {
         this.title = issue == null ? null : issue.title;
-        if (title == null || !ownerEquals(login)) {
+        if (issue == null || title == null || !ownerEquals(login)) {
             return;
         }
         appIssue = ApplicationIssue.fromDataCommonType(issue);

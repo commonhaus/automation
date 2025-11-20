@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import jakarta.annotation.Nonnull;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.ContextService;
@@ -89,10 +90,13 @@ public abstract class BaseContextService implements ContextService {
     }
 
     @Override
+    @Nonnull
     public String[] botErrorEmailAddress() {
         return logMailer.botErrorEmailAddress();
     }
 
+    @Nonnull
+    @Override
     public String[] getErrorAddresses(EmailNotification notifications) {
         Set<String> addresses = new HashSet<>();
         if (notifications != null) {

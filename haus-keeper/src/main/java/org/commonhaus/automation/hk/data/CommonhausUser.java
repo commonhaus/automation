@@ -34,7 +34,6 @@ public class CommonhausUser implements UserLogin {
 
     @Nonnull
     String login;
-    @Nonnull
     final long id;
     @Nonnull
     final CommonhausUserData data;

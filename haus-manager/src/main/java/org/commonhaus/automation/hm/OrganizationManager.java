@@ -237,7 +237,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             qc.logAndSendEmail("readOrgConfig: unable to parse configuraton",
                     "Unable to parse %s in %s".formatted(OrganizationConfig.PATH, repo.getFullName()),
                     qc.bundleExceptions(),
-                    orgCfg.emailNotifications());
+                    orgCfg == null ? null : orgCfg.emailNotifications());
             return false;
         }
         Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());

@@ -284,9 +284,6 @@ public class GitHubTeamService {
     @Nonnull
     public Set<String> getCollaboratorLogins(GitHubQueryContext qc, String repoFullName) {
         Collaborators collaborators = getCollaborators(qc, repoFullName);
-        if (collaborators == null) {
-            return Set.of();
-        }
         return collaborators.logins();
     }
 
@@ -302,11 +299,9 @@ public class GitHubTeamService {
         return getCollaboratorLogins(qc, repository.getFullName());
     }
 
+    @Nonnull
     public Set<String> getOwnerAdministrators(GitHubQueryContext qc, String repoFullName) {
         var collaborators = getCollaborators(qc, repoFullName);
-        if (collaborators == null) {
-            return Set.of();
-        }
         return collaborators.adminLogins();
     }
 

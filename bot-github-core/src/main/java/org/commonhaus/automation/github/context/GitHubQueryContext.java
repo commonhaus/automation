@@ -4,6 +4,7 @@ import static org.commonhaus.automation.github.context.BaseQueryCache.BOT_LOGIN;
 import static org.commonhaus.automation.github.context.BaseQueryCache.LABELS;
 import static org.commonhaus.automation.github.context.BaseQueryCache.RECENT_BOT_CONTENT;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Nullable;
 import jakarta.json.JsonObject;
 
 import org.commonhaus.automation.ContextService;
@@ -410,7 +412,7 @@ public class GitHubQueryContext extends GraphQLQueryContext {
                         ? null
                         : new BotComment(itemId, comment).setBody(commentBody); // keep original body for test
             }
-        } else if (botComment.requiresUpdate(commentBody)) {
+        } else if (botComment != null && botComment.requiresUpdate(commentBody)) {
             if (isDryRun()) {
                 Log.debugf("[%s] updateBotComment would edit comment %s with %s", getLogId(), botComment.getCommentId(),
                         commentBody);
@@ -428,7 +430,8 @@ public class GitHubQueryContext extends GraphQLQueryContext {
                 botComment = comment == null ? null : botComment.setBody(commentBody);
             }
         } else {
-            Log.debugf("[%s] updateBotComment: comment %s unchanged", getLogId(), botComment.getCommentId());
+            Log.debugf("[%s] updateBotComment: comment %s unchanged", getLogId(),
+                    botComment == null ? "(not found)" : botComment.getCommentId());
         }
         RECENT_BOT_CONTENT.put(itemId, botComment);
         return botComment;
@@ -665,6 +668,17 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         return content;
     }
 
+    @Nullable
+    public <T> T readYamlContent(File file, Class<T> type) {
+        try {
+            return ctx.parseYamlFile(file, type);
+        } catch (IOException e) {
+            addException(e);
+            return null;
+        }
+    }
+
+    @Nullable
     public JsonNode readYamlContent(GHContent content) {
         try {
             return ctx.parseYamlFile(content);
@@ -674,6 +688,7 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         }
     }
 
+    @Nullable
     public <T> T readYamlContent(GHContent content, Class<T> type) {
         try {
             return ctx.parseYamlFile(content, type);
@@ -683,6 +698,7 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         }
     }
 
+    @Nullable
     public <T> T readYamlContent(GHContent content, TypeReference<T> type) {
         try {
             return ctx.parseYamlFile(content, type);
@@ -692,6 +708,7 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         }
     }
 
+    @Nullable
     public <T> String writeYamlValue(T user) {
         try {
             return ctx.writeYamlValue(user);

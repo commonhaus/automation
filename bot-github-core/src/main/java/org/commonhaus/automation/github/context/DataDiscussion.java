@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
@@ -78,7 +78,7 @@ public class DataDiscussion extends DataCommonItem {
         return "Discussion [%s] %s".formatted(this.id, this.title);
     }
 
-    @Nonnull
+    @Nullable
     public static List<DataDiscussion> findDiscussionsWithLabel(GitHubQueryContext qc,
             String labelName) {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
@@ -108,7 +108,7 @@ public class DataDiscussion extends DataCommonItem {
         return allDiscussions;
     }
 
-    @Nonnull
+    @Nullable
     public static List<DataDiscussion> findDiscussionsBetween(GitHubQueryContext qc,
             LocalDate from, LocalDate toExclusive) {
         List<DataDiscussion> allDiscussions = new ArrayList<>();
@@ -138,6 +138,7 @@ public class DataDiscussion extends DataCommonItem {
         return allDiscussions;
     }
 
+    @Nullable
     static DataDiscussion queryDiscussion(GitHubQueryContext qc, String nodeId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", nodeId);
@@ -153,6 +154,7 @@ public class DataDiscussion extends DataCommonItem {
     /**
      * package private. See QueryHelper / QueryContext
      */
+    @Nullable
     static DataDiscussion editDiscussion(GitHubQueryContext qc, String nodeId,
             String modifiedText, String fields) {
 

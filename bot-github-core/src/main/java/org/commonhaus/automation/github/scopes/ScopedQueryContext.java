@@ -31,7 +31,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
 
     private ScopedQueryContext(
             @Nonnull ContextService contextService,
-            @Nonnull long installationId,
+            long installationId,
             GHRepository repository,
             String repoFullName,
             String ownerName) {
@@ -43,7 +43,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
 
     public ScopedQueryContext(
             @Nonnull ContextService contextService,
-            @Nonnull long installationId,
+            long installationId,
             @Nonnull GHRepository repository) {
         this(contextService, installationId, repository,
                 repository.getFullName(),
@@ -52,7 +52,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
 
     public ScopedQueryContext(
             @Nonnull ContextService contextService,
-            @Nonnull long installationId,
+            long installationId,
             @Nonnull String repoFullName) {
         this(contextService, installationId, null,
                 repoFullName,
@@ -61,7 +61,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
 
     public ScopedQueryContext(
             @Nonnull ContextService contextService,
-            @Nonnull long installationId,
+            long installationId,
             @Nonnull String orgName,
             String repoFullName) {
         this(contextService, installationId, null, repoFullName, orgName);
@@ -151,7 +151,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
         return ownerName.equals(orgName);
     }
 
-    public static ScopedQueryContext forUpdate(ContextService ctx, MembershipUpdate update) {
+    public static ScopedQueryContext forUpdate(@Nonnull ContextService ctx, @Nonnull MembershipUpdate update) {
         if (update.type() == MembershipUpdateType.COLLABORATOR) {
             RepositoryEvent event = update.repositoryEvent();
             return new ScopedQueryContext(ctx, event.installationId(), event.repository())
@@ -164,6 +164,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
         }
     }
 
+    @Nonnull
     public String[] getErrorAddresses(EmailNotification notifications) {
         Set<String> addresses = new HashSet<>();
         if (notifications != null) {

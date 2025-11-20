@@ -141,8 +141,11 @@ public class CommonhausDatastore {
         if (content != null) {
             // if this throws, it will be captured in the query context
             result = dqc.readYamlContent(content, CommonhausUser.class);
-            result.sha(content.getSha());
+            if (result != null) {
+                result.sha(content.getSha());
+            }
         }
+
         if (result == null && event.create()) {
             // Create a new user if requested and not found
             result = CommonhausUser.create(event.login(), event.id());
