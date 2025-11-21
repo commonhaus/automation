@@ -80,6 +80,29 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         System.out.println("Config teams: " + teamNames);
         assertThat(teamNames).isNotEmpty();
 
+        assertThat(config.domainManagement()).isNotNull();
+        assertThat(config.domainManagement().dryRun()).isTrue();
+
+        assertThat(config.githubOrgVerification()).isNotNull();
+        assertThat(config.githubOrgVerification().dryRun()).isTrue();
+
+        assertThat(config.sponsors()).isNotNull();
+        assertThat(config.sponsors().enabled()).isFalse();
+
+        // Project assets
+
+        assertThat(config.projects()).isNotNull();
+
+        var expectedDomains = config.projects().expectedDomains();
+        assertThat(expectedDomains).isNotEmpty();
+        assertThat(expectedDomains).hasSize(3);
+
+        var expectedOrgs = config.projects().expectedOrganizations();
+        assertThat(expectedOrgs).isNotEmpty();
+        assertThat(expectedOrgs).hasSize(2);
+
+        // Trigger config removal
+
         triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, false);
 
         waitForQueue();

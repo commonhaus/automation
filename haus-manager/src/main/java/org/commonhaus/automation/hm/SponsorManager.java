@@ -82,7 +82,7 @@ public class SponsorManager extends GroupCoordinator {
     private void reconcile() {
         recordRun();
         OrganizationConfig config = latestOrgConfig.getConfig();
-        if (config == null || config.sponsors() == null) {
+        if (config == null || config.sponsors() == null || !config.sponsors().enabled()) {
             Log.debugf("[%s] refreshSponsors: configuration not available or sponsors not enabled", ME);
             return;
         }

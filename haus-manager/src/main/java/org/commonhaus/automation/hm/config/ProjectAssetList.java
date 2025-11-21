@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -15,10 +16,25 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public class ProjectAssetList {
     @JsonValue
-    Map<String, ProjectAssets> allAssets;
+    final Map<String, ProjectAssets> allAssets;
+
+    /**
+     * Default constructor for Jackson deserialization
+     */
+    public ProjectAssetList() {
+        allAssets = new HashMap<>();
+    }
+
+    /**
+     * Constructor for Jackson deserialization from a map structure
+     */
+    @JsonCreator
+    public ProjectAssetList(Map<String, ProjectAssets> assets) {
+        allAssets = assets != null ? assets : new HashMap<>();
+    }
 
     Map<String, ProjectAssets> allAssets() {
-        return allAssets == null ? Map.of() : allAssets;
+        return allAssets;
     }
 
     public ProjectAssets assetsForProject(String projectName) {
