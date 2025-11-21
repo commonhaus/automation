@@ -10,7 +10,7 @@ githubOrgVerification:
   dryRun: true
 
 sponsors:
-  enabled: true
+  enabled: false
   dryRun: true
   sponsorable: test-org
   targetRepository: test-org/sponsors
@@ -41,13 +41,18 @@ emailNotifications:
   dryRun:
     - test@test.org
 
+## Project configuration
+
 projects:
   test-project:
     domainAssociation:
       - test-project.org
       - test-project.io
-    githubOrganizations: []
+    githubOrganizations:
+      - test-project
+
   another-project:
     domainAssociation:
       - another.dev
-    githubOrganizations: []
+    githubOrganizations:
+      - another-project

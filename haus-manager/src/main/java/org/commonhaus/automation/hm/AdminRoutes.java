@@ -26,7 +26,7 @@ public class AdminRoutes implements LocalRouteOnly {
     AppContextService ctx;
 
     @Inject
-    DomainManager domainManager;
+    DomainMonitor domainManager;
 
     @Inject
     OrganizationManager organizationManager;

@@ -37,7 +37,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class DomainManager extends ScheduledService implements ProjectConfigListener {
+public class DomainMonitor extends ScheduledService implements ProjectConfigListener {
     static final String ME = "📋-domains";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
