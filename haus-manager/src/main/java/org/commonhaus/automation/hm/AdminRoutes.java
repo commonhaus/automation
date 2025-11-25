@@ -8,6 +8,7 @@ import jakarta.inject.Singleton;
 import org.commonhaus.automation.config.LocalRouteOnly;
 import org.commonhaus.automation.github.stats.ProjectHealthCollector;
 import org.commonhaus.automation.hm.github.AppContextService;
+import org.commonhaus.automation.hm.namecheap.NamecheapService;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 
@@ -26,7 +27,10 @@ public class AdminRoutes implements LocalRouteOnly {
     AppContextService ctx;
 
     @Inject
-    DomainMonitor domainManager;
+    DomainMonitor domainMonitor;
+
+    @Inject
+    NamecheapService namecheapService;
 
     @Inject
     OrganizationManager organizationManager;
@@ -67,9 +71,9 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
-        updateQueue.queueReconciliation("triggerDomainUpdate", () -> {
-            Log.info("🚀 🏡 Domain update triggered");
-            domainManager.refreshDomains(true);
+        updateQueue.queueReconciliation("triggerDomainRefresh", () -> {
+            Log.info("🚀 🏡 Domain refresh triggered");
+            domainMonitor.refreshDomains(true);
         });
         routingExchange.ok().end();
     }
@@ -93,8 +97,8 @@ public class AdminRoutes implements LocalRouteOnly {
             return;
         }
         updateQueue.queueReconciliation("domainInfo::" + domain, () -> {
-            Log.info("🚀 🏡 Domain update triggered");
-            //domainManager.getDomainInfo(domain);
+            var info = namecheapService.getDomainInfo(domain);
+            Log.infof("Domain information for %s: %s", domain, info);
         });
         routingExchange.ok().end();
     }

@@ -27,4 +27,24 @@ public record DomainContacts(
                 !admin.isSameAs(current.admin) ||
                 !auxBilling.isSameAs(current.auxBilling);
     }
+
+    public String prettyString() {
+        return """
+                Registrant:
+                %s
+
+                Tech:
+                %s
+
+                Admin:
+                %s
+
+                AuxBilling:
+                %s
+                """.formatted(
+                registrant.prettyString(),
+                tech.prettyString(),
+                admin.prettyString(),
+                auxBilling.prettyString());
+    }
 }

@@ -14,6 +14,7 @@ public class OrganizationConfig {
     protected EmailNotification emailNotifications;
     protected List<GroupMapping> teamMembership;
     protected DomainManagementConfig domainManagement;
+    protected DomainMonitoringConfig domainMonitoring;
     protected EnabledDryRunConfig githubOrgVerification;
     protected ProjectAssetList projects;
     protected SponsorsConfig sponsors;
@@ -49,6 +50,21 @@ public class OrganizationConfig {
     }
 
     /**
+     * @return the domain monitoring configuration
+     */
+    public DomainMonitoringConfig domainMonitoring() {
+        return domainMonitoring;
+    }
+
+    public boolean isDomainMonitoringEnabled() {
+        return domainMonitoring != null && domainMonitoring.isEnabled();
+    }
+
+    public boolean isMonitoringDryRun() {
+        return domainMonitoring != null && domainMonitoring.isDryRun();
+    }
+
+    /**
      * @return the GitHub organization verification configuration
      */
     public EnabledDryRunConfig githubOrgVerification() {
@@ -64,8 +80,26 @@ public class OrganizationConfig {
 
     @Override
     public String toString() {
-        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, githubOrgVerification=%s, projects=%s}"
-                .formatted(emailNotifications, sponsors, teamMembership, domainManagement, githubOrgVerification, projects);
+        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s}"
+                .formatted(emailNotifications, sponsors, teamMembership, domainManagement, domainMonitoring,
+                        githubOrgVerification, projects);
+    }
+
+    /**
+     * @param enabled Whether domain monitoring is enabled
+     * @param dryRun If true, do not send emails or update domain contacts (log only)
+     */
+    public record DomainMonitoringConfig(
+            Boolean enabled,
+            Boolean dryRun) {
+
+        public boolean isEnabled() {
+            return enabled == null || enabled;
+        }
+
+        public boolean isDryRun() {
+            return dryRun != null && dryRun;
+        }
     }
 
     /**

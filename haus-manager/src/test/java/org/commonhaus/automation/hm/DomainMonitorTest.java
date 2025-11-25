@@ -78,6 +78,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         configProducer.setNamecheapConfig(namecheapConfig);
 
         // Setup common mocks
+        when(namecheapService.isEnabled()).thenReturn(true);
         when(namecheapService.defaultContacts()).thenReturn(defaultContacts);
 
         // Create mock org config
@@ -174,11 +175,22 @@ public class DomainMonitorTest extends HausManagerTestBase {
 
         // Verify: Audit email sent to org with summary of valid domains
         var auditEmails = mailbox.getMailsSentTo("audit@test.org");
-        assertThat(auditEmails).hasSize(1);
+        assertThat(auditEmails).hasSize(2);
         assertThat(auditEmails.get(0).getSubject()).contains("Domain reconciliation summary");
         assertThat(auditEmails.get(0).getText()).contains(orgDomain);
         assertThat(auditEmails.get(0).getText()).contains(project1Domain);
         assertThat(auditEmails.get(0).getText()).contains(project2Domain);
+
+        assertThat(auditEmails.get(1).getSubject()).contains("Domain contacts updated");
+        assertThat(auditEmails.get(1).getText()).contains(orgDomain);
+        assertThat(auditEmails.get(1).getText()).doesNotContain(project1Domain);
+        assertThat(auditEmails.get(1).getText()).doesNotContain(project2Domain);
+
+        var projectEmails = mailbox.getMailsSentTo("audit@project2.dev");
+        assertThat(projectEmails.get(0).getSubject()).contains("Domain contacts updated");
+        assertThat(projectEmails.get(0).getText()).doesNotContain(orgDomain);
+        assertThat(projectEmails.get(0).getText()).doesNotContain(project1Domain);
+        assertThat(projectEmails.get(0).getText()).contains(project2Domain);
     }
 
     @Test

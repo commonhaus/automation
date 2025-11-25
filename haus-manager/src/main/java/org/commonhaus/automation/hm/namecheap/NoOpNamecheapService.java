@@ -15,6 +15,11 @@ import io.quarkus.logging.Log;
 class NoOpNamecheapService implements NamecheapService {
 
     @Override
+    public boolean isEnabled() {
+        return false;
+    }
+
+    @Override
     public Optional<DomainContacts> getContacts(String domainName) {
         Log.debugf("Namecheap not configured - skipping getContacts for %s", domainName);
         return Optional.empty();

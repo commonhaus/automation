@@ -4,6 +4,10 @@ domainManagement:
   domains:
     - name: test.org
 
+domainMonitoring:
+  enabled: true
+  dryRun: false
+
 githubOrgVerification:
   enabled: false
   dryRun: true

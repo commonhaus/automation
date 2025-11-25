@@ -79,9 +79,11 @@ public class OrganizationManagerTest extends HausManagerTestBase {
 
         List<String> teamNames = teams(config);
         System.out.println("Config teams: " + teamNames);
+
         assertThat(teamNames).isNotEmpty();
 
         assertThat(config.domainManagement()).isNotNull();
+        assertThat(config.domainManagement().enabled()).isFalse();
         assertThat(config.domainManagement().dryRun()).isTrue();
 
         assertThat(config.githubOrgVerification()).isNotNull();

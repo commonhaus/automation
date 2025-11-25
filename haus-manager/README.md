@@ -1,6 +1,6 @@
 # Haus Manager: Organization and Project Management Automation
 
-*Comprehensive management of GitHub organizations, teams, collaborators, sponsors, and project health monitoring*
+Comprehensive management of GitHub organizations, teams, collaborators, sponsors, and project health monitoring
 
 > **GitHub App**: [haus-manager-bot](https://github.com/apps/haus-manager-bot)  
 > **Source Code**: [commonhaus/automation/haus-manager](https://github.com/commonhaus/automation/tree/main/haus-manager)
@@ -107,6 +107,60 @@ sponsors:
   ignoreUsers: ["non-sponsor-user"]
 ```
 
+### Domain Management
+
+Automated domain monitoring and contact synchronization with Namecheap registrar.
+
+**Organization-level monitoring control** (`.github/cf-haus-organization.yml`):
+
+```yaml
+domainMonitoring:
+  enabled: true  # Enable domain monitoring (default: true)
+  dryRun: false  # If true, log actions without making changes
+
+domainManagement:
+  enabled: true
+  dryRun: false  # Domain-specific dry-run
+  techContact:   # Optional: org-level default tech contact
+    firstName: "Tech"
+    lastName: "Admin"
+    email: "tech@example.org"
+    # ... other required contact fields
+  domains:
+    - name: example.org
+      techContact:  # Optional: domain-specific tech contact override
+        firstName: "Domain"
+        lastName: "Admin"
+        email: "domain-admin@example.org"
+```
+
+**Project-level domain management** (`.github/cf-haus-manager.yml`):
+
+```yaml
+domainManagement:
+  enabled: true
+  dryRun: false
+  techContact:  # Optional: project-level default tech contact
+    firstName: "Project"
+    lastName: "Tech"
+    email: "project-tech@example.org"
+  domains:
+    - name: project.org
+```
+
+**Features:**
+
+- **Domain Reconciliation**: Validates domains across Namecheap registration, organization config, and project configs
+- **Contact Synchronization**: Automatically updates domain contacts based on configured tech contact hierarchy
+- **Conflict Detection**: Identifies and alerts on domain ownership conflicts
+- **Tech Contact Hierarchy**: domain-specific > project-level > organization-level > bot default
+- **Dual Dry-Run Modes**: Organization-level monitoring dry-run OR domain-level management dry-run
+- **Graceful Degradation**: Continues processing other domains when individual domain operations fail
+
+**Scheduled Operation**: Weekly on Thursday at 1:25 PM (`27 25 13 ? * THU *`)
+
+**Domain Assignment**: Projects must be listed in organization's `projects` section with `domainAssociation` to claim domains.
+
 ### Team Conflict Resolution
 
 Haus Manager prevents conflicts between organization and project-level team management:
@@ -119,19 +173,23 @@ Haus Manager prevents conflicts between organization and project-level team mana
 ## GitHub App Permissions
 
 **Summary:**
+
 - **Read** access to code, discussions, issues, metadata, organization administration, and pull requests
 - **Read** and **write** access to administration and members
 
 **Organization Permissions:**
+
 - **Administration**: *Read* - Organization settings access
 - **Members**: *Read/Write* - Management of members and teams
 
 **Repository Permissions:**
+
 - **Administration**: *Read/Write* - Repository settings, teams, and collaborators
 - **Contents**: *Read* - Read configuration files and commit statistics  
 - **Discussions, Issues, Pull Requests**: *Read* - Gather statistics for health reports
 
 For the primary/home organization, Haus Manager uses an additional **fine-grained access token** for:
+
 - **Contents**: *Write* access for committing health reports and metrics
 - **Repository Dispatch**: Trigger workflows and automation events
 
