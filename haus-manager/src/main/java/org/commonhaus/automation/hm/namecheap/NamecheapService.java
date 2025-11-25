@@ -60,4 +60,7 @@ public interface NamecheapService {
      * @return Default contacts, or null if not configured
      */
     DomainContacts defaultContacts();
+
+    /** True if this is the real namecheap service */
+    boolean isEnabled();
 }

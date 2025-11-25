@@ -16,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.DomainManagementConfig;
@@ -28,7 +29,6 @@ import org.commonhaus.automation.hm.github.ReportQueryContext;
 import org.commonhaus.automation.hm.namecheap.NamecheapService;
 import org.commonhaus.automation.hm.namecheap.models.ContactInfo;
 import org.commonhaus.automation.hm.namecheap.models.DomainContacts;
-import org.commonhaus.automation.hm.namecheap.models.DomainInformation;
 import org.commonhaus.automation.hm.namecheap.models.DomainRecord;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.commonhaus.automation.queue.ScheduledService;
@@ -90,22 +90,27 @@ public class DomainMonitor extends ScheduledService {
      * @param userTriggered true if triggered manually
      */
     public void refreshDomains(boolean userTriggered) {
+        recordRun();
+        if (!namecheapService.isEnabled() || !latestOrgConfig.getConfig().isDomainMonitoringEnabled()) {
+            Log.infof("[%s]: domain monitoring is disabled (last run: %s)", ME, lastRun);
+            return;
+        }
         if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(24))) {
             Log.infof("[%s]: skip domain refresh (last run: %s)", ME, lastRun);
             return;
         }
-        recordRun();
+
+        // Get dry-run setting
+        var dryRun = latestOrgConfig.getConfig().isMonitoringDryRun();
+
+        if (dryRun) {
+            Log.infof("[%s]: MONITORING IN DRY RUN MODE - no emails or updates", ME);
+        }
+
         try {
             // 1. What NameCheap knows
             List<DomainRecord> namecheapDomains = namecheapService.fetchAllDomains();
             Log.infof("[%s] Retrieved %d domain(s) from Namecheap", ME, namecheapDomains.size());
-
-            // 1a. Update known domains with contact information
-            List<DomainInformation> domainWithContacts = fetchDomainContacts(namecheapDomains);
-            Log.infof("[%s] Updated %d domain(s) with contact information", ME, domainWithContacts.size());
-
-            // 1b. Dispatch a workflow to update foundation records with expiration dates
-            dispatchDomainList(domainWithContacts);
 
             // 2. What the organization knows
             var orgDomainProject = latestOrgConfig.getConfig().projects().expectedDomains();
@@ -113,17 +118,17 @@ public class DomainMonitor extends ScheduledService {
 
             // 3. What the projects know
             var projectDomainsMgmt = latestProjectConfig.getAllProjects().stream()
-                    .filter(p -> p.projectConfig() != null)
-                    .filter(p -> p.projectConfig().domainManagement() != null
-                            && p.projectConfig().domainManagement().enabled())
+                    .filter(p -> p.projectConfig() != null
+                            && p.projectConfig().domainManagement() != null
+                            && p.projectConfig().domainManagement().isEnabled())
                     .collect(Collectors.toMap(
                             p -> p.repoFullName(),
                             p -> p.projectConfig().domainManagement()));
 
             // 4. Reconcile sources
             var domainReconciliation = reconcileDomainSources(
-                    domainWithContacts,
-                    orgDomainMgmt.domains(),
+                    namecheapDomains,
+                    orgDomainMgmt.isEnabled() ? orgDomainMgmt.domains() : List.of(),
                     orgDomainProject,
                     projectDomainsMgmt);
 
@@ -135,43 +140,34 @@ public class DomainMonitor extends ScheduledService {
                 if (validDomain.orgManagedDirectly) {
                     syncContactsForProject(
                             mgrBotConfig.home().repositoryFullName(),
-                            orgDomainMgmt);
+                            orgDomainMgmt,
+                            latestOrgConfig.getConfig().emailNotifications());
                 } else {
                     // valid domains will have a set with exactly one project
                     var project = validDomain.projectsClaimingDomain().iterator().next();
                     syncContactsForProject(
                             project,
-                            projectDomainsMgmt.get(project));
+                            projectDomainsMgmt.get(project),
+                            latestProjectConfig.getProjectConfigState(project).emailNotifications());
                 }
+            }
+
+            // 7. Dispatch full domain list to GitHub Actions workflow for reporting
+            if (!dryRun) {
+                dispatchDomainList(namecheapDomains);
             }
         } catch (Exception e) {
             ctx.logAndSendEmail(ME, "⛓️ Error fetching domain(s) from Namecheap", e);
         }
     }
 
-    /**
-     * Enrich domain records with contact information from Namecheap.
-     * Only includes domains where contact fetch succeeds.
-     * Note: NamecheapService handles error logging and email notifications for API
-     * failures.
-     */
-    private List<DomainInformation> fetchDomainContacts(List<DomainRecord> domains) {
-        List<DomainInformation> enriched = new ArrayList<>();
-
-        for (DomainRecord domain : domains) {
-            Optional<DomainContacts> contacts = namecheapService.getContacts(domain.name());
-            if (contacts.isPresent()) {
-                enriched.add(new DomainInformation(domain, contacts.get()));
-            } else {
-                Log.warnf("[%s] Failed to fetch contacts for %s, excluding from report", ME, domain.name());
-            }
+    private void dispatchDomainList(List<DomainRecord> namecheapDomains) {
+        var config = mgrBotConfig.namecheap().get();
+        if (!config.hasWorkflowConfig()) {
+            Log.infof("[%s] No workflow configuration for domain list dispatch; skipping", ME);
+            return;
         }
 
-        return enriched;
-    }
-
-    private void dispatchDomainList(List<DomainInformation> domains) {
-        var config = mgrBotConfig.namecheap().get();
         ReportQueryContext rqc = ctx.getReportQueryContext(config.workflowRepository());
 
         try {
@@ -184,13 +180,13 @@ public class DomainMonitor extends ScheduledService {
 
             Map<String, Object> payload = Map.of(
                     "date", LocalDate.now().format(DATE_FORMAT),
-                    "domains", objectMapper.writeValueAsString(domains),
-                    "count", domains.size());
+                    "domains", objectMapper.writeValueAsString(namecheapDomains),
+                    "count", namecheapDomains.size());
 
             repo.dispatch(config.workflowName(), payload);
 
             Log.infof("[%s] Dispatched %d domain(s) to workflow %s in %s",
-                    ME, domains.size(), config.workflowName(), config.workflowRepository());
+                    ME, namecheapDomains.size(), config.workflowName(), config.workflowRepository());
         } catch (Exception e) {
             rqc.addException(e);
             rqc.logAndSendContextErrors("Error sending domain list to " + config.workflowRepository());
@@ -199,8 +195,11 @@ public class DomainMonitor extends ScheduledService {
 
     /**
      * Synchronize contacts for domains registered in a project configuration
+     *
+     * @param emailNotification
      */
-    private void syncContactsForProject(String repoFullName, DomainManagementConfig domainConfig) {
+    private void syncContactsForProject(String repoFullName, DomainManagementConfig domainConfig,
+            EmailNotification emailNotification) {
         Log.infof("[%s] Syncing contacts for project: %s", ME, repoFullName);
 
         if (domainConfig.domains().isEmpty()) {
@@ -211,9 +210,12 @@ public class DomainMonitor extends ScheduledService {
         // Get default contacts from NamecheapService (from bot config)
         DomainContacts defaultContacts = namecheapService.defaultContacts();
 
+        // Combine org-level monitoring dry-run with domain-specific dry-run
+        boolean effectiveDryRun = latestOrgConfig.getConfig().isMonitoringDryRun() || domainConfig.isDryRun();
+
         for (ManagedDomain managedDomain : domainConfig.domains()) {
             try {
-                syncDomainContacts(managedDomain, domainConfig, defaultContacts, domainConfig.isDryRun());
+                syncDomainContacts(managedDomain, domainConfig, defaultContacts, effectiveDryRun, emailNotification);
             } catch (Exception e) {
                 ctx.logAndSendEmail(ME,
                         "Error syncing contacts for domain: " + managedDomain.name(), e);
@@ -223,17 +225,21 @@ public class DomainMonitor extends ScheduledService {
 
     /**
      * Synchronize contacts for a single domain
+     *
+     * @param emailNotification
      */
     private void syncDomainContacts(ManagedDomain managedDomain, DomainManagementConfig domainConfig,
-            DomainContacts defaultContacts, boolean dryRun) {
+            DomainContacts defaultContacts, boolean dryRun, EmailNotification emailNotification) {
 
         String domainName = managedDomain.name();
         Log.debugf("[%s] Checking contacts for domain: %s (dryRun=%s)", ME, domainName, dryRun);
 
         // Fetch current contacts from Namecheap
-        Optional<DomainContacts> currentContacts = namecheapService.getContacts(domainName);
-        if (currentContacts.isEmpty()) {
-            Log.warnf("[%s] Failed to fetch current contacts for %s", ME, domainName);
+        Optional<DomainContacts> currentContacts = Optional.empty();
+        try {
+            currentContacts = namecheapService.getContacts(domainName);
+        } catch (Exception e) {
+            Log.errorf(e, "[%s] Error fetching current contacts for %s", ME, domainName);
             return;
         }
 
@@ -242,8 +248,8 @@ public class DomainMonitor extends ScheduledService {
         DomainContacts desiredContacts = buildDesiredContacts(
                 managedDomain, domainConfig, defaultContacts);
 
-        // Check if update is needed
-        if (!desiredContacts.requiresUpdate(currentContacts.get())) {
+        // Is update required?
+        if (currentContacts.map(c -> !desiredContacts.requiresUpdate(c)).orElse(false)) {
             Log.debugf("[%s] Contacts for %s are up to date", ME, domainName);
             return;
         }
@@ -252,15 +258,44 @@ public class DomainMonitor extends ScheduledService {
 
         if (dryRun) {
             Log.infof("[%s] DRY RUN: Would update contacts for %s", ME, domainName);
+            ctx.sendEmail(ME, "DRY RUN: Domain contact updates",
+                    """
+                            Contacts would be updated for domain %s.
+
+                            Current contacts:
+                            %s
+
+                            Desired contacts:
+                            %s
+
+                            """.formatted(domainName, currentContacts.map(c -> c.prettyString()).orElse("none"),
+                            desiredContacts.prettyString()),
+                    emailNotification.dryRun());
             return;
         }
 
-        // Update contacts
-        boolean success = namecheapService.setContacts(domainName, desiredContacts);
-        if (success) {
-            Log.infof("[%s] Successfully updated contacts for %s", ME, domainName);
-        } else {
-            Log.errorf("[%s] Failed to update contacts for %s", ME, domainName);
+        try {
+            if (namecheapService.setContacts(domainName, desiredContacts)) {
+                Log.infof("[%s] Successfully updated contacts for %s", ME, domainName);
+                ctx.sendEmail(ME, "Domain contacts updated",
+                        """
+                                Contacts updated for domain %s.
+
+                                Previous contacts:
+                                %s
+
+                                Updated contacts:
+                                %s
+
+                                """.formatted(domainName, currentContacts.map(c -> c.prettyString()).orElse("none"),
+                                desiredContacts.prettyString()),
+                        emailNotification.audit());
+            } else {
+                ctx.logAndSendEmail(ME, "[%s] Failed to update contacts for %s".formatted(ME, domainName), null);
+            }
+        } catch (Exception e) {
+            Log.errorf(e, "[%s] Error updating contacts for %s", ME, domainName);
+            return;
         }
     }
 
@@ -374,6 +409,12 @@ public class DomainMonitor extends ScheduledService {
                 : state.projectConfig().emailNotifications().audit();
         var message = messageFormat.formatted(state.repoFullName());
 
+        if (latestOrgConfig.getConfig().isMonitoringDryRun()) {
+            Log.infof("[%s] DRY RUN: would create issue and send email for project %s to %s. title: %s; body: %s",
+                    ME, state.repoFullName(), String.join(", ", addresses), title, message);
+            return;
+        }
+
         ctx.sendEmail(ME, title, message, addresses);
 
         // TODO: Create if absent
@@ -385,6 +426,12 @@ public class DomainMonitor extends ScheduledService {
         var addresses = isError
                 ? latestOrgConfig.getConfig().emailNotifications().errors()
                 : latestOrgConfig.getConfig().emailNotifications().audit();
+
+        if (latestOrgConfig.getConfig().isMonitoringDryRun()) {
+            Log.infof("[%s] DRY RUN: would create issue and send email to %s. title: %s; body: %s",
+                    ME, String.join(", ", addresses), title, message);
+            return;
+        }
 
         ctx.sendEmail(ME, title, message, addresses);
 
@@ -543,7 +590,7 @@ public class DomainMonitor extends ScheduledService {
         Log.warnf("[%s] %d domains in NameCheap without any configuration:", ME, orphans.size());
         for (var orphan : orphans) {
             Log.warnf("[%s]   %s (expires: %s)", ME,
-                    orphan.domainName(), orphan.namecheapInfo().record().expires());
+                    orphan.domainName(), orphan.namecheapInfo().expires());
         }
 
         String title = "haus-manager: Unconfigured domains in NameCheap";
@@ -558,7 +605,7 @@ public class DomainMonitor extends ScheduledService {
                 - Remove them from NameCheap if they're no longer needed
                 """
                 .formatted(String.join("\n", orphans.stream()
-                        .map(o -> "  - " + o.domainName() + " (expires: " + o.namecheapInfo().record().expires() + ")")
+                        .map(o -> "  - " + o.domainName() + " (expires: " + o.namecheapInfo().expires() + ")")
                         .toList()));
 
         createOrgIssueAndMail(title, message, true);
@@ -635,7 +682,7 @@ public class DomainMonitor extends ScheduledService {
     }
 
     private Map<String, DomainReconciliation> reconcileDomainSources(
-            List<DomainInformation> namecheapDomains,
+            List<DomainRecord> namecheapDomains,
             List<ManagedDomain> orgDomains,
             Map<String, Set<String>> orgDomainProjects,
             Map<String, DomainManagementConfig> projectDomainMgmt) {
@@ -692,7 +739,7 @@ public class DomainMonitor extends ScheduledService {
 
     record DomainReconciliation(
             String domainName,
-            DomainInformation namecheapInfo, // null if not in NameCheap
+            DomainRecord namecheapInfo, // null if not in NameCheap
             boolean orgManagedDirectly, // org-level domain management, not delegated to projects
             Set<String> orgExpectedProjects, // projects assigned this domain in org config
             Set<String> projectsClaimingDomain // projects with this domain in their config

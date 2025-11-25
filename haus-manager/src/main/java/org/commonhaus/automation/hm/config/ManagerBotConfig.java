@@ -79,5 +79,9 @@ public interface ManagerBotConfig {
          * If not specified, falls back to registrant.
          */
         Optional<ContactConfig> billing();
+
+        default boolean hasWorkflowConfig() {
+            return !workflowRepository().isBlank() && !workflowName().isBlank();
+        }
     }
 }

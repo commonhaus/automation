@@ -104,20 +104,60 @@ sponsors:
 - **Ownership Priority**: Organization > Single Project > Multiple Projects (conflict)
 - **State Persistence**: Maintains conflict state across application restarts
 - **Conflict Types**:
-  - `ORGANIZATION`: Org-level config takes precedence
-  - `PROJECT`: Single project manages team
-  - `PROJECT_CONFLICT`: Multiple projects claim same team (blocked)
-  - `EMPTY`: No active management
+    - `ORGANIZATION`: Org-level config takes precedence
+    - `PROJECT`: Single project manages team
+    - `PROJECT_CONFLICT`: Multiple projects claim same team (blocked)
+    - `EMPTY`: No active management
 - **Email Notifications**: Alerts administrators about conflicts with resolution guidance
 - **Automatic Cleanup**: Removes stale entries after bootstrap discovery
 
-### DomainManager
+### DomainMonitor
 
-**Single instance**: Manages domain synchronization with Namecheap registrar.
+**Single instance**: Manages domain monitoring, reconciliation, and contact synchronization with Namecheap registrar.
 
-- Fetches domain list from Namecheap API and dispatches to configured workflow repository
-- Uses `NamecheapService` abstraction (real implementation or no-op based on configuration)
+**Configuration**:
+
+- Organization-level: `DomainMonitoringConfig` in `cf-haus-organization.yml` (controls whether monitoring runs)
+- Organization domains: `DomainManagementConfig` in `cf-haus-organization.yml` (org-managed domains)
+- Project domains: `DomainManagementConfig` in `cf-haus-manager.yml` (project-claimed domains)
 - Scheduled: Weekly on Thursday at 1:25 PM (`27 25 13 ? * THU *`)
+
+**Core Operations**:
+
+1. **Domain Reconciliation**: Validates consistency across three sources:
+   - Namecheap registration (what's actually registered)
+   - Organization config (org-managed domains + project domain assignments)
+   - Project configs (project-claimed domains)
+
+2. **Conflict Detection**: Identifies and alerts on:
+   - **Org/Project Conflicts**: Org managing domain + project(s) claiming it
+   - **Multi-Project Conflicts**: Multiple projects claiming same domain
+   - **Assignment Mismatches**: Project claiming domain not assigned to them in org config
+   - **Orphan Domains**: Registered in Namecheap but not in any config
+   - **Missing Domains**: In config but not registered in Namecheap
+
+3. **Contact Synchronization**: For valid domains, syncs contacts using hierarchy:
+   - Domain-specific tech contact (highest priority)
+   - Project-level tech contact
+   - Organization-level tech contact
+   - Bot default contacts (lowest priority)
+
+4. **Domain List Dispatch**: Sends domain list to GitHub Actions workflow for reporting
+
+**Dry-Run Modes**: Two-level system prevents unwanted emails/updates:
+
+- Organization `domainMonitoring.dryRun`: Disables all monitoring actions
+- Domain `domainManagement.dryRun`: Disables actions for specific domain configs
+- Effective dry-run: `org.isMonitoringDryRun() OR domain.isDryRun()`
+
+**Email Notifications**: Sends notifications for:
+
+- Domain conflicts (errors channel)
+- Domain mismatches (errors channel)
+- Contact updates (audit channel)
+- Dry-run previews (dryRun channel)
+
+**Graceful Degradation**: Continues processing other domains when individual operations fail
 
 **Namecheap API Integration**: The Namecheap API is notably awkward to work with:
 
@@ -132,7 +172,8 @@ Design patterns used to manage this complexity:
 - **ClientRequestFilter**: `NamecheapClientFilter` injects global parameters automatically
 - **Clean domain models**: `ContactInfo` and `DomainContacts` hide API ugliness from business logic
 - **Dedicated XML parser**: `NamecheapResponseParser` handles XML responses and structured error handling via `NamecheapException`
-- **Producer pattern**: NamecheapServiceProducer` provides no-op implementation when not configured
+- **Producer pattern**: `NamecheapServiceProducer` provides no-op implementation when not configured
+- **Exception propagation**: `NamecheapServiceImpl` lets exceptions bubble to `DomainMonitor` for centralized error handling
 
 Namecheap API documentation available in `docs/api-reference/`
 

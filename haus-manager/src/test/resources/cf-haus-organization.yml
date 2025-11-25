@@ -3,6 +3,7 @@ domainManagement:
   dryRun: true
   domains:
     - name: test.org
+    - name: test.dev
 
 githubOrgVerification:
   enabled: false
@@ -45,7 +46,8 @@ emailNotifications:
 projects:
   one:
     domainAssociation:
-      - test-project1.org
+      - test-project.org
+      - test-project.io
     githubOrganizations:
       - test-project
 

@@ -57,7 +57,7 @@ public class NamecheapServiceProducer {
             DomainContacts defaultContacts = buildDefaultContacts(ncConfig);
 
             Log.infof("Namecheap service configured for: %s", ncConfig.url());
-            return new NamecheapServiceImpl(client, defaultContacts, ctx);
+            return new NamecheapServiceImpl(client, defaultContacts);
 
         } catch (Exception e) {
             Log.error("Failed to create Namecheap REST client - using no-op implementation", e);

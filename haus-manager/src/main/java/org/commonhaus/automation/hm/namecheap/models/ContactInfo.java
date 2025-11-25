@@ -64,7 +64,8 @@ public record ContactInfo(
     }
 
     /**
-     * Merge this contact with an override, preferring non-null values from override.
+     * Merge this contact with an override, preferring non-null values from
+     * override.
      * Useful for applying partial overrides from more specific configurations.
      *
      * @param override Contact to merge with (higher priority)
@@ -95,7 +96,8 @@ public record ContactInfo(
     }
 
     /**
-     * Check if this contact is functionally the same as another (ignoring readOnly flag).
+     * Check if this contact is functionally the same as another (ignoring readOnly
+     * flag).
      * Used to detect if contact information has changed.
      *
      * @param other Contact to compare with
@@ -130,5 +132,31 @@ public record ContactInfo(
             return false;
         }
         return a.equals(b);
+    }
+
+    public Object prettyString() {
+        return """
+                - Organization: %s
+                - Job Title: %s
+                - %s %s
+                - Address1: %s
+                - Address2: %s
+                - City: %s
+                - State/Province: %s
+                - Postal Code: %s
+                - Country: %s
+                - Email Address: %s
+                """.formatted(
+                organization.orElse(""),
+                jobTitle.orElse(""),
+                firstName,
+                lastName,
+                address1,
+                address2.orElse(""),
+                city,
+                stateProvince,
+                postalCode,
+                country,
+                emailAddress);
     }
 }
