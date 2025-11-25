@@ -1,4 +1,6 @@
-package org.commonhaus.automation.hm;
+package org.commonhaus.automation.hm.github;
+
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
 import java.util.Optional;
 
@@ -16,22 +18,28 @@ import io.quarkus.arc.profile.UnlessBuildProfile;
 @Alternative
 @Priority(1)
 @UnlessBuildProfile("dev")
-class TestManagerBotConfig implements ManagerBotConfig {
+public class TestManagerBotConfig implements ManagerBotConfig {
 
-    static final DefaultValues DEFAULT = new DefaultValues(
+    public static final DefaultValues DEFAULT = new DefaultValues(
             46053716,
             new Resource(144493209, "test-org"),
             new Resource("test-org/test-repo"));
 
     DefaultValues activeConfig = DEFAULT;
+    Optional<NamecheapConfig> namecheapConfig = Optional.empty();
 
     public void setConfig(DefaultValues config) {
         activeConfig = config;
     }
 
+    public void setNamecheapConfig(TestNamecheapConfig namecheapConfig2) {
+        namecheapConfig = Optional.of(namecheapConfig2);
+    }
+
     public void reset() {
         // Reset the configuration
         activeConfig = DEFAULT;
+        namecheapConfig = Optional.empty();
     }
 
     @Override
@@ -45,7 +53,7 @@ class TestManagerBotConfig implements ManagerBotConfig {
 
             @Override
             public String repository() {
-                return activeConfig.repoFullName();
+                return toRelativeName(activeConfig.orgName(), activeConfig.repoFullName());
             }
         };
     }
@@ -78,6 +86,6 @@ class TestManagerBotConfig implements ManagerBotConfig {
 
     @Override
     public Optional<NamecheapConfig> namecheap() {
-        return Optional.empty();
+        return namecheapConfig;
     }
 }

@@ -1,6 +1,6 @@
 package org.commonhaus.automation.hm.github;
 
-import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -20,16 +20,19 @@ public class AppContextService extends BaseContextService {
     @Inject
     ManagerBotConfig mgrBotConfig;
 
-    public ReportQueryContext getReportQueryContext(String repoFullName) {
-        String org = getOrganization();
-        return new ReportQueryContext(this, tokenClients, org, toRelativeName(org, repoFullName));
-    }
-
     public String getOrganization() {
         return mgrBotConfig.home().organization();
     }
 
+    public ReportQueryContext getReportQueryContext(String repoFullName) {
+        var fullName = repoFullName.contains("/")
+                ? repoFullName
+                : toFullName(getOrganization(), repoFullName);
+
+        return new ReportQueryContext(this, this.tokenClients, fullName);
+    }
+
     public ScopedQueryContext getHomeQueryContext() {
-        return installationMap.getOrgScopedQueryContext(this, mgrBotConfig.home().organization());
+        return installationMap.getOrgScopedQueryContext(this, getOrganization());
     }
 }

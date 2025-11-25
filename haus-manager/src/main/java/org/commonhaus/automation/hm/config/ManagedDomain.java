@@ -21,6 +21,13 @@ public class ManagedDomain {
      */
     public DomainContact techContact;
 
+    public ManagedDomain() {
+    }
+
+    public ManagedDomain(String name) {
+        this.name = name;
+    }
+
     public String name() {
         return name;
     }

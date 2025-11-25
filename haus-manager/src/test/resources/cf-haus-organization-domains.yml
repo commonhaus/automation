@@ -1,6 +1,6 @@
 domainManagement:
-  enabled: false
-  dryRun: true
+  enabled: true
+  dryRun: false
   domains:
     - name: test.org
 
@@ -36,9 +36,11 @@ teamMembership:
 
 emailNotifications:
   errors:
-    - test@test.org
+    - errors@test.org
   dryRun:
     - test@test.org
+  audit:
+    - audit@test.org
 
 ## Project configuration
 

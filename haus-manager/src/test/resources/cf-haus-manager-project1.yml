@@ -1,0 +1,16 @@
+enabled: true
+dryRun: true
+
+domainManagement:
+  enabled: true
+  dryRun: false
+  domains:
+    - name: test-project1.org
+
+emailNotifications:
+  errors:
+    - errors@project1.dev
+  dryRun:
+    - test@project1.dev
+  audit:
+    - audit@project1.dev
