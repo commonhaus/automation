@@ -362,7 +362,7 @@ public class TeamConflictResolver {
      * Hard-reset of the file watcher.
      * This is useful for testing.
      */
-    protected void reset() {
+    public void reset() {
         teamOwnership.clear();
     }
 

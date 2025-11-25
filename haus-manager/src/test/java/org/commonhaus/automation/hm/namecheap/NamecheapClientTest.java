@@ -104,7 +104,7 @@ public class NamecheapClientTest {
     public void ensureTestDomainsExist() {
         // Fetch all existing domains
         List<DomainRecord> domainRecords = namecheapService.fetchAllDomains();
-        Log.infof("Found %d existing domains in sandbox", domainRecords.size());
+        Log.infof("Found %d existing domain(s) in sandbox", domainRecords.size());
 
         // Check each required domain
         for (String requiredDomain : requiredDomains) {
@@ -126,7 +126,7 @@ public class NamecheapClientTest {
             }
         }
 
-        Log.infof("Test domains ready: %s", testDomains);
+        Log.infof("Test domain(s) ready: %s", testDomains);
         assertThat(testDomains).isNotEmpty();
     }
 

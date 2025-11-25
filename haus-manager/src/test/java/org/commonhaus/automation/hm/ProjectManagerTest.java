@@ -23,6 +23,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
 import org.commonhaus.automation.hm.config.ProjectConfig;
+import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
     @BeforeEach
     @Override
-    void setup() throws IOException {
+    protected void setup() throws IOException {
         super.setup();
         Log.info("START: ProjectManagerTest.setup()");
 

@@ -1,0 +1,12 @@
+organization: organization
+address1: "123 Test St"
+city: "Test City"
+state-province: California
+postal-code: 12345
+country: US
+
+job-title: Admin
+first-name: "Default"
+last-name: "Org"
+phone: "+1.5555551234"
+email-address: "test@example.com"

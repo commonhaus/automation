@@ -19,6 +19,7 @@ import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
+import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,7 @@ public class OrganizationManagerTest extends HausManagerTestBase {
 
     @BeforeEach
     @Override
-    void setup() throws IOException {
+    protected void setup() throws IOException {
         super.setup();
         Log.info("START: OrganizationManagerTest.setup()");
 

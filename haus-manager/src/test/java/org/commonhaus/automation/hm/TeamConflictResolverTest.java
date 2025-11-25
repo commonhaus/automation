@@ -10,6 +10,7 @@ import org.commonhaus.automation.hm.OrganizationManager.OrganizationConfigState;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
+import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,10 +31,10 @@ public class TeamConflictResolverTest extends HausManagerTestBase {
 
     @BeforeEach
     @Override
-    void setup() throws IOException {
+    protected void setup() throws IOException {
         super.setup();
         resolver = new TeamConflictResolver();
-        resolver.ctx = appContextService;
+        resolver.ctx = ctx;
         resolver.updateQueue = updateQueue;
 
         String orgString = """

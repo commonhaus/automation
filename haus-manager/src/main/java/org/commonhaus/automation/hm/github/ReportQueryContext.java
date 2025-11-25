@@ -9,7 +9,7 @@ import io.quarkiverse.githubapp.TokenGitHubClients;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 /**
- * Connection to Datastore repository (with issue/content write privileges)
+ * Connection to Datastore repository (with issue/dispatch/content write privileges)
  * is managed by PAT, rather than GH App permissions (to reduce the permissions
  * required by the app overall)
  */
@@ -22,11 +22,11 @@ public class ReportQueryContext extends GitHubQueryContext {
     private final TokenGitHubClients tokenClients;
     private String logId;
 
-    public ReportQueryContext(AppContextService ctx, TokenGitHubClients tokenClients, String organization, String repoName) {
+    public ReportQueryContext(AppContextService ctx, TokenGitHubClients tokenClients, String repoFullName) {
         super(ctx, -1);
         this.ctx = ctx;
-        this.ownerName = organization;
-        this.repoFullName = toFullName(organization, repoName);
+        this.ownerName = toOrganizationName(repoFullName);
+        this.repoFullName = repoFullName;
         this.tokenClients = tokenClients;
         this.logId = "hrqc";
     }

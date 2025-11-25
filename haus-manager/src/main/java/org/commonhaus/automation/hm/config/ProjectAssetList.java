@@ -33,7 +33,7 @@ public class ProjectAssetList {
         allAssets = assets != null ? assets : new HashMap<>();
     }
 
-    Map<String, ProjectAssets> allAssets() {
+    public Map<String, ProjectAssets> allAssets() {
         return allAssets;
     }
 
@@ -96,5 +96,9 @@ public class ProjectAssetList {
         public List<String> githubOrganizations() {
             return githubOrganizations == null ? List.of() : githubOrganizations;
         }
+    }
+
+    public void clear() {
+        allAssets.clear();
     }
 }
