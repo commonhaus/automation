@@ -71,6 +71,14 @@ public class OrganizationConfig {
         return githubOrgVerification;
     }
 
+    public boolean isOrgValidationEnabled() {
+        return githubOrgVerification != null && githubOrgVerification.isEnabled();
+    }
+
+    public boolean isOrgValidationDryRun() {
+        return githubOrgVerification != null && githubOrgVerification.isDryRun();
+    }
+
     /**
      * @return the projects configuration
      */
