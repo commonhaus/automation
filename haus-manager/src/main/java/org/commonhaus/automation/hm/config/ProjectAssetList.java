@@ -84,6 +84,7 @@ public class ProjectAssetList {
      */
     @RegisterForReflection
     public record ProjectAssets(
+            String projectRepository,
             List<String> domainAssociation,
             List<String> githubOrganizations) {
 

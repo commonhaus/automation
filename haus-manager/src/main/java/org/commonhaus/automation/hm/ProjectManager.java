@@ -79,14 +79,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         return taskGroupToState.get(taskGroup);
     }
 
-    @Override
-    public ProjectConfigState getProjectStateByName(String project) {
-        String repoFullName = project.contains("/project-") ? project
-                : mgrBotConfig.home().organization() + "/project-" + project;
-        var taskGroup = repoNametoTaskGroup(repoFullName);
-        return taskGroupToState.get(taskGroup);
-    }
-
     /**
      * Periodically refresh/re-synchronize team access lists.
      */

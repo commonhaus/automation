@@ -8,8 +8,6 @@ public interface LatestProjectConfig {
 
     ProjectConfigState getProjectConfigState(String repoFullName);
 
-    ProjectConfigState getProjectStateByName(String project);
-
     Collection<ProjectConfigState> getAllProjects();
 
     /**

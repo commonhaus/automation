@@ -102,8 +102,6 @@ public class DomainMonitorTest extends HausManagerTestBase {
                 config);
         when(latestProjectConfig.getProjectConfigState(repo))
                 .thenReturn(mockProjectState1);
-        when(latestProjectConfig.getProjectStateByName("one"))
-                .thenReturn(mockProjectState1);
 
         // Project 2 mock config/state
         config = loadYamlResource(
@@ -119,8 +117,6 @@ public class DomainMonitorTest extends HausManagerTestBase {
                 HOME_PROJECT_2.installId(),
                 config);
         when(latestProjectConfig.getProjectConfigState(repo))
-                .thenReturn(mockProjectState2);
-        when(latestProjectConfig.getProjectStateByName("two"))
                 .thenReturn(mockProjectState2);
         when(latestProjectConfig.getAllProjects())
                 .thenReturn(List.of(mockProjectState1, mockProjectState2));

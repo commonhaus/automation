@@ -1,5 +1,7 @@
 package org.commonhaus.automation.hm;
 
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
+
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -677,7 +679,12 @@ public class DomainMonitor extends ScheduledService {
      * Returns null if project not found.
      */
     private String projectNameToRepoFullName(String projectName) {
-        ProjectConfigState state = latestProjectConfig.getProjectStateByName(projectName);
+        var assets = latestOrgConfig.getConfig().projects().assetsForProject(projectName);
+        var repoName = assets.projectRepository() == null
+                ? "project-" + projectName
+                : assets.projectRepository();
+        var repoFullName = toFullName(mgrBotConfig.home().organization(), repoName);
+        ProjectConfigState state = latestProjectConfig.getProjectConfigState(repoFullName);
         return state != null ? state.repoFullName() : null;
     }
 
