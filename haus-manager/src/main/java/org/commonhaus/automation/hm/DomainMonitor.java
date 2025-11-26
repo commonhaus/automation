@@ -119,13 +119,18 @@ public class DomainMonitor extends ScheduledService {
             var orgDomainMgmt = latestOrgConfig.getConfig().domainManagement();
 
             // 3. What the projects know
-            var projectDomainsMgmt = latestProjectConfig.getAllProjects().stream()
+            var allProjects = latestProjectConfig.getAllProjects();
+            Log.debugf("[%s] All loaded projects (%d): %s", ME, allProjects.size(),
+                    allProjects.stream().map(p -> p.repoFullName()).collect(Collectors.joining(", ")));
+            var projectDomainsMgmt = allProjects.stream()
                     .filter(p -> p.projectConfig() != null
                             && p.projectConfig().domainManagement() != null
                             && p.projectConfig().domainManagement().isEnabled())
                     .collect(Collectors.toMap(
                             p -> p.repoFullName(),
                             p -> p.projectConfig().domainManagement()));
+            Log.debugf("[%s] Projects with domain management (%d): %s", ME, projectDomainsMgmt.size(),
+                    String.join(", ", projectDomainsMgmt.keySet()));
 
             // 4. Reconcile sources
             var domainReconciliation = reconcileDomainSources(
@@ -684,7 +689,13 @@ public class DomainMonitor extends ScheduledService {
                 ? "project-" + projectName
                 : assets.projectRepository();
         var repoFullName = toFullName(mgrBotConfig.home().organization(), repoName);
+        Log.debugf("[%s] projectNameToRepoFullName: projectName=%s, assets.projectRepository=%s, repoName=%s, repoFullName=%s",
+                ME, projectName, assets.projectRepository(), repoName, repoFullName);
         ProjectConfigState state = latestProjectConfig.getProjectConfigState(repoFullName);
+        if (state == null) {
+            Log.warnf("[%s] projectNameToRepoFullName: No ProjectConfigState found for %s (project=%s)",
+                    ME, repoFullName, projectName);
+        }
         return state != null ? state.repoFullName() : null;
     }
 
