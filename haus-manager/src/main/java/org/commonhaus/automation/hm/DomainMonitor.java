@@ -411,6 +411,13 @@ public class DomainMonitor extends ScheduledService {
     private void createProjectIssueAndMail(String title, String messageFormat,
             ProjectConfigState state, boolean isError) {
 
+        // Skip if project doesn't have a valid configuration
+        if (state == null || state.projectConfig() == null) {
+            Log.warnf("[%s] Cannot send notification for project (no config found). title: %s",
+                    ME, title);
+            return;
+        }
+
         var addresses = isError
                 ? state.projectConfig().emailNotifications().errors()
                 : state.projectConfig().emailNotifications().audit();
@@ -519,11 +526,13 @@ public class DomainMonitor extends ScheduledService {
 
     private void handleProjectMismatches(List<DomainReconciliation> mismatches) {
         for (var mismatch : mismatches) {
-            Log.warnf("[%s]   %s: expected for %s, claimed by %s", ME,
+            Log.warnf("[%s]   %s: expected for %s, %s", ME,
                     mismatch.domainName(),
                     mismatch.orgExpectedProjects().isEmpty() ? "none"
                             : String.join(", ", mismatch.orgExpectedProjects()),
-                    String.join(", ", mismatch.projectsClaimingDomain()));
+                    mismatch.projectsClaimingDomain().isEmpty()
+                            ? "not claimed (no project configuration)"
+                            : "claimed by " + String.join(", ", mismatch.projectsClaimingDomain()));
 
             String title = "haus-manager: Domain assignment mismatch for " + mismatch.domainName();
 
