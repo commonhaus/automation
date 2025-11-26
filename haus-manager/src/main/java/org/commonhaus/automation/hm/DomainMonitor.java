@@ -352,70 +352,199 @@ public class DomainMonitor extends ScheduledService {
      * Process domain reconciliation results and take appropriate actions
      */
     private List<DomainReconciliation> processDomainReconciliation(Map<String, DomainReconciliation> reconciliation) {
-        List<DomainReconciliation> orgProjectConflicts = new ArrayList<>();
-        List<DomainReconciliation> multipleProjectConflicts = new ArrayList<>();
-        List<DomainReconciliation> projectMismatches = new ArrayList<>();
-        List<DomainReconciliation> orphanDomains = new ArrayList<>();
-        List<DomainReconciliation> missingFromNamecheap = new ArrayList<>();
+
+        // Group domain issues by project - each project can have multiple domain issues
+        Map<String, List<DomainReconciliation>> issuesByProject = new HashMap<>();
         List<DomainReconciliation> validDomains = new ArrayList<>();
 
-        // Categorize each domain (order matters - check conflicts first)
-        for (var recon : reconciliation.values()) {
-            if (recon.hasOrgProjectConflict()) {
-                // Org managing directly + project(s) claiming = conflict
-                orgProjectConflicts.add(recon);
-            } else if (recon.hasMultipleClaimants()) {
-                // Multiple projects claiming same domain = conflict
-                multipleProjectConflicts.add(recon);
-            } else if (recon.hasOrgMismatch()) {
-                // Project claiming domain not assigned to them in org config
-                // or vice versa
-                projectMismatches.add(recon);
-            } else if (recon.isOrphan()) {
-                // In NameCheap but not in any config (org or project)
-                orphanDomains.add(recon);
-            } else if (recon.isInOrgConfig() && !recon.isInNameCheap()) {
-                // Expected in org config (org-managed or project-assigned) but not registered
-                missingFromNamecheap.add(recon);
-            } else if (recon.isInNameCheap() && recon.isInOrgConfig()) {
-                // Valid: registered, managed by org directly or claimed by one project matching
-                // org config
-                validDomains.add(recon);
-            } else {
-                // Defensive: catch any unexpected domain states
-                Log.errorf("[%s] Uncategorized domain %s: inNC=%s, orgManaged=%s, orgExpected=%s, projClaims=%s",
-                        ME, recon.domainName(), recon.isInNameCheap(), recon.orgManagedDirectly,
-                        recon.orgExpectedProjects(), recon.projectsClaimingDomain());
+        for (var dr : reconciliation.values()) {
+            // Collect valid domains separately for contact sync
+            if (dr.isValid()) {
+                validDomains.add(dr);
+                continue;
+            }
+            // Add to each project claiming this domain
+            for (var project : dr.projectsClaimingDomain()) {
+                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
+            }
+            // Add to org for domains it manages directly or orphans
+            if (dr.orgManagedDirectly || dr.isOrphan()) {
+                String orgRepo = mgrBotConfig.home().repositoryFullName();
+                issuesByProject.computeIfAbsent(orgRepo, k -> new ArrayList<>()).add(dr);
             }
         }
 
         // Log summary
-        Log.infof("[%s] Domain reconciliation: %d valid, %d org/project conflicts, %d multi-project conflicts, " +
-                "%d mismatches, %d orphan, %d missing",
-                ME, validDomains.size(), orgProjectConflicts.size(), multipleProjectConflicts.size(),
-                projectMismatches.size(), orphanDomains.size(), missingFromNamecheap.size());
+        Log.infof("[%s] Domain reconciliation: %d results, %d valid domains", ME, reconciliation.size(),
+                validDomains.size());
 
-        // Process each category
-        if (!orgProjectConflicts.isEmpty()) {
-            handleOrgProjectConflicts(orgProjectConflicts);
+        // Process each project's domain issues
+        for (var entry : issuesByProject.entrySet()) {
+            String project = entry.getKey();
+            List<DomainReconciliation> projectDomains = entry.getValue();
+
+            Log.debugf("[%s] Project %s has %d domain issue(s)", ME, project, projectDomains.size());
+
+            // Categorize this project's domains
+            List<DomainReconciliation> orgProjectConflicts = new ArrayList<>();
+            List<DomainReconciliation> multipleProjectConflicts = new ArrayList<>();
+            List<DomainReconciliation> projectMismatches = new ArrayList<>();
+            List<DomainReconciliation> orphanDomains = new ArrayList<>();
+            List<DomainReconciliation> missingFromNamecheap = new ArrayList<>();
+
+            for (var recon : projectDomains) {
+                if (recon.hasOrgProjectConflict()) {
+                    orgProjectConflicts.add(recon);
+                } else if (recon.hasMultipleClaimants()) {
+                    multipleProjectConflicts.add(recon);
+                } else if (recon.hasOrgMismatch()) {
+                    projectMismatches.add(recon);
+                } else if (recon.isOrphan()) {
+                    orphanDomains.add(recon);
+                } else if (recon.isInOrgConfig() && !recon.isInNameCheap()) {
+                    missingFromNamecheap.add(recon);
+                } else {
+                    ctx.logAndSendEmail(ME, "Unknown domain reconciliation states",
+                            "[%s] Uncategorized domain %s: inNC=%s, orgManaged=%s, orgExpected=%s, projClaims=%s"
+                                    .formatted(
+                                            ME, recon.domainName(), recon.isInNameCheap(), recon.orgManagedDirectly,
+                                            recon.orgExpectedProjects(), recon.projectsClaimingDomain()),
+                            null,
+                            latestOrgConfig.getConfig().emailNotifications().errors());
+                }
+            }
+
+            sendProjectDomainIssues(project, orgProjectConflicts, multipleProjectConflicts,
+                    projectMismatches, orphanDomains, missingFromNamecheap);
         }
-        if (!multipleProjectConflicts.isEmpty()) {
-            handleMultipleProjectConflicts(multipleProjectConflicts);
-        }
-        if (!projectMismatches.isEmpty()) {
-            handleProjectMismatches(projectMismatches);
-        }
-        if (!orphanDomains.isEmpty()) {
-            handleOrphanDomains(orphanDomains);
-        }
-        if (!missingFromNamecheap.isEmpty()) {
-            handleMissingDomains(missingFromNamecheap);
-        }
+
+        // Send summary of valid domains to org
         if (!validDomains.isEmpty()) {
             handleValidDomains(validDomains);
         }
 
         return validDomains;
+    }
+
+    /**
+     * Send consolidated domain issue notification to a project
+     */
+    private void sendProjectDomainIssues(String project,
+            List<DomainReconciliation> orgProjectConflicts,
+            List<DomainReconciliation> multipleProjectConflicts,
+            List<DomainReconciliation> projectMismatches,
+            List<DomainReconciliation> orphanDomains,
+            List<DomainReconciliation> missingFromNamecheap) {
+
+        // Check if this is the org repo
+        boolean isOrgRepo = project.equals(mgrBotConfig.home().repositoryFullName());
+
+        // Build consolidated message
+        StringBuilder message = new StringBuilder();
+
+        if (!orgProjectConflicts.isEmpty()) {
+            message.append("## Conflicts with Organization Management\n\n");
+            if (isOrgRepo) {
+                message.append(
+                        "These domains are managed directly by the organization but are also claimed by projects:\n");
+            } else {
+                message.append(
+                        "These domains are managed by the organization but are also in your project configuration:\n");
+            }
+            for (var conflict : orgProjectConflicts) {
+                message.append("  - ").append(conflict.domainName());
+                if (isOrgRepo) {
+                    message.append(" (also claimed by: ")
+                            .append(String.join(", ", conflict.projectsClaimingDomain()));
+                }
+                message.append(")\n");
+            }
+            if (!isOrgRepo) {
+                message.append("\nPlease remove these from your domainManagement configuration.\n");
+            }
+            message.append("\n");
+        }
+
+        if (!multipleProjectConflicts.isEmpty()) {
+            message.append("## Conflicts with Other Projects\n\n");
+            message.append("These domains are claimed by multiple projects:\n");
+            for (var conflict : multipleProjectConflicts) {
+                message.append("  - ").append(conflict.domainName())
+                        .append(" (also claimed by: ")
+                        .append(String.join(", ", conflict.projectsClaimingDomain()))
+                        .append(")\n");
+            }
+            message.append("\nPlease coordinate with other projects to resolve ownership.\n\n");
+        }
+
+        if (!projectMismatches.isEmpty()) {
+            message.append("## Configuration Mismatches\n\n");
+            List<String> toAdd = new ArrayList<>();
+            List<String> toRemove = new ArrayList<>();
+
+            for (var mismatch : projectMismatches) {
+                if (mismatch.orgExpectedProjects().contains(project) &&
+                        !mismatch.projectsClaimingDomain().contains(project)) {
+                    toAdd.add(mismatch.domainName());
+                } else if (!mismatch.orgExpectedProjects().contains(project) &&
+                        mismatch.projectsClaimingDomain().contains(project)) {
+                    toRemove.add(mismatch.domainName());
+                }
+            }
+
+            if (!toAdd.isEmpty()) {
+                message.append("**Domains assigned to your project but not in your configuration:**\n");
+                for (var domain : toAdd) {
+                    message.append("  - ").append(domain).append("\n");
+                }
+                message.append(
+                        "\nPlease add these to your domainManagement configuration, or create a PR in %s to correct foundation records..\n\n"
+                                .formatted(mgrBotConfig.home().repositoryFullName()));
+            }
+
+            if (!toRemove.isEmpty()) {
+                message.append("**Domains in your configuration but not assigned to your project:**\n");
+                for (var domain : toRemove) {
+                    message.append("  - ").append(domain).append("\n");
+                }
+                message.append(
+                        "\nPlease remove these from your domainManagement configuration, or create a PR in %s to correct foundation records.\n\n"
+                                .formatted(mgrBotConfig.home().repositoryFullName()));
+            }
+        }
+
+        if (!orphanDomains.isEmpty() && isOrgRepo) {
+            message.append("## Unconfigured Domains\n\n");
+            message.append("These domains are registered but not configured:\n");
+            for (var orphan : orphanDomains) {
+                message.append("  - ").append(orphan.domainName())
+                        .append(" (expires: ").append(orphan.namecheapInfo().expires()).append(")\n");
+            }
+            message.append("\nPlease add to organization or project configuration, or remove from Namecheap.\n\n");
+        }
+
+        if (!missingFromNamecheap.isEmpty()) {
+            message.append("## Domains Not Registered\n\n");
+            message.append("These domains are in configuration but not registered in Namecheap:\n");
+            for (var missing : missingFromNamecheap) {
+                message.append("  - ").append(missing.domainName()).append("\n");
+            }
+            message.append("\nPlease register these domains or remove from configuration.\n\n");
+        }
+
+        // Send the notification using helper methods
+        String title = isOrgRepo
+                ? "haus-manager: Domain issues for organization"
+                : "haus-manager: Domain issues for " + project;
+
+        if (isOrgRepo) {
+            createOrgIssueAndMail(title, message.toString(), true);
+        } else {
+            ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
+            createProjectIssueAndMail(title, message.toString(), state, true);
+            // cc: send a copy to org errors email
+            ctx.sendEmail(ME, title, message.toString(), latestOrgConfig.getConfig().emailNotifications().errors());
+        }
     }
 
     private void createProjectIssueAndMail(String title, String messageFormat,
@@ -466,208 +595,6 @@ public class DomainMonitor extends ScheduledService {
 
     }
 
-    private void handleOrgProjectConflicts(List<DomainReconciliation> conflicts) {
-        for (var conflict : conflicts) {
-            Log.warnf("[%s]   %s: org-managed + claimed by %s", ME,
-                    conflict.domainName(), String.join(", ", conflict.projectsClaimingDomain()));
-
-            String title = "haus-manager: Domain conflict for " + conflict.domainName();
-
-            // Notify org about the conflict
-            String orgMessage = """
-                    %s is managed by the organization but is also declared in project configuration(s): %s.
-
-                    This conflict prevents domain contact updates. The project(s) have been notified to remove the domain from their configuration.
-                    """
-                    .formatted(
-                            conflict.domainName(),
-                            String.join(", ", conflict.projectsClaimingDomain()));
-
-            createOrgIssueAndMail(title, orgMessage, true);
-
-            // Notify projects claiming the domain
-            String projectMessage = """
-                    %s is both owned and managed by the parent foundation, it should not be present in your project configuration.
-
-                    Please check the domainManagement section of your haus-manager configuration in %%s.
-                    """
-                    .formatted(
-                            conflict.domainName());
-
-            for (var project : conflict.projectsClaimingDomain()) {
-                createProjectIssueAndMail(title, projectMessage,
-                        latestProjectConfig.getProjectConfigState(project), true);
-            }
-        }
-    }
-
-    private void handleMultipleProjectConflicts(List<DomainReconciliation> conflicts) {
-        for (var conflict : conflicts) {
-            Log.warnf("[%s]   %s claimed by: %s", ME,
-                    conflict.domainName(), String.join(", ", conflict.projectsClaimingDomain()));
-
-            String title = "haus-manager: Domain conflict for " + conflict.domainName();
-            String message = """
-                    %s is declared in multiple project configurations: %s.
-
-                    Please check the domainManagement section of your haus-manager configuration in %%s,
-                    and remove the domain if it does not belong to your project.
-                    """
-                    .formatted(
-                            conflict.domainName(),
-                            String.join(", ", conflict.projectsClaimingDomain()));
-
-            for (var project : conflict.projectsClaimingDomain()) {
-                createProjectIssueAndMail(title, message,
-                        latestProjectConfig.getProjectConfigState(project), true);
-            }
-
-            message = """
-                    %s is declared in multiple project configurations: %s.
-
-                    Projects have been notified to resolve the conflict.
-                    """
-                    .formatted(
-                            conflict.domainName(),
-                            String.join(", ", conflict.projectsClaimingDomain()));
-            createOrgIssueAndMail(title, message, true);
-        }
-    }
-
-    private void handleProjectMismatches(List<DomainReconciliation> mismatches) {
-        for (var mismatch : mismatches) {
-            Log.warnf("[%s]   %s: expected for %s, %s", ME,
-                    mismatch.domainName(),
-                    mismatch.orgExpectedProjects().isEmpty() ? "none"
-                            : String.join(", ", mismatch.orgExpectedProjects()),
-                    mismatch.projectsClaimingDomain().isEmpty()
-                            ? "not claimed (no project configuration)"
-                            : "claimed by " + String.join(", ", mismatch.projectsClaimingDomain()));
-
-            String title = "haus-manager: Domain assignment mismatch for " + mismatch.domainName();
-
-            // Email projects that are claiming but shouldn't be
-            Set<String> claimingButNotAssigned = new HashSet<>(mismatch.projectsClaimingDomain());
-            claimingButNotAssigned.removeAll(mismatch.orgExpectedProjects());
-
-            if (!claimingButNotAssigned.isEmpty()) {
-                String message = """
-                        %s is configured in your project but is not assigned to your project in the organization configuration.
-
-                        Please remove it from the domainManagement section of your haus-manager configuration in %%s
-                        or submit a PR to update the organization configuration.
-                        """
-                        .formatted(mismatch.domainName());
-
-                for (var project : claimingButNotAssigned) {
-                    createProjectIssueAndMail(title, message,
-                            latestProjectConfig.getProjectConfigState(project), true);
-                }
-            }
-
-            // Email projects that should be claiming but aren't
-            Set<String> assignedButNotClaiming = new HashSet<>(mismatch.orgExpectedProjects());
-            assignedButNotClaiming.removeAll(mismatch.projectsClaimingDomain());
-
-            if (!assignedButNotClaiming.isEmpty()) {
-                // Email each project directly
-                String projectMessage = """
-                        %s is assigned to your project in the organization configuration but is not present in your project configuration.
-
-                        Please add it to the domainManagement section of your haus-manager configuration in %%s
-                        or contact the foundation if this assignment is incorrect.
-                        """
-                        .formatted(mismatch.domainName());
-
-                for (var project : assignedButNotClaiming) {
-                    createProjectIssueAndMail(title, projectMessage,
-                            latestProjectConfig.getProjectConfigState(project), true);
-                }
-            }
-
-            // Also notify org for visibility
-            StringBuilder orgMessageBuilder = new StringBuilder();
-            orgMessageBuilder.append(
-                    "%s has assignment mismatches:\n\n"
-                            .formatted(mismatch.domainName()));
-
-            if (!assignedButNotClaiming.isEmpty()) {
-                orgMessageBuilder.append(
-                        "- Assigned but not claimed: %s\n"
-                                .formatted(String.join(", ", assignedButNotClaiming)));
-            }
-
-            if (!claimingButNotAssigned.isEmpty()) {
-                orgMessageBuilder.append(
-                        "- Claiming but not assigned: %s\n"
-                                .formatted(String.join(", ", claimingButNotAssigned)));
-            }
-
-            orgMessageBuilder.append("""
-
-                    Projects have been notified. Follow up with projects directly to resolve discrepancies.
-                    """);
-
-            createOrgIssueAndMail(title, orgMessageBuilder.toString(), true);
-        }
-    }
-
-    private void handleOrphanDomains(List<DomainReconciliation> orphans) {
-        Log.warnf("[%s] %d domains in NameCheap without any configuration:", ME, orphans.size());
-        for (var orphan : orphans) {
-            Log.warnf("[%s]   %s (expires: %s)", ME,
-                    orphan.domainName(), orphan.namecheapInfo().expires());
-        }
-
-        String title = "haus-manager: Unconfigured domains in NameCheap";
-        String message = """
-                The following domains are registered in NameCheap but not present in any organization or project configuration:
-
-                %s
-
-                Please either:
-                - Add them to the organization's domainManagement configuration if the foundation manages them
-                - Add them to the appropriate project's domainManagement configuration and project assets list
-                - Remove them from NameCheap if they're no longer needed
-                """
-                .formatted(String.join("\n", orphans.stream()
-                        .map(o -> "  - " + o.domainName() + " (expires: " + o.namecheapInfo().expires() + ")")
-                        .toList()));
-
-        createOrgIssueAndMail(title, message, true);
-    }
-
-    private void handleMissingDomains(List<DomainReconciliation> missing) {
-        Log.warnf("[%s] %d domains expected but not in NameCheap:", ME, missing.size());
-
-        List<String> details = new ArrayList<>();
-        for (var domain : missing) {
-            if (domain.orgManagedDirectly) {
-                Log.warnf("[%s]   %s (org-managed)", ME, domain.domainName());
-                details.add("  - " + domain.domainName() + " (org-managed)");
-            } else {
-                Log.warnf("[%s]   %s (expected for: %s)", ME,
-                        domain.domainName(), String.join(", ", domain.orgExpectedProjects()));
-                details.add("  - " + domain.domainName() + " (assigned to: " +
-                        String.join(", ", domain.orgExpectedProjects()) + ")");
-            }
-        }
-
-        String title = "haus-manager: Domains in configuration but not registered";
-        String message = """
-                The following domains are configured but not found in NameCheap:
-
-                %s
-
-                Please either:
-                - Register these domains in NameCheap if they should be managed
-                - Remove them from the organization or project configurations if no longer needed
-                """
-                .formatted(String.join("\n", details));
-
-        createOrgIssueAndMail(title, message, true);
-    }
-
     private void handleValidDomains(List<DomainReconciliation> valid) {
         Log.infof("[%s] Processing %d valid domains for contact sync", ME, valid.size());
 
@@ -710,8 +637,6 @@ public class DomainMonitor extends ScheduledService {
                 ? "project-" + projectName
                 : assets.projectRepository();
         var repoFullName = toFullName(mgrBotConfig.home().organization(), repoName);
-        Log.debugf("[%s] projectNameToRepoFullName: projectName=%s, assets.projectRepository=%s, repoName=%s, repoFullName=%s",
-                ME, projectName, assets.projectRepository(), repoName, repoFullName);
         return repoFullName;
     }
 
@@ -791,6 +716,7 @@ public class DomainMonitor extends ScheduledService {
         }
 
         boolean hasMultipleClaimants() {
+            // Multiple projects claiming same domain = conflict
             return projectsClaimingDomain.size() > 1;
         }
 
@@ -800,11 +726,20 @@ public class DomainMonitor extends ScheduledService {
         }
 
         boolean hasOrgMismatch() {
+            // Project claiming domain not assigned to them in org config
+            // or vice versa
             return !orgExpectedProjects.equals(projectsClaimingDomain);
         }
 
         boolean isOrphan() {
+            // In NameCheap but not in any config (org or project)
             return isInNameCheap() && !isInOrgConfig();
+        }
+
+        boolean isValid() {
+            return isInNameCheap() && isInOrgConfig()
+                    && (orgManagedDirectly || projectsClaimingDomain.size() == 1)
+                    && !hasOrgMismatch();
         }
     }
 

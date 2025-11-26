@@ -216,24 +216,29 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // Verify: Should NOT sync contacts due to conflict
         verify(namecheapService, never()).setContacts(eq(domain), any());
 
-        // Verify: Error email sent to org about the conflict
+        // Verify: One consolidated error email sent to org with ALL domain issues
         var orgErrorEmails = mailbox.getMailsSentTo("errors@test.org");
-        assertThat(orgErrorEmails).hasSize(2);
-        assertThat(orgErrorEmails.get(0).getSubject()).contains("Domain conflict");
+        assertThat(orgErrorEmails).hasSize(3);
+
+        // Should also contain test.org missing domain issue (from default setup)
+        assertThat(orgErrorEmails.get(0).getSubject()).contains("Domain issues for organization");
         assertThat(orgErrorEmails.get(0).getText()).contains(domain);
-        assertThat(orgErrorEmails.get(0).getText()).contains("also declared in project configuration");
+        assertThat(orgErrorEmails.get(0).getText()).contains("Conflicts with Organization Management");
+        assertThat(orgErrorEmails.get(0).getText()).contains("test.org");
+        assertThat(orgErrorEmails.get(0).getText()).contains("Domains Not Registered");
 
-        // Missing: Domains (default setup) are in config but not registered/mocked
-        assertThat(orgErrorEmails.get(1).getSubject()).contains("Domains in configuration but not registered");
-        assertThat(orgErrorEmails.get(1).getText()).contains("test.org");
-        assertThat(orgErrorEmails.get(1).getText()).contains("not found in NameCheap");
+        // Should contain test-project2.org missing domain issue (from default setup)
+        assertThat(orgErrorEmails.get(1).getSubject()).contains("Domain issues for");
+        assertThat(orgErrorEmails.get(1).getText()).contains("test-project2.org");
+        assertThat(orgErrorEmails.get(1).getText()).contains("Domains Not Registered");
 
-        // Verify: Error email sent to project claiming the domain
+        // Verify: Consolidated error email sent to project with domain issues
         var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
         assertThat(projectErrorEmails).hasSize(1);
-        assertThat(projectErrorEmails.get(0).getSubject()).contains("Domain conflict");
+        assertThat(projectErrorEmails.get(0).getSubject()).contains("Domain issues for test-org/project-one");
         assertThat(projectErrorEmails.get(0).getText()).contains(domain);
-        assertThat(projectErrorEmails.get(0).getText()).contains("owned and managed by the parent foundation");
+        assertThat(projectErrorEmails.get(0).getText()).contains("Conflicts with Organization Management");
+        assertThat(projectErrorEmails.get(0).getText()).contains("remove these from your domainManagement configuration");
     }
 
     @Test
@@ -271,36 +276,29 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // Verify: Should NOT sync contacts due to conflict
         verify(namecheapService, never()).setContacts(eq(domain), any());
 
-        // Verify: Error emails sent to both projects claiming the domain
+        // Verify: Consolidated error emails sent to both projects with their domain issues
         var project1Emails = mailbox.getMailsSentTo("errors@project1.dev");
         assertThat(project1Emails).hasSize(1);
-        assertThat(project1Emails.get(0).getSubject()).contains("Domain conflict");
+        assertThat(project1Emails.get(0).getSubject()).contains("Domain issues for");
         assertThat(project1Emails.get(0).getText()).contains(domain);
-        assertThat(project1Emails.get(0).getText()).contains("declared in multiple project configurations");
-        assertThat(project1Emails.get(0).getText()).contains("haus-manager configuration in test-org/project-one");
+        assertThat(project1Emails.get(0).getText()).contains("Conflicts with Other Projects");
+        assertThat(project1Emails.get(0).getText()).contains("test-org/project-two, test-org/project-one");
+        assertThat(project1Emails.get(0).getText()).contains("claimed by multiple projects");
 
         var project2Emails = mailbox.getMailsSentTo("errors@project2.dev");
-        assertThat(project2Emails).hasSize(2);
-        assertThat(project2Emails.get(0).getSubject()).contains("Domain conflict");
+        assertThat(project2Emails).hasSize(1);
+        assertThat(project2Emails.get(0).getSubject()).contains("Domain issues for");
         assertThat(project2Emails.get(0).getText()).contains(domain);
-        assertThat(project2Emails.get(0).getText()).contains("declared in multiple project configurations");
-        assertThat(project2Emails.get(0).getText()).contains("haus-manager configuration in test-org/project-two");
+        assertThat(project2Emails.get(0).getText()).contains("Conflicts with Other Projects");
+        assertThat(project2Emails.get(0).getText()).contains("test-org/project-two, test-org/project-one");
 
-        assertThat(project2Emails.get(1).getSubject()).contains("Domain assignment mismatch");
-        assertThat(project2Emails.get(1).getText()).contains("test-project2.org");
-        assertThat(project2Emails.get(1).getText()).contains("haus-manager configuration in test-org/project-two");
-
+        // Verify: Org receives consolidated notification
         var orgEmails = mailbox.getMailsSentTo("errors@test.org");
         assertThat(orgEmails).hasSize(2);
-        assertThat(orgEmails.get(0).getSubject()).contains("Domain conflict");
+        assertThat(orgEmails.get(0).getSubject()).contains("Domain issues for");
         assertThat(orgEmails.get(0).getText()).contains(domain);
-        assertThat(orgEmails.get(0).getText()).contains("declared in multiple project configurations");
-        assertThat(orgEmails.get(0).getText()).contains("Projects have been notified");
-
-        assertThat(orgEmails.get(1).getSubject()).contains("Domain assignment mismatch");
-        assertThat(orgEmails.get(1).getText()).contains("test-project2.org");
-        assertThat(orgEmails.get(1).getText()).contains("has assignment mismatches");
-        assertThat(orgEmails.get(1).getText()).contains("Projects have been notified");
+        assertThat(orgEmails.get(0).getText()).contains("Conflicts with Other Projects");
+        assertThat(orgEmails.get(0).getText()).contains("test-org/project-two, test-org/project-one");
     }
 
     @Test
@@ -329,12 +327,13 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // Verify: Should NOT sync contacts for orphan domain
         verify(namecheapService, never()).setContacts(eq(domain), any());
 
-        // Verify: Org receives error notification about unconfigured domain
+        // Verify: Org receives consolidated error notification with unconfigured domain
         var orgErrorEmails = mailbox.getMailsSentTo("errors@test.org");
         assertThat(orgErrorEmails).hasSize(1);
-        assertThat(orgErrorEmails.get(0).getSubject()).contains("Unconfigured domains in NameCheap");
+        assertThat(orgErrorEmails.get(0).getSubject()).contains("Domain issues for");
         assertThat(orgErrorEmails.get(0).getText()).contains(domain);
-        assertThat(orgErrorEmails.get(0).getText()).contains("not present in any organization or project configuration");
+        assertThat(orgErrorEmails.get(0).getText()).contains("Unconfigured Domains");
+        assertThat(orgErrorEmails.get(0).getText()).contains("registered but not configured");
     }
 
     @Test
