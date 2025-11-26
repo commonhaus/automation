@@ -196,8 +196,23 @@ public class NamecheapResponseParser {
             ContactInfo admin = parseContactElement(resultElement, "Admin");
             ContactInfo auxBilling = parseContactElement(resultElement, "AuxBilling");
 
-            if (registrant == null || tech == null || admin == null || auxBilling == null) {
-                throw new NamecheapException("Missing required contact type in response");
+            // Registrant is required; for others, fall back to registrant if missing
+            if (registrant == null) {
+                throw new NamecheapException("Missing required Registrant contact in response");
+            }
+
+            // Some TLDs don't support all contact types - use registrant as fallback
+            if (tech == null) {
+                Log.warnf("Tech contact missing, using Registrant as fallback");
+                tech = registrant;
+            }
+            if (admin == null) {
+                Log.warnf("Admin contact missing, using Registrant as fallback");
+                admin = registrant;
+            }
+            if (auxBilling == null) {
+                Log.warnf("AuxBilling contact missing, using Registrant as fallback");
+                auxBilling = registrant;
             }
 
             return new DomainContacts(registrant, tech, admin, auxBilling);

@@ -133,28 +133,38 @@ public class DomainMonitor extends ScheduledService {
                     String.join(", ", projectDomainsMgmt.keySet()));
 
             // 4. Reconcile sources
+            // Note: Include org domains in reconciliation even if management is disabled
+            // The enabled flag only controls whether we actively sync contacts
             var domainReconciliation = reconcileDomainSources(
                     namecheapDomains,
-                    orgDomainMgmt.isEnabled() ? orgDomainMgmt.domains() : List.of(),
+                    orgDomainMgmt.domains(),
                     orgDomainProject,
                     projectDomainsMgmt);
 
             // 5. Process reconciliation results
             var validDomains = processDomainReconciliation(domainReconciliation);
 
-            // 6. Synchronize contacts for valid domains
+            // 6. Synchronize contacts for valid domains (only if management is enabled)
             for (var validDomain : validDomains) {
                 if (validDomain.orgManagedDirectly) {
-                    syncContactsForProject(
-                            mgrBotConfig.home().repositoryFullName(),
-                            orgDomainMgmt,
-                            latestOrgConfig.getConfig().emailNotifications());
+                    // Only sync if org domain management is enabled
+                    if (orgDomainMgmt.isEnabled()) {
+                        syncContactsForProject(
+                                mgrBotConfig.home().repositoryFullName(),
+                                orgDomainMgmt,
+                                latestOrgConfig.getConfig().emailNotifications());
+                    } else {
+                        Log.debugf("[%s] Skipping contact sync for org domain %s (management disabled)",
+                                ME, validDomain.domainName());
+                    }
                 } else {
                     // valid domains will have a set with exactly one project
                     var project = validDomain.projectsClaimingDomain().iterator().next();
+                    var projectDomainMgmt = projectDomainsMgmt.get(project);
+                    // Project domain management is already filtered by isEnabled() at line 128
                     syncContactsForProject(
                             project,
-                            projectDomainsMgmt.get(project),
+                            projectDomainMgmt,
                             latestProjectConfig.getProjectConfigState(project).emailNotifications());
                 }
             }
