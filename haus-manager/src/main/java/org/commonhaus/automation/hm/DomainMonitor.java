@@ -680,8 +680,10 @@ public class DomainMonitor extends ScheduledService {
     }
 
     /**
-     * Convert project name to repository full name using project state lookup.
-     * Returns null if project not found.
+     * Convert project name to repository full name.
+     * Returns the constructed repository full name based on org config.
+     * A ProjectConfigState is not required to exist - projects may not have
+     * their own config files yet.
      */
     private String projectNameToRepoFullName(String projectName) {
         var assets = latestOrgConfig.getConfig().projects().assetsForProject(projectName);
@@ -691,12 +693,7 @@ public class DomainMonitor extends ScheduledService {
         var repoFullName = toFullName(mgrBotConfig.home().organization(), repoName);
         Log.debugf("[%s] projectNameToRepoFullName: projectName=%s, assets.projectRepository=%s, repoName=%s, repoFullName=%s",
                 ME, projectName, assets.projectRepository(), repoName, repoFullName);
-        ProjectConfigState state = latestProjectConfig.getProjectConfigState(repoFullName);
-        if (state == null) {
-            Log.warnf("[%s] projectNameToRepoFullName: No ProjectConfigState found for %s (project=%s)",
-                    ME, repoFullName, projectName);
-        }
-        return state != null ? state.repoFullName() : null;
+        return repoFullName;
     }
 
     private Map<String, DomainReconciliation> reconcileDomainSources(
