@@ -14,7 +14,7 @@ public class OrganizationConfig {
     protected EmailNotification emailNotifications;
     protected List<GroupMapping> teamMembership;
     protected DomainManagementConfig domainManagement;
-    protected DomainMonitoringConfig domainMonitoring;
+    protected EnabledDryRunConfig domainMonitoring;
     protected EnabledDryRunConfig githubOrgVerification;
     protected ProjectAssetList projects;
     protected SponsorsConfig sponsors;
@@ -52,7 +52,7 @@ public class OrganizationConfig {
     /**
      * @return the domain monitoring configuration
      */
-    public DomainMonitoringConfig domainMonitoring() {
+    public EnabledDryRunConfig domainMonitoring() {
         return domainMonitoring;
     }
 
@@ -83,23 +83,6 @@ public class OrganizationConfig {
         return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s}"
                 .formatted(emailNotifications, sponsors, teamMembership, domainManagement, domainMonitoring,
                         githubOrgVerification, projects);
-    }
-
-    /**
-     * @param enabled Whether domain monitoring is enabled
-     * @param dryRun If true, do not send emails or update domain contacts (log only)
-     */
-    public record DomainMonitoringConfig(
-            Boolean enabled,
-            Boolean dryRun) {
-
-        public boolean isEnabled() {
-            return enabled == null || enabled;
-        }
-
-        public boolean isDryRun() {
-            return dryRun != null && dryRun;
-        }
     }
 
     /**
