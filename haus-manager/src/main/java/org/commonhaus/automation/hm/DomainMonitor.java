@@ -623,9 +623,11 @@ public class DomainMonitor extends ScheduledService {
                                     .sorted((v1, v2) -> v1.domainName().compareTo(v2.domainName()))
                                     .map(v -> {
                                         if (v.orgManagedDirectly) {
-                                            return "  - " + v.domainName() + " (org-managed)";
+                                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
+                                                    + "; org-managed)";
                                         } else {
-                                            return "  - " + v.domainName() + " (managed by: " +
+                                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
+                                                    + "; managed by: " +
                                                     String.join(", ", v.projectsClaimingDomain()) + ")";
                                         }
                                     })
