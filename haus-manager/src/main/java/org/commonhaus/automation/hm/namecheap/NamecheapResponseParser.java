@@ -201,21 +201,13 @@ public class NamecheapResponseParser {
                 throw new NamecheapException("Missing required Registrant contact in response");
             }
 
-            // Some TLDs don't support all contact types - use registrant as fallback
-            if (tech == null) {
-                Log.warnf("Tech contact missing, using Registrant as fallback");
-                tech = registrant;
-            }
-            if (admin == null) {
-                Log.warnf("Admin contact missing, using Registrant as fallback");
-                admin = registrant;
-            }
-            if (auxBilling == null) {
-                Log.warnf("AuxBilling contact missing, using Registrant as fallback");
-                auxBilling = registrant;
-            }
-
-            return new DomainContacts(registrant, tech, admin, auxBilling);
+            return new DomainContacts(registrant,
+                    tech == null ? registrant : tech,
+                    admin == null ? registrant : admin,
+                    auxBilling == null ? registrant : auxBilling,
+                    tech != null,
+                    admin != null,
+                    auxBilling != null);
 
         } catch (NamecheapException e) {
             throw e;

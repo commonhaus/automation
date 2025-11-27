@@ -252,9 +252,14 @@ public class DomainMonitor extends ScheduledService {
         Log.debugf("[%s] Checking contacts for domain: %s (dryRun=%s)", ME, domainName, dryRun);
 
         // Fetch current contacts from Namecheap
-        Optional<DomainContacts> currentContacts = Optional.empty();
+        DomainContacts currentContacts;
         try {
-            currentContacts = namecheapService.getContacts(domainName);
+            Optional<DomainContacts> contactsOpt = namecheapService.getContacts(domainName);
+            if (contactsOpt.isEmpty()) {
+                Log.errorf("[%s] No contacts returned for %s", ME, domainName);
+                return;
+            }
+            currentContacts = contactsOpt.get();
         } catch (Exception e) {
             Log.errorf(e, "[%s] Error fetching current contacts for %s", ME, domainName);
             return;
@@ -262,11 +267,12 @@ public class DomainMonitor extends ScheduledService {
 
         // Build desired contacts by merging: bot defaults + project tech contact +
         // domain-specific tech contact
+        // Preserve contact type flags from current contacts (which types the TLD supports)
         DomainContacts desiredContacts = buildDesiredContacts(
-                managedDomain, domainConfig, defaultContacts);
+                managedDomain, domainConfig, defaultContacts, currentContacts);
 
         // Is update required?
-        if (currentContacts.map(c -> !desiredContacts.requiresUpdate(c)).orElse(false)) {
+        if (!desiredContacts.requiresUpdate(currentContacts)) {
             Log.debugf("[%s] Contacts for %s are up to date", ME, domainName);
             return;
         }
@@ -285,7 +291,7 @@ public class DomainMonitor extends ScheduledService {
                             Desired contacts:
                             %s
 
-                            """.formatted(domainName, currentContacts.map(c -> c.prettyString()).orElse("none"),
+                            """.formatted(domainName, currentContacts.prettyString(),
                             desiredContacts.prettyString()),
                     emailNotification.dryRun());
             return;
@@ -304,7 +310,7 @@ public class DomainMonitor extends ScheduledService {
                                 Updated contacts:
                                 %s
 
-                                """.formatted(domainName, currentContacts.map(c -> c.prettyString()).orElse("none"),
+                                """.formatted(domainName, currentContacts.prettyString(),
                                 desiredContacts.prettyString()),
                         emailNotification.audit());
             } else {
@@ -323,9 +329,13 @@ public class DomainMonitor extends ScheduledService {
      * If a tech contact override is specified, it must be valid (all required
      * fields present).
      * We use it as-is without merging if valid; otherwise fall back to default.
+     *
+     * Preserves contact type flags from currentContacts to ensure we only update
+     * contact types that the TLD actually supports.
      */
     private DomainContacts buildDesiredContacts(ManagedDomain managedDomain,
-            DomainManagementConfig domainConfig, DomainContacts defaultContacts) {
+            DomainManagementConfig domainConfig, DomainContacts defaultContacts,
+            DomainContacts currentContacts) {
 
         ContactInfo registrant = defaultContacts.registrant();
         ContactInfo admin = defaultContacts.admin();
@@ -345,7 +355,11 @@ public class DomainMonitor extends ScheduledService {
             Log.debugf("[%s] Using project-level tech contact for %s", ME, managedDomain.name());
         }
 
-        return new DomainContacts(registrant, tech, admin, billing);
+        // Preserve contact type flags from current contacts (which contact types the TLD supports)
+        return new DomainContacts(registrant, tech, admin, billing,
+                currentContacts.hasTech(),
+                currentContacts.hasAdmin(),
+                currentContacts.hasAuxBilling());
     }
 
     /**
