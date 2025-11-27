@@ -363,14 +363,18 @@ public class DomainMonitor extends ScheduledService {
                 validDomains.add(dr);
                 continue;
             }
-            // Add to each project claiming this domain
-            for (var project : dr.projectsClaimingDomain()) {
-                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
-            }
             // Add to org for domains it manages directly or orphans
             if (dr.orgManagedDirectly || dr.isOrphan()) {
                 String orgRepo = mgrBotConfig.home().repositoryFullName();
                 issuesByProject.computeIfAbsent(orgRepo, k -> new ArrayList<>()).add(dr);
+            }
+            // Add to each project claiming this domain
+            for (var project : dr.projectsClaimingDomain()) {
+                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
+            }
+            // Add to projects that should claim this domain but don't
+            for (var project : dr.orgExpectedProjects()) {
+                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
             }
         }
 
@@ -451,6 +455,7 @@ public class DomainMonitor extends ScheduledService {
                 message.append(
                         "These domains are managed by the organization but are also in your project configuration:\n");
             }
+            orgProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
             for (var conflict : orgProjectConflicts) {
                 message.append("  - ").append(conflict.domainName());
                 if (isOrgRepo) {
@@ -468,6 +473,7 @@ public class DomainMonitor extends ScheduledService {
         if (!multipleProjectConflicts.isEmpty()) {
             message.append("## Conflicts with Other Projects\n\n");
             message.append("These domains are claimed by multiple projects:\n");
+            multipleProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
             for (var conflict : multipleProjectConflicts) {
                 message.append("  - ").append(conflict.domainName())
                         .append(" (also claimed by: ")
@@ -482,6 +488,7 @@ public class DomainMonitor extends ScheduledService {
             List<String> toAdd = new ArrayList<>();
             List<String> toRemove = new ArrayList<>();
 
+            projectMismatches.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
             for (var mismatch : projectMismatches) {
                 if (mismatch.orgExpectedProjects().contains(project) &&
                         !mismatch.projectsClaimingDomain().contains(project)) {
@@ -516,6 +523,7 @@ public class DomainMonitor extends ScheduledService {
         if (!orphanDomains.isEmpty() && isOrgRepo) {
             message.append("## Unconfigured Domains\n\n");
             message.append("These domains are registered but not configured:\n");
+            orphanDomains.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
             for (var orphan : orphanDomains) {
                 message.append("  - ").append(orphan.domainName())
                         .append(" (expires: ").append(orphan.namecheapInfo().expires()).append(")\n");
@@ -526,6 +534,7 @@ public class DomainMonitor extends ScheduledService {
         if (!missingFromNamecheap.isEmpty()) {
             message.append("## Domains Not Registered\n\n");
             message.append("These domains are in configuration but not registered in Namecheap:\n");
+            missingFromNamecheap.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
             for (var missing : missingFromNamecheap) {
                 message.append("  - ").append(missing.domainName()).append("\n");
             }
@@ -562,7 +571,8 @@ public class DomainMonitor extends ScheduledService {
                 : state.projectConfig().emailNotifications().audit();
         var message = messageFormat.formatted(state.repoFullName());
 
-        if (latestOrgConfig.getConfig().isMonitoringDryRun()) {
+        if (latestOrgConfig.getConfig().isMonitoringDryRun() ||
+                state.projectConfig().domainManagement().isDryRun()) {
             Log.infof("[%s] DRY RUN: would create issue and send email for project %s to %s. title: %s; body: %s",
                     ME, state.repoFullName(), String.join(", ", addresses), title, message);
             return;
@@ -592,7 +602,6 @@ public class DomainMonitor extends ScheduledService {
         // ReportQueryContext rqc =
         // ctx.getReportQueryContext(mgrBotConfig.home().repositoryFullName());
         // rqc.createItem(EventType.issue, title, message, null);
-
     }
 
     private void handleValidDomains(List<DomainReconciliation> valid) {
@@ -611,6 +620,7 @@ public class DomainMonitor extends ScheduledService {
                     .formatted(
                             valid.size(),
                             String.join("\n", valid.stream()
+                                    .sorted((v1, v2) -> v1.domainName().compareTo(v2.domainName()))
                                     .map(v -> {
                                         if (v.orgManagedDirectly) {
                                             return "  - " + v.domainName() + " (org-managed)";

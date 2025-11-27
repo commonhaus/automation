@@ -27,6 +27,7 @@ nb-configuration.xml
 
 # OSX
 .DS_Store
+*.log
 
 # Vim
 *.swp
