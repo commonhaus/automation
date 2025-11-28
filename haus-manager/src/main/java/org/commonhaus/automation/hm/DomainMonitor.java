@@ -28,6 +28,7 @@ import org.commonhaus.automation.hm.config.ManagedDomain;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.hm.github.ReportQueryContext;
+import org.commonhaus.automation.hm.namecheap.NamecheapException;
 import org.commonhaus.automation.hm.namecheap.NamecheapService;
 import org.commonhaus.automation.hm.namecheap.models.ContactInfo;
 import org.commonhaus.automation.hm.namecheap.models.DomainContacts;
@@ -173,8 +174,10 @@ public class DomainMonitor extends ScheduledService {
             if (!dryRun) {
                 dispatchDomainList(namecheapDomains);
             }
+        } catch (NamecheapException e) {
+            ctx.logAndSendEmail(ME, "⛓️ Error interacting with Namecheap", e);
         } catch (Exception e) {
-            ctx.logAndSendEmail(ME, "⛓️ Error fetching domain(s) from Namecheap", e);
+            ctx.logAndSendEmail(ME, "⛓️ Error refreshing domain information", e);
         }
     }
 
