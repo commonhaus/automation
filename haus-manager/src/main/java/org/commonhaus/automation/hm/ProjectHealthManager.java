@@ -63,7 +63,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
     public void onProjectConfigUpdate(String healthTaskGroup, ProjectConfigState state) {
         Log.debugf("[%s] Project config updated for %s", ME, healthTaskGroup);
 
-        if (!state.healthCollectionEnabled()) {
+        if (!state.isHealthCollectionEnabled()) {
             Log.debugf("[%s] %s: Health collection disabled, skipping", ME, healthTaskGroup);
             return;
         }
@@ -88,7 +88,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
 
     public void collectHistoricalProjectHealthData(String projectName) {
         var state = latestProjectConfig.getProjectConfigState(projectName);
-        if (state != null && state.healthCollectionEnabled()) {
+        if (state != null && state.isHealthCollectionEnabled()) {
             var healthTaskGroup = getTaskGroup(state.repoFullName());
 
             updateQueue.queueBackground(healthTaskGroup, () -> {
@@ -169,7 +169,7 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
         Log.debugf("[%s]: found %d total projects", ME, allProjects.size());
         for (var state : allProjects) {
             var healthTaskGroup = getTaskGroup(state.repoFullName());
-            if (!state.healthCollectionEnabled()) {
+            if (!state.isHealthCollectionEnabled()) {
                 Log.debugf("[%s] %s: Health collection is disabled for %s", ME, healthTaskGroup, state.repoFullName());
                 continue;
             }

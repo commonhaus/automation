@@ -523,8 +523,8 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public boolean healthCollectionHasChanged(ProjectConfigState newState) {
-            boolean oldEnabled = this != EMPTY && this.healthCollectionEnabled();
-            boolean newEnabled = newState != EMPTY && newState.healthCollectionEnabled();
+            boolean oldEnabled = this != EMPTY && this.isHealthCollectionEnabled();
+            boolean newEnabled = newState != EMPTY && newState.isHealthCollectionEnabled();
 
             // Health collection toggled on or off
             if (oldEnabled != newEnabled) {
@@ -554,7 +554,27 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return newAccess == null || !Objects.equals(myAccess.sourceTeam(), newAccess.sourceTeam());
         }
 
-        public boolean healthCollectionEnabled() {
+        public boolean isDomainManagementEnabled() {
+            if (this == EMPTY) {
+                return false; // not configured yet (wait)
+            }
+            ProjectConfig config = projectConfig();
+            return config != null
+                    && config.domainManagement() != null
+                    && config.domainManagement().isEnabled();
+        }
+
+        public boolean isDomainManagementDryRun() {
+            if (this == EMPTY) {
+                return false; // not configured yet (wait)
+            }
+            ProjectConfig config = projectConfig();
+            return config != null
+                    && config.domainManagement() != null
+                    && config.domainManagement().isDryRun();
+        }
+
+        public boolean isHealthCollectionEnabled() {
             if (this == EMPTY) {
                 return false; // not configured yet (wait)
             }

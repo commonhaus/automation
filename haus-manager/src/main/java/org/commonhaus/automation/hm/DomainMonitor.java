@@ -585,8 +585,7 @@ public class DomainMonitor extends ScheduledService {
                 : state.projectConfig().emailNotifications().audit();
         var message = messageFormat.formatted(state.repoFullName());
 
-        if (latestOrgConfig.getConfig().isMonitoringDryRun() ||
-                state.projectConfig().domainManagement().isDryRun()) {
+        if (latestOrgConfig.getConfig().isMonitoringDryRun() || state.isDomainManagementDryRun()) {
             Log.infof("[%s] DRY RUN: would create issue and send email for project %s to %s. title: %s; body: %s",
                     ME, state.repoFullName(), String.join(", ", addresses), title, message);
             return;
