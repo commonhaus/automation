@@ -1,8 +1,11 @@
 package org.commonhaus.automation.hm.config;
 
+import static org.commonhaus.automation.hm.namecheap.models.ContactInfo.isValidPhoneFormat;
+
 import java.util.Optional;
 
 import org.commonhaus.automation.ContextService;
+import org.commonhaus.automation.config.EmailNotification;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
@@ -33,9 +36,11 @@ public record DomainContact(
 
         /**
          * Name of the base contact to merge with.
-         * Can reference bot default contacts: "defaultRegistrantAdmin", "defaultTech", "defaultBilling"
+         * Can reference bot default contacts: "defaultRegistrantAdmin", "defaultTech",
+         * "defaultBilling"
          * or org/project level contact names.
-         * If specified, this contact's null fields will be filled from the base contact.
+         * If specified, this contact's null fields will be filled from the base
+         * contact.
          */
         Optional<String> contactBase) implements ContactConfig {
 
@@ -79,9 +84,12 @@ public record DomainContact(
      * @param ctx Context service for logging and email
      * @param logId Log identifier
      * @param domainName Domain name for error message context
-     * @return true if all required fields are present and non-blank, false otherwise
+     * @param emailNotification
+     * @return true if all required fields are present and non-blank, false
+     *         otherwise
      */
-    public boolean isValid(ContextService ctx, String logId, String domainName) {
+    public boolean isValid(ContextService ctx, String logId, String domainName,
+            EmailNotification emailNotification) {
         var valid = firstName != null && !firstName.isBlank()
                 && lastName != null && !lastName.isBlank()
                 && address1 != null && !address1.isBlank()
@@ -95,8 +103,21 @@ public record DomainContact(
         if (!valid) {
             ctx.logAndSendEmail(logId,
                     "Invalid domain-specific tech contact for " + domainName,
-                    new IllegalStateException("Contact validation failed: " + this));
+                    new IllegalStateException("Contact validation failed: " + this),
+                    emailNotification.errors());
+            return false;
         }
-        return valid;
+
+        // Validate phone number format: +NNN.NNNNNNNNNN per Namecheap API requirements
+        if (!isValidPhoneFormat(phone)) {
+            ctx.logAndSendEmail(logId,
+                    "Invalid phone number format for " + domainName,
+                    new IllegalStateException(
+                            "Phone number must be in format +NNN.NNNNNNNNNN (e.g. +1.6613102107). Got: " + phone),
+                    emailNotification.errors());
+            return false;
+        }
+
+        return true;
     }
 }

@@ -75,17 +75,47 @@ public class NamecheapServiceProducer {
     private DomainContacts buildDefaultContacts(NamecheapConfig ncConfig) {
         ContactConfig defaultRegistrant = ncConfig.registrant(); // required
 
+        // Validate phone format for registrant
+        validatePhoneFormat("registrant", defaultRegistrant.phone());
+
         ContactInfo registrant = ContactInfo.fromConfig(defaultRegistrant);
         ContactInfo admin = registrant;
 
         ContactInfo tech = ncConfig.tech()
-                .map((config) -> ContactInfo.fromConfig(registrant, config))
+                .map((config) -> {
+                    validatePhoneFormat("tech", config.phone());
+                    return ContactInfo.fromConfig(registrant, config);
+                })
                 .orElse(registrant);
 
         ContactInfo billing = ncConfig.billing()
-                .map((config) -> ContactInfo.fromConfig(registrant, config))
+                .map((config) -> {
+                    validatePhoneFormat("billing", config.phone());
+                    return ContactInfo.fromConfig(registrant, config);
+                })
                 .orElse(registrant);
 
         return new DomainContacts(registrant, tech, admin, billing);
+    }
+
+    /**
+     * Validate phone number format per Namecheap API requirements.
+     * Throws IllegalStateException if invalid - this stops application startup.
+     *
+     * @param contactType Type of contact for error message
+     * @param phone Phone number to validate
+     */
+    private void validatePhoneFormat(String contactType, String phone) {
+        if (phone == null || phone.isBlank()) {
+            throw new IllegalStateException(
+                    "Phone number is required for " + contactType + " contact in bot configuration");
+        }
+        // Must start with +, contain exactly one dot, and have digits on both sides
+        // Pattern: +NNN.NNNNNNNNNN (e.g. +1.6613102107)
+        if (!phone.matches("^\\+\\d{1,3}\\.\\d{4,}$")) {
+            throw new IllegalStateException(
+                    "Invalid phone number format for " + contactType + " contact in bot configuration. "
+                            + "Phone number must be in format +NNN.NNNNNNNNNN (e.g. +1.6613102107). Got: " + phone);
+        }
     }
 }

@@ -264,15 +264,17 @@ public class DomainMonitor extends ScheduledService {
             }
             currentContacts = contactsOpt.get();
         } catch (Exception e) {
-            Log.errorf(e, "[%s] Error fetching current contacts for %s", ME, domainName);
+            ctx.logAndSendEmail(ME,
+                    "Error syncing contacts for domain: " + domainName, e, emailNotification.errors());
             return;
         }
 
         // Build desired contacts by merging: bot defaults + project tech contact +
         // domain-specific tech contact
-        // Preserve contact type flags from current contacts (which types the TLD supports)
+        // Preserve contact type flags from current contacts (which types the TLD
+        // supports)
         DomainContacts desiredContacts = buildDesiredContacts(
-                managedDomain, domainConfig, defaultContacts, currentContacts);
+                managedDomain, domainConfig, defaultContacts, currentContacts, emailNotification);
 
         // Is update required?
         if (!desiredContacts.requiresUpdate(currentContacts)) {
@@ -320,7 +322,8 @@ public class DomainMonitor extends ScheduledService {
                 ctx.logAndSendEmail(ME, "[%s] Failed to update contacts for %s".formatted(ME, domainName), null);
             }
         } catch (Exception e) {
-            Log.errorf(e, "[%s] Error updating contacts for %s", ME, domainName);
+            ctx.logAndSendEmail(ME,
+                    "Error syncing contacts for domain: " + domainName, e, emailNotification.errors());
             return;
         }
     }
@@ -338,7 +341,7 @@ public class DomainMonitor extends ScheduledService {
      */
     private DomainContacts buildDesiredContacts(ManagedDomain managedDomain,
             DomainManagementConfig domainConfig, DomainContacts defaultContacts,
-            DomainContacts currentContacts) {
+            DomainContacts currentContacts, EmailNotification emailNotification) {
 
         ContactInfo registrant = defaultContacts.registrant();
         ContactInfo admin = defaultContacts.admin();
@@ -348,17 +351,20 @@ public class DomainMonitor extends ScheduledService {
         ContactInfo tech = defaultContacts.tech();
 
         // Check for domain-specific tech contact override (highest priority)
-        if (managedDomain.techContact().map(c -> c.isValid(ctx, ME, managedDomain.name())).orElse(false)) {
+        if (managedDomain.techContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
+                .orElse(false)) {
             tech = ContactInfo.fromConfig(managedDomain.techContact().get());
             Log.debugf("[%s] Using domain-specific tech contact for %s", ME, managedDomain.name());
         }
         // Check for project-level tech contact override (medium priority)
-        else if (domainConfig.getTechContact().map(c -> c.isValid(ctx, ME, managedDomain.name())).orElse(false)) {
+        else if (domainConfig.getTechContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
+                .orElse(false)) {
             tech = ContactInfo.fromConfig(domainConfig.getTechContact().get());
             Log.debugf("[%s] Using project-level tech contact for %s", ME, managedDomain.name());
         }
 
-        // Preserve contact type flags from current contacts (which contact types the TLD supports)
+        // Preserve contact type flags from current contacts (which contact types the
+        // TLD supports)
         return new DomainContacts(registrant, tech, admin, billing,
                 currentContacts.hasTech(),
                 currentContacts.hasAdmin(),

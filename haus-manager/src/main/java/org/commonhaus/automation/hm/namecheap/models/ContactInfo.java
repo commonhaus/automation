@@ -162,4 +162,20 @@ public record ContactInfo(
                 country,
                 emailAddress);
     }
+
+    /**
+     * Validate phone number format per Namecheap API requirements.
+     * Format: +{country code}.{phone number} (e.g. +1.6613102107)
+     *
+     * @param phone Phone number to validate
+     * @return true if format is valid
+     */
+    public static boolean isValidPhoneFormat(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
+        }
+        // Must start with +, contain exactly one dot, and have digits on both sides
+        // Pattern: +NNN.NNNNNNNNNN per Namecheap API documentation
+        return phone.matches("^\\+\\d{1,3}\\.\\d{4,}$");
+    }
 }
