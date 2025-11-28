@@ -1,5 +1,7 @@
 package org.commonhaus.automation.hm.namecheap.models;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 /**
  * Complete set of domain contacts (all 4 roles).
  * Namecheap requires Registrant, Tech, Admin, and AuxBilling contacts for each domain.
@@ -8,6 +10,7 @@ package org.commonhaus.automation.hm.namecheap.models;
  * The hasXxx flags track which contacts were actually present in the API response,
  * so we only compare and send back the contacts that the TLD supports.
  */
+@RegisterForReflection
 public record DomainContacts(
         ContactInfo registrant,
         ContactInfo tech,

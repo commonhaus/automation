@@ -2,6 +2,9 @@ package org.commonhaus.automation.hm.namecheap.models;
 
 import java.time.LocalDate;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public record DomainRecord(
         String name,
         LocalDate expires, // nullable if date parsing fails

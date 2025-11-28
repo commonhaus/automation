@@ -4,10 +4,13 @@ import java.util.Optional;
 
 import org.commonhaus.automation.hm.config.ContactConfig;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 /**
  * Immutable contact information for domain registration.
  * Represents a single contact (Registrant, Tech, Admin, or Billing).
  */
+@RegisterForReflection
 public record ContactInfo(
         // Required fields
         String firstName,
