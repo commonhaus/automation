@@ -79,20 +79,24 @@ public record ContactInfo(
             return this;
         }
 
+        // Special handling for optional fields:
+        // - phoneExt, copy it if phone is defined in override
+        // - address2, copy it if address1 is defined in override
+
         return new ContactInfo(
                 override.firstName != null ? override.firstName : this.firstName,
                 override.lastName != null ? override.lastName : this.lastName,
-                override.address1 != null ? override.address1 : this.address1,
-                override.city != null ? override.city : this.city,
-                override.stateProvince != null ? override.stateProvince : this.stateProvince,
-                override.postalCode != null ? override.postalCode : this.postalCode,
-                override.country != null ? override.country : this.country,
-                override.phone != null ? override.phone : this.phone,
+                /* address */ override.address1 != null ? override.address1 : this.address1,
+                /* address */ override.city != null ? override.city : this.city,
+                /* address */ override.stateProvince != null ? override.stateProvince : this.stateProvince,
+                /* address */ override.postalCode != null ? override.postalCode : this.postalCode,
+                /* address */ override.country != null ? override.country : this.country,
+                /* phone */ override.phone != null ? override.phone : this.phone,
                 override.emailAddress != null ? override.emailAddress : this.emailAddress,
                 override.organization.isPresent() ? override.organization : this.organization,
                 override.jobTitle.isPresent() ? override.jobTitle : this.jobTitle,
-                override.address2.isPresent() ? override.address2 : this.address2,
-                override.phoneExt.isPresent() ? override.phoneExt : this.phoneExt,
+                /* address */ override.address1 != null ? override.address2 : this.address2,
+                /* phone */override.phone != null ? override.phoneExt : this.phoneExt,
                 override.fax.isPresent() ? override.fax : this.fax,
                 this.readOnly // Preserve readOnly status
         );

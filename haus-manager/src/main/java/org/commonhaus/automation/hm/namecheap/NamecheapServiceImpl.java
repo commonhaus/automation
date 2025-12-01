@@ -34,7 +34,6 @@ class NamecheapServiceImpl implements NamecheapService {
     @Override
     public Optional<DomainContacts> getContacts(String domainName) {
         String currentXml = client.getContacts(domainName);
-        Log.debugf("[%s] getContacts response for %s:\n%s", ME, domainName, currentXml);
         DomainContacts contacts = NamecheapResponseParser.parseGetContactsResponse(currentXml);
         return Optional.of(contacts);
     }

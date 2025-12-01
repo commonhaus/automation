@@ -329,12 +329,17 @@ public class DomainMonitor extends ScheduledService {
     }
 
     /**
-     * Build desired contacts by using bot defaults and validating project/domain
-     * tech contact overrides.
+     * Build desired contacts by merging bot defaults with project/domain tech contact overrides.
      * Tech contact hierarchy: domain-specific > project-level > bot default
-     * If a tech contact override is specified, it must be valid (all required
-     * fields present).
-     * We use it as-is without merging if valid; otherwise fall back to default.
+     *
+     * Project contacts can specify minimal information (firstName, lastName, emailAddress)
+     * and optionally override phone and/or address fields. Missing fields are filled from
+     * bot defaults via merging.
+     *
+     * Validation rules:
+     * - Always required: firstName, lastName, emailAddress
+     * - Phone: optional, but if specified must be valid format
+     * - Address: optional as group, but if any address field specified, all must be specified
      *
      * Preserves contact type flags from currentContacts to ensure we only update
      * contact types that the TLD actually supports.
@@ -353,14 +358,14 @@ public class DomainMonitor extends ScheduledService {
         // Check for domain-specific tech contact override (highest priority)
         if (managedDomain.techContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
                 .orElse(false)) {
-            tech = ContactInfo.fromConfig(managedDomain.techContact().get());
-            Log.debugf("[%s] Using domain-specific tech contact for %s", ME, managedDomain.name());
+            tech = ContactInfo.fromConfig(tech, managedDomain.techContact().get());
+            Log.debugf("[%s] Merging domain-specific tech contact for %s", ME, managedDomain.name());
         }
         // Check for project-level tech contact override (medium priority)
         else if (domainConfig.getTechContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
                 .orElse(false)) {
-            tech = ContactInfo.fromConfig(domainConfig.getTechContact().get());
-            Log.debugf("[%s] Using project-level tech contact for %s", ME, managedDomain.name());
+            tech = ContactInfo.fromConfig(tech, domainConfig.getTechContact().get());
+            Log.debugf("[%s] Merging project-level tech contact for %s", ME, managedDomain.name());
         }
 
         // Preserve contact type flags from current contacts (which contact types the
