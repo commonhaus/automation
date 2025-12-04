@@ -578,7 +578,7 @@ public class DomainMonitor extends ScheduledService {
             ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
             createProjectIssueAndMail(title, message.toString(), state, true);
             // cc: send a copy to org errors email
-            ctx.sendEmail(ME, title, message.toString(), latestOrgConfig.getConfig().emailNotifications().errors());
+            createOrgIssueAndMail(title, message.toString(), true);
         }
     }
 
@@ -616,9 +616,7 @@ public class DomainMonitor extends ScheduledService {
                 : latestOrgConfig.getConfig().emailNotifications().audit();
 
         if (latestOrgConfig.getConfig().isMonitoringDryRun()) {
-            Log.infof("[%s] DRY RUN: would create issue and send email to %s. title: %s; body: %s",
-                    ME, String.join(", ", addresses), title, message);
-            return;
+            addresses = latestOrgConfig.getConfig().emailNotifications().dryRun();
         }
 
         ctx.sendEmail(ME, title, message, addresses);
