@@ -26,6 +26,7 @@ public class ProjectConfig {
     protected EmailNotification emailNotifications;
     protected ProjectHealth projectHealth;
     protected DomainManagementConfig domainManagement;
+    protected List<String> githubOrganizations;
 
     /**
      * Return list of teams that should have membership
@@ -65,6 +66,10 @@ public class ProjectConfig {
     /** Domain management configuration */
     public DomainManagementConfig domainManagement() {
         return domainManagement;
+    }
+
+    public List<String> githubOrganizations() {
+        return githubOrganizations == null ? List.of() : githubOrganizations;
     }
 
     @Override

@@ -86,6 +86,10 @@ public class DomainMonitorTest extends HausManagerTestBase {
                 "src/test/resources/cf-haus-organization-domains.yml",
                 OrganizationConfig.class);
         when(latestOrgConfig.getConfig()).thenReturn(mockOrgConfig);
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("one")))
+                .thenReturn(HOME_PROJECT_1.repoFullName());
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("two")))
+                .thenReturn(HOME_PROJECT_2.repoFullName());
 
         // Project 1 mock config/state
         var config = loadYamlResource(

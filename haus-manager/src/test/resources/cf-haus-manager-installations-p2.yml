@@ -1,0 +1,13 @@
+enabled: true
+dryRun: false
+
+githubOrganizations:
+  - test-org-two
+
+emailNotifications:
+  errors:
+    - errors@project2.dev
+  dryRun:
+    - test@project2.dev
+  audit:
+    - audit@project2.dev
