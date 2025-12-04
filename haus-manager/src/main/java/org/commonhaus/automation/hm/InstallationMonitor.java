@@ -286,16 +286,16 @@ public class InstallationMonitor extends ScheduledService {
         if (dryRun) {
             Log.infof("[%s] DRY RUN: would send email for project %s. title: %s; body: %s",
                     ME, project, title, message);
-            return;
-        }
-
-        if (state != null && state.projectConfig() != null) {
+        } else if (state != null && state.projectConfig() != null) {
             ctx.sendEmail(ME, title, message.toString(),
                     state.projectConfig().emailNotifications().errors());
         }
+
         // cc: send a copy to org errors email
         ctx.sendEmail(ME, title, message.toString(),
-                latestOrgConfig.getConfig().emailNotifications().errors());
+                dryRun
+                        ? latestOrgConfig.getConfig().emailNotifications().dryRun()
+                        : latestOrgConfig.getConfig().emailNotifications().errors());
     }
 
     private void sendOrgSummary(
@@ -320,8 +320,9 @@ public class InstallationMonitor extends ScheduledService {
 
         if (!valid.isEmpty()) {
             message.append("## Configured Organizations\n\n");
-            message.append("The following %d GitHub organizations are properly configured and have HausManager installed:\n\n"
-                    .formatted(valid.size()));
+            message.append(
+                    "The following %d GitHub organizations are properly configured and have HausManager installed:\n\n"
+                            .formatted(valid.size()));
             for (var v : valid) {
                 if (!v.orgExpectedProjects().isEmpty()) {
                     message.append("  - ").append(v.ghOrgName()).append(" (assigned to: ")
@@ -342,19 +343,16 @@ public class InstallationMonitor extends ScheduledService {
             for (var org : unmappedOrgs.stream().sorted().toList()) {
                 message.append("  - ").append(org).append("\n");
             }
-            message.append("\nConsider adding these to the organization config or removing the installation if not needed.\n");
+            message.append(
+                    "\nConsider adding these to the organization config or removing the installation if not needed.\n");
         }
 
         String title = "haus-manager: GitHub organization verification summary";
 
-        if (dryRun) {
-            Log.infof("[%s] DRY RUN: would send org summary email. title: %s; body: %s",
-                    ME, title, message);
-            return;
-        }
-
         ctx.sendEmail(ME, title, message.toString(),
-                latestOrgConfig.getConfig().emailNotifications().audit());
+                dryRun
+                        ? latestOrgConfig.getConfig().emailNotifications().dryRun()
+                        : latestOrgConfig.getConfig().emailNotifications().audit());
     }
 
     record InstallationReconciliation(
