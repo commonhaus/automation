@@ -73,7 +73,6 @@ public class FileWatcher {
      * Registered watchers will be automatically cleaned up if app loses visiblity to the
      * repository or organization (DiscoveryAction: REMOVED, INSTALL_REMOVED)
      *
-     *
      * @param taskGroupName Name of the task group to use for periodic updates
      * @param installationId Installation ID for the repository
      * @param repoName Name of the repository

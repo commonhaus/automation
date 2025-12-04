@@ -156,11 +156,17 @@ public class RepositoryDiscovery {
         @Inject
         Event<ConnectionEvent> fireConnectionEvent;
 
-        void onEvent(@RawEvent GitHubEvent event,
-                GitHub github, DynamicGraphQLClient graphQLClient) {
+        @Inject
+        GitHubClientProvider gitHubService;
+
+        void onEvent(@RawEvent GitHubEvent event) {
             if (event == null || event.getInstallationId() == null) {
                 return;
             }
+
+            long installationId = event.getInstallationId();
+            GitHub github = gitHubService.getInstallationClient(installationId);
+            DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(installationId);
 
             BaseQueryCache.putCachedGithubClient(event.getInstallationId(), github);
             BaseQueryCache.putCachedGraphQLClient(event.getInstallationId(), graphQLClient);
@@ -172,8 +178,7 @@ public class RepositoryDiscovery {
         /**
          * Respond to installation changes
          */
-        void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent,
-                GitHub github, DynamicGraphQLClient graphQLClient) {
+        void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent) {
 
             String action = gitHubEvent.getAction();
             JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
@@ -184,6 +189,9 @@ public class RepositoryDiscovery {
 
             switch (action) {
                 case "created", "unsuspend" -> {
+                    GitHub github = gitHubService.getInstallationClient(installationId);
+                    DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(installationId);
+
                     for (GHRepository repo : repositories) {
                         repositoryDiscovery.fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
                                 DiscoveryAction.INSTALL_ADDED, github, graphQLClient, installationId,
@@ -196,12 +204,12 @@ public class RepositoryDiscovery {
                 case "deleted", "suspend" -> {
                     for (GHRepository repo : repositories) {
                         repositoryDiscovery.fireRepositoryDiscoveryEvent.fire(new RepositoryDiscoveryEvent(
-                                DiscoveryAction.INSTALL_REMOVED, github, graphQLClient, installationId,
+                                DiscoveryAction.INSTALL_REMOVED, null, null, installationId,
                                 repo, false));
                     }
                     repositoryDiscovery.fireInstallationDiscoveryEvent
                             .fire(new InstallationDiscoveryEvent(DiscoveryAction.INSTALL_REMOVED,
-                                    installationId, github, graphQLClient));
+                                    installationId, null, null));
                 }
                 default -> {
                 }
