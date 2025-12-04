@@ -1,7 +1,5 @@
 package org.commonhaus.automation.hm;
 
-import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
-
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -45,14 +43,14 @@ import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class DomainMonitor extends ScheduledService {
-    static final String ME = "📋-domains";
+    static final String ME = "🌐-domains";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Inject
     AppContextService ctx;
 
     @Inject
-    ManagerBotConfig mgrBotConfig;
+    public ManagerBotConfig mgrBotConfig;
 
     @Inject
     PeriodicUpdateQueue updateQueue;
@@ -64,7 +62,7 @@ public class DomainMonitor extends ScheduledService {
     NamecheapService namecheapService;
 
     @Inject
-    LatestOrgConfig latestOrgConfig;
+    public LatestOrgConfig latestOrgConfig;
 
     @Inject
     LatestProjectConfig latestProjectConfig;
@@ -83,7 +81,7 @@ public class DomainMonitor extends ScheduledService {
             Log.infof("[%s] ⏰ Scheduled: refresh domains", ME);
             refreshDomains(false);
         } catch (Throwable t) {
-            ctx.logAndSendEmail(ME, "⏰ Error running scheduled domain refresh", t);
+            ctx.logAndSendEmail(ME, "Error running scheduled domain refresh", t);
         }
     }
 
@@ -175,9 +173,9 @@ public class DomainMonitor extends ScheduledService {
                 dispatchDomainList(namecheapDomains);
             }
         } catch (NamecheapException e) {
-            ctx.logAndSendEmail(ME, "⛓️ Error interacting with Namecheap", e);
+            ctx.logAndSendEmail(ME, "Error interacting with Namecheap", e);
         } catch (Exception e) {
-            ctx.logAndSendEmail(ME, "⛓️ Error refreshing domain information", e);
+            ctx.logAndSendEmail(ME, "Error refreshing domain information", e);
         }
     }
 
@@ -319,7 +317,7 @@ public class DomainMonitor extends ScheduledService {
                                 desiredContacts.prettyString()),
                         emailNotification.audit());
             } else {
-                ctx.logAndSendEmail(ME, "[%s] Failed to update contacts for %s".formatted(ME, domainName), null);
+                ctx.logAndSendEmail(ME, "Failed to update contacts for " + domainName, null);
             }
         } catch (Exception e) {
             ctx.logAndSendEmail(ME,
@@ -664,21 +662,6 @@ public class DomainMonitor extends ScheduledService {
         }
     }
 
-    /**
-     * Convert project name to repository full name.
-     * Returns the constructed repository full name based on org config.
-     * A ProjectConfigState is not required to exist - projects may not have
-     * their own config files yet.
-     */
-    private String projectNameToRepoFullName(String projectName) {
-        var assets = latestOrgConfig.getConfig().projects().assetsForProject(projectName);
-        var repoName = assets.projectRepository() == null
-                ? "project-" + projectName
-                : assets.projectRepository();
-        var repoFullName = toFullName(mgrBotConfig.home().organization(), repoName);
-        return repoFullName;
-    }
-
     private Map<String, DomainReconciliation> reconcileDomainSources(
             List<DomainRecord> namecheapDomains,
             List<ManagedDomain> orgDomains,
@@ -712,7 +695,7 @@ public class DomainMonitor extends ScheduledService {
 
             // Convert project names to repo full names for consistent comparison
             for (String projectName : entry.getValue()) {
-                String repoFullName = projectNameToRepoFullName(projectName);
+                String repoFullName = latestOrgConfig.projectNameToRepoFullName(mgrBotConfig, projectName);
                 if (repoFullName != null) {
                     dr.orgExpectedProjects.add(repoFullName);
                 } else {

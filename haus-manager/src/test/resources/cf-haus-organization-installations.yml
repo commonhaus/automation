@@ -1,0 +1,34 @@
+domainManagement:
+  enabled: false
+  dryRun: true
+
+domainMonitoring:
+  enabled: false
+  dryRun: true
+
+githubOrgVerification:
+  enabled: true
+  dryRun: false
+
+sponsors:
+  enabled: false
+  dryRun: true
+
+emailNotifications:
+  errors:
+    - errors@test.org
+  dryRun:
+    - test@test.org
+  audit:
+    - audit@test.org
+
+## Project configuration with GitHub organization assignments
+
+projects:
+  one:
+    githubOrganizations:
+      - https://github.com/test-org-one
+
+  two:
+    githubOrganizations:
+      - test-org-two

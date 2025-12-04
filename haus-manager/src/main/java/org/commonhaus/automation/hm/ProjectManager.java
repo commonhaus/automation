@@ -584,6 +584,10 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                     && !config.projectHealth().organizationRepositories().isEmpty();
         }
 
+        public List<String> githubOrganizations() {
+            return this == EMPTY ? List.of() : projectConfig().githubOrganizations();
+        }
+
         public String[] errors() {
             return this == EMPTY ? null : projectConfig().emailNotifications().errors();
         }

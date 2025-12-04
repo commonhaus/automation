@@ -1,0 +1,13 @@
+enabled: true
+dryRun: false
+
+githubOrganizations:
+  - https://github.com/test-org-one
+
+emailNotifications:
+  errors:
+    - errors@project1.dev
+  dryRun:
+    - test@project1.dev
+  audit:
+    - audit@project1.dev

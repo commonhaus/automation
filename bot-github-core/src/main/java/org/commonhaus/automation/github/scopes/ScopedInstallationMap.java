@@ -23,8 +23,8 @@ import io.quarkus.logging.Log;
 @Singleton
 public class ScopedInstallationMap {
 
-    final Map<Long, AppInstallationState> installationsById = new ConcurrentHashMap<>();
-    final Map<String, AppInstallationState> installationsByScope = new ConcurrentHashMap<>();
+    protected final Map<Long, AppInstallationState> installationsById = new ConcurrentHashMap<>();
+    protected final Map<String, AppInstallationState> installationsByScope = new ConcurrentHashMap<>();
 
     public Optional<Long> getInstallationId(String orgOrFullName) {
         String orgName = toOrganizationName(orgOrFullName);
@@ -79,7 +79,7 @@ public class ScopedInstallationMap {
         }
     }
 
-    void updateInstallationMap(long installationId, String repoFullName) {
+    protected void updateInstallationMap(long installationId, String repoFullName) {
         String orgName = toOrganizationName(repoFullName);
 
         AppInstallationState appInstallation = installationsById.computeIfAbsent(installationId, (k) -> {
