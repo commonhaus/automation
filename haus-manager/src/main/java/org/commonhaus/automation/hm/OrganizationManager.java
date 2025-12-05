@@ -78,7 +78,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         if (action.repository()
                 && repoFullName.equals(mgrBotConfig.home().repositoryFullName())) {
 
-            Log.debugf("[%s] repositoryDiscovered: %s main=%s", ME, action.name(), repoFullName);
             if (action.added()) {
                 // main repository for configuration
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)

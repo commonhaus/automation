@@ -135,7 +135,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         String repoFullName = repo.getFullName();
         String orgName = toOrganizationName(repoFullName);
 
-        Log.debugf("[%s] repositoryDiscovered (%s): %s", ME, repoEvent.action(), repoFullName);
         long installationId = repoEvent.installationId();
 
         // We only read configuration files from repositories in the configured

@@ -72,14 +72,12 @@ public class ConfigWatcher {
 
     protected void repositoryDiscovered(
             @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
-        Log.infof("[%s] ConfigWatcher.repositoryDiscovered: %s", ME, repoEvent.repository().getFullName());
 
         DiscoveryAction action = repoEvent.action();
         GHRepository repo = repoEvent.repository();
         String repoFullName = repo.getFullName();
         long installationId = repoEvent.installationId();
 
-        Log.debugf("[%s] repoDiscovered: %s", ME, repoFullName);
         readConfiguration(repoEvent.installationId(), repoEvent.repository(), null);
 
         if (action.repository() && action.added()) {

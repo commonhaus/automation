@@ -101,8 +101,6 @@ public class VoteProcessor extends ScheduledService {
     }
 
     public void repositoryDiscovered(@Observes @Priority(value = RdePriority.APP_EVENT) RepositoryDiscoveryEvent repoEvent) {
-        Log.infof("🗳️ ⚙️ VoteProcessor.repositoryDiscovered: %s", repoEvent.repository().getFullName());
-
         long ghiId = repoEvent.installationId();
         GHRepository repo = repoEvent.repository();
         VoteConfig voteConfig = ctx.getVoteConfig(repo.getFullName());
