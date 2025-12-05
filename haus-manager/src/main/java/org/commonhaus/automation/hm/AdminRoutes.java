@@ -36,6 +36,9 @@ public class AdminRoutes implements LocalRouteOnly {
     OrganizationManager organizationManager;
 
     @Inject
+    InstallationMonitor installationMonitor;
+
+    @Inject
     ProjectManager projectManager;
 
     @Inject
@@ -99,6 +102,19 @@ public class AdminRoutes implements LocalRouteOnly {
         updateQueue.queueReconciliation("domainInfo::" + domain, () -> {
             var info = namecheapService.getDomainInfo(domain);
             Log.infof("Domain information for %s: %s", domain, info);
+        });
+        routingExchange.ok().end();
+    }
+
+    @Route(path = "/installations", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerInstallationUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+        updateQueue.queueReconciliation("triggerInstallationUpdate", () -> {
+            Log.info("🚀 🏡 Installation update triggered");
+            installationMonitor.checkInstallations(true);
         });
         routingExchange.ok().end();
     }
