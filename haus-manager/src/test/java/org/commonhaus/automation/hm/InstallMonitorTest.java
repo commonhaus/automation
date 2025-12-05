@@ -28,10 +28,10 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @GitHubAppTest
-public class InstallationMonitorTest extends HausManagerTestBase {
+public class InstallMonitorTest extends HausManagerTestBase {
 
     @Inject
-    InstallationMonitor installationMonitor;
+    InstallMonitor installMonitor;
 
     @Inject
     TestScopedInstallationMap installationMap;
@@ -135,7 +135,7 @@ public class InstallationMonitorTest extends HausManagerTestBase {
         mockProjectState2.projectConfig().githubOrganizations().add("test-org-four");
 
         // Execute
-        installationMonitor.checkInstallations(true);
+        installMonitor.checkInstallations(true);
         waitForQueue();
 
         // Verify: Project-one gets error about test-org-three

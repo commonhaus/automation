@@ -30,7 +30,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class InstallationMonitor extends ScheduledService {
+public class InstallMonitor extends ScheduledService {
     static final String ME = "🔧-installs";
 
     @Inject
@@ -248,7 +248,7 @@ public class InstallationMonitor extends ScheduledService {
             if (!toAdd.isEmpty()) {
                 message.append("**GitHub organizations assigned to your project but not in your configuration:**\n");
                 for (var org : toAdd) {
-                    message.append("  - ").append(org).append("\n");
+                    message.append("  - https://github.com/").append(org).append("\n");
                 }
                 message.append(
                         "\nPlease add these to your `githubOrganizations` list in %s, or create a PR in %s to correct foundation records.\n\n"
@@ -258,7 +258,7 @@ public class InstallationMonitor extends ScheduledService {
             if (!toRemove.isEmpty()) {
                 message.append("**GitHub organizations in your configuration but not assigned to your project:**\n");
                 for (var org : toRemove) {
-                    message.append("  - ").append(org).append("\n");
+                    message.append("  - https://github.com/").append(org).append("\n");
                 }
                 message.append(
                         "\nPlease remove these from your `githubOrganizations` list in %s, or create a PR in %s to correct foundation records.\n\n"
@@ -271,7 +271,7 @@ public class InstallationMonitor extends ScheduledService {
             message.append("HausManager is not installed in these GitHub organizations:\n");
             notInstalled.sort(Comparator.comparing(InstallationReconciliation::ghOrgName));
             for (var ni : notInstalled) {
-                message.append("  - ").append(ni.ghOrgName()).append("\n");
+                message.append("  - https://github.com/").append(ni.ghOrgName()).append("\n");
             }
             message.append("\nPlease install HausManager in these organizations.\n\n");
         }
@@ -325,10 +325,10 @@ public class InstallationMonitor extends ScheduledService {
                             .formatted(valid.size()));
             for (var v : valid) {
                 if (!v.orgExpectedProjects().isEmpty()) {
-                    message.append("  - ").append(v.ghOrgName()).append(" (assigned to: ")
+                    message.append("  - https://github.com/").append(v.ghOrgName()).append(" (assigned to: ")
                             .append(String.join(", ", v.orgExpectedProjects())).append(")\n");
                 } else {
-                    message.append("  - ").append(v.ghOrgName()).append(" (declared by: ")
+                    message.append("  - https://github.com/").append(v.ghOrgName()).append(" (declared by: ")
                             .append(String.join(", ", v.projectsDeclaring())).append(")\n");
                 }
             }
@@ -341,7 +341,7 @@ public class InstallationMonitor extends ScheduledService {
                     "The following %d GitHub organizations have HausManager installed but are not mapped to any project:\n\n"
                             .formatted(unmappedOrgs.size()));
             for (var org : unmappedOrgs.stream().sorted().toList()) {
-                message.append("  - ").append(org).append("\n");
+                message.append("  - https://github.com/").append(org).append("\n");
             }
             message.append(
                     "\nConsider adding these to the organization config or removing the installation if not needed.\n");

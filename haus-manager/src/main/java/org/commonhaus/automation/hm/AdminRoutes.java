@@ -36,7 +36,7 @@ public class AdminRoutes implements LocalRouteOnly {
     OrganizationManager organizationManager;
 
     @Inject
-    InstallationMonitor installationMonitor;
+    InstallMonitor installMonitor;
 
     @Inject
     ProjectManager projectManager;
@@ -114,7 +114,7 @@ public class AdminRoutes implements LocalRouteOnly {
         }
         updateQueue.queueReconciliation("triggerInstallationUpdate", () -> {
             Log.info("🚀 🏡 Installation update triggered");
-            installationMonitor.checkInstallations(true);
+            installMonitor.checkInstallations(true);
         });
         routingExchange.ok().end();
     }
