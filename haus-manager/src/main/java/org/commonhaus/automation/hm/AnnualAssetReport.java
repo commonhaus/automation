@@ -188,7 +188,8 @@ public class AnnualAssetReport extends ScheduledService {
     }
 
     /**
-     * Get the set of assets expected for a specific project from the org config
+     * Get the set of assets expected for a specific project from the org config.
+     * Handles pseudo-projects by converting project names to repo full names.
      */
     private Set<String> getExpectedAssetsForProject(
             String projectName,
@@ -198,10 +199,16 @@ public class AnnualAssetReport extends ScheduledService {
         Set<String> expected = new HashSet<>();
         for (var entry : assetToProjects.entrySet()) {
             String asset = entry.getKey();
-            Set<String> projects = entry.getValue();
-            // Check if this project is in the set (by name or by repo)
-            if (projects.contains(projectName) || projects.contains(repoFullName)) {
-                expected.add(asset);
+            Set<String> projectNames = entry.getValue();
+
+            // Convert project names to repo full names for consistent comparison
+            // This handles pseudo-projects with projectRepository pointing to another repo
+            for (String pName : projectNames) {
+                String expectedRepoFullName = latestOrgConfig.projectNameToRepoFullName(mgrBotConfig, pName);
+                if (expectedRepoFullName != null && expectedRepoFullName.equals(repoFullName)) {
+                    expected.add(asset);
+                    break; // Found a match, no need to check other projects for this asset
+                }
             }
         }
         return expected;
