@@ -85,10 +85,18 @@ public class AnnualAssetReport extends ScheduledService {
                 reconciliations.add(recon);
             }
 
-            // 4. Send reports
+            // 4. Send reports (skip home repository)
+            String homeRepo = mgrBotConfig.home().repositoryFullName();
+            int reportsSent = 0;
             for (ProjectAssetReconciliation recon : reconciliations) {
+                // Skip the foundation's home repository
+                if (recon.repoFullName().equals(homeRepo)) {
+                    Log.debugf("[%s] Skipping annual report for home repository: %s", ME, homeRepo);
+                    continue;
+                }
                 try {
                     sendAnnualReport(recon, dryRun);
+                    reportsSent++;
                 } catch (Exception e) {
                     ctx.logAndSendEmail(ME,
                             "Error sending annual report for project: " + recon.repoFullName(), e);
@@ -96,7 +104,7 @@ public class AnnualAssetReport extends ScheduledService {
                 }
             }
 
-            Log.infof("[%s] Annual reports sent for %d project(s)", ME, reconciliations.size());
+            Log.infof("[%s] Annual reports sent for %d project(s)", ME, reportsSent);
 
         } catch (Exception e) {
             ctx.logAndSendEmail(ME, "Error generating annual asset reports", e);
