@@ -240,7 +240,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                     orgCfg == null ? null : orgCfg.emailNotifications());
             return false;
         }
-        Log.debugf("[%s] readOrgConfig: found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
+        Log.debugf("[%s] readOrgConfig: ✔️ found %s in %s", ME, OrganizationConfig.PATH, repo.getFullName());
 
         OrganizationConfigState newState = new OrganizationConfigState(
                 qc.getInstallationId(), repo.getFullName(), orgCfg);

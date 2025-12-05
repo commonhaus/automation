@@ -293,7 +293,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                     qc.getErrorAddresses(oldState == null ? null : oldState.emailNotifications()));
             return;
         }
-        Log.debugf("[%s] readProjectConfig %s: found %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
+        Log.debugf("[%s] readProjectConfig %s: ✔️ found %s in %s", ME, taskGroup, ProjectConfig.PATH, repo.getFullName());
 
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
                 () -> {

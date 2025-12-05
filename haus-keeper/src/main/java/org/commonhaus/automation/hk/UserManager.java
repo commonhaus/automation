@@ -111,7 +111,7 @@ public class UserManager {
                     .formatted(ME, HausKeeperConfig.PATH, repo.getFullName()));
             return;
         }
-        Log.debugf("%s/processConfigUpdate: found %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
+        Log.debugf("%s/processConfigUpdate: ✔️ found %s in %s", ME, HausKeeperConfig.PATH, repo.getFullName());
         hkConfig.update(qc, cfg);
     }
 }

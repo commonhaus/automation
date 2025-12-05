@@ -127,7 +127,7 @@ public class ConfigWatcher {
             return;
         }
 
-        Log.debugf("[%s] readHausRulesConfig: found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
+        Log.debugf("[%s] readHausRulesConfig: ✔️ found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
         repoConfig.put(repo.getFullName(), hausRulesCfg);
     }
 }

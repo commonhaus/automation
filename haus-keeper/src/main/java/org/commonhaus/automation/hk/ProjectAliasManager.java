@@ -189,7 +189,7 @@ public class ProjectAliasManager extends ScheduledService {
         GHContent content = qc.readSourceFile(repo, ProjectAliasMapping.CONFIG_FILE);
         if (content == null || qc.hasErrors()) {
             // Normal
-            Log.debugf("%s readProjectConfig: no %s in %s", taskGroup,
+            Log.debugf("%s readProjectConfig: unable to read %s in %s", taskGroup,
                     ProjectAliasMapping.CONFIG_FILE, repoFullName);
             return;
         }
@@ -206,7 +206,7 @@ public class ProjectAliasManager extends ScheduledService {
                     qc.getErrorAddresses());
             return;
         }
-        Log.debugf("%s readProjectConfig: found %s in %s", taskGroup, ProjectAliasMapping.CONFIG_FILE,
+        Log.debugf("%s readProjectConfig: ✔️ found %s in %s", taskGroup, ProjectAliasMapping.CONFIG_FILE,
                 repo.getFullName());
 
         AliasConfigState newState = new AliasConfigState(taskGroup,
