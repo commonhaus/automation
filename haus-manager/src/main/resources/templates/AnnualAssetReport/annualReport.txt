@@ -1,0 +1,87 @@
+Hello {projectName} team,
+
+As part of our annual check-in process, we're verifying that the Commonhaus Foundation and your project are in agreement about declared assets.
+
+**TL;DR**: Please review your declared assets below. If you have domains or GitHub organizations not listed here, update your project configuration to include them. This ensures the foundation's records stay current with your project's resources.
+
+This is a routine verification to ensure our records match yours and to catch any discrepancies early. Please review the information below and let us know if anything needs to be updated.
+
+## Technical Contact
+
+For reference, your current technical contact is:
+
+{techContact}
+
+If this needs to be updated, please modify your project configuration in {repoFullName}.
+
+## Asset Summary
+
+{#if !matchedDomains.isEmpty() || !matchedGithubOrgs.isEmpty()}
+### Confirmed Assets
+
+The following assets are properly declared in both your project configuration and our foundation records:
+
+{#if !matchedDomains.isEmpty()}
+**Domains:**
+{#for domain in matchedDomains}
+  - {domain}
+{/for}
+{/if}
+
+{#if !matchedGithubOrgs.isEmpty()}
+**GitHub Organizations:**
+{#for org in matchedGithubOrgs}
+  - https://github.com/{org}
+{/for}
+{/if}
+
+{/if}
+{#if !mismatches.isEmpty()}
+### Items Requiring Attention
+
+We found some discrepancies between your project configuration and our foundation records:
+
+{#each mismatches}
+{#if it.assetType.name() == 'DOMAIN'}
+**Domain: {it.assetName}**
+  - Status: {it.description}
+{#if it.mismatchType.name() == 'IN_PROJECT_NOT_IN_ORG'}
+  - Action: This domain is in your project configuration but not registered with the foundation. Please create a PR in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
+{#else}
+  - Action: The foundation expects this domain to be managed by your project, but it's not in your project configuration. Please add it to your project config in {repoFullName}, or contact us if this is no longer your domain.
+{/if}
+
+{#else}
+**GitHub Organization: {it.assetName}**
+  - Status: {it.description}
+{#if it.mismatchType.name() == 'IN_PROJECT_NOT_IN_ORG'}
+  - Action: This GitHub organization is in your project configuration but not registered with the foundation. Please create a PR in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
+{#else}
+  - Action: The foundation expects this GitHub organization to be managed by your project, but it's not in your project configuration. Please add it to your project config in {repoFullName}, or contact us if this is no longer your organization.
+{/if}
+
+{/if}
+{/each}
+
+{/if}
+## Next Steps
+
+{#if mismatches.isEmpty()}
+Everything looks good! No action is required for the assets listed above.
+
+**Important**: If your project has acquired any new domains or GitHub organizations that aren't listed above, please update your project configuration in {repoFullName} to include them. This ensures the foundation's records stay current with your project's resources.
+
+We'd appreciate a response confirming you've reviewed this information. If you have any questions or concerns, please reply to this email or contact us at the foundation.
+{#else}
+Please review the items above and take the appropriate actions. If you have any questions or need assistance, please reply to this email.
+
+**Also**: If your project has acquired any new domains or GitHub organizations that aren't listed in this report, please update your project configuration in {repoFullName} to include them.
+
+We'd appreciate a response confirming you've reviewed this information.
+{/if}
+
+Thank you for being part of the Commonhaus Foundation!
+
+---
+This is an automated annual check-in from the Commonhaus Foundation's haus-manager bot.
+Repository: {repoFullName}

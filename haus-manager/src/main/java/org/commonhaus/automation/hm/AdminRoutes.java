@@ -39,6 +39,9 @@ public class AdminRoutes implements LocalRouteOnly {
     InstallMonitor installMonitor;
 
     @Inject
+    AnnualAssetReport annualAssetReport;
+
+    @Inject
     ProjectManager projectManager;
 
     @Inject
@@ -115,6 +118,22 @@ public class AdminRoutes implements LocalRouteOnly {
         updateQueue.queueReconciliation("triggerInstallationUpdate", () -> {
             Log.info("🚀 🏡 Installation update triggered");
             installMonitor.checkInstallations(true);
+        });
+        routingExchange.ok().end();
+    }
+
+    @Route(path = "/annualAssetReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerAnnualAssetReport(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+        var request = routingContext.request();
+        boolean dryRun = Boolean.parseBoolean(request.getParam("dryRun"));
+
+        updateQueue.queueReconciliation("triggerAnnualAssetReport", () -> {
+            Log.info("🚀 📋 Annual asset report triggered");
+            annualAssetReport.generateAnnualReports(dryRun);
         });
         routingExchange.ok().end();
     }
