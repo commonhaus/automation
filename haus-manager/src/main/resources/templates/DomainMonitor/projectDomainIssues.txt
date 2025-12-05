@@ -1,0 +1,72 @@
+{#if !orgProjectConflicts.isEmpty()}
+## Conflicts with Organization Management
+
+{#if isOrgRepo}
+These domains are managed directly by the organization but are also claimed by projects:
+{#else}
+These domains are managed by the organization but are also in your project configuration:
+{/if}
+{#for conflict in orgProjectConflicts}
+  - {conflict.domainName}{#if isOrgRepo} (also claimed by: {#each conflict.projectsClaimingDomain}{it}{#if it_hasNext}, {/if}{/each}){/if}
+{/for}
+{#if !isOrgRepo}
+
+Please remove these from your domainManagement configuration.
+{/if}
+
+{/if}
+{#if !multipleProjectConflicts.isEmpty()}
+## Conflicts with Other Projects
+
+These domains are claimed by multiple projects:
+{#for conflict in multipleProjectConflicts}
+  - {conflict.domainName} (also claimed by: {#each conflict.projectsClaimingDomain}{it}{#if it_hasNext}, {/if}{/each})
+{/for}
+
+Please coordinate with other projects to resolve ownership.
+
+{/if}
+{#if !toAdd.isEmpty() || !toRemove.isEmpty()}
+## Configuration Mismatches
+
+{/if}
+{#if !toAdd.isEmpty()}
+**Domains assigned to your project but not in your configuration:**
+{#for domain in toAdd}
+  - {domain}
+{/for}
+
+Please add these to your domainManagement configuration, or create a PR in {homeRepo} to correct foundation records..
+
+{/if}
+{#if !toRemove.isEmpty()}
+**Domains in your configuration but not assigned to your project:**
+{#for domain in toRemove}
+  - {domain}
+{/for}
+
+Please remove these from your domainManagement configuration, or create a PR in {homeRepo} to correct foundation records.
+
+{/if}
+{#if !orphanDomains.isEmpty() && isOrgRepo}
+## Unconfigured Domains
+
+These domains are registered but not configured:
+{#for orphan in orphanDomains}
+  - {orphan.domainName} (expires: {orphan.namecheapInfo.expires})
+{/for}
+
+Please add to organization or project configuration, or remove from Namecheap.
+
+{/if}
+{#if !missingFromNamecheap.isEmpty()}
+## Domains Not Registered
+
+These domains are in configuration but not registered in Namecheap:
+{#for missing in missingFromNamecheap}
+  - {missing.domainName}
+{/for}
+
+Please register these domains or remove from configuration.
+
+{/if}

@@ -1,0 +1,25 @@
+{#if !valid.isEmpty()}
+## Configured Organizations
+
+The following {valid.size()} GitHub organizations are properly configured and have HausManager installed:
+
+{#for v in valid}
+{#if !v.orgExpectedProjects.isEmpty()}
+  - https://github.com/{v.ghOrgName} (assigned to: {#each v.orgExpectedProjects}{it}{#if it_hasNext}, {/if}{/each})
+{#else}
+  - https://github.com/{v.ghOrgName} (declared by: {#each v.projectsDeclaring}{it}{#if it_hasNext}, {/if}{/each})
+{/if}
+{/for}
+
+{/if}
+{#if !unmapped.isEmpty()}
+## Unmapped Organizations
+
+The following {unmapped.size()} GitHub organizations have HausManager installed but are not mapped to any project:
+
+{#for org in unmapped}
+  - https://github.com/{org}
+{/for}
+
+Consider adding these to the organization config or removing the installation if not needed.
+{/if}

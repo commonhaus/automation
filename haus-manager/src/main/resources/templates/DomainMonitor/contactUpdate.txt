@@ -1,0 +1,8 @@
+Contacts {#if dryRun}would be updated{#else}updated{/if} for domain {domainName}.
+
+Previous contacts:
+{currentContacts}
+
+{#if dryRun}Desired{#else}Updated{/if} contacts:
+{desiredContacts}
+

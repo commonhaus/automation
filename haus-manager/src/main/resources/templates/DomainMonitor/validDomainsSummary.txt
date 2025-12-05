@@ -1,0 +1,5 @@
+The following {validCount} domains are properly configured and registered:
+
+{validDomainsText}
+
+These domains will be monitored for contact information updates.

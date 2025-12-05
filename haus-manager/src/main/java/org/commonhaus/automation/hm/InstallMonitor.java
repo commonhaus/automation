@@ -26,12 +26,28 @@ import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.queue.ScheduledService;
 
 import io.quarkus.logging.Log;
+import io.quarkus.qute.CheckedTemplate;
+import io.quarkus.qute.TemplateInstance;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
 public class InstallMonitor extends ScheduledService {
     static final String ME = "🔧-installs";
+
+    @CheckedTemplate
+    static class Templates {
+        public static native TemplateInstance projectInstallationIssues(
+                List<String> toAdd,
+                List<String> toRemove,
+                List<String> notInstalled,
+                String projectConfigPath,
+                String homeRepo);
+
+        public static native TemplateInstance orgSummary(
+                List<InstallationReconciliation> valid,
+                List<String> unmapped);
+    }
 
     @Inject
     AppContextService ctx;
@@ -213,8 +229,6 @@ public class InstallMonitor extends ScheduledService {
             List<InstallationReconciliation> issues,
             boolean dryRun) {
 
-        StringBuilder message = new StringBuilder();
-
         List<InstallationReconciliation> mismatches = new ArrayList<>();
         List<InstallationReconciliation> notInstalled = new ArrayList<>();
 
@@ -226,10 +240,10 @@ public class InstallMonitor extends ScheduledService {
             }
         }
 
-        if (!mismatches.isEmpty()) {
-            List<String> toAdd = new ArrayList<>();
-            List<String> toRemove = new ArrayList<>();
+        List<String> toAdd = new ArrayList<>();
+        List<String> toRemove = new ArrayList<>();
 
+        if (!mismatches.isEmpty()) {
             mismatches.sort(Comparator.comparing(InstallationReconciliation::ghOrgName));
             for (var mismatch : mismatches) {
                 if (mismatch.orgExpectedProjects().contains(project) &&
@@ -240,45 +254,26 @@ public class InstallMonitor extends ScheduledService {
                     toRemove.add(mismatch.ghOrgName());
                 }
             }
-
-            if (!toAdd.isEmpty() || !toRemove.isEmpty()) {
-                message.append("## Configuration Mismatches\n\n");
-            }
-
-            if (!toAdd.isEmpty()) {
-                message.append("**GitHub organizations assigned to your project but not in your configuration:**\n");
-                for (var org : toAdd) {
-                    message.append("  - https://github.com/").append(org).append("\n");
-                }
-                message.append(
-                        "\nPlease add these to your `githubOrganizations` list in %s, or create a PR in %s to correct foundation records.\n\n"
-                                .formatted(ProjectConfig.PATH, mgrBotConfig.home().repositoryFullName()));
-            }
-
-            if (!toRemove.isEmpty()) {
-                message.append("**GitHub organizations in your configuration but not assigned to your project:**\n");
-                for (var org : toRemove) {
-                    message.append("  - https://github.com/").append(org).append("\n");
-                }
-                message.append(
-                        "\nPlease remove these from your `githubOrganizations` list in %s, or create a PR in %s to correct foundation records.\n\n"
-                                .formatted(ProjectConfig.PATH, mgrBotConfig.home().repositoryFullName()));
-            }
         }
 
+        List<String> notInstalledOrgs = new ArrayList<>();
         if (!notInstalled.isEmpty()) {
-            message.append("## Missing Installations\n\n");
-            message.append("HausManager is not installed in these GitHub organizations:\n");
             notInstalled.sort(Comparator.comparing(InstallationReconciliation::ghOrgName));
             for (var ni : notInstalled) {
-                message.append("  - https://github.com/").append(ni.ghOrgName()).append("\n");
+                notInstalledOrgs.add(ni.ghOrgName());
             }
-            message.append("\nPlease install HausManager in these organizations.\n\n");
         }
 
-        if (message.length() == 0) {
+        if (toAdd.isEmpty() && toRemove.isEmpty() && notInstalledOrgs.isEmpty()) {
             return; // Nothing to send
         }
+
+        String message = Templates.projectInstallationIssues(
+                toAdd,
+                toRemove,
+                notInstalledOrgs,
+                ProjectConfig.PATH,
+                mgrBotConfig.home().repositoryFullName()).render();
 
         String title = "haus-manager: GitHub organization issues for " + project;
         ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
@@ -287,12 +282,12 @@ public class InstallMonitor extends ScheduledService {
             Log.infof("[%s] DRY RUN: would send email for project %s. title: %s; body: %s",
                     ME, project, title, message);
         } else if (state != null && state.projectConfig() != null) {
-            ctx.sendEmail(ME, title, message.toString(),
+            ctx.sendEmail(ME, title, message,
                     state.projectConfig().emailNotifications().errors());
         }
 
         // cc: send a copy to org errors email
-        ctx.sendEmail(ME, title, message.toString(),
+        ctx.sendEmail(ME, title, message,
                 dryRun
                         ? latestOrgConfig.getConfig().emailNotifications().dryRun()
                         : latestOrgConfig.getConfig().emailNotifications().errors());
@@ -316,40 +311,12 @@ public class InstallMonitor extends ScheduledService {
             return; // Nothing to report
         }
 
-        StringBuilder message = new StringBuilder();
-
-        if (!valid.isEmpty()) {
-            message.append("## Configured Organizations\n\n");
-            message.append(
-                    "The following %d GitHub organizations are properly configured and have HausManager installed:\n\n"
-                            .formatted(valid.size()));
-            for (var v : valid) {
-                if (!v.orgExpectedProjects().isEmpty()) {
-                    message.append("  - https://github.com/").append(v.ghOrgName()).append(" (assigned to: ")
-                            .append(String.join(", ", v.orgExpectedProjects())).append(")\n");
-                } else {
-                    message.append("  - https://github.com/").append(v.ghOrgName()).append(" (declared by: ")
-                            .append(String.join(", ", v.projectsDeclaring())).append(")\n");
-                }
-            }
-            message.append("\n");
-        }
-
-        if (!unmappedOrgs.isEmpty()) {
-            message.append("## Unmapped Organizations\n\n");
-            message.append(
-                    "The following %d GitHub organizations have HausManager installed but are not mapped to any project:\n\n"
-                            .formatted(unmappedOrgs.size()));
-            for (var org : unmappedOrgs.stream().sorted().toList()) {
-                message.append("  - https://github.com/").append(org).append("\n");
-            }
-            message.append(
-                    "\nConsider adding these to the organization config or removing the installation if not needed.\n");
-        }
+        List<String> unmappedList = unmappedOrgs.stream().sorted().toList();
+        String message = Templates.orgSummary(valid, unmappedList).render();
 
         String title = "haus-manager: GitHub organization verification summary";
 
-        ctx.sendEmail(ME, title, message.toString(),
+        ctx.sendEmail(ME, title, message,
                 dryRun
                         ? latestOrgConfig.getConfig().emailNotifications().dryRun()
                         : latestOrgConfig.getConfig().emailNotifications().audit());

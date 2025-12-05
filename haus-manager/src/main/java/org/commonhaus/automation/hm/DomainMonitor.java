@@ -38,6 +38,8 @@ import org.kohsuke.github.GHRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkus.logging.Log;
+import io.quarkus.qute.CheckedTemplate;
+import io.quarkus.qute.TemplateInstance;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
@@ -45,6 +47,29 @@ import io.quarkus.scheduler.Scheduled;
 public class DomainMonitor extends ScheduledService {
     static final String ME = "🌐-domains";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    @CheckedTemplate
+    static class Templates {
+        public static native TemplateInstance contactUpdate(
+                boolean dryRun,
+                String domainName,
+                String currentContacts,
+                String desiredContacts);
+
+        public static native TemplateInstance projectDomainIssues(
+                boolean isOrgRepo,
+                List<DomainReconciliation> orgProjectConflicts,
+                List<DomainReconciliation> multipleProjectConflicts,
+                List<String> toAdd,
+                List<String> toRemove,
+                List<DomainReconciliation> orphanDomains,
+                List<DomainReconciliation> missingFromNamecheap,
+                String homeRepo);
+
+        public static native TemplateInstance validDomainsSummary(
+                int validCount,
+                String validDomainsText);
+    }
 
     @Inject
     AppContextService ctx;
@@ -284,38 +309,24 @@ public class DomainMonitor extends ScheduledService {
 
         if (dryRun) {
             Log.infof("[%s] DRY RUN: Would update contacts for %s", ME, domainName);
-            ctx.sendEmail(ME, "DRY RUN: Domain contact updates",
-                    """
-                            Contacts would be updated for domain %s.
-
-                            Current contacts:
-                            %s
-
-                            Desired contacts:
-                            %s
-
-                            """.formatted(domainName, currentContacts.prettyString(),
-                            desiredContacts.prettyString()),
-                    emailNotification.dryRun());
+            String body = Templates.contactUpdate(
+                    true,
+                    domainName,
+                    currentContacts.prettyString(),
+                    desiredContacts.prettyString()).render();
+            ctx.sendEmail(ME, "DRY RUN: Domain contact updates", body, emailNotification.dryRun());
             return;
         }
 
         try {
             if (namecheapService.setContacts(domainName, desiredContacts)) {
                 Log.infof("[%s] Successfully updated contacts for %s", ME, domainName);
-                ctx.sendEmail(ME, "Domain contacts updated",
-                        """
-                                Contacts updated for domain %s.
-
-                                Previous contacts:
-                                %s
-
-                                Updated contacts:
-                                %s
-
-                                """.formatted(domainName, currentContacts.prettyString(),
-                                desiredContacts.prettyString()),
-                        emailNotification.audit());
+                String body = Templates.contactUpdate(
+                        false,
+                        domainName,
+                        currentContacts.prettyString(),
+                        desiredContacts.prettyString()).render();
+                ctx.sendEmail(ME, "Domain contacts updated", body, emailNotification.audit());
             } else {
                 ctx.logAndSendEmail(ME, "Failed to update contacts for " + domainName, null);
             }
@@ -469,103 +480,35 @@ public class DomainMonitor extends ScheduledService {
         // Check if this is the org repo
         boolean isOrgRepo = project.equals(mgrBotConfig.home().repositoryFullName());
 
-        // Build consolidated message
-        StringBuilder message = new StringBuilder();
+        // Sort all lists
+        orgProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
+        multipleProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
+        projectMismatches.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
+        orphanDomains.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
+        missingFromNamecheap.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
 
-        if (!orgProjectConflicts.isEmpty()) {
-            message.append("## Conflicts with Organization Management\n\n");
-            if (isOrgRepo) {
-                message.append(
-                        "These domains are managed directly by the organization but are also claimed by projects:\n");
-            } else {
-                message.append(
-                        "These domains are managed by the organization but are also in your project configuration:\n");
-            }
-            orgProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
-            for (var conflict : orgProjectConflicts) {
-                message.append("  - ").append(conflict.domainName());
-                if (isOrgRepo) {
-                    message.append(" (also claimed by: ")
-                            .append(String.join(", ", conflict.projectsClaimingDomain()));
-                }
-                message.append(")\n");
-            }
-            if (!isOrgRepo) {
-                message.append("\nPlease remove these from your domainManagement configuration.\n");
-            }
-            message.append("\n");
-        }
-
-        if (!multipleProjectConflicts.isEmpty()) {
-            message.append("## Conflicts with Other Projects\n\n");
-            message.append("These domains are claimed by multiple projects:\n");
-            multipleProjectConflicts.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
-            for (var conflict : multipleProjectConflicts) {
-                message.append("  - ").append(conflict.domainName())
-                        .append(" (also claimed by: ")
-                        .append(String.join(", ", conflict.projectsClaimingDomain()))
-                        .append(")\n");
-            }
-            message.append("\nPlease coordinate with other projects to resolve ownership.\n\n");
-        }
-
-        if (!projectMismatches.isEmpty()) {
-            message.append("## Configuration Mismatches\n\n");
-            List<String> toAdd = new ArrayList<>();
-            List<String> toRemove = new ArrayList<>();
-
-            projectMismatches.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
-            for (var mismatch : projectMismatches) {
-                if (mismatch.orgExpectedProjects().contains(project) &&
-                        !mismatch.projectsClaimingDomain().contains(project)) {
-                    toAdd.add(mismatch.domainName());
-                } else if (!mismatch.orgExpectedProjects().contains(project) &&
-                        mismatch.projectsClaimingDomain().contains(project)) {
-                    toRemove.add(mismatch.domainName());
-                }
-            }
-
-            if (!toAdd.isEmpty()) {
-                message.append("**Domains assigned to your project but not in your configuration:**\n");
-                for (var domain : toAdd) {
-                    message.append("  - ").append(domain).append("\n");
-                }
-                message.append(
-                        "\nPlease add these to your domainManagement configuration, or create a PR in %s to correct foundation records..\n\n"
-                                .formatted(mgrBotConfig.home().repositoryFullName()));
-            }
-
-            if (!toRemove.isEmpty()) {
-                message.append("**Domains in your configuration but not assigned to your project:**\n");
-                for (var domain : toRemove) {
-                    message.append("  - ").append(domain).append("\n");
-                }
-                message.append(
-                        "\nPlease remove these from your domainManagement configuration, or create a PR in %s to correct foundation records.\n\n"
-                                .formatted(mgrBotConfig.home().repositoryFullName()));
+        // Extract toAdd and toRemove from projectMismatches
+        List<String> toAdd = new ArrayList<>();
+        List<String> toRemove = new ArrayList<>();
+        for (var mismatch : projectMismatches) {
+            if (mismatch.orgExpectedProjects().contains(project) &&
+                    !mismatch.projectsClaimingDomain().contains(project)) {
+                toAdd.add(mismatch.domainName());
+            } else if (!mismatch.orgExpectedProjects().contains(project) &&
+                    mismatch.projectsClaimingDomain().contains(project)) {
+                toRemove.add(mismatch.domainName());
             }
         }
 
-        if (!orphanDomains.isEmpty() && isOrgRepo) {
-            message.append("## Unconfigured Domains\n\n");
-            message.append("These domains are registered but not configured:\n");
-            orphanDomains.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
-            for (var orphan : orphanDomains) {
-                message.append("  - ").append(orphan.domainName())
-                        .append(" (expires: ").append(orphan.namecheapInfo().expires()).append(")\n");
-            }
-            message.append("\nPlease add to organization or project configuration, or remove from Namecheap.\n\n");
-        }
-
-        if (!missingFromNamecheap.isEmpty()) {
-            message.append("## Domains Not Registered\n\n");
-            message.append("These domains are in configuration but not registered in Namecheap:\n");
-            missingFromNamecheap.sort((dr1, dr2) -> dr1.domainName().compareTo(dr2.domainName()));
-            for (var missing : missingFromNamecheap) {
-                message.append("  - ").append(missing.domainName()).append("\n");
-            }
-            message.append("\nPlease register these domains or remove from configuration.\n\n");
-        }
+        String message = Templates.projectDomainIssues(
+                isOrgRepo,
+                orgProjectConflicts,
+                multipleProjectConflicts,
+                toAdd,
+                toRemove,
+                orphanDomains,
+                missingFromNamecheap,
+                mgrBotConfig.home().repositoryFullName()).render();
 
         // Send the notification using helper methods
         String title = isOrgRepo
@@ -573,12 +516,12 @@ public class DomainMonitor extends ScheduledService {
                 : "haus-manager: Domain issues for " + project;
 
         if (isOrgRepo) {
-            createOrgIssueAndMail(title, message.toString(), true);
+            createOrgIssueAndMail(title, message, true);
         } else {
             ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
-            createProjectIssueAndMail(title, message.toString(), state, true);
+            createProjectIssueAndMail(title, message, state, true);
             // cc: send a copy to org errors email
-            createOrgIssueAndMail(title, message.toString(), true);
+            createOrgIssueAndMail(title, message, true);
         }
     }
 
@@ -633,28 +576,22 @@ public class DomainMonitor extends ScheduledService {
         // Send audit email to org with list of valid domains
         if (!valid.isEmpty()) {
             String title = "haus-manager: Domain reconciliation summary";
-            String message = """
-                    The following %d domains are properly configured and registered:
 
-                    %s
+            String validDomainsText = String.join("\n", valid.stream()
+                    .sorted((v1, v2) -> v1.domainName().compareTo(v2.domainName()))
+                    .map(v -> {
+                        if (v.orgManagedDirectly) {
+                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
+                                    + "; org-managed)";
+                        } else {
+                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
+                                    + "; managed by: " +
+                                    String.join(", ", v.projectsClaimingDomain()) + ")";
+                        }
+                    })
+                    .toList());
 
-                    These domains will be monitored for contact information updates.
-                    """
-                    .formatted(
-                            valid.size(),
-                            String.join("\n", valid.stream()
-                                    .sorted((v1, v2) -> v1.domainName().compareTo(v2.domainName()))
-                                    .map(v -> {
-                                        if (v.orgManagedDirectly) {
-                                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
-                                                    + "; org-managed)";
-                                        } else {
-                                            return "  - " + v.domainName() + " (expires " + v.namecheapInfo().expires()
-                                                    + "; managed by: " +
-                                                    String.join(", ", v.projectsClaimingDomain()) + ")";
-                                        }
-                                    })
-                                    .toList()));
+            String message = Templates.validDomainsSummary(valid.size(), validDomainsText).render();
 
             createOrgIssueAndMail(title, message, false);
         }
