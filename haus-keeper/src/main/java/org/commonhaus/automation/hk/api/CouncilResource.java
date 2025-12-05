@@ -60,6 +60,14 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @Path("/manager/installations")
+    public Response triggerInstallMonitor() {
+        asyncCommonhausService.triggerInstallMonitor(session);
+        return Response.noContent().build();
+    }
+
+    @GET
+    @KnownUser
     @Path("/manager/org")
     public Response triggerOrgUpdate() {
         asyncCommonhausService.triggerOrgUpdate(session);

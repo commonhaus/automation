@@ -33,6 +33,20 @@ public class AsyncCommonhausService {
     @Inject
     EventBus eventBus;
 
+    public void triggerInstallMonitor(MemberSession session) {
+        Log.debugf("[%s] Trigger installation monitor", session.login());
+        if (session.roles().contains("cfc")) {
+            AsyncServiceEvent event = new AsyncServiceEvent(
+                    session.login(),
+                    "HausManager.triggerInstallMonitor",
+                    () -> {
+                        hausManagerClient.triggerInstallMonitor();
+                        return null;
+                    });
+            eventBus.send(AsyncServiceEvent.ADDRESS, event);
+        }
+    }
+
     public void triggerOrgUpdate(MemberSession session) {
         Log.debugf("[%s] Trigger org update", session.login());
         if (session.roles().contains("egc")) {
@@ -121,6 +135,10 @@ public class AsyncCommonhausService {
         @GET
         @Path("/org")
         Response triggerOrgUpdate();
+
+        @GET
+        @Path("/installations")
+        Response triggerInstallMonitor();
 
         @GET
         @Path("/sponsors")
