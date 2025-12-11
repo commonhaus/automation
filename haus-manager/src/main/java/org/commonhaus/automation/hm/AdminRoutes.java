@@ -33,6 +33,9 @@ public class AdminRoutes implements LocalRouteOnly {
     NamecheapService namecheapService;
 
     @Inject
+    CollaboratorMonitor collaboratorMonitor;
+
+    @Inject
     OrganizationManager organizationManager;
 
     @Inject
@@ -68,6 +71,17 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
+        routingExchange.ok().end();
+    }
+
+    @Route(path = "/collaborators", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void triggerAllCollaborators(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange)) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
+        Log.info("🚀 👥 Collaborator synchronization triggered");
+        collaboratorMonitor.refreshCollaborators(true);
         routingExchange.ok().end();
     }
 

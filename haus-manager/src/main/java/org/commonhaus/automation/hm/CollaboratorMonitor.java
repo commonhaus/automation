@@ -61,12 +61,8 @@ public class CollaboratorMonitor extends ScheduledService {
     // Quartz cron expression: s m h dom mon dow year(optional)
     @Scheduled(cron = "${automation.hausManager.cron.collaborators:0 47 9 */3 * ?}")
     public void scheduledRefresh() {
-        try {
-            Log.infof("[%s] ⏰ Scheduled: refresh collaborators", ME);
-            refreshCollaborators(false);
-        } catch (Throwable t) {
-            ctx.logAndSendEmail(ME, "👥 ⏰ Error running scheduled collaborator refresh", t);
-        }
+        Log.infof("[%s] ⏰ Scheduled: refresh collaborators", ME);
+        refreshCollaborators(false);
     }
 
     public void refreshCollaborators(boolean userTriggered) {
