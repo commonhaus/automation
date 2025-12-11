@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
@@ -121,7 +120,7 @@ public class MemberAttestationResource {
     }
 
     public record AttestationPost(
-            @Nonnull String id,
-            @Nonnull String version) {
+            String id,
+            String version) {
     }
 }

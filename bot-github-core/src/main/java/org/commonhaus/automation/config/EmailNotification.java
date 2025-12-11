@@ -2,8 +2,6 @@ package org.commonhaus.automation.config;
 
 import java.util.Arrays;
 
-import jakarta.annotation.Nonnull;
-
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -20,19 +18,16 @@ public record EmailNotification(
     static final String[] EMPTY = new String[0];
     public static final EmailNotification UNDEFINED = new EmailNotification(EMPTY, EMPTY, EMPTY);
 
-    @Nonnull
     @Override
     public String[] audit() {
         return audit == null ? EMPTY : audit;
     }
 
-    @Nonnull
     @Override
     public String[] dryRun() {
         return dryRun == null ? EMPTY : dryRun;
     }
 
-    @Nonnull
     @Override
     public String[] errors() {
         return errors == null ? EMPTY : errors;

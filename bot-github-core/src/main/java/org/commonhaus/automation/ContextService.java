@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.function.Supplier;
 
-import jakarta.annotation.Nonnull;
-
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.mail.LogMailer;
@@ -87,10 +85,8 @@ public interface ContextService {
 
     boolean isDiscoveryEnabled();
 
-    @Nonnull
     String[] botErrorEmailAddress();
 
-    @Nonnull
     String[] getErrorAddresses(EmailNotification notifications);
 
     GitHub getInstallationClient(long installationId);

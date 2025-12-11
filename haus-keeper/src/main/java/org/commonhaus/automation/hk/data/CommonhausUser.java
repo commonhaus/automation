@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import jakarta.annotation.Nonnull;
 import jakarta.ws.rs.core.Response;
 
 import org.commonhaus.automation.hk.data.CommonhausUserData.GoodStanding;
@@ -32,12 +31,9 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 public class CommonhausUser implements UserLogin {
     public static final String MEMBER_ROLE = "member";
 
-    @Nonnull
     String login;
     final long id;
-    @Nonnull
     final CommonhausUserData data;
-    @Nonnull
     final Set<String> history = new TreeSet<>();
 
     Boolean isMember;

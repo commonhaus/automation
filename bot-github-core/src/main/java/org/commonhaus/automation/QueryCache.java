@@ -25,7 +25,7 @@ public class QueryCache {
         this.name = name;
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "null", "unchecked", "unused" })
     public <T> T get(String key) {
         T result = (T) cache.getIfPresent(key);
         if (result != null) {
@@ -43,6 +43,7 @@ public class QueryCache {
      * @param value to be cached
      * @return new value
      */
+    @SuppressWarnings("null")
     public <T> T put(String key, T value) {
         if (value == null) {
             invalidate(key);
@@ -82,6 +83,7 @@ public class QueryCache {
         return (T) cache.asMap().putIfAbsent(key, value);
     }
 
+    @SuppressWarnings("null")
     public void invalidate(String key) {
         Log.debugf(":: INVALIDATE %s/%s ::: ", name, key);
         cache.invalidate(key);

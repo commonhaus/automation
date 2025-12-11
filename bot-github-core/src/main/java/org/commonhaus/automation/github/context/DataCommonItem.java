@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.annotation.Nonnull;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
@@ -195,7 +194,6 @@ public class DataCommonItem extends DataCommonObject {
         return JsonAttribute.pullRequest.commonItemFrom(result);
     }
 
-    @Nonnull
     public static List<DataCommonItem> findIssuesWithLabel(GitHubQueryContext qc,
             String labelName) {
         List<DataCommonItem> allIssues = new ArrayList<>();

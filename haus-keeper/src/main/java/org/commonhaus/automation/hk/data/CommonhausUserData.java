@@ -7,13 +7,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import jakarta.annotation.Nonnull;
-
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 public class CommonhausUserData {
-    @Nonnull
     MemberStatus status = MemberStatus.UNKNOWN;
 
     @JsonAlias("good_until")
@@ -139,9 +136,9 @@ public class CommonhausUserData {
     }
 
     public record Attestation(
-            @Nonnull @JsonAlias("with_status") MemberStatus withStatus,
-            @Nonnull String date,
-            @Nonnull String version) {
+            @JsonAlias("with_status") MemberStatus withStatus,
+            String date,
+            String version) {
     }
 
     public void merge(CommonhausUserData other) {

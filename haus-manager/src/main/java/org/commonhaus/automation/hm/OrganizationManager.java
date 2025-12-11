@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import jakarta.annotation.Nonnull;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -330,7 +329,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     record OrganizationConfigState(
             long installationId,
             String repoFullName,
-            @Nonnull OrganizationConfig orgConfig,
+            OrganizationConfig orgConfig,
             Set<RepoSource> groupMapSources) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {

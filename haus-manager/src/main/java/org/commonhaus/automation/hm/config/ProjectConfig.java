@@ -3,8 +3,6 @@ package org.commonhaus.automation.hm.config;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.annotation.Nonnull;
-
 import org.commonhaus.automation.config.EmailNotification;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -51,7 +49,6 @@ public class ProjectConfig {
     }
 
     /** Email notifications configuration */
-    @Nonnull
     public EmailNotification emailNotifications() {
         return emailNotifications == null
                 ? EmailNotification.UNDEFINED

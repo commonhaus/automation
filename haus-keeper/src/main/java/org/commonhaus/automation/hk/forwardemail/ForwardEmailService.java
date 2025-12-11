@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import jakarta.annotation.Nonnull;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.WebApplicationException;
@@ -159,7 +158,7 @@ public class ForwardEmailService {
      * @throws WebApplicationException on Rest Client error (including Not Found)
      *         or if the key resolves to multiple aliases
      */
-    protected Alias getAlias(@Nonnull AliasKey aliasKey) {
+    protected Alias getAlias(AliasKey aliasKey) {
         if (emailDisabled()) {
             return null;
         }
@@ -195,8 +194,8 @@ public class ForwardEmailService {
      * @param existing Existing Alias object (if present)
      * @throws WebApplicationException on Rest Client error
      */
-    protected Alias putAlias(@Nonnull AliasKey aliasKey, @Nonnull String description,
-            @Nonnull Set<String> recipients, Alias existing) {
+    protected Alias putAlias(AliasKey aliasKey, String description,
+            Set<String> recipients, Alias existing) {
         if (emailDisabled() || recipients == null || recipients.isEmpty()) {
             return null;
         }

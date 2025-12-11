@@ -4,7 +4,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Optional;
 
-import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.commonhaus.automation.PackagedException;
@@ -56,7 +55,6 @@ public class LogMailer {
                 : null;
     }
 
-    @Nonnull
     public String[] botErrorEmailAddress() {
         return errorAddress == null ? EMPTY : errorAddress;
     }
@@ -71,8 +69,8 @@ public class LogMailer {
      * @see MailEvent
      * @see MailConsumer
      */
-    public void sendEmail(@Nonnull String logId, @Nonnull String title,
-            @Nonnull String body, @Nonnull String[] addresses) {
+    public void sendEmail(String logId, String title,
+            String body, String[] addresses) {
         String htmlBody = MarkdownConverter.toHtml(body.toString());
         MailEvent event = new MailEvent(logId, Templates.basicEmail(title, body, htmlBody), title, addresses);
         if (event.hasAddresses()) {
@@ -90,8 +88,8 @@ public class LogMailer {
      * @see MailEvent
      * @see MailConsumer
      */
-    public void sendEmail(@Nonnull String logId, @Nonnull String title,
-            MailTemplateInstance mailTemplate, @Nonnull String[] addresses) {
+    public void sendEmail(String logId, String title,
+            MailTemplateInstance mailTemplate, String[] addresses) {
         MailEvent event = new MailEvent(logId, mailTemplate, title, addresses);
         if (event.hasAddresses()) {
             bus.send(MailEvent.ADDRESS, event);
@@ -153,7 +151,7 @@ public class LogMailer {
      * @param addresses
      * @return
      */
-    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, @Nonnull String[] addresses) {
+    MailEvent createErrorMailEvent(String logId, String title, String body, Throwable e, String[] addresses) {
         // If configured to do so, email the error_email_address
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);

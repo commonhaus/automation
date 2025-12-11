@@ -4,8 +4,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.annotation.Nonnull;
-
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.ActionType;
@@ -30,7 +28,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
     private GHRepository repository;
 
     private ScopedQueryContext(
-            @Nonnull ContextService contextService,
+            ContextService contextService,
             long installationId,
             GHRepository repository,
             String repoFullName,
@@ -42,34 +40,34 @@ public class ScopedQueryContext extends GitHubQueryContext {
     }
 
     public ScopedQueryContext(
-            @Nonnull ContextService contextService,
+            ContextService contextService,
             long installationId,
-            @Nonnull GHRepository repository) {
+            GHRepository repository) {
         this(contextService, installationId, repository,
                 repository.getFullName(),
                 toOrganizationName(repository.getFullName()));
     }
 
     public ScopedQueryContext(
-            @Nonnull ContextService contextService,
+            ContextService contextService,
             long installationId,
-            @Nonnull String repoFullName) {
+            String repoFullName) {
         this(contextService, installationId, null,
                 repoFullName,
                 toOrganizationName(repoFullName));
     }
 
     public ScopedQueryContext(
-            @Nonnull ContextService contextService,
+            ContextService contextService,
             long installationId,
-            @Nonnull String orgName,
+            String orgName,
             String repoFullName) {
         this(contextService, installationId, null, repoFullName, orgName);
     }
 
     public ScopedQueryContext(
-            @Nonnull ContextService contextService,
-            @Nonnull AppInstallationState installState,
+            ContextService contextService,
+            AppInstallationState installState,
             String orgOrFullName) {
         this(contextService,
                 installState.installationId(),
@@ -151,7 +149,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
         return ownerName.equals(orgName);
     }
 
-    public static ScopedQueryContext forUpdate(@Nonnull ContextService ctx, @Nonnull MembershipUpdate update) {
+    public static ScopedQueryContext forUpdate(ContextService ctx, MembershipUpdate update) {
         if (update.type() == MembershipUpdateType.COLLABORATOR) {
             RepositoryEvent event = update.repositoryEvent();
             return new ScopedQueryContext(ctx, event.installationId(), event.repository())
@@ -164,7 +162,7 @@ public class ScopedQueryContext extends GitHubQueryContext {
         }
     }
 
-    @Nonnull
+    @Override
     public String[] getErrorAddresses(EmailNotification notifications) {
         Set<String> addresses = new HashSet<>();
         if (notifications != null) {

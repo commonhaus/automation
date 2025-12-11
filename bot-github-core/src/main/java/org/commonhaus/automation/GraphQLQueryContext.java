@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.annotation.Nonnull;
-
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.GitHubQueryContext.GitHubParameterApiCall;
 import org.kohsuke.github.GHFileNotFoundException;
@@ -256,12 +254,10 @@ public abstract class GraphQLQueryContext {
         }
     }
 
-    @Nonnull
     public String[] getErrorAddresses() {
         return ctx.botErrorEmailAddress();
     }
 
-    @Nonnull
     public String[] getErrorAddresses(EmailNotification notifications) {
         return ctx.getErrorAddresses(notifications);
     }
