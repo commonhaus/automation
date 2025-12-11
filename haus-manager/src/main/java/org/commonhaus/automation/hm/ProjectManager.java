@@ -439,7 +439,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return;
         }
 
-        GHOrganization.RepositoryRole role = toRole("doSyncCollaborators", teamAccess.role(),
+        GHOrganization.RepositoryRole role = teamService.toRole(ctx, ME, "doSyncCollaborators", teamAccess.role(),
                 projectConfig.emailNotifications(), teamAccess);
 
         // Add configured logins as outside collaborators on the repository that

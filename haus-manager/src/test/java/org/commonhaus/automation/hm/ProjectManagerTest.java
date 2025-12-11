@@ -27,6 +27,8 @@ import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHOrganization.Permission;
+import org.kohsuke.github.GHOrganization.RepositoryRole;
 import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
@@ -101,6 +103,9 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
         when(teamService.getTeamLogins(any(), any()))
                 .thenReturn(otherTeamLogins);
+
+        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RepositoryRole.from(Permission.PUSH));
 
         projectManager.processFileUpdate(taskGroup, new FileUpdate(
                 ProjectConfig.PATH, FileUpdateType.MODIFIED,

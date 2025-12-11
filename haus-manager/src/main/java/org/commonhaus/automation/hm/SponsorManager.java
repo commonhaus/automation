@@ -118,7 +118,8 @@ public class SponsorManager extends GroupCoordinator {
             return;
         }
 
-        GHOrganization.RepositoryRole role = toRole("reconcile", sponsors.role(),
+        GHOrganization.RepositoryRole role = teamService.toRole(ctx, ME,
+                "reconcile", sponsors.role(),
                 config.emailNotifications(), sponsors);
 
         teamService.addExpectedCollaborators(qc, repo, role, sponsorLogins,

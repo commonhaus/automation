@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.github.context.DataRepository.Collaborators;
@@ -185,7 +185,6 @@ public class GitHubTeamService {
      * @param teamFullName
      * @return
      */
-    @Nonnull
     public TeamList getTeamList(GitHubQueryContext qc, String teamFullName) {
         Set<GHUser> members = getTeamMembers(qc, teamFullName);
         TeamList teamList = new TeamList(teamFullName, members);
@@ -264,7 +263,6 @@ public class GitHubTeamService {
      * @param repoFullName full repository name
      * @return set of collaborator logins or null if repository not found
      */
-    @Nonnull
     public Collaborators getCollaborators(GitHubQueryContext qc, String repoFullName) {
         Collaborators collaborators = getCachedCollaborators(repoFullName);
         if (collaborators == null) {
@@ -281,7 +279,6 @@ public class GitHubTeamService {
      * @param repoFullName full repository name
      * @return set of collaborator logins or null if repository not found
      */
-    @Nonnull
     public Set<String> getCollaboratorLogins(GitHubQueryContext qc, String repoFullName) {
         Collaborators collaborators = getCollaborators(qc, repoFullName);
         return collaborators.logins();
@@ -294,12 +291,10 @@ public class GitHubTeamService {
      * @param repository GH repository
      * @return set of collaborator logins or null if repository not found
      */
-    @Nonnull
     public Set<String> getCollaboratorLogins(GitHubQueryContext qc, GHRepository repository) {
         return getCollaboratorLogins(qc, repository.getFullName());
     }
 
-    @Nonnull
     public Set<String> getOwnerAdministrators(GitHubQueryContext qc, String repoFullName) {
         var collaborators = getCollaborators(qc, repoFullName);
         return collaborators.adminLogins();
@@ -606,6 +601,31 @@ public class GitHubTeamService {
         finalLogins.removeAll(toRemove);
 
         return new MembershipChanges(collaborators, resourceName, currentLogins, toAdd, toRemove, finalLogins, ignoreUsers);
+    }
+
+    public GHOrganization.RepositoryRole toRole(ContextService ctx, String logId, String method, String rolePermission,
+            EmailNotification notifications, Object errorContent) {
+        GHOrganization.Permission permission = GHOrganization.Permission.TRIAGE;
+        if (rolePermission != null) {
+            for (GHOrganization.Permission p : GHOrganization.Permission.values()) {
+                if (p.name().equalsIgnoreCase(rolePermission)) {
+                    permission = p;
+                }
+            }
+            if (!permission.name().toLowerCase().equals(rolePermission.toLowerCase())) {
+                Log.warnf("[%s] %s: unknown role permission %s; using TRIAGE", logId, method, rolePermission);
+                ctx.sendEmail(logId, "Unknown role permission",
+                        """
+                                Unknown role/permission %s in config file; using TRIAGE.
+
+                                Please check the configuration file and correct the role/permission value.
+
+                                %s
+                                """.formatted(rolePermission, errorContent.toString()),
+                        ctx.getErrorAddresses(notifications));
+            }
+        }
+        return GHOrganization.RepositoryRole.from(permission);
     }
 
     // Record for team changes
