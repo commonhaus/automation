@@ -1,0 +1,10 @@
+enabled: true
+dryRun: false
+
+collaboratorSync:
+  role: triage
+  sourceTeam: test-org/team2
+
+emailNotifications:
+  errors:
+    - test@commonhaus.org

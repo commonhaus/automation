@@ -18,6 +18,7 @@ public class OrganizationConfig {
     protected EnabledDryRunConfig githubOrgVerification;
     protected ProjectAssetList projects;
     protected SponsorsConfig sponsors;
+    protected CollaboratorMonitorConfig collaboratorMonitor;
 
     /**
      * @return the emailNotifications
@@ -86,11 +87,26 @@ public class OrganizationConfig {
         return projects;
     }
 
+    /**
+     * @return the collaborator monitor configuration
+     */
+    public CollaboratorMonitorConfig collaboratorMonitor() {
+        return collaboratorMonitor;
+    }
+
+    public boolean isCollaboratorMonitorEnabled() {
+        return collaboratorMonitor != null && collaboratorMonitor.isEnabled();
+    }
+
+    public boolean isCollaboratorMonitorDryRun() {
+        return collaboratorMonitor != null && collaboratorMonitor.isDryRun();
+    }
+
     @Override
     public String toString() {
-        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s}"
+        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s, collaboratorMonitor=%s}"
                 .formatted(emailNotifications, sponsors, teamMembership, domainManagement, domainMonitoring,
-                        githubOrgVerification, projects);
+                        githubOrgVerification, projects, collaboratorMonitor);
     }
 
     /**
@@ -134,6 +150,48 @@ public class OrganizationConfig {
         public String toString() {
             return "SponsorsConfig{enabled=%s, dryRun=%s, targetRepository='%s', sponsorable=%s, ignoreUsers=%s}"
                     .formatted(isEnabled(), isDryRun(), targetRepository, sponsorable, ignoreUsers);
+        }
+    }
+
+    /**
+     * Automation to gather collaborators from all project repositories
+     * and ensure they are added to a single "all collaborators" repository.
+     *
+     * @param enabled Whether collaborator monitoring is enabled
+     * @param dryRun If true, do not update the repository
+     * @param allCollaboratorsRepository Repository to update with all project collaborators
+     * @param role Role to assign to the collaborators (default: 'triage')
+     * @param ignoreUsers List of users to ignore (do not add or remove)
+     */
+    public record CollaboratorMonitorConfig(
+            Boolean enabled,
+            Boolean dryRun,
+            String allCollaboratorsRepository,
+            String role,
+            List<String> ignoreUsers) {
+
+        public boolean isEnabled() {
+            return enabled == null || enabled;
+        }
+
+        public boolean isDryRun() {
+            return dryRun != null && dryRun;
+        }
+
+        @Override
+        public String role() {
+            return role != null ? role : "triage";
+        }
+
+        @Override
+        public List<String> ignoreUsers() {
+            return ignoreUsers == null ? List.of() : ignoreUsers;
+        }
+
+        @Override
+        public String toString() {
+            return "CollaboratorMonitorConfig{enabled=%s, dryRun=%s, allCollaboratorsRepository='%s', role=%s, ignoreUsers=%s}"
+                    .formatted(isEnabled(), isDryRun(), allCollaboratorsRepository, role, ignoreUsers);
         }
     }
 

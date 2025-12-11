@@ -1,0 +1,8 @@
+enabled: true
+dryRun: false
+
+# No collaboratorSync configured
+
+emailNotifications:
+  errors:
+    - test@commonhaus.org

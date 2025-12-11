@@ -30,12 +30,12 @@ public class HausManagerTestBase extends ContextHelper {
 
     public static final DefaultValues HOME_PROJECT_1 = new DefaultValues(
             46053716,
-            new Resource(123456789, "test-org"),
+            new Resource(144493209, "test-org"),
             new Resource("test-org/project-one"));
 
     public static final DefaultValues HOME_PROJECT_2 = new DefaultValues(
             46053716,
-            new Resource(123456789, "test-org"),
+            new Resource(144493209, "test-org"),
             new Resource("test-org/project-two"));
 
     public static final DefaultValues PROJECT_ORG = new DefaultValues(

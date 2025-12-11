@@ -1,0 +1,42 @@
+teamMembership:
+  - dryRun: true
+    source:
+      repository: public-org/source
+      filePath: CONTACTS.yaml
+    defaults:
+      field: login
+    pushMembers:
+      cf-council:
+        teams:
+          - test-org/cf-council
+
+domainManagement:
+  enabled: false
+  dryRun: true
+
+domainMonitoring:
+  enabled: false
+  dryRun: true
+
+githubOrgVerification:
+  enabled: false
+  dryRun: true
+
+sponsors:
+  enabled: false
+
+collaboratorMonitor:
+  enabled: true
+  dryRun: false
+  allCollaboratorsRepository: "test-org/all-collaborators"
+  role: "triage"
+  ignoreUsers:
+    - "bot-user"
+
+emailNotifications:
+  errors:
+    - test@commonhaus.org
+  dryRun:
+    - test@commonhaus.org
+  audit:
+    - test@commonhaus.org
