@@ -38,28 +38,31 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 @GitHubAppTest
 public class ProjectManagerTest extends HausManagerTestBase {
-    final static String taskGroup = ProjectManager.repoNametoTaskGroup(PRIMARY.repoFullName());
+    final static String taskGroup = ProjectManager.repoNametoTaskGroup(HOME_PROJECT_1.repoFullName());
 
     @Inject
     ProjectManager projectManager;
 
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 
+    MockInstallation home_project_1;
+
     @BeforeEach
     @Override
     protected void setup() throws IOException {
         super.setup();
+        home_project_1 = setupInstallationMocks(HOME_PROJECT_1);
         Log.info("START: ProjectManagerTest.setup()");
 
         // Mock the file content for organization config in primary repo
-        mockFileContent(hausMocks, ProjectConfig.PATH,
+        mockFileContent(home_project_1, ProjectConfig.PATH,
                 "src/test/resources/cf-haus-manager.yml");
 
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project_org, true);
 
         // Trigger bootstrap completion to execute deferred reconciliation
-        triggerBootstrapDiscovery(hausMocks);
+        triggerBootstrapDiscovery(home_project_1);
     }
 
     @AfterEach
@@ -70,7 +73,7 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
     @Test
     void testRepositoryEvents() throws IOException {
-        GHRepository contactRepo = mockRepository("public-org/source", hausMocks.github());
+        GHRepository contactRepo = mockRepository("public-org/source", home_project_1.github());
         mockFileContent(contactRepo, "signatories.yaml",
                 "src/test/resources/signatories.yml");
 
@@ -79,18 +82,18 @@ public class ProjectManagerTest extends HausManagerTestBase {
         mockTeam("test-org/team-quorum", null);
 
         // Trigger discovery to initialize manager
-        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, false);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, home_project_1, false);
 
         waitForQueue();
 
         // Trigger discovery to remove configuration
-        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, hausMocks, false);
+        triggerRepositoryDiscovery(DiscoveryAction.REMOVED, home_project_1, false);
 
         waitForQueue();
 
         // This should be called only once (first event); second event cleans state
         verify(teamService, times(1)).syncCollaborators(any(),
-                eq(hausMocks.repository()), any(), any(), any(), anyBoolean(), any());
+                eq(home_project_1.repository()), any(), any(), any(), anyBoolean(), any());
 
         verify(teamService, times(1)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService, times(1)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
@@ -109,18 +112,18 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
         projectManager.processFileUpdate(taskGroup, new FileUpdate(
                 ProjectConfig.PATH, FileUpdateType.MODIFIED,
-                hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
+                home_project_1.installationId(), home_project_1.repository(), home_project_1.github()));
 
         waitForQueue();
 
         // A change to watched memebership should trigger a sync
         projectManager.processMembershipUpdate(taskGroup,
-                new MembershipUpdate(MembershipUpdateType.COLLABORATOR, PRIMARY.orgName(),
+                new MembershipUpdate(MembershipUpdateType.COLLABORATOR, HOME_PROJECT_1.orgName(),
                         new RepositoryEvent(
-                                hausMocks.github(),
-                                hausMocks.installationId(),
-                                hausMocks.organization(),
-                                hausMocks.repository(),
+                                home_project_1.github(),
+                                home_project_1.installationId(),
+                                home_project_1.organization(),
+                                home_project_1.repository(),
                                 mockUser("test-user"),
                                 ActionType.added,
                                 EventType.member)));
@@ -133,7 +136,7 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
         // This should be called twice (file and membership events)
         verify(teamService, times(2)).syncCollaborators(any(),
-                eq(hausMocks.repository()),
+                eq(home_project_1.repository()),
                 argThat(actualRole -> actualRole.toString().equals(expectedRoleString)),
                 eq(expectedLogins), any(), anyBoolean(), any());
     }
@@ -143,18 +146,18 @@ public class ProjectManagerTest extends HausManagerTestBase {
         // A change to watched memebership should not trigger a sync if the
         // state has been cleared (e.g. after config removed)
         projectManager.processMembershipUpdate(taskGroup,
-                new MembershipUpdate(MembershipUpdateType.COLLABORATOR, PRIMARY.orgName(),
+                new MembershipUpdate(MembershipUpdateType.COLLABORATOR, HOME_PROJECT_1.orgName(),
                         new RepositoryEvent(
-                                hausMocks.github(),
-                                hausMocks.installationId(),
-                                hausMocks.organization(),
-                                hausMocks.repository(),
+                                home_project_1.github(),
+                                home_project_1.installationId(),
+                                home_project_1.organization(),
+                                home_project_1.repository(),
                                 mockUser("test-user"),
                                 ActionType.added,
                                 EventType.member)));
 
         // This shouldn't be called. The state is gone.
         verify(teamService, times(0)).syncCollaborators(any(),
-                eq(hausMocks.repository()), any(), any(), any(), anyBoolean(), any());
+                eq(home_project_1.repository()), any(), any(), any(), anyBoolean(), any());
     }
 }

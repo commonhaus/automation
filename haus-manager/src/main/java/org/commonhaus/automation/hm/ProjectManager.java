@@ -142,7 +142,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         if (action.repository() && orgName.equals(mgrBotConfig.home().organization())) {
             final String taskGroup = repoNametoTaskGroup(repoFullName);
 
-            if (action.added()) {
+            if (action.added() && repoFullName.contains("project-")) {
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
