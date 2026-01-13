@@ -116,7 +116,6 @@ public class DomainMonitor extends ScheduledService {
      * @param userTriggered true if triggered manually
      */
     public void refreshDomains(boolean userTriggered) {
-        recordRun();
         if (!namecheapService.isEnabled() || !latestOrgConfig.getConfig().isDomainMonitoringEnabled()) {
             Log.infof("[%s]: domain monitoring is disabled (last run: %s)", ME, lastRun);
             return;
@@ -125,6 +124,7 @@ public class DomainMonitor extends ScheduledService {
             Log.infof("[%s]: skip domain refresh (last run: %s)", ME, lastRun);
             return;
         }
+        recordRun();
 
         // Get dry-run setting
         var dryRun = latestOrgConfig.getConfig().isMonitoringDryRun();
