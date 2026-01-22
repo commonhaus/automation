@@ -91,9 +91,11 @@ public class AdminRoutes implements LocalRouteOnly {
             rejectNonLocalAccess(routingExchange);
             return;
         }
+        var request = routingContext.request();
+        var project = request.getParam("project");
         updateQueue.queueReconciliation("triggerDomainRefresh", () -> {
             Log.info("🚀 🏡 Domain refresh triggered");
-            domainMonitor.refreshDomains(true);
+            domainMonitor.refreshDomains(true, project);
         });
         routingExchange.ok().end();
     }

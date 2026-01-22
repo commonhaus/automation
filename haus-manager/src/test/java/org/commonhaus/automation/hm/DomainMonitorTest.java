@@ -165,7 +165,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // Org config assigns domains to respective projects
 
         // Execute
-        domainMonitor.refreshDomains(true);
+        domainMonitor.refreshDomains(true, null);
         waitForQueue();
 
         // Verify: All valid domains should have contacts synced
@@ -214,7 +214,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         mockProjectState1.projectConfig().domainManagement().domains().add(managedDomain);
 
         // Execute
-        domainMonitor.refreshDomains(true);
+        domainMonitor.refreshDomains(true, null);
         waitForQueue();
 
         // Verify: Should NOT sync contacts due to conflict
@@ -274,7 +274,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         mockProjectState2.projectConfig().domainManagement().domains().add(managedDomain);
 
         // Execute
-        domainMonitor.refreshDomains(true);
+        domainMonitor.refreshDomains(true, null);
         waitForQueue();
 
         // Verify: Should NOT sync contacts due to conflict
@@ -306,6 +306,58 @@ public class DomainMonitorTest extends HausManagerTestBase {
     }
 
     @Test
+    void testSingleProjectFilteringOnlyNotifiesOneProject() {
+        Log.info("TEST: Single-project filter sends notifications only for selected project");
+
+        String domain = "shared.com";
+        ManagedDomain managedDomain = new ManagedDomain(domain);
+
+        // Setup: Two projects claim the same domain
+        DomainRecord ncDomain = createDomainRecord(domain);
+        DomainContacts currentContacts = createTestContacts("Current", "Tech");
+
+        when(namecheapService.fetchAllDomains()).thenReturn(List.of(ncDomain));
+        when(namecheapService.getContacts(domain)).thenReturn(Optional.of(currentContacts));
+
+        // clear org domains for this test
+        mockOrgConfig.domainManagement().domains().clear();
+
+        // Org assigns to project-one
+        var assets = mockOrgConfig.projects().assetsForProject("one");
+        assets.domainAssociation().clear();
+        assets.domainAssociation().add(domain);
+
+        // Project one and Project two claim it
+        mockProjectState1.projectConfig().domainManagement().domains().clear();
+        mockProjectState1.projectConfig().domainManagement().domains().add(managedDomain);
+        mockProjectState2.projectConfig().domainManagement().domains().clear();
+        mockProjectState2.projectConfig().domainManagement().domains().add(managedDomain);
+
+        // Execute with filter
+        domainMonitor.refreshDomains(true, "project-one");
+        waitForQueue();
+
+        // Verify: Should NOT sync contacts due to conflict
+        verify(namecheapService, never()).setContacts(eq(domain), any());
+
+        // Verify: Only selected project receives consolidated error email
+        var project1Emails = mailbox.getMailsSentTo("errors@project1.dev");
+        assertThat(project1Emails).hasSize(1);
+        assertThat(project1Emails.get(0).getSubject()).contains("Domain issues for");
+        assertThat(project1Emails.get(0).getText()).contains(domain);
+        assertThat(project1Emails.get(0).getText()).contains("Conflicts with Other Projects");
+        assertThat(project1Emails.get(0).getText()).contains("test-org/project-two");
+
+        var project2Emails = mailbox.getMailsSentTo("errors@project2.dev");
+        assertThat(project2Emails).isEmpty();
+
+        // Verify: Org receives only the one cc'd notification for the filtered project
+        var orgEmails = mailbox.getMailsSentTo("errors@test.org");
+        assertThat(orgEmails).hasSize(1);
+        assertThat(orgEmails.get(0).getText()).contains(domain);
+    }
+
+    @Test
     void testOrphanDomain() {
         Log.info("TEST: Domain in Namecheap but not in any config - orphan detected");
 
@@ -325,7 +377,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         mockProjectState2.projectConfig().domainManagement().domains().clear();
 
         // Execute
-        domainMonitor.refreshDomains(true);
+        domainMonitor.refreshDomains(true, null);
         waitForQueue();
 
         // Verify: Should NOT sync contacts for orphan domain
@@ -362,7 +414,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
 
         // Use project/org configs from setup where domains are defined
         // Execute
-        domainMonitor.refreshDomains(true);
+        domainMonitor.refreshDomains(true, null);
         waitForQueue();
 
         // Verify: Should NOT call setContacts since they already match

@@ -104,7 +104,7 @@ public class DomainMonitor extends ScheduledService {
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: refresh domains", ME);
-            refreshDomains(false);
+            refreshDomains(false, null);
         } catch (Throwable t) {
             ctx.logAndSendEmail(ME, "Error running scheduled domain refresh", t);
         }
@@ -114,8 +114,12 @@ public class DomainMonitor extends ScheduledService {
      * Update information we know about registered domains
      *
      * @param userTriggered true if triggered manually
+     * @param singleProject send reports for a single project
      */
-    public void refreshDomains(boolean userTriggered) {
+    public void refreshDomains(boolean userTriggered, String singleProject) {
+        if (singleProject != null && singleProject.isBlank()) {
+            singleProject = null;
+        }
         if (!namecheapService.isEnabled() || !latestOrgConfig.getConfig().isDomainMonitoringEnabled()) {
             Log.infof("[%s]: domain monitoring is disabled (last run: %s)", ME, lastRun);
             return;
@@ -166,13 +170,13 @@ public class DomainMonitor extends ScheduledService {
                     projectDomainsMgmt);
 
             // 5. Process reconciliation results
-            var validDomains = processDomainReconciliation(domainReconciliation);
+            var validDomains = processDomainReconciliation(domainReconciliation, singleProject);
 
             // 6. Synchronize contacts for valid domains (only if management is enabled)
             for (var validDomain : validDomains) {
                 if (validDomain.orgManagedDirectly) {
                     // Only sync if org domain management is enabled
-                    if (orgDomainMgmt.isEnabled()) {
+                    if (orgDomainMgmt.isEnabled() && singleProject == null) {
                         syncContactsForProject(
                                 mgrBotConfig.home().repositoryFullName(),
                                 orgDomainMgmt,
@@ -185,11 +189,13 @@ public class DomainMonitor extends ScheduledService {
                     // valid domains will have a set with exactly one project
                     var project = validDomain.projectsClaimingDomain().iterator().next();
                     var projectDomainMgmt = projectDomainsMgmt.get(project);
-                    // Project domain management is already filtered by isEnabled() at line 128
-                    syncContactsForProject(
-                            project,
-                            projectDomainMgmt,
-                            latestProjectConfig.getProjectConfigState(project).emailNotifications());
+                    if (singleProject == null || project.endsWith(singleProject)) {
+                        // Project domain management is already filtered by isEnabled() at line 128
+                        syncContactsForProject(
+                                project,
+                                projectDomainMgmt,
+                                latestProjectConfig.getProjectConfigState(project).emailNotifications());
+                    }
                 }
             }
 
@@ -387,8 +393,11 @@ public class DomainMonitor extends ScheduledService {
 
     /**
      * Process domain reconciliation results and take appropriate actions
+     *
+     * @param singleProject If processing / sending warnings to only a single project
      */
-    private List<DomainReconciliation> processDomainReconciliation(Map<String, DomainReconciliation> reconciliation) {
+    private List<DomainReconciliation> processDomainReconciliation(Map<String, DomainReconciliation> reconciliation,
+            String singleProject) {
 
         // Group domain issues by project - each project can have multiple domain issues
         Map<String, List<DomainReconciliation>> issuesByProject = new HashMap<>();
@@ -423,6 +432,12 @@ public class DomainMonitor extends ScheduledService {
         for (var entry : issuesByProject.entrySet()) {
             String project = entry.getKey();
             List<DomainReconciliation> projectDomains = entry.getValue();
+
+            if (singleProject != null && !project.endsWith(singleProject)) {
+                Log.debugf("[%s] Skipping domain issue notification for %s (singleProject=%s)",
+                        ME, project, singleProject);
+                continue;
+            }
 
             Log.debugf("[%s] Project %s has %d domain issue(s)", ME, project, projectDomains.size());
 
@@ -459,8 +474,8 @@ public class DomainMonitor extends ScheduledService {
                     projectMismatches, orphanDomains, missingFromNamecheap);
         }
 
-        // Send summary of valid domains to org
-        if (!validDomains.isEmpty()) {
+        // Send summary of valid domains to org (skip for single-project refresh)
+        if (singleProject == null && !validDomains.isEmpty()) {
             handleValidDomains(validDomains);
         }
 
