@@ -153,7 +153,7 @@ public class InstallMonitor extends ScheduledService {
 
         // 1. Add all org-expected organizations
         for (var entry : orgExpectedOrganizations.entrySet()) {
-            String ghOrg = entry.getKey().replaceAll("^https?://github\\.com/", "");
+            String ghOrg = normalizeOrg(entry.getKey());
             Set<String> expectedProjects = entry.getValue();
 
             // Convert project names to repo full names
@@ -172,7 +172,7 @@ public class InstallMonitor extends ScheduledService {
         for (var entry : projectDeclaredOrganizations.entrySet()) {
             String project = entry.getKey();
             for (String ghOrgKey : entry.getValue()) {
-                var ghOrg = ghOrgKey.replaceAll("^https?://github\\.com/", "");
+                var ghOrg = this.normalizeOrg(ghOrgKey);
                 InstallationReconciliation ir = result.computeIfAbsent(ghOrg,
                         k -> new InstallationReconciliation(
                                 ghOrg,
@@ -307,6 +307,10 @@ public class InstallMonitor extends ScheduledService {
         Set<String> unmappedOrgs = new HashSet<>(installedOrgs);
         unmappedOrgs.removeAll(reconciliation.keySet());
 
+        // remove organization-associated github organizations (expected)
+        unmappedOrgs.removeAll(latestOrgConfig.getConfig().githubOrganizations()
+                .stream().map(this::normalizeOrg).toList());
+
         if (valid.isEmpty() && unmappedOrgs.isEmpty()) {
             return; // Nothing to report
         }
@@ -335,6 +339,10 @@ public class InstallMonitor extends ScheduledService {
         boolean isValid() {
             return isInstalled && !hasMismatch();
         }
+    }
+
+    public String normalizeOrg(String ghOrg) {
+        return ghOrg.replaceAll("^https?://github\\.com/", "");
     }
 
     @Override

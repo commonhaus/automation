@@ -12,12 +12,17 @@ public class OrganizationConfig {
     public static final String PATH = ".github/" + NAME;
 
     protected EmailNotification emailNotifications;
-    protected List<GroupMapping> teamMembership;
+
     protected DomainManagementConfig domainManagement;
     protected EnabledDryRunConfig domainMonitoring;
+
     protected EnabledDryRunConfig githubOrgVerification;
+    protected List<String> githubOrganizations;
+
     protected ProjectAssetList projects;
     protected SponsorsConfig sponsors;
+
+    protected List<GroupMapping> teamMembership;
     protected CollaboratorMonitorConfig collaboratorMonitor;
 
     /**
@@ -63,6 +68,10 @@ public class OrganizationConfig {
 
     public boolean isMonitoringDryRun() {
         return domainMonitoring != null && domainMonitoring.isDryRun();
+    }
+
+    public List<String> githubOrganizations() {
+        return githubOrganizations == null ? List.of() : githubOrganizations;
     }
 
     /**

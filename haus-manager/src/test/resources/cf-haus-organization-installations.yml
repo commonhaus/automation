@@ -10,6 +10,9 @@ githubOrgVerification:
   enabled: true
   dryRun: false
 
+githubOrganizations:
+  - https://github.com/main-org
+
 sponsors:
   enabled: false
   dryRun: true

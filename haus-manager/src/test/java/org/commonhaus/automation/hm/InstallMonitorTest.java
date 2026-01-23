@@ -116,6 +116,7 @@ public class InstallMonitorTest extends HausManagerTestBase {
         // - test-org-four: assigned to project-two, declared by project-two, NOT installed (missing)
         // - orphan-org: NOT assigned, NOT declared, installed (unmapped)
 
+        installationMap.addTestOrg(88888, "main-org/repo");
         installationMap.addTestOrg(12345, "test-org-one/repo");
         installationMap.addTestOrg(123456, "test-org-two/repo");
         installationMap.addTestOrg(11111, "test-org-three/repo");
@@ -159,6 +160,7 @@ public class InstallMonitorTest extends HausManagerTestBase {
         assertThat(auditEmails.get(0).getText()).contains("test-org-one");
         assertThat(auditEmails.get(0).getText()).contains("Unmapped Organizations");
         assertThat(auditEmails.get(0).getText()).contains("orphan-org");
+        assertThat(auditEmails.get(0).getText()).doesNotContain("main-org");
         // Should not contain problematic orgs in configured section
         assertThat(auditEmails.get(0).getText().split("Configured Organizations")[1].split("Unmapped")[0])
                 .doesNotContain("test-org-two")
