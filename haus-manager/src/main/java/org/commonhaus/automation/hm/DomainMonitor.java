@@ -181,10 +181,13 @@ public class DomainMonitor extends ScheduledService {
                     // Only sync if org domain management is enabled
                     if (orgDomainMgmt.isEnabled() && singleProject == null) {
                         if (syncedProjects.add(mgrBotConfig.home().repositoryFullName())) {
-                            syncContactsForProject(
-                                    mgrBotConfig.home().repositoryFullName(),
-                                    orgDomainMgmt,
-                                    latestOrgConfig.getConfig().emailNotifications());
+                            updateQueue.queueBackground("domains-" + mgrBotConfig.home().repositoryFullName(),
+                                    () -> {
+                                        syncContactsForProject(
+                                                mgrBotConfig.home().repositoryFullName(),
+                                                orgDomainMgmt,
+                                                latestOrgConfig.getConfig().emailNotifications());
+                                    });
                         }
                     } else {
                         Log.debugf("[%s] Skipping contact sync for org domain %s (management disabled)",
@@ -196,11 +199,14 @@ public class DomainMonitor extends ScheduledService {
                     var projectDomainMgmt = projectDomainsMgmt.get(project);
                     if (singleProject == null || project.endsWith(singleProject)) {
                         if (syncedProjects.add(project)) {
-                            // Project domain management is already filtered by isEnabled() at line 128
-                            syncContactsForProject(
-                                    project,
-                                    projectDomainMgmt,
-                                    latestProjectConfig.getProjectConfigState(project).emailNotifications());
+                            updateQueue.queueBackground("domains-" + project,
+                                    () -> {
+                                        syncContactsForProject(
+                                                project,
+                                                projectDomainMgmt,
+                                                latestProjectConfig.getProjectConfigState(project)
+                                                        .emailNotifications());
+                                    });
                         }
                     }
                 }
