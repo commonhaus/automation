@@ -8,7 +8,7 @@
   - https://github.com/{org}
 {/for}
 
-Please add these to your `githubOrganizations` list in {projectConfigPath}, or create a PR in {homeRepo} to correct foundation records.
+Please add these to your `githubOrganizations` list in {projectConfigPath}, or create an issue in {homeRepo} to correct foundation records.
 
 {/if}
 {#if !toRemove.isEmpty()}
@@ -17,7 +17,7 @@ Please add these to your `githubOrganizations` list in {projectConfigPath}, or c
   - https://github.com/{org}
 {/for}
 
-Please remove these from your `githubOrganizations` list in {projectConfigPath}, or create a PR in {homeRepo} to correct foundation records.
+Please remove these from your `githubOrganizations` list in {projectConfigPath}, or create an issue in {homeRepo} to correct foundation records.
 
 {/if}
 {#if !notInstalled.isEmpty()}

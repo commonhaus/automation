@@ -36,7 +36,7 @@ Please coordinate with other projects to resolve ownership.
   - {domain}
 {/for}
 
-Please add these to your domainManagement configuration, or create a PR in {homeRepo} to correct foundation records..
+Please add these to your domainManagement configuration, or create an issue in {homeRepo} to correct foundation records..
 
 {/if}
 {#if !toRemove.isEmpty()}
@@ -45,7 +45,7 @@ Please add these to your domainManagement configuration, or create a PR in {home
   - {domain}
 {/for}
 
-Please remove these from your domainManagement configuration, or create a PR in {homeRepo} to correct foundation records.
+Please remove these from your domainManagement configuration, or create an issue in {homeRepo} to correct foundation records.
 
 {/if}
 {#if !orphanDomains.isEmpty() && isOrgRepo}

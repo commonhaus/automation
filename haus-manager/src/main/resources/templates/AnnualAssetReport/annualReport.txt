@@ -46,7 +46,7 @@ We found some discrepancies between your project configuration and our foundatio
 **Domain: {it.assetName}**
   - Status: {it.description}
 {#if it.mismatchType.name() == 'IN_PROJECT_NOT_IN_ORG'}
-  - Action: This domain is in your project configuration but not registered with the foundation. Please create a PR in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
+  - Action: This domain is in your project configuration but not registered with the foundation. Please create an issue in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
 {#else}
   - Action: The foundation expects this domain to be managed by your project, but it's not in your project configuration. Please add it to your project config in {repoFullName}, or contact us if this is no longer your domain.
 {/if}
@@ -55,7 +55,7 @@ We found some discrepancies between your project configuration and our foundatio
 **GitHub Organization: {it.assetName}**
   - Status: {it.description}
 {#if it.mismatchType.name() == 'IN_PROJECT_NOT_IN_ORG'}
-  - Action: This GitHub organization is in your project configuration but not registered with the foundation. Please create a PR in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
+  - Action: This GitHub organization is in your project configuration but not registered with the foundation. Please create an issue in {homeRepo} to add this to the foundation records, or remove it from your project config if it's no longer needed.
 {#else}
   - Action: The foundation expects this GitHub organization to be managed by your project, but it's not in your project configuration. Please add it to your project config in {repoFullName}, or contact us if this is no longer your organization.
 {/if}
