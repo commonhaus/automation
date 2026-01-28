@@ -411,5 +411,10 @@ public class TeamConflictResolver {
         public int hashCode() {
             return Objects.hash(type, org, projects);
         }
+
+        @Override
+        public String toString() {
+            return "TeamOwnership [type=" + type + ", hasConflict()=" + hasConflict() + "]";
+        }
     }
 }
