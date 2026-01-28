@@ -33,6 +33,6 @@ public class AppContextService extends BaseContextService {
     }
 
     public ScopedQueryContext getHomeQueryContext() {
-        return installationMap.getOrgScopedQueryContext(this, getOrganization());
+        return installationMap.getOrgScopedQueryContext(this, mgrBotConfig.home().repositoryFullName());
     }
 }
