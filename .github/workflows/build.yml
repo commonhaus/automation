@@ -144,7 +144,7 @@ jobs:
         gh release edit "${SNAPSHOT}"  -t "${SNAPSHOT}" --prerelease
 
     - name: Log in to the Container registry
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
       if: needs.main_root.outputs.is_main
       with:
         registry: ${{ env.REGISTRY }}
