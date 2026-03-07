@@ -413,7 +413,7 @@ public class DomainMonitor extends ScheduledService {
             String singleProject) {
 
         // Group domain issues by project - each project can have multiple domain issues
-        Map<String, List<DomainReconciliation>> issuesByProject = new HashMap<>();
+        Map<String, Set<DomainReconciliation>> issuesByProject = new HashMap<>();
         List<DomainReconciliation> validDomains = new ArrayList<>();
 
         for (var dr : reconciliation.values()) {
@@ -425,15 +425,15 @@ public class DomainMonitor extends ScheduledService {
             // Add to org for domains it manages directly or orphans
             if (dr.orgManagedDirectly || dr.isOrphan()) {
                 String orgRepo = mgrBotConfig.home().repositoryFullName();
-                issuesByProject.computeIfAbsent(orgRepo, k -> new ArrayList<>()).add(dr);
+                issuesByProject.computeIfAbsent(orgRepo, k -> new HashSet<>()).add(dr);
             }
             // Add to each project claiming this domain
             for (var project : dr.projectsClaimingDomain()) {
-                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
+                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(dr);
             }
             // Add to projects that should claim this domain but don't
             for (var project : dr.orgExpectedProjects()) {
-                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(dr);
+                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(dr);
             }
         }
 
@@ -444,7 +444,7 @@ public class DomainMonitor extends ScheduledService {
         // Process each project's domain issues
         for (var entry : issuesByProject.entrySet()) {
             String project = entry.getKey();
-            List<DomainReconciliation> projectDomains = entry.getValue();
+            Set<DomainReconciliation> projectDomains = entry.getValue();
 
             if (singleProject != null && !project.endsWith(singleProject)) {
                 Log.debugf("[%s] Skipping domain issue notification for %s (singleProject=%s)",
