@@ -73,7 +73,7 @@ public class InstallMonitor extends ScheduledService {
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
     // Run weekly on Thursday at 1:30 PM (similar to DomainMonitor)
-    @Scheduled(cron = "${automation.hausManager.cron.domain:27 13 17 ? * WED *}")
+    @Scheduled(cron = "${automation.hausManager.cron.install:27 13 17 ? * WED *}")
     public void scheduledRefresh() {
         try {
             Log.infof("[%s] ⏰ Scheduled: refresh installation check", ME);
