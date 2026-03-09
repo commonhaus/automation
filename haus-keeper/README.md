@@ -34,7 +34,7 @@ Notes:
 - `userMapping`
     - `login` is a valid GH user login
     - `aliases` specifies email addresses within one of the defined project domains that the specified GH user can manage.
-    - This mapping does not need to be 1:1, several logins can be permitted to manage the same email alias.
+    - This mapping does not need to be 1:1, several logins can be permitted to manage the same email address.
 
 Named GH users will use the Member UI to manage their email aliases
 
