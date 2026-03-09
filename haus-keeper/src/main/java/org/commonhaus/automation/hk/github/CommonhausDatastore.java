@@ -229,6 +229,20 @@ public class CommonhausDatastore {
         pendingJournal.put(userKey, user);
 
         GHRepository repo = dqc.getRepository();
+
+        // If this is an existing user (not new) but we don't have a sha,
+        // fetch the current file to get the sha before updating.
+        if (user.sha() == null && !user.isNew()) {
+            GHContent existing = dqc.readSourceFile(repo, dataPath(user.id()));
+            if (existing != null) {
+                user.sha(existing.getSha());
+            }
+            if (dqc.hasErrors()) {
+                handlePersistenceError(dqc, entry, user, retryCount);
+                return;
+            }
+        }
+
         GHContentBuilder update = repo.createContent()
                 .path(dataPath(user.id()))
                 .message("🤖 [%s] %s".formatted(user.id(), entry.commitMessage()))
@@ -357,13 +371,11 @@ public class CommonhausDatastore {
             return;
         }
         for (var entry : pendingJournal.entrySet()) {
-            String userKey = entry.getKey();
             CommonhausUser pendingUser = entry.getValue();
 
-            // Prime the cache with journaled version before queueing update
-            DatastoreCacheEntry cacheEntry = AdminDataCache.COMMONHAUS_DATA
-                    .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
-            cacheEntry.refreshUserData(pendingUser);
+            // Do not prime the cache with journaled data here.
+            // The sha field is transient and will be null after deserialization.
+            // Let setCommonhausUser fetch from GitHub to get the current sha.
 
             updateQueue.queue(entry.getKey(), () -> {
                 setCommonhausUser(new UpdateEvent(pendingUser,
