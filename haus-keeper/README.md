@@ -2,11 +2,12 @@
 
 ## Project Email Aliases
 
-**For Project Maintainers:** Haus Keeper can manage email aliases for your project team members.
+**For Project Maintainers:** Haus Keeper can manage email aliases for your project team members. _This configuration is optional_
 
 ### Configuration
 
-Create a `project-mail-aliases.yml` file in your project repository:
+If you want Commonhaus to manage email address forwarding through ForwardEmail, 
+create a `project-mail-aliases.yml` file in your project repository:
 
 ```yaml
 # Single domain (backward compatible)
@@ -27,6 +28,15 @@ userMapping:
       - maintainer@project.example.com
       - lead@project.example.org
 ```
+
+Notes:
+- `domain` or `domains`: a domain configured for email forwarding with ForwardEmail. This requires configuration and should be done after the domain has been transferred. Talk to a council member to set this up.
+- `userMapping`
+    - `login` is a valid GH user login
+    - `aliases` specifies email addresses within one of the defined project domains that the specified GH user can manage.
+    - This mapping does not need to be 1:1, several logins can be permitted to manage the same email alias.
+
+Named GH users will use the Member UI to manage their email aliases
 
 ### How it works
 
