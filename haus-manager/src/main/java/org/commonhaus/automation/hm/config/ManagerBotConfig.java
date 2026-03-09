@@ -36,6 +36,9 @@ public interface ManagerBotConfig {
         // Cron expression for periodic sync of domains
         Optional<String> domain();
 
+        // Cron expression for periodic sync of haus manager installations
+        Optional<String> install();
+
         // Cron expression for periodic sync of sponsors
         Optional<String> sponsor();
 

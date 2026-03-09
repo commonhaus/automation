@@ -81,6 +81,11 @@ public class TestManagerBotConfig implements ManagerBotConfig {
             public Optional<String> domain() {
                 return Optional.empty();
             }
+
+            @Override
+            public Optional<String> install() {
+                return Optional.empty();
+            }
         };
     }
 
