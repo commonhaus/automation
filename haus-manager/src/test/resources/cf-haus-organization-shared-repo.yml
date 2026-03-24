@@ -1,0 +1,43 @@
+domainManagement:
+  enabled: false
+  dryRun: true
+
+domainMonitoring:
+  enabled: false
+  dryRun: true
+
+githubOrgVerification:
+  enabled: true
+  dryRun: false
+
+githubOrganizations:
+  - https://github.com/main-org
+
+sponsors:
+  enabled: false
+  dryRun: true
+
+emailNotifications:
+  errors:
+    - errors@test.org
+  dryRun:
+    - test@test.org
+  audit:
+    - audit@test.org
+
+## Project configuration with shared repository
+## Both projectA and projectB share the same projectRepository
+
+projects:
+  projectA:
+    projectRepository: project-shared
+    domainAssociation:
+      - projecta.example.org
+    githubOrganizations:
+      - https://github.com/test-org-shared
+
+  projectB:
+    projectRepository: project-shared
+    domainAssociation:
+      - projectb.example.org
+    githubOrganizations: []

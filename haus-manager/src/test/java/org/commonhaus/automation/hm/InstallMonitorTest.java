@@ -123,6 +123,9 @@ public class InstallMonitorTest extends HausManagerTestBase {
         installationMap.addTestOrg(11111, "test-org-three/repo");
         installationMap.addTestOrg(99999, "orphan-org/repo");
 
+        when(latestOrgConfig.getProjectDisplayNameFromRepo(eq("test-org/project-one")))
+                .thenReturn("project-one");
+
         // Modify configs
         // Org assigns test-org-four to project-two (not declared by project, not installed)
         var assets = mockOrgConfig.projects().assetsForProject("two");
@@ -240,5 +243,57 @@ public class InstallMonitorTest extends HausManagerTestBase {
         assertThat(auditText).contains("main-org");
         // main-org should show as having issues (org-project conflict)
         assertThat(auditText).contains("⚠️");
+    }
+
+    @Test
+    void testSharedRepositoryProjectName() throws IOException {
+        Log.info("TEST: Shared repository should use repository name, not YAML key, for display name");
+
+        // Setup: Use shared repository configuration where projectA and projectB
+        // both reference project-shared, with projectB listed after projectA
+        mockOrgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-shared-repo.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(mockOrgConfig);
+
+        // Shared project config
+        var sharedConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-shared-repo.yml",
+                ProjectConfig.class);
+        var sharedProjectState = new ProjectConfigState(
+                ProjectManager.repoNametoTaskGroup("test-org/project-shared"),
+                () -> {
+                },
+                "test-org/project-shared",
+                home_project_1.installationId(),
+                sharedConfig);
+        when(latestProjectConfig.getProjectConfigState("test-org/project-shared"))
+                .thenReturn(sharedProjectState);
+        when(latestProjectConfig.getAllProjects())
+                .thenReturn(List.of(sharedProjectState));
+        when(latestOrgConfig.getProjectDisplayNameFromRepo(eq("test-org/project-shared")))
+                .thenReturn("project-shared");
+
+        // Setup: test-org-shared is assigned to projectA but not installed
+        // This will trigger an error email
+        // Note: NOT adding test-org-shared to installationMap to trigger "not installed" error
+
+        // Execute
+        installMonitor.checkInstallations(true);
+        waitForQueue();
+
+        // Verify: Email subject should use "shared" (from project-shared), not "projectB"
+        // Bug: Currently uses "projectB" because it's last in YAML iteration order
+        // Fix: Should extract "shared" from "project-shared" repository name
+        var sharedErrors = mailbox.getMailsSentTo("errors@projectA.dev");
+        assertThat(sharedErrors).hasSize(1);
+        String subject = sharedErrors.get(0).getSubject();
+
+        // After fix, this should pass:
+        assertThat(subject).contains("shared");
+        // Before fix, this would be true (the bug):
+        // assertThat(subject).contains("projectB");
+        assertThat(subject).doesNotContain("projectA");
+        assertThat(subject).doesNotContain("projectB");
     }
 }

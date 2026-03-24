@@ -539,9 +539,14 @@ public class DomainMonitor extends ScheduledService {
                 mgrBotConfig.home().repositoryFullName()).render();
 
         // Send the notification using helper methods
-        String title = isOrgRepo
-                ? "haus-manager: Domain issues for organization"
-                : "haus-manager: Domain issues for " + project;
+        String title;
+        if (isOrgRepo) {
+            title = "haus-manager: Domain issues for organization";
+        } else {
+            // Extract display name from repository full name (e.g., "easymock" from "org/project-easymock")
+            String displayName = latestOrgConfig.getProjectDisplayNameFromRepo(project);
+            title = "haus-manager: Domain issues for " + displayName;
+        }
 
         if (isOrgRepo) {
             createOrgIssueAndMail(title, message, true);

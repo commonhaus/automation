@@ -1,0 +1,13 @@
+enabled: true
+dryRun: false
+
+githubOrganizations:
+  - https://github.com/test-org-shared
+
+emailNotifications:
+  errors:
+    - errors@projectA.dev
+  dryRun:
+    - test@projectA.dev
+  audit:
+    - audit@projectA.dev
