@@ -300,7 +300,14 @@ public class InstallMonitor extends ScheduledService {
         if (projectAssets != null) {
             for (var entry : projectAssets.allAssets().entrySet()) {
                 String projectName = entry.getKey();
-                Set<OrgStatus> orgStatuses = new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName));
+                // Convert project name to repository full name for grouping
+                // This ensures shared repositories are grouped together
+                String repoFullName = latestOrgConfig.projectNameToRepoFullName(mgrBotConfig, projectName);
+
+                // Group by repoFullName (stable, never null)
+                Set<OrgStatus> orgStatuses = projectOrgMap.computeIfAbsent(repoFullName,
+                        k -> new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName)));
+
                 for (String ghOrgKey : entry.getValue().githubOrganizations()) {
                     String ghOrg = normalizeOrg(ghOrgKey);
                     knownOrgs.add(ghOrg);
@@ -311,7 +318,6 @@ public class InstallMonitor extends ScheduledService {
                         orgStatuses.add(new OrgStatus(ghOrg, false, true));
                     }
                 }
-                projectOrgMap.put(projectName, orgStatuses);
             }
         }
 
@@ -330,7 +336,7 @@ public class InstallMonitor extends ScheduledService {
             }
         }
 
-        // Build ordered group list
+        // Build ordered group list, converting repoFullName to display name
         List<ProjectOrgGroup> orgGroups = new ArrayList<>();
         if (!orgManagedList.isEmpty()) {
             orgGroups.add(new ProjectOrgGroup("Organization", orgManagedList));
@@ -338,7 +344,9 @@ public class InstallMonitor extends ScheduledService {
         for (var entry : projectOrgMap.entrySet()) {
             Set<OrgStatus> orgs = entry.getValue();
             if (!orgs.isEmpty()) {
-                orgGroups.add(new ProjectOrgGroup(entry.getKey(), orgs));
+                // Convert repoFullName to display name for presentation
+                String displayName = latestOrgConfig.getProjectDisplayNameFromRepo(entry.getKey());
+                orgGroups.add(new ProjectOrgGroup(displayName, orgs));
             }
         }
 

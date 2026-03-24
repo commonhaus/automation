@@ -68,6 +68,8 @@ public class InstallMonitorTest extends HausManagerTestBase {
                 .thenReturn(HOME_PROJECT_1.repoFullName());
         when(latestOrgConfig.projectNameToRepoFullName(any(), eq("two")))
                 .thenReturn(HOME_PROJECT_2.repoFullName());
+        // Use real method for getProjectDisplayNameFromRepo (strips "project-" prefix)
+        when(latestOrgConfig.getProjectDisplayNameFromRepo(any())).thenCallRealMethod();
 
         // Project 1 mock config/state
         var config1 = loadYamlResource(
@@ -122,9 +124,6 @@ public class InstallMonitorTest extends HausManagerTestBase {
         installationMap.addTestOrg(123456, "test-org-two/repo");
         installationMap.addTestOrg(11111, "test-org-three/repo");
         installationMap.addTestOrg(99999, "orphan-org/repo");
-
-        when(latestOrgConfig.getProjectDisplayNameFromRepo(eq("test-org/project-one")))
-                .thenReturn("project-one");
 
         // Modify configs
         // Org assigns test-org-four to project-two (not declared by project, not installed)
@@ -255,6 +254,11 @@ public class InstallMonitorTest extends HausManagerTestBase {
                 "src/test/resources/cf-haus-organization-shared-repo.yml",
                 OrganizationConfig.class);
         when(latestOrgConfig.getConfig()).thenReturn(mockOrgConfig);
+        // Both projectA and projectB map to the same shared repository
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("projectA")))
+                .thenReturn("test-org/project-shared");
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("projectB")))
+                .thenReturn("test-org/project-shared");
 
         // Shared project config
         var sharedConfig = loadYamlResource(
@@ -271,8 +275,6 @@ public class InstallMonitorTest extends HausManagerTestBase {
                 .thenReturn(sharedProjectState);
         when(latestProjectConfig.getAllProjects())
                 .thenReturn(List.of(sharedProjectState));
-        when(latestOrgConfig.getProjectDisplayNameFromRepo(eq("test-org/project-shared")))
-                .thenReturn("project-shared");
 
         // Setup: test-org-shared is assigned to projectA but not installed
         // This will trigger an error email
