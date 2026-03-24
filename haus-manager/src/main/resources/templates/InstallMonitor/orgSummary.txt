@@ -1,24 +1,22 @@
-{#if !valid.isEmpty()}
-## Configured Organizations
+{#for group in orgGroups}
+## {group.projectName}
 
-The following {valid.size()} GitHub organizations are properly configured and have HausManager installed:
-
-{#for v in valid}
-{#if !v.orgExpectedProjects.isEmpty()}
-  - https://github.com/{v.ghOrgName} (assigned to: {#each v.orgExpectedProjects}{it}{#if it_hasNext}, {/if}{/each})
-{#else}
-  - https://github.com/{v.ghOrgName} (declared by: {#each v.projectsDeclaring}{it}{#if it_hasNext}, {/if}{/each})
+{#for org in group.organizations}
+{#if org.isMissingFromOrgConfig}  - ❓ {org.ghOrgName} (not in organization records)
+{#else if org.isInstalled && !org.hasConfigIssues}  - ✅ {org.ghOrgName}
+{#else if org.isInstalled && org.hasConfigIssues}  - ⚠️ {org.ghOrgName} (configuration issues)
+{#else}  - ❌ {org.ghOrgName} (not installed)
 {/if}
 {/for}
 
-{/if}
+{/for}
 {#if !unmapped.isEmpty()}
-## Unmapped Organizations
+## Unmapped
 
-The following {unmapped.size()} GitHub organizations have HausManager installed but are not mapped to any project:
+The following organizations have HausManager installed but are not mapped to any project or organization config:
 
 {#for org in unmapped}
-  - https://github.com/{org}
+  - ❓ {org}
 {/for}
 
 Consider adding these to the organization config or removing the installation if not needed.

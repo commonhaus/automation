@@ -1,9 +1,5 @@
-{#if !toAdd.isEmpty() || !toRemove.isEmpty()}
-## Configuration Mismatches
-
-{/if}
 {#if !toAdd.isEmpty()}
-**GitHub organizations assigned to your project but not in your configuration:**
+**GitHub organizations assigned to your project in organization records but missing from your project configuration:**
 {#for org in toAdd}
   - https://github.com/{org}
 {/for}
@@ -12,22 +8,20 @@ Please add these to your `githubOrganizations` list in {projectConfigPath}, or c
 
 {/if}
 {#if !toRemove.isEmpty()}
-**GitHub organizations in your configuration but not assigned to your project:**
+**GitHub organizations in your project configuration but not in organization records:**
 {#for org in toRemove}
   - https://github.com/{org}
 {/for}
 
-Please remove these from your `githubOrganizations` list in {projectConfigPath}, or create an issue in {homeRepo} to correct foundation records.
+If these are new organizations, please create an issue in {homeRepo} to update foundation records. Otherwise, remove them from your `githubOrganizations` list in {projectConfigPath}.
 
 {/if}
 {#if !notInstalled.isEmpty()}
-## Missing Installations
-
-HausManager is not installed in these GitHub organizations:
+**GitHub organizations where HausManager is not installed:**
 {#for org in notInstalled}
   - https://github.com/{org}
 {/for}
 
-Please install HausManager in these organizations.
+Please install HausManager in these organizations, or create an issue in {homeRepo} if you need assistance.
 
 {/if}

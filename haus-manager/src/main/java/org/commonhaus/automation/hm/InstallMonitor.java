@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -45,7 +46,7 @@ public class InstallMonitor extends ScheduledService {
                 String homeRepo);
 
         public static native TemplateInstance orgSummary(
-                List<InstallationReconciliation> valid,
+                List<ProjectOrgGroup> orgGroups,
                 List<String> unmapped);
     }
 
@@ -72,7 +73,7 @@ public class InstallMonitor extends ScheduledService {
      * Periodically check GitHub organization installations
      */
     // Quartz cron expression: s m h dom mon dow year(optional)
-    // Run weekly on Thursday at 1:30 PM (similar to DomainMonitor)
+    // Run at 17:13:27, on every Wednesday, every month
     @Scheduled(cron = "${automation.hausManager.cron.install:27 13 17 ? * WED *}")
     public void scheduledRefresh() {
         try {
@@ -151,7 +152,18 @@ public class InstallMonitor extends ScheduledService {
 
         Map<String, InstallationReconciliation> result = new HashMap<>();
 
-        // 1. Add all org-expected organizations
+        // 1. Seed org-managed organizations (from githubOrganizations field)
+        for (String ghOrgKey : latestOrgConfig.getConfig().githubOrganizations()) {
+            String ghOrg = normalizeOrg(ghOrgKey);
+            result.put(ghOrg, new InstallationReconciliation(
+                    ghOrg,
+                    installedOrgs.contains(ghOrg),
+                    true,
+                    new HashSet<>(),
+                    new HashSet<>()));
+        }
+
+        // 2. Add all org-expected organizations (from projects section of org config)
         for (var entry : orgExpectedOrganizations.entrySet()) {
             String ghOrg = normalizeOrg(entry.getKey());
             Set<String> expectedProjects = entry.getValue();
@@ -161,14 +173,16 @@ public class InstallMonitor extends ScheduledService {
                     .map(projectName -> latestOrgConfig.projectNameToRepoFullName(mgrBotConfig, projectName))
                     .collect(Collectors.toSet());
 
-            result.put(ghOrg, new InstallationReconciliation(
+            result.computeIfAbsent(ghOrg, k -> new InstallationReconciliation(
                     ghOrg,
                     installedOrgs.contains(ghOrg),
-                    expectedProjectRepos,
-                    new HashSet<>()));
+                    false,
+                    new HashSet<>(),
+                    new HashSet<>()))
+                    .orgExpectedProjects().addAll(expectedProjectRepos);
         }
 
-        // 2. Add project-declared organizations
+        // 3. Add project-declared organizations
         for (var entry : projectDeclaredOrganizations.entrySet()) {
             String project = entry.getKey();
             for (String ghOrgKey : entry.getValue()) {
@@ -177,6 +191,7 @@ public class InstallMonitor extends ScheduledService {
                         k -> new InstallationReconciliation(
                                 ghOrg,
                                 installedOrgs.contains(ghOrg),
+                                false,
                                 new HashSet<>(),
                                 new HashSet<>()));
                 ir.projectsDeclaring().add(project);
@@ -191,91 +206,87 @@ public class InstallMonitor extends ScheduledService {
             Map<String, InstallationReconciliation> reconciliation,
             boolean dryRun) {
 
-        // Group issues by project
-        Map<String, List<InstallationReconciliation>> issuesByProject = new HashMap<>();
+        // Build repo-full-name → project-name lookup (used by both emails and audit)
+        Map<String, String> repoToProject = new HashMap<>();
+        var projectAssets = latestOrgConfig.getConfig().projects();
+        if (projectAssets != null) {
+            for (String projectName : projectAssets.allAssets().keySet()) {
+                String repoFullName = latestOrgConfig.projectNameToRepoFullName(mgrBotConfig, projectName);
+                repoToProject.put(repoFullName, projectName);
+            }
+        }
+
+        // Group project-actionable issues by project
+        Map<String, Set<InstallationReconciliation>> issuesByProject = new HashMap<>();
 
         for (var ir : reconciliation.values()) {
-            if (ir.isValid()) {
-                continue; // All good, skip
+            if (ir.isValid() || ir.orgManagedDirectly() || ir.isOrphan()) {
+                continue; // Org-level concerns are visible in the audit summary
             }
 
-            // Add to each project declaring this org
             for (var project : ir.projectsDeclaring()) {
-                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(ir);
+                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(ir);
             }
 
-            // Add to projects expected to declare this org
             for (var project : ir.orgExpectedProjects()) {
-                issuesByProject.computeIfAbsent(project, k -> new ArrayList<>()).add(ir);
+                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(ir);
             }
         }
 
         Log.infof("[%s] Installation reconciliation: %d organizations checked, %d projects with issues",
                 ME, reconciliation.size(), issuesByProject.size());
 
-        // Process each project's issues
+        // Send per-project error emails
         for (var entry : issuesByProject.entrySet()) {
-            String project = entry.getKey();
-            List<InstallationReconciliation> projectIssues = entry.getValue();
-            sendProjectInstallationIssues(project, projectIssues, dryRun);
+            sendProjectInstallationIssues(entry.getKey(), entry.getValue(), repoToProject, dryRun);
         }
 
-        // Send summary to org (pass installedOrgs to identify unmapped)
-        sendOrgSummary(installedOrgs, reconciliation, dryRun);
+        // Send structured audit summary
+        sendOrgSummary(installedOrgs, reconciliation, repoToProject, dryRun);
     }
 
     private void sendProjectInstallationIssues(
             String project,
-            List<InstallationReconciliation> issues,
+            Set<InstallationReconciliation> issues,
+            Map<String, String> repoToProject,
             boolean dryRun) {
-
-        List<InstallationReconciliation> mismatches = new ArrayList<>();
-        List<InstallationReconciliation> notInstalled = new ArrayList<>();
-
-        for (var issue : issues) {
-            if (issue.hasMismatch()) {
-                mismatches.add(issue);
-            } else if (!issue.isInstalled()) {
-                notInstalled.add(issue);
-            }
-        }
 
         List<String> toAdd = new ArrayList<>();
         List<String> toRemove = new ArrayList<>();
+        List<String> notInstalled = new ArrayList<>();
 
-        if (!mismatches.isEmpty()) {
-            mismatches.sort(Comparator.comparing(InstallationReconciliation::ghOrgName));
-            for (var mismatch : mismatches) {
-                if (mismatch.orgExpectedProjects().contains(project) &&
-                        !mismatch.projectsDeclaring().contains(project)) {
-                    toAdd.add(mismatch.ghOrgName());
-                } else if (!mismatch.orgExpectedProjects().contains(project) &&
-                        mismatch.projectsDeclaring().contains(project)) {
-                    toRemove.add(mismatch.ghOrgName());
+        for (var ir : issues) {
+            if (ir.hasOrgMismatch()) {
+                if (ir.orgExpectedProjects().contains(project) &&
+                        !ir.projectsDeclaring().contains(project)) {
+                    toAdd.add(ir.ghOrgName());
+                } else if (!ir.orgExpectedProjects().contains(project) &&
+                        ir.projectsDeclaring().contains(project)) {
+                    toRemove.add(ir.ghOrgName());
                 }
             }
-        }
-
-        List<String> notInstalledOrgs = new ArrayList<>();
-        if (!notInstalled.isEmpty()) {
-            notInstalled.sort(Comparator.comparing(InstallationReconciliation::ghOrgName));
-            for (var ni : notInstalled) {
-                notInstalledOrgs.add(ni.ghOrgName());
+            if (!ir.isInstalled()) {
+                notInstalled.add(ir.ghOrgName());
             }
         }
 
-        if (toAdd.isEmpty() && toRemove.isEmpty() && notInstalledOrgs.isEmpty()) {
-            return; // Nothing to send
+        toAdd.sort(Comparator.naturalOrder());
+        toRemove.sort(Comparator.naturalOrder());
+        notInstalled.sort(Comparator.naturalOrder());
+
+        if (toAdd.isEmpty() && toRemove.isEmpty() && notInstalled.isEmpty()) {
+            return;
         }
 
         String message = Templates.projectInstallationIssues(
                 toAdd,
                 toRemove,
-                notInstalledOrgs,
+                notInstalled,
                 ProjectConfig.PATH,
                 mgrBotConfig.home().repositoryFullName()).render();
 
-        String title = "haus-manager: GitHub organization issues for " + project;
+        String projectDisplayName = repoToProject.getOrDefault(project, project);
+        String title = "haus-manager: GitHub organization issues for " + projectDisplayName;
         ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
 
         if (dryRun) {
@@ -285,8 +296,7 @@ public class InstallMonitor extends ScheduledService {
             ctx.sendEmail(ME, title, message,
                     state.projectConfig().emailNotifications().errors());
         }
-
-        // cc: send a copy to org errors email
+        // CC to org errors
         ctx.sendEmail(ME, title, message,
                 dryRun
                         ? latestOrgConfig.getConfig().emailNotifications().dryRun()
@@ -296,28 +306,68 @@ public class InstallMonitor extends ScheduledService {
     private void sendOrgSummary(
             Collection<String> installedOrgs,
             Map<String, InstallationReconciliation> reconciliation,
+            Map<String, String> repoToProject,
             boolean dryRun) {
 
-        List<InstallationReconciliation> valid = reconciliation.values().stream()
-                .filter(InstallationReconciliation::isValid)
-                .sorted(Comparator.comparing(InstallationReconciliation::ghOrgName))
-                .toList();
+        List<OrgStatus> orgManagedList = new ArrayList<>();
+        // Collect known org-config orgs while building project groups (single pass over assets)
+        Map<String, List<OrgStatus>> projectOrgMap = new TreeMap<>();
+        Set<String> knownOrgs = new HashSet<>();
+
+        var projectAssets = latestOrgConfig.getConfig().projects();
+        if (projectAssets != null) {
+            for (var entry : projectAssets.allAssets().entrySet()) {
+                String projectName = entry.getKey();
+                List<OrgStatus> orgStatuses = new ArrayList<>();
+                for (String ghOrgKey : entry.getValue().githubOrganizations()) {
+                    String ghOrg = normalizeOrg(ghOrgKey);
+                    knownOrgs.add(ghOrg);
+                    InstallationReconciliation ir = reconciliation.get(ghOrg);
+                    if (ir != null) {
+                        orgStatuses.add(new OrgStatus(ir.ghOrgName(), ir.isInstalled(), ir.hasConfigIssues()));
+                    } else {
+                        orgStatuses.add(new OrgStatus(ghOrg, false, true));
+                    }
+                }
+                projectOrgMap.put(projectName, orgStatuses);
+            }
+        }
+
+        // Classify reconciliation entries: org-managed and project-only
+        for (var ir : reconciliation.values()) {
+            if (ir.orgManagedDirectly()) {
+                knownOrgs.add(ir.ghOrgName());
+                orgManagedList.add(new OrgStatus(ir.ghOrgName(), ir.isInstalled(), ir.hasConfigIssues()));
+            } else if (!knownOrgs.contains(ir.ghOrgName()) && !ir.projectsDeclaring().isEmpty()) {
+                // Declared by project but not in org config
+                for (String repoFullName : ir.projectsDeclaring()) {
+                    String projectName = repoToProject.getOrDefault(repoFullName, repoFullName);
+                    projectOrgMap.computeIfAbsent(projectName, k -> new ArrayList<>())
+                            .add(new OrgStatus(ir.ghOrgName(), ir.isInstalled(), true, true));
+                }
+            }
+        }
+
+        // Build ordered group list
+        List<ProjectOrgGroup> orgGroups = new ArrayList<>();
+        if (!orgManagedList.isEmpty()) {
+            orgManagedList.sort(Comparator.comparing(OrgStatus::ghOrgName));
+            orgGroups.add(new ProjectOrgGroup("Organization", orgManagedList));
+        }
+        for (var entry : projectOrgMap.entrySet()) {
+            List<OrgStatus> orgs = entry.getValue();
+            if (!orgs.isEmpty()) {
+                orgs.sort(Comparator.comparing(OrgStatus::ghOrgName));
+                orgGroups.add(new ProjectOrgGroup(entry.getKey(), orgs));
+            }
+        }
 
         // Find unmapped organizations (installed but not in any config)
         Set<String> unmappedOrgs = new HashSet<>(installedOrgs);
         unmappedOrgs.removeAll(reconciliation.keySet());
-
-        // remove organization-associated github organizations (expected)
-        unmappedOrgs.removeAll(latestOrgConfig.getConfig().githubOrganizations()
-                .stream().map(this::normalizeOrg).toList());
-
-        if (valid.isEmpty() && unmappedOrgs.isEmpty()) {
-            return; // Nothing to report
-        }
-
         List<String> unmappedList = unmappedOrgs.stream().sorted().toList();
-        String message = Templates.orgSummary(valid, unmappedList).render();
 
+        String message = Templates.orgSummary(orgGroups, unmappedList).render();
         String title = "haus-manager: GitHub organization verification summary";
 
         ctx.sendEmail(ME, title, message,
@@ -329,19 +379,43 @@ public class InstallMonitor extends ScheduledService {
     record InstallationReconciliation(
             String ghOrgName,
             boolean isInstalled,
-            Set<String> orgExpectedProjects, // projects assigned this ghOrg in org config
-            Set<String> projectsDeclaring // projects declaring this ghOrg in their config
-    ) {
-        boolean hasMismatch() {
-            return !orgExpectedProjects.equals(projectsDeclaring);
+            boolean orgManagedDirectly,
+            Set<String> orgExpectedProjects,
+            Set<String> projectsDeclaring) {
+
+        boolean hasOrgProjectConflict() {
+            return orgManagedDirectly && !projectsDeclaring.isEmpty();
+        }
+
+        boolean hasOrgMismatch() {
+            return !orgManagedDirectly && !orgExpectedProjects.equals(projectsDeclaring);
+        }
+
+        boolean isOrphan() {
+            return isInstalled && !orgManagedDirectly
+                    && orgExpectedProjects.isEmpty() && projectsDeclaring.isEmpty();
+        }
+
+        /** Has configuration issues independent of installation status */
+        boolean hasConfigIssues() {
+            return hasOrgProjectConflict() || hasOrgMismatch();
         }
 
         boolean isValid() {
-            return isInstalled && !hasMismatch();
+            return isInstalled && !hasConfigIssues() && !isOrphan();
         }
     }
 
-    public String normalizeOrg(String ghOrg) {
+    record OrgStatus(String ghOrgName, boolean isInstalled, boolean hasConfigIssues, boolean isMissingFromOrgConfig) {
+        OrgStatus(String ghOrgName, boolean isInstalled, boolean hasConfigIssues) {
+            this(ghOrgName, isInstalled, hasConfigIssues, false);
+        }
+    }
+
+    record ProjectOrgGroup(String projectName, List<OrgStatus> organizations) {
+    }
+
+    String normalizeOrg(String ghOrg) {
         return ghOrg.replaceAll("^https?://github\\.com/", "");
     }
 

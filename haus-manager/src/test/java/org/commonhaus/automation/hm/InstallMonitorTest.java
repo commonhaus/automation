@@ -110,61 +110,135 @@ public class InstallMonitorTest extends HausManagerTestBase {
         Log.info("TEST: Comprehensive 3-way reconciliation covering all scenarios");
 
         // Setup complex scenario:
+        // - main-org: org-managed (in githubOrganizations), NOT installed (missing org-managed)
         // - test-org-one: assigned to project-one, declared by project-one, installed ✓
-        // - test-org-two: assigned to project-two, NOT declared by project-two, installed (mismatch)
-        // - test-org-three: NOT assigned, declared by project-one, installed (mismatch)
-        // - test-org-four: assigned to project-two, declared by project-two, NOT installed (missing)
+        // - test-org-two: assigned to project-two, declared by project-two, installed ✓
+        // - test-org-three: NOT assigned, declared by project-one, installed (mismatch → toRemove)
+        // - test-org-four: assigned to project-two, NOT declared by project-two, NOT installed (mismatch + missing)
         // - orphan-org: NOT assigned, NOT declared, installed (unmapped)
 
-        installationMap.addTestOrg(88888, "main-org/repo");
+        // Note: main-org deliberately NOT added to installationMap
         installationMap.addTestOrg(12345, "test-org-one/repo");
         installationMap.addTestOrg(123456, "test-org-two/repo");
         installationMap.addTestOrg(11111, "test-org-three/repo");
         installationMap.addTestOrg(99999, "orphan-org/repo");
 
         // Modify configs
-        // Org assigns test-org-four to project-two
+        // Org assigns test-org-four to project-two (not declared by project, not installed)
         var assets = mockOrgConfig.projects().assetsForProject("two");
         assets.githubOrganizations().add("test-org-four");
 
         // Project-one declares test-org-three (not assigned to them)
         mockProjectState1.projectConfig().githubOrganizations().add("test-org-three");
 
-        // Project-two doesn't declare test-org-two (but assigned to them)
-        mockProjectState2.projectConfig().githubOrganizations().remove("test-org-two");
-        // Project-two declares test-org-four (assigned to them but not installed)
-        mockProjectState2.projectConfig().githubOrganizations().add("test-org-four");
+        // Execute
+        installMonitor.checkInstallations(true);
+        waitForQueue();
+
+        // Verify: Project-one gets error about test-org-three (declared but not assigned → toRemove)
+        var project1Errors = mailbox.getMailsSentTo("errors@project1.dev");
+        assertThat(project1Errors).hasSize(1);
+        assertThat(project1Errors.get(0).getText()).contains("test-org-three");
+        assertThat(project1Errors.get(0).getText()).contains("not in organization records");
+
+        // Verify: Project-two gets error about test-org-four
+        //   - config mismatch: assigned but not declared (toAdd)
+        //   - not installed: HausManager missing
+        var project2Errors = mailbox.getMailsSentTo("errors@project2.dev");
+        assertThat(project2Errors).hasSize(1);
+        assertThat(project2Errors.get(0).getText()).contains("test-org-four");
+        assertThat(project2Errors.get(0).getText()).contains("missing from your project configuration");
+        assertThat(project2Errors.get(0).getText()).contains("HausManager is not installed");
+
+        // Verify: Audit summary is grouped by project name with status indicators
+        var auditEmails = mailbox.getMailsSentTo("audit@test.org");
+        assertThat(auditEmails).hasSize(1);
+        String auditText = auditEmails.get(0).getText();
+
+        // Organization section: main-org is org-managed but NOT installed
+        assertThat(auditText).contains("## Organization");
+        assertThat(auditText).contains("❌ main-org");
+
+        // Project sections use project names (not repo full names)
+        assertThat(auditText).contains("## one");
+        assertThat(auditText).contains("✅ test-org-one");
+        // test-org-three declared by project but not in org config — shown under project with ❓
+        assertThat(auditText).contains("❓ test-org-three");
+        assertThat(auditText).contains("not in organization records");
+
+        assertThat(auditText).contains("## two");
+        assertThat(auditText).contains("✅ test-org-two");
+        // test-org-four: assigned in org config but not installed
+        assertThat(auditText).contains("❌ test-org-four");
+        assertThat(auditText).contains("not installed");
+        assertThat(auditText).doesNotContain("test-org/project-one");
+        assertThat(auditText).doesNotContain("test-org/project-two");
+
+        // Unmapped section
+        assertThat(auditText).contains("## Unmapped");
+        assertThat(auditText).contains("❓ orphan-org");
+    }
+
+    @Test
+    void testNoIssuesWhenAllValid() {
+        Log.info("TEST: No issue emails when all orgs are properly configured");
+
+        // Setup: everything matches, no orphans
+        installationMap.addTestOrg(88888, "main-org/repo");
+        installationMap.addTestOrg(12345, "test-org-one/repo");
+        installationMap.addTestOrg(123456, "test-org-two/repo");
 
         // Execute
         installMonitor.checkInstallations(true);
         waitForQueue();
 
-        // Verify: Project-one gets error about test-org-three
+        // No project error emails
         var project1Errors = mailbox.getMailsSentTo("errors@project1.dev");
-        assertThat(project1Errors).hasSize(1);
-        assertThat(project1Errors.get(0).getText()).contains("test-org-three");
-        assertThat(project1Errors.get(0).getText()).contains("not assigned to your project");
-
-        // Verify: Project-two gets errors about test-org-two (should add) and test-org-four (not installed)
+        assertThat(project1Errors).isEmpty();
         var project2Errors = mailbox.getMailsSentTo("errors@project2.dev");
-        assertThat(project2Errors).hasSize(1);
-        assertThat(project2Errors.get(0).getText()).contains("test-org-two");
-        assertThat(project2Errors.get(0).getText()).contains("assigned to your project but not in your configuration");
-        assertThat(project2Errors.get(0).getText()).contains("test-org-four");
-        assertThat(project2Errors.get(0).getText()).contains("Missing Installations");
+        assertThat(project2Errors).isEmpty();
+        var orgErrors = mailbox.getMailsSentTo("errors@test.org");
+        assertThat(orgErrors).isEmpty();
 
-        // Verify: Summary shows valid (test-org-one) and unmapped (orphan-org)
+        // Audit email uses project names, not repo full names
         var auditEmails = mailbox.getMailsSentTo("audit@test.org");
         assertThat(auditEmails).hasSize(1);
-        assertThat(auditEmails.get(0).getText()).contains("Configured Organizations");
-        assertThat(auditEmails.get(0).getText()).contains("test-org-one");
-        assertThat(auditEmails.get(0).getText()).contains("Unmapped Organizations");
-        assertThat(auditEmails.get(0).getText()).contains("orphan-org");
-        assertThat(auditEmails.get(0).getText()).doesNotContain("main-org");
-        // Should not contain problematic orgs in configured section
-        assertThat(auditEmails.get(0).getText().split("Configured Organizations")[1].split("Unmapped")[0])
-                .doesNotContain("test-org-two")
-                .doesNotContain("test-org-three")
-                .doesNotContain("test-org-four");
+        String auditText = auditEmails.get(0).getText();
+        assertThat(auditText).contains("## Organization");
+        assertThat(auditText).contains("main-org");
+        assertThat(auditText).contains("## one");
+        assertThat(auditText).contains("test-org-one");
+        assertThat(auditText).contains("## two");
+        assertThat(auditText).contains("test-org-two");
+        assertThat(auditText).doesNotContain("Unmapped");
+    }
+
+    @Test
+    void testOrgManagedConflict() {
+        Log.info("TEST: Project declaring an org-managed organization shows warning in audit");
+
+        // Setup: project-one also declares main-org (which is org-managed)
+        installationMap.addTestOrg(88888, "main-org/repo");
+        installationMap.addTestOrg(12345, "test-org-one/repo");
+        installationMap.addTestOrg(123456, "test-org-two/repo");
+
+        mockProjectState1.projectConfig().githubOrganizations().add("main-org");
+
+        // Execute
+        installMonitor.checkInstallations(true);
+        waitForQueue();
+
+        // No project error emails for org-managed conflicts
+        var project1Errors = mailbox.getMailsSentTo("errors@project1.dev");
+        assertThat(project1Errors).isEmpty();
+
+        // Audit summary shows main-org with issues indicator
+        var auditEmails = mailbox.getMailsSentTo("audit@test.org");
+        assertThat(auditEmails).hasSize(1);
+        String auditText = auditEmails.get(0).getText();
+        assertThat(auditText).contains("Organization");
+        assertThat(auditText).contains("main-org");
+        // main-org should show as having issues (org-project conflict)
+        assertThat(auditText).contains("⚠️");
     }
 }
