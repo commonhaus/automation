@@ -213,6 +213,9 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // But project-one also claims it
         mockProjectState1.projectConfig().domainManagement().domains().add(managedDomain);
 
+        when(latestOrgConfig.getProjectDisplayNameFromRepo(eq("test-org/project-one")))
+                .thenReturn("project-one");
+
         // Execute
         domainMonitor.refreshDomains(true, null);
         waitForQueue();
@@ -239,7 +242,7 @@ public class DomainMonitorTest extends HausManagerTestBase {
         // Verify: Consolidated error email sent to project with domain issues
         var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
         assertThat(projectErrorEmails).hasSize(1);
-        assertThat(projectErrorEmails.get(0).getSubject()).contains("Domain issues for test-org/project-one");
+        assertThat(projectErrorEmails.get(0).getSubject()).contains("Domain issues for project-one");
         assertThat(projectErrorEmails.get(0).getText()).contains(domain);
         assertThat(projectErrorEmails.get(0).getText()).contains("Conflicts with Organization Management");
         assertThat(projectErrorEmails.get(0).getText()).contains("remove these from your domainManagement configuration");
