@@ -207,20 +207,37 @@ public class InstallMonitor extends ScheduledService {
             Map<String, InstallationReconciliation> reconciliation,
             boolean dryRun) {
 
-        // Group project-actionable issues by project
-        Map<String, Set<InstallationReconciliation>> issuesByProject = new HashMap<>();
+        // Group and categorize project-actionable issues by project (single pass)
+        Map<String, ProjectIssues> issuesByProject = new HashMap<>();
 
         for (var ir : reconciliation.values()) {
             if (ir.isValid() || ir.orgManagedDirectly() || ir.isOrphan()) {
                 continue; // Org-level concerns are visible in the audit summary
             }
 
+            boolean notInstalled = !ir.isInstalled();
+            boolean hasMismatch = ir.hasOrgMismatch();
+
             for (var project : ir.projectsDeclaring()) {
-                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(ir);
+                ProjectIssues issues = issuesByProject.computeIfAbsent(project, k -> new ProjectIssues());
+
+                if (hasMismatch && !ir.orgExpectedProjects().contains(project)) {
+                    issues.toRemove.add(ir.ghOrgName());
+                }
+                if (notInstalled) {
+                    issues.notInstalled.add(ir.ghOrgName());
+                }
             }
 
             for (var project : ir.orgExpectedProjects()) {
-                issuesByProject.computeIfAbsent(project, k -> new HashSet<>()).add(ir);
+                ProjectIssues issues = issuesByProject.computeIfAbsent(project, k -> new ProjectIssues());
+
+                if (hasMismatch && !ir.projectsDeclaring().contains(project)) {
+                    issues.toAdd.add(ir.ghOrgName());
+                }
+                if (notInstalled) {
+                    issues.notInstalled.add(ir.ghOrgName());
+                }
             }
         }
 
@@ -238,36 +255,17 @@ public class InstallMonitor extends ScheduledService {
 
     private void sendProjectInstallationIssues(
             String project,
-            Set<InstallationReconciliation> issues,
+            ProjectIssues issues,
             boolean dryRun) {
 
-        Set<String> toAdd = new TreeSet<>();
-        Set<String> toRemove = new TreeSet<>();
-        Set<String> notInstalled = new TreeSet<>();
-
-        for (var ir : issues) {
-            if (ir.hasOrgMismatch()) {
-                if (ir.orgExpectedProjects().contains(project) &&
-                        !ir.projectsDeclaring().contains(project)) {
-                    toAdd.add(ir.ghOrgName());
-                } else if (!ir.orgExpectedProjects().contains(project) &&
-                        ir.projectsDeclaring().contains(project)) {
-                    toRemove.add(ir.ghOrgName());
-                }
-            }
-            if (!ir.isInstalled()) {
-                notInstalled.add(ir.ghOrgName());
-            }
-        }
-
-        if (toAdd.isEmpty() && toRemove.isEmpty() && notInstalled.isEmpty()) {
+        if (issues.toAdd.isEmpty() && issues.toRemove.isEmpty() && issues.notInstalled.isEmpty()) {
             return;
         }
 
         String message = Templates.projectInstallationIssues(
-                toAdd,
-                toRemove,
-                notInstalled,
+                issues.toAdd,
+                issues.toRemove,
+                issues.notInstalled,
                 ProjectConfig.PATH,
                 mgrBotConfig.home().repositoryFullName()).render();
 
@@ -294,10 +292,10 @@ public class InstallMonitor extends ScheduledService {
             boolean dryRun) {
 
         Set<OrgStatus> orgManagedList = new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName));
-        // Collect known org-config orgs while building project groups (single pass over assets)
         Map<String, Set<OrgStatus>> projectOrgMap = new TreeMap<>();
         Set<String> knownOrgs = new HashSet<>();
 
+        // First: Build from project assets config
         var projectAssets = latestOrgConfig.getConfig().projects();
         if (projectAssets != null) {
             for (var entry : projectAssets.allAssets().entrySet()) {
@@ -317,7 +315,7 @@ public class InstallMonitor extends ScheduledService {
             }
         }
 
-        // Classify reconciliation entries: org-managed and project-only
+        // Second: Add org-managed orgs and project-declared orgs not in config
         for (var ir : reconciliation.values()) {
             if (ir.orgManagedDirectly()) {
                 knownOrgs.add(ir.ghOrgName());
@@ -345,9 +343,13 @@ public class InstallMonitor extends ScheduledService {
         }
 
         // Find unmapped organizations (installed but not in any config)
-        Set<String> unmappedOrgs = new HashSet<>(installedOrgs);
-        unmappedOrgs.removeAll(reconciliation.keySet());
-        List<String> unmappedList = unmappedOrgs.stream().sorted().toList();
+        List<String> unmappedList = new ArrayList<>();
+        for (String org : installedOrgs) {
+            if (!reconciliation.containsKey(org)) {
+                unmappedList.add(org);
+            }
+        }
+        unmappedList.sort(null);
 
         String message = Templates.orgSummary(orgGroups, unmappedList).render();
         String title = "haus-manager: GitHub organization verification summary";
@@ -356,6 +358,15 @@ public class InstallMonitor extends ScheduledService {
                 dryRun
                         ? latestOrgConfig.getConfig().emailNotifications().dryRun()
                         : latestOrgConfig.getConfig().emailNotifications().audit());
+    }
+
+    record ProjectIssues(
+            Set<String> toAdd,
+            Set<String> toRemove,
+            Set<String> notInstalled) {
+        ProjectIssues() {
+            this(new TreeSet<>(), new TreeSet<>(), new TreeSet<>());
+        }
     }
 
     record InstallationReconciliation(
