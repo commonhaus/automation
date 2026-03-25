@@ -25,7 +25,6 @@ import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.github.AppContextService;
-import org.commonhaus.automation.queue.ScheduledService;
 
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
@@ -34,7 +33,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class InstallMonitor extends ScheduledService {
+public class InstallMonitor extends BaseMonitor {
     static final String ME = "🔧-installs";
 
     @CheckedTemplate
@@ -65,6 +64,31 @@ public class InstallMonitor extends ScheduledService {
 
     @Inject
     LatestProjectConfig latestProjectConfig;
+
+    @Override
+    protected AppContextService getCtx() {
+        return ctx;
+    }
+
+    @Override
+    protected ManagerBotConfig getMgrBotConfig() {
+        return mgrBotConfig;
+    }
+
+    @Override
+    protected LatestOrgConfig getLatestOrgConfig() {
+        return latestOrgConfig;
+    }
+
+    @Override
+    protected boolean isMonitoringEnabled() {
+        return latestOrgConfig.getConfig().isOrgValidationEnabled();
+    }
+
+    @Override
+    protected boolean isOrgDryRun() {
+        return latestOrgConfig.getConfig().isOrgValidationDryRun();
+    }
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Installation check refreshed", () -> lastRun);
@@ -270,20 +294,11 @@ public class InstallMonitor extends ScheduledService {
                 mgrBotConfig.home().repositoryFullName()).render();
 
         // Extract display name from repo full name (e.g., "easymock" from "org/project-easymock")
-        String projectDisplayName = latestOrgConfig.getProjectDisplayNameFromRepo(project);
+        String projectDisplayName = getProjectDisplayName(project);
         String title = "haus-manager: GitHub organization issues for " + projectDisplayName;
         ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
 
-        if (dryRun) {
-            Log.infof("[%s] DRY RUN: would send email for project %s. title: %s; body: %s",
-                    ME, project, title, message);
-            ctx.sendEmail(ME, title, message, latestOrgConfig.getConfig().emailNotifications().dryRun());
-        } else if (state != null && state.projectConfig() != null) {
-            ctx.sendEmail(ME, title, message,
-                    state.projectConfig().emailNotifications().errors());
-            // CC to org errors
-            ctx.sendEmail(ME, title, message, latestOrgConfig.getConfig().emailNotifications().errors());
-        }
+        sendProjectErrorNotification(title, message, state, dryRun);
     }
 
     private void sendOrgSummary(
@@ -329,7 +344,7 @@ public class InstallMonitor extends ScheduledService {
             } else if (!knownOrgs.contains(ir.ghOrgName()) && !ir.projectsDeclaring().isEmpty()) {
                 // Declared by project but not in org config
                 for (String repoFullName : ir.projectsDeclaring()) {
-                    String projectName = latestOrgConfig.getProjectDisplayNameFromRepo(repoFullName);
+                    String projectName = getProjectDisplayName(repoFullName);
                     projectOrgMap.computeIfAbsent(projectName, k -> new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName)))
                             .add(new OrgStatus(ir.ghOrgName(), ir.isInstalled(), true, true));
                 }
@@ -345,7 +360,7 @@ public class InstallMonitor extends ScheduledService {
             Set<OrgStatus> orgs = entry.getValue();
             if (!orgs.isEmpty()) {
                 // Convert repoFullName to display name for presentation
-                String displayName = latestOrgConfig.getProjectDisplayNameFromRepo(entry.getKey());
+                String displayName = getProjectDisplayName(entry.getKey());
                 orgGroups.add(new ProjectOrgGroup(displayName, orgs));
             }
         }
@@ -362,10 +377,7 @@ public class InstallMonitor extends ScheduledService {
         String message = Templates.orgSummary(orgGroups, unmappedList).render();
         String title = "haus-manager: GitHub organization verification summary";
 
-        ctx.sendEmail(ME, title, message,
-                dryRun
-                        ? latestOrgConfig.getConfig().emailNotifications().dryRun()
-                        : latestOrgConfig.getConfig().emailNotifications().audit());
+        sendOrgAuditNotification(title, message, dryRun);
     }
 
     record ProjectIssues(

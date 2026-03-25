@@ -32,7 +32,6 @@ import org.commonhaus.automation.hm.namecheap.models.ContactInfo;
 import org.commonhaus.automation.hm.namecheap.models.DomainContacts;
 import org.commonhaus.automation.hm.namecheap.models.DomainRecord;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
-import org.commonhaus.automation.queue.ScheduledService;
 import org.kohsuke.github.GHRepository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +43,7 @@ import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 
 @ApplicationScoped
-public class DomainMonitor extends ScheduledService {
+public class DomainMonitor extends BaseMonitor {
     static final String ME = "🌐-domains";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -75,7 +74,7 @@ public class DomainMonitor extends ScheduledService {
     AppContextService ctx;
 
     @Inject
-    public ManagerBotConfig mgrBotConfig;
+    ManagerBotConfig mgrBotConfig;
 
     @Inject
     PeriodicUpdateQueue updateQueue;
@@ -87,10 +86,35 @@ public class DomainMonitor extends ScheduledService {
     NamecheapService namecheapService;
 
     @Inject
-    public LatestOrgConfig latestOrgConfig;
+    LatestOrgConfig latestOrgConfig;
 
     @Inject
     LatestProjectConfig latestProjectConfig;
+
+    @Override
+    protected AppContextService getCtx() {
+        return ctx;
+    }
+
+    @Override
+    protected ManagerBotConfig getMgrBotConfig() {
+        return mgrBotConfig;
+    }
+
+    @Override
+    protected LatestOrgConfig getLatestOrgConfig() {
+        return latestOrgConfig;
+    }
+
+    @Override
+    protected boolean isMonitoringEnabled() {
+        return latestOrgConfig.getConfig().isDomainMonitoringEnabled();
+    }
+
+    @Override
+    protected boolean isOrgDryRun() {
+        return latestOrgConfig.getConfig().isMonitoringDryRun();
+    }
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Domain list refreshed", () -> lastRun);
@@ -542,65 +566,14 @@ public class DomainMonitor extends ScheduledService {
         String title;
         if (isOrgRepo) {
             title = "haus-manager: Domain issues for organization";
+            sendOrgErrorNotification(title, message, isOrgDryRun());
         } else {
             // Extract display name from repository full name (e.g., "easymock" from "org/project-easymock")
-            String displayName = latestOrgConfig.getProjectDisplayNameFromRepo(project);
+            String displayName = getProjectDisplayName(project);
             title = "haus-manager: Domain issues for " + displayName;
-        }
-
-        if (isOrgRepo) {
-            createOrgIssueAndMail(title, message, true);
-        } else {
             ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
-            createProjectIssueAndMail(title, message, state, true);
-            // cc: send a copy to org errors email
-            createOrgIssueAndMail(title, message, true);
+            sendProjectErrorNotification(title, message, state, isOrgDryRun() || state.isDomainManagementDryRun());
         }
-    }
-
-    private void createProjectIssueAndMail(String title, String messageFormat,
-            ProjectConfigState state, boolean isError) {
-
-        // Skip if project doesn't have a valid configuration
-        if (state == null || state.projectConfig() == null) {
-            Log.warnf("[%s] Cannot send notification for project (no config found). title: %s",
-                    ME, title);
-            return;
-        }
-
-        var addresses = isError
-                ? state.projectConfig().emailNotifications().errors()
-                : state.projectConfig().emailNotifications().audit();
-        var message = messageFormat.formatted(state.repoFullName());
-
-        if (latestOrgConfig.getConfig().isMonitoringDryRun() || state.isDomainManagementDryRun()) {
-            Log.infof("[%s] DRY RUN: would create issue and send email for project %s to %s. title: %s; body: %s",
-                    ME, state.repoFullName(), String.join(", ", addresses), title, message);
-            return;
-        }
-
-        ctx.sendEmail(ME, title, message, addresses);
-
-        // TODO: Create if absent
-        // ReportQueryContext rqc = ctx.getReportQueryContext(state.repoFullName());
-        // rqc.createItem(EventType.issue, title, message, null);
-    }
-
-    private void createOrgIssueAndMail(String title, String message, boolean isError) {
-        var addresses = isError
-                ? latestOrgConfig.getConfig().emailNotifications().errors()
-                : latestOrgConfig.getConfig().emailNotifications().audit();
-
-        if (latestOrgConfig.getConfig().isMonitoringDryRun()) {
-            addresses = latestOrgConfig.getConfig().emailNotifications().dryRun();
-        }
-
-        ctx.sendEmail(ME, title, message, addresses);
-
-        // TODO: Create if absent
-        // ReportQueryContext rqc =
-        // ctx.getReportQueryContext(mgrBotConfig.home().repositoryFullName());
-        // rqc.createItem(EventType.issue, title, message, null);
     }
 
     private void handleValidDomains(List<DomainReconciliation> valid) {
@@ -626,7 +599,7 @@ public class DomainMonitor extends ScheduledService {
 
             String message = Templates.validDomainsSummary(valid.size(), validDomainsText).render();
 
-            createOrgIssueAndMail(title, message, false);
+            sendOrgAuditNotification(title, message, isOrgDryRun());
         }
     }
 

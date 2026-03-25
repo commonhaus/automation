@@ -68,8 +68,6 @@ public class InstallMonitorTest extends HausManagerTestBase {
                 .thenReturn(HOME_PROJECT_1.repoFullName());
         when(latestOrgConfig.projectNameToRepoFullName(any(), eq("two")))
                 .thenReturn(HOME_PROJECT_2.repoFullName());
-        // Use real method for getProjectDisplayNameFromRepo (strips "project-" prefix)
-        when(latestOrgConfig.getProjectDisplayNameFromRepo(any())).thenCallRealMethod();
 
         // Project 1 mock config/state
         var config1 = loadYamlResource(
