@@ -38,3 +38,4 @@ Additional resources:
 - **Understand interactions**: Use architecture docs to see how components fit together
 - **Respect boundaries**: Each module has specific responsibilities
 - **Test appropriately**: Follow established testing patterns
+- **Prefer clarity over cleverness**: Use traditional for loops when they're clearer than streams; streams aren't inherently better.
