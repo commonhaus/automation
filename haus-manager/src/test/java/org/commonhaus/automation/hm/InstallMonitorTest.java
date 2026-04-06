@@ -243,6 +243,62 @@ public class InstallMonitorTest extends HausManagerTestBase {
     }
 
     @Test
+    void testSharedRepositoryAndSharedGitHubOrg() throws IOException {
+        Log.info(
+                "TEST: Two project entries sharing the same projectRepository and the same GitHub org produce no false mismatch");
+
+        // Mirrors the easymock/objenesis scenario: both project entries point to
+        // project-easymock and both list https://github.com/easymock.
+        // Because they resolve to the same ProjectConfigState, projectsDeclaring
+        // should contain only one entry and no mismatch should be reported.
+        mockOrgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-shared-org.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(mockOrgConfig);
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("common")))
+                .thenReturn("test-org/project-common");
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("common2")))
+                .thenReturn("test-org/project-common");
+
+        var sharedConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-common.yml",
+                ProjectConfig.class);
+
+        var sharedProjectState = new ProjectConfigState(
+                ProjectManager.repoNametoTaskGroup("test-org/project-common"),
+                () -> {
+                },
+                "test-org/project-common",
+                home_project_1.installationId(),
+                sharedConfig);
+        when(latestProjectConfig.getProjectConfigState("test-org/project-common"))
+                .thenReturn(sharedProjectState);
+        when(latestProjectConfig.getAllProjects())
+                .thenReturn(List.of(sharedProjectState));
+
+        // The GitHub org is installed
+        installationMap.addTestOrg(42000, "common/some-repo");
+
+        installMonitor.checkInstallations(true);
+        waitForQueue();
+
+        // No project-level error emails: the shared repo maps to a single declaring
+        // project so orgExpectedProjects == projectsDeclaring (both contain the same
+        // resolved repo full name) and hasOrgMismatch() is false.
+        var errors = mailbox.getMailsSentTo("errors@projectA.dev");
+        assertThat(errors).isEmpty();
+        var orgErrors = mailbox.getMailsSentTo("errors@test.org");
+        assertThat(orgErrors).isEmpty();
+
+        // Audit summary shows the org as valid (✅) under the common project group
+        var auditEmails = mailbox.getMailsSentTo("audit@test.org");
+        assertThat(auditEmails).hasSize(1);
+        String auditText = auditEmails.get(0).getText();
+        assertThat(auditText).contains("common");
+        assertThat(auditText).contains("✅ common");
+    }
+
+    @Test
     void testSharedRepositoryProjectName() throws IOException {
         Log.info("TEST: Shared repository should use repository name, not YAML key, for display name");
 

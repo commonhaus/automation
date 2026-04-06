@@ -1,0 +1,37 @@
+domainManagement:
+  enabled: false
+  dryRun: true
+
+domainMonitoring:
+  enabled: false
+  dryRun: true
+
+githubOrgVerification:
+  enabled: true
+  dryRun: false
+
+sponsors:
+  enabled: false
+  dryRun: true
+
+emailNotifications:
+  errors:
+    - errors@test.org
+  dryRun:
+    - test@test.org
+  audit:
+    - audit@test.org
+
+## Two project entries sharing both the same projectRepository and the same GitHub org.
+## This mirrors the common/common2 scenario: both projects live in the common GH org.
+
+projects:
+  common:
+    projectRepository: project-common
+    githubOrganizations:
+      - https://github.com/common
+
+  common2:
+    projectRepository: project-common
+    githubOrganizations:
+      - https://github.com/common
