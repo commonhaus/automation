@@ -572,7 +572,17 @@ public class DomainMonitor extends BaseMonitor {
             String displayName = getProjectDisplayName(project);
             title = "haus-manager: Domain issues for " + displayName;
             ProjectConfigState state = latestProjectConfig.getProjectConfigState(project);
-            sendProjectErrorNotification(title, message, state, isOrgDryRun() || state.isDomainManagementDryRun());
+
+            if (state == null) {
+                // Project referenced in org config but not yet discovered or has no config file
+                Log.warnf("[%s] Cannot send domain notification to %s - project config not loaded. " +
+                        "This may indicate the project hasn't been discovered or configured yet.",
+                        ME, project);
+                return;
+            }
+
+            boolean dryRun = isOrgDryRun() || state.isDomainManagementDryRun();
+            sendProjectErrorNotification(title, message, state, dryRun);
         }
     }
 
