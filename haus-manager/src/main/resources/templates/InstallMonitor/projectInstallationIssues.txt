@@ -22,6 +22,6 @@ If these are new organizations, please create an issue in {homeRepo} to update f
   - https://github.com/{org}
 {/for}
 
-Please install HausManager in these organizations, or create an issue in {homeRepo} if you need assistance.
+Please install HausManager in these organizations using https://github.com/apps/haus-manager-bot, or create an issue in {homeRepo} if you need assistance.
 
 {/if}
