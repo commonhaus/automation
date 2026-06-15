@@ -2,40 +2,31 @@
 
 **For build commands and development setup, see [CONTRIBUTING.md](CONTRIBUTING.md).**
 
-## Pair Programming Approach
+## Architecture
 
-Act as an effective coding partner:
+- [docs/common-overview.md](docs/common-overview.md) - Core framework (QueryContext, queue, watchers, JsonAttribute pattern)
+- [docs/pom-xml-overview.md](docs/pom-xml-overview.md) - Module structure and dependencies
 
-- **Review thoroughly**: Use file system access to analyze information flow and cross-module interactions
-- **Ask for clarification**: Don't assume—ask when implementation choices are unclear
-- **Be efficient**: Be succinct and concise, don't waste tokens
-- **Respect privacy**: Don't read .env* files unless instructed
-- **Never speculate**: Don't make up code unless asked
+## Module layout
 
-## Context Gathering
+```text
+bot-github-core/   shared library (QueryContext, queue, watchers, test infrastructure)
+haus-keeper/       member self-service, OAuth, email aliases, GitHub-backed data storage
+haus-manager/      org/team/collaborator/sponsor/domain management
+haus-rules/        vote counting and notice automation
+```
 
-Start with core architecture:
+Each module has its own `AGENTS.md` with module-specific context. Read it before making changes within that module.
 
-- [docs/common-overview.md](docs/common-overview.md) - Core functionality
-- [docs/pom-xml-overview.md](docs/pom-xml-overview.md) - Module structure
+## Cross-cutting concerns
 
-Then review module-specific docs as needed:
-
-- [docs/haus-keeper-overview.md](docs/haus-keeper-overview.md)
-- [docs/haus-manager-overview.md](docs/haus-manager-overview.md)
-- [docs/haus-rules-overview.md](docs/haus-rules-overview.md)
-- [docs/configuration-overview.md](docs/configuration-overview.md)
-- [docs/testing-overview.md](docs/testing-overview.md)
-- [docs/front-end-overview.md](docs/front-end-overview.md)
-
-Additional resources:
-
+- [docs/configuration-overview.md](docs/configuration-overview.md) - Config file naming conventions and FileWatcher pattern
+- [docs/testing-overview.md](docs/testing-overview.md) - Shared test infrastructure (ContextHelper, mocking patterns)
 - [docs/api-reference/](docs/api-reference/) - API documentation
 
-## Working Principles
+## Key constraints
 
-- **Follow existing patterns**: Find and emulate similar functions in the same module
-- **Understand interactions**: Use architecture docs to see how components fit together
-- **Respect boundaries**: Each module has specific responsibilities
-- **Test appropriately**: Follow established testing patterns
-- **Prefer clarity over cleverness**: Use traditional for loops when they're clearer than streams; streams aren't inherently better.
+- **No Spring**: Quarkus only — no Spring annotations or dependencies.
+- **JSON libraries**: Two are in use. Jackson for GitHub REST (Java GitHub SDK); JSON-P (Jakarta) for GraphQL (Quarkus GitHub App). Use `JsonAttribute` rather than creating new POJOs for parsing either. See `common-overview.md`.
+- **All GitHub API calls go through QueryContext** — never call GitHub APIs directly. This ensures error accumulation, dryRun support, and auth retry behavior.
+- **Queue discipline**: Route work through `PeriodicUpdateQueue`. Use CHANGE for specific events, RECONCILE (with a stable `taskGroup`) for expensive idempotent operations that can be collapsed.

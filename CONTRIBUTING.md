@@ -89,6 +89,7 @@ When implementing new features:
 2. **Follow established patterns** already in use rather than creating new approaches
 3. **Use existing APIs and utilities** - each bot has commonly used patterns that should be emulated
 4. **Refer to `docs/` architecture documentation** for understanding how components interact
+5. **Prefer clarity over cleverness**: use traditional for loops when they're clearer than streams.
 
 ## Architecture Overview
 
