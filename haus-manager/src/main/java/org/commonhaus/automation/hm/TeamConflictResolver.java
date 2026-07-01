@@ -321,7 +321,7 @@ public class TeamConflictResolver {
 
                 for (var project : ownership.projects.values()) {
                     var addresses = ctx.getErrorAddresses(project.emailNotifications());
-                    ctx.logAndSendEmail("TeamConflictResolver", message, null, addresses);
+                    ctx.logAndSendEmail("TeamConflictResolver", "Team management conflict", message, null, addresses);
                 }
             }
 
@@ -343,7 +343,7 @@ public class TeamConflictResolver {
 
                 for (var project : ownership.projects.values()) {
                     var addresses = ctx.getErrorAddresses(project.emailNotifications());
-                    ctx.logAndSendEmail("TeamConflictResolver", message, null, addresses);
+                    ctx.logAndSendEmail("TeamConflictResolver", "Team management conflict", message, null, addresses);
                 }
 
                 Log.warnf("[TeamConflictResolver] Project conflict for team %s: %s",
