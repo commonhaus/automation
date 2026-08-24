@@ -1,8 +1,5 @@
 package org.commonhaus.automation.queue;
 
-import java.time.Instant;
-import java.util.Optional;
-
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
@@ -21,9 +18,8 @@ public abstract class ScheduledService {
     }
 
     protected void bootstrapFinished(@Observes BootstrapDiscoveryEvent event) {
-        lastRun = Optional.ofNullable(taskState.lastRun(me()))
-                .map(Instant::toString)
-                .orElse(Instant.now().toString());
-        recordRun();
+        // Bootstrap restores the prior persisted view of this task's freshness.
+        // It must not stamp a new run before scheduled or restart-triggered work actually executes.
+        lastRun = taskState.lastRunOrNow(me()).toString();
     }
 }

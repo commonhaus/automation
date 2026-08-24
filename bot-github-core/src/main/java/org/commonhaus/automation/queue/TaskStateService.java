@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,6 +26,7 @@ import io.quarkus.runtime.StartupEvent;
 @ApplicationScoped
 public class TaskStateService {
     private static final String ME = TaskStateService.class.getSimpleName();
+    static final String BACKGROUND_PERSIST_TASK = "task-state";
     private final static TypeReference<Map<String, Instant>> TYPE_REF = new TypeReference<>() {
     };
 
@@ -69,20 +71,14 @@ public class TaskStateService {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }
-        if (stateFile != null) {
-            try {
-                Files.createDirectories(stateFile.getParent());
-                Files.writeString(stateFile, ContextService.yamlMapper.writeValueAsString(lastRunTimes));
-                Log.infof("[%s] Saved task state to %s", ME, stateFile);
-            } catch (IOException e) {
-                Log.warn("Could not save state file", e);
-            }
-        }
+        persistState();
     }
 
     public Instant recordRun(String taskId) {
         Instant now = Instant.now();
         lastRunTimes.put(taskId, now);
+        // Normal operation persists through the idle-only background queue; shutdown still flushes explicitly.
+        queuePersistence();
         return now;
     }
 
@@ -102,5 +98,33 @@ public class TaskStateService {
             return Instant.now();
         }
         return lastRunTimes.get(taskId);
+    }
+
+    public Instant lastRunOrNow(String taskId) {
+        return Optional.ofNullable(lastRun(taskId)).orElse(Instant.now());
+    }
+
+    void configureStateFile(Path stateFile) {
+        this.stateFile = stateFile;
+    }
+
+    void persistState() {
+        if (stateFile == null) {
+            return;
+        }
+        try {
+            Files.createDirectories(stateFile.getParent());
+            Files.writeString(stateFile, ContextService.yamlMapper.writeValueAsString(lastRunTimes));
+            Log.infof("[%s] Saved task state to %s", ME, stateFile);
+        } catch (IOException e) {
+            Log.warn("Could not save state file", e);
+        }
+    }
+
+    void queuePersistence() {
+        if (stateFile != null) {
+            // Use one stable background task name so repeated updates collapse to a single pending write.
+            updateQueue.queueBackground(BACKGROUND_PERSIST_TASK, this::persistState);
+        }
     }
 }
