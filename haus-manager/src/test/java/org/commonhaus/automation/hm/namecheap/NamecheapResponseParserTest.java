@@ -32,7 +32,7 @@ class NamecheapResponseParserTest {
     }
 
     @Test
-    void redactDomainInfoXmlMasksContactFieldsButKeepsOperationalFields() {
+    void redactDomainInfoXmlMasksPersonalContactFieldsButKeepsOrgAndRoleTrace() {
         String redacted = NamecheapResponseParser.redactDomainInfoXml(SAMPLE_DOMAIN_INFO_XML);
 
         assertThat(redacted)

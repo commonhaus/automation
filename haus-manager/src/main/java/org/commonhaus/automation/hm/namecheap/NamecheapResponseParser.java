@@ -22,7 +22,9 @@ import io.quarkus.logging.Log;
 
 public class NamecheapResponseParser {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
-    private static final List<String> PII_TAGS = List.of(
+    // Keep OrganizationName and JobTitle visible in redacted XML so parse failures still show
+    // whether Namecheap returned a generic org/role-based contact versus a fully person-specific one.
+    private static final List<String> REDACTED_CONTACT_TAGS = List.of(
             "FirstName",
             "LastName",
             "Address1",
@@ -146,7 +148,7 @@ public class NamecheapResponseParser {
 
     public static String redactDomainInfoXml(String xmlResponse) {
         String redacted = xmlResponse;
-        for (String tag : PII_TAGS) {
+        for (String tag : REDACTED_CONTACT_TAGS) {
             redacted = replaceTagValue(redacted, tag);
         }
         return redacted;
