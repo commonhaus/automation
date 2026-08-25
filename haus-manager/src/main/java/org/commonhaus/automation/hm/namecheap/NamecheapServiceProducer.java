@@ -49,7 +49,8 @@ public class NamecheapServiceProducer {
             // Build REST client
             NamecheapClient client = RestClientBuilder.newBuilder()
                     .baseUri(java.net.URI.create(ncConfig.url()))
-                    .followRedirects(true)
+                    // Do not follow redirects when talking to the registrar API.
+                    .followRedirects(false)
                     .register(new NamecheapClientFilter(ncConfig))
                     .build(NamecheapClient.class);
 
