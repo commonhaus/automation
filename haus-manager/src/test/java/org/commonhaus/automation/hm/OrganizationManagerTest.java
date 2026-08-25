@@ -5,28 +5,40 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.github.context.ActionType;
+import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
+import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
+import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
+import org.commonhaus.automation.github.watchers.MembershipWatcher.TeamEvent;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.github.HausManagerTestBase;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHTeam;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.logging.Log;
+import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
@@ -36,7 +48,11 @@ public class OrganizationManagerTest extends HausManagerTestBase {
     @Inject
     OrganizationManager organizationManager;
 
+    @InjectMock
+    TaskStateService taskState;
+
     GHRepository contactRepo;
+    GHTeam councilTeam;
 
     @BeforeEach
     @Override
@@ -53,9 +69,14 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         mockFileContent(contactRepo, "CONTACTS.yaml",
                 "src/test/resources/test-contacts.yml");
 
-        mockTeam("test-org/cf-council", null);
+        councilTeam = mockTeam("test-org/cf-council", null);
         mockTeam("test-org/admin", null);
         mockTeam("test-org/team-quorum", null);
+
+        when(taskState.lastRunOrNow(anyString())).thenReturn(Instant.parse("2026-08-24T11:00:00Z"));
+        when(taskState.recordRun(anyString())).thenReturn(Instant.parse("2026-08-24T12:00:00Z"));
+        when(taskState.shouldRun(anyString(), any())).thenReturn(true);
+        clearInvocations(taskState);
     }
 
     @AfterEach
@@ -143,6 +164,40 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void scheduledRefreshRecordsRunStateWhenFullScopeWorkExecutes() {
+        organizationManager.refreshOrganizationMembership(false);
+
+        waitForQueue();
+
+        verify(taskState).shouldRun(OrganizationManager.ME, Duration.ofHours(12));
+        verify(taskState).recordRun(OrganizationManager.ME);
+    }
+
+    @Test
+    void membershipUpdateRecordsRunStateWhenFullScopeReconcileExecutes() throws IOException {
+        organizationManager.processFileUpdate(new FileUpdate(
+                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+                hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
+        waitForQueue();
+        clearInvocations(taskState, teamService);
+
+        organizationManager.processMembershipUpdate(OrganizationManager.ME,
+                new MembershipUpdate(MembershipUpdateType.TEAM, PRIMARY.orgName(),
+                        new TeamEvent(
+                                hausMocks.github(),
+                                hausMocks.installationId(),
+                                hausMocks.organization(),
+                                councilTeam,
+                                mockUser("test-user"),
+                                ActionType.added,
+                                EventType.membership)));
+        waitForQueue();
+
+        verify(taskState).recordRun(OrganizationManager.ME);
+        verify(contactRepo, timeout(1000).atLeastOnce()).getFileContent(anyString());
     }
 
     List<String> teams(OrganizationConfig config) {

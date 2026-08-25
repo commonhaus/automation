@@ -177,6 +177,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
     /** All repositories have been discovered: Organization and project config have been detected */
     protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
         if (taskState.shouldRun(ME, Duration.ofHours(12))) {
+            recordRun();
             queueReconciliation();
         } else {
             Log.debugf("[%s] bootstrapComplete: Skip eager team sync", ME);
@@ -187,6 +188,9 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         // Add this to the queue so it occurs after project configurations are read
         updateQueue.queue(ME, () -> {
             Log.debugf("[%s] queueReconciliation: Reconcile all project configurations", ME);
+            if (taskGroupToState.isEmpty()) {
+                Log.debugf("[%s] queueReconciliation: no project configurations available", ME);
+            }
             for (String taskGroup : taskGroupToState.keySet()) {
                 updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
             }

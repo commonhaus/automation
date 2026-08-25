@@ -2,14 +2,18 @@ package org.commonhaus.automation.hm;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -24,6 +28,7 @@ import org.commonhaus.automation.hm.config.OrganizationConfig.CollaboratorMonito
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.commonhaus.automation.hm.github.HausManagerTestBase;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHOrganization.Permission;
@@ -51,6 +56,9 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
 
     @InjectMock
     LatestProjectConfig latestProjectConfig;
+
+    @InjectMock
+    TaskStateService taskState;
 
     // Mock data
     Set<String> project1Collaborators = Set.of("user1", "user2", "user3");
@@ -100,6 +108,10 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
         when(teamService.toRole(any(), any(), any(), any(), any(), any()))
                 .thenReturn(RepositoryRole.from(Permission.TRIAGE));
 
+        when(taskState.lastRunOrNow(anyString())).thenReturn(Instant.parse("2026-08-24T11:00:00Z"));
+        when(taskState.recordRun(anyString())).thenReturn(Instant.parse("2026-08-24T12:00:00Z"));
+        when(taskState.shouldRun(anyString(), any())).thenReturn(true);
+
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project1, true);
@@ -107,6 +119,7 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
 
         // Trigger bootstrap completion to execute deferred reconciliation
         triggerBootstrapDiscovery(hausMocks);
+        clearInvocations(taskState);
     }
 
     private OrganizationConfig mockOrgConfig(boolean enabled, boolean dryRun, List<String> ignoreUsers) {
@@ -156,7 +169,7 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
         OrganizationConfig disabledConfig = mockOrgConfig(false, false, List.of());
         when(latestOrgConfig.getConfig()).thenReturn(disabledConfig);
 
-        collaboratorMonitor.refreshCollaborators(true);
+        collaboratorMonitor.refreshCollaborators(false);
         waitForQueue();
 
         // Verify syncCollaborators was NOT called
@@ -168,6 +181,8 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
                 any(),
                 anyBoolean(),
                 any());
+        verify(taskState).shouldRun(CollaboratorMonitor.ME, Duration.ofHours(12));
+        verify(taskState, never()).recordRun(CollaboratorMonitor.ME);
     }
 
     @Test

@@ -163,17 +163,20 @@ public class ProjectHealthManager extends GroupCoordinator implements ProjectCon
             return;
         }
         Log.infof("[%s]: collect health data (last run: %s)", ME, lastRun);
-        recordRun();
 
         var allProjects = latestProjectConfig.getAllProjects();
         Log.debugf("[%s]: found %d total projects", ME, allProjects.size());
-        for (var state : allProjects) {
-            var healthTaskGroup = getTaskGroup(state.repoFullName());
-            if (!state.isHealthCollectionEnabled()) {
-                Log.debugf("[%s] %s: Health collection is disabled for %s", ME, healthTaskGroup, state.repoFullName());
-                continue;
-            }
+        var enabledProjects = allProjects.stream()
+                .filter(ProjectConfigState::isHealthCollectionEnabled)
+                .toList();
+        if (enabledProjects.isEmpty()) {
+            Log.debugf("[%s]: no projects have health collection enabled", ME);
+            return;
+        }
+        recordRun();
 
+        for (var state : enabledProjects) {
+            var healthTaskGroup = getTaskGroup(state.repoFullName());
             Log.debugf("[%s]: processing project %s: %s", ME, state.repoFullName(), state.projectConfig());
             final var taskState = state;
             Runnable task = () -> collectAndCommitProjectHealth(healthTaskGroup, taskState, anchorDate);

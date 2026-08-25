@@ -2,10 +2,16 @@ package org.commonhaus.automation.hm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 import jakarta.inject.Inject;
@@ -17,6 +23,7 @@ import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.commonhaus.automation.hm.github.TestScopedInstallationMap;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +48,9 @@ public class InstallMonitorTest extends HausManagerTestBase {
 
     @InjectMock
     LatestProjectConfig latestProjectConfig;
+
+    @InjectMock
+    TaskStateService taskState;
 
     private OrganizationConfig mockOrgConfig;
 
@@ -98,11 +108,34 @@ public class InstallMonitorTest extends HausManagerTestBase {
                 .thenReturn(mockProjectState2);
         when(latestProjectConfig.getAllProjects())
                 .thenReturn(List.of(mockProjectState1, mockProjectState2));
+
+        when(taskState.recordRun(anyString())).thenReturn(Instant.parse("2026-08-24T12:00:00Z"));
+        when(taskState.shouldRun(anyString(), any())).thenReturn(true);
+        clearInvocations(taskState);
     }
 
     @AfterEach
     protected void resetMap() {
         installationMap.reset();
+    }
+
+    @Test
+    void scheduledSkipDoesNotRecordRunState() {
+        when(taskState.shouldRun(InstallMonitor.ME, Duration.ofHours(24))).thenReturn(false);
+
+        installMonitor.checkInstallations(false);
+
+        verify(taskState).shouldRun(InstallMonitor.ME, Duration.ofHours(24));
+        verify(taskState, never()).recordRun(InstallMonitor.ME);
+    }
+
+    @Test
+    void scheduledRunRecordsRunStateAfterGating() {
+        installMonitor.checkInstallations(false);
+        waitForQueue();
+
+        verify(taskState).shouldRun(InstallMonitor.ME, Duration.ofHours(24));
+        verify(taskState).recordRun(InstallMonitor.ME);
     }
 
     @Test

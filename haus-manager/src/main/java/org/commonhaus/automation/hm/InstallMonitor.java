@@ -115,7 +115,6 @@ public class InstallMonitor extends BaseMonitor {
      * @param userTriggered true if triggered manually
      */
     public void checkInstallations(boolean userTriggered) {
-        recordRun();
         if (!latestOrgConfig.getConfig().isOrgValidationEnabled()) {
             Log.infof("[%s]: GitHub organization verification is disabled (last run: %s)", ME, lastRun);
             return;
@@ -124,6 +123,7 @@ public class InstallMonitor extends BaseMonitor {
             Log.infof("[%s]: skip installation check (last run: %s)", ME, lastRun);
             return;
         }
+        recordRun();
 
         boolean dryRun = latestOrgConfig.getConfig().isOrgValidationDryRun();
         if (dryRun) {

@@ -77,7 +77,6 @@ public class UserLoginVerifier extends ScheduledService {
             Log.infof("[%s]: skip scheduled login verification (last run: %s)", ME, lastRun);
             return;
         }
-        recordRun();
 
         // Get all user IDs from datastore
         DatastoreQueryContext dqc = ctx.getDatastoreContext();
@@ -86,6 +85,7 @@ public class UserLoginVerifier extends ScheduledService {
             Log.error("Failed to get repository for user login verification");
             return;
         }
+        recordRun();
 
         Path tempDir = null;
         try {

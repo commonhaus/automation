@@ -74,12 +74,12 @@ public class CollaboratorMonitor extends ScheduledService {
     }
 
     private void reconcile() {
-        recordRun();
         OrganizationConfig config = latestOrgConfig.getConfig();
         if (config == null || !config.isCollaboratorMonitorEnabled()) {
             Log.debugf("[%s] reconcile: configuration not available or collaborator monitor not enabled", ME);
             return;
         }
+        recordRun();
 
         CollaboratorMonitorConfig monitorConfig = config.collaboratorMonitor();
         Log.debugf("[%s] reconcile: start %s", ME, monitorConfig);

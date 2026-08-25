@@ -2,6 +2,7 @@ package org.commonhaus.automation.hr.voting;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -119,13 +120,17 @@ public class VoteProcessor extends ScheduledService {
     public void scheduledDiscovery() {
         try {
             Log.info("🗳️ ⏰ Scheduled: begin count votes");
-            discoverVotes();
+            discoverVotes(false);
         } catch (Throwable t) {
             ctx.logAndSendEmail("🗳️ ", "🗳️ ⏰ Error running scheduled refresh", t);
         }
     }
 
-    public void discoverVotes() {
+    public void discoverVotes(boolean userTriggered) {
+        if (!userTriggered && !taskState.shouldRun(me(), Duration.ofHours(1))) {
+            return;
+        }
+        recordRun();
         var i = votingRepositories.entrySet().iterator();
         while (i.hasNext()) {
             var e = i.next();

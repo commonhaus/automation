@@ -2,14 +2,17 @@ package org.commonhaus.automation.hm;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Set;
 
 import jakarta.inject.Inject;
@@ -24,6 +27,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.github.HausManagerTestBase;
+import org.commonhaus.automation.queue.TaskStateService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +37,7 @@ import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.logging.Log;
+import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
@@ -42,6 +47,9 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
     @Inject
     ProjectManager projectManager;
+
+    @InjectMock
+    TaskStateService taskState;
 
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 
@@ -61,8 +69,15 @@ public class ProjectManagerTest extends HausManagerTestBase {
         // trigger discovery to register installation
         triggerRepositoryDiscovery(DiscoveryAction.ADDED, project_org, true);
 
+        when(taskState.lastRunOrNow(anyString())).thenReturn(Instant.parse("2026-08-24T11:00:00Z"));
+        when(taskState.recordRun(anyString())).thenReturn(Instant.parse("2026-08-24T12:00:00Z"));
+        when(taskState.shouldRun(anyString(), any())).thenReturn(false);
+
         // Trigger bootstrap completion to execute deferred reconciliation
         triggerBootstrapDiscovery(home_project_1);
+        waitForQueue();
+
+        clearInvocations(taskState, teamService);
     }
 
     @AfterEach
@@ -139,6 +154,7 @@ public class ProjectManagerTest extends HausManagerTestBase {
                 eq(home_project_1.repository()),
                 argThat(actualRole -> actualRole.toString().equals(expectedRoleString)),
                 eq(expectedLogins), any(), anyBoolean(), any());
+        verify(taskState, never()).recordRun(ProjectManager.ME);
     }
 
     @Test
@@ -158,6 +174,38 @@ public class ProjectManagerTest extends HausManagerTestBase {
 
         // This shouldn't be called. The state is gone.
         verify(teamService, times(0)).syncCollaborators(any(),
+                eq(home_project_1.repository()), any(), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void bootstrapCompleteRecordsRunStateForFullScopeRefresh() {
+        when(taskState.shouldRun(anyString(), any())).thenReturn(true);
+
+        triggerBootstrapDiscovery(home_project_1);
+
+        waitForQueue();
+
+        verify(taskState).recordRun(ProjectManager.ME);
+    }
+
+    @Test
+    void targetedFileUpdateDoesNotRecordFullScopeRunState() throws IOException {
+        mockTeam("other-org/teamA", project_org.github(), otherTeamLogins);
+
+        when(teamService.getTeamLogins(any(), any()))
+                .thenReturn(otherTeamLogins);
+
+        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RepositoryRole.from(Permission.PUSH));
+
+        projectManager.processFileUpdate(taskGroup, new FileUpdate(
+                ProjectConfig.PATH, FileUpdateType.MODIFIED,
+                home_project_1.installationId(), home_project_1.repository(), home_project_1.github()));
+
+        waitForQueue();
+
+        verify(taskState, never()).recordRun(ProjectManager.ME);
+        verify(teamService, times(1)).syncCollaborators(any(),
                 eq(home_project_1.repository()), any(), any(), any(), anyBoolean(), any());
     }
 }

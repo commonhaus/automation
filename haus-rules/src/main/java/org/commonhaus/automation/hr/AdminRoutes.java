@@ -30,7 +30,7 @@ public class AdminRoutes implements LocalRouteOnly {
         }
         updateQueue.queueReconciliation("triggerVoteCount", () -> {
             Log.info("🚀 🗳️ vote counting triggered");
-            voteProcessor.discoverVotes();
+            voteProcessor.discoverVotes(true);
         });
         routingExchange.ok();
     }

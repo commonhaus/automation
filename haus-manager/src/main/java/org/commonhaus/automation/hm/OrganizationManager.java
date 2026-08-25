@@ -85,6 +85,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 // READ ORG CONFIG from Main repository immediately.
                 readOrgConfig(qc);
                 if (!repoEvent.bootstrap() && taskState.shouldRun(ME, Duration.ofHours(12))) {
+                    recordRun();
                     queueReconciliation();
                 }
 
@@ -107,6 +108,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      */
     protected void bootstrapComplete(@Observes @Priority(value = RdePriority.APP_DISCOVERY) BootstrapDiscoveryEvent event) {
         if (taskState.shouldRun(ME, Duration.ofHours(12))) {
+            recordRun();
             queueReconciliation();
         } else {
             Log.debugf("[%s] bootstrapComplete: Defer reconciliation", ME);
@@ -135,13 +137,13 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             Log.infof("[%s]: skip scheduled organization membership update (last run: %s)", ME, lastRun);
             return;
         }
-        recordRun();
         ScopedQueryContext qc = ctx.getHomeQueryContext();
         if (qc == null) {
             Log.debugf("[%s] refreshOrganizationMembership: no organization installation", ME);
             return;
         }
         if (readOrgConfig(qc)) {
+            recordRun();
             queueReconciliation();
         } else if (qc.hasErrors()) {
             qc.logAndSendContextErrors(
@@ -189,7 +191,6 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      */
     protected void processFileUpdate(FileUpdate fileUpdate) {
         recordRun();
-
         GitHub github = fileUpdate.github();
         GHRepository repo = fileUpdate.repository();
 
@@ -292,7 +293,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
      * Reconcile team membership with org configuration (CONTACTS.yaml)
      * Review collected configuration and perform required actions
      */
-    public void reconcile() {
+    private void reconcile() {
         OrganizationConfigState configState = currentConfig.get().orElse(null);
         if (configState == null || !configState.performSync()) {
             Log.debugf("[%s] reconcile: configuration not available or team sync not enabled: %s", ME, configState);

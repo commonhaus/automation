@@ -56,8 +56,6 @@ public class AnnualAssetReport extends ScheduledService {
      * @param dryRun if true, log what would be sent instead of actually sending emails
      */
     public void generateAnnualReports(boolean dryRun) {
-        recordRun();
-
         if (dryRun) {
             Log.infof("[%s] DRY RUN: Generating annual asset reports (no emails will be sent)", ME);
         } else {
@@ -72,6 +70,10 @@ public class AnnualAssetReport extends ScheduledService {
             // 2. Get all projects
             var allProjects = latestProjectConfig.getAllProjects();
             Log.infof("[%s] Processing %d project(s)", ME, allProjects.size());
+            recordRun();
+            if (allProjects.isEmpty()) {
+                Log.debugf("[%s] No projects available for annual asset reporting", ME);
+            }
 
             // 3. Reconcile each project
             List<ProjectAssetReconciliation> reconciliations = new ArrayList<>();
