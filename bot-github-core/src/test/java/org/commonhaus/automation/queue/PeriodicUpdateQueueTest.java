@@ -2,8 +2,11 @@ package org.commonhaus.automation.queue;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.awaitility.Awaitility.await;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.commonhaus.automation.github.context.ContextHelper;
@@ -124,6 +127,17 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
     }
 
     @Test
+    void testCollapsedReconciliationWithoutQueuedReplacementDoesNotEscape() throws Exception {
+        setReconcileCounter("groupA", 2);
+
+        var reconcileTask = new PeriodicUpdateQueue.Task(PeriodicUpdateQueue.TaskType.RECONCILE, "groupA",
+                () -> this.doStuff("groupA", new AtomicInteger()));
+
+        assertThatCode(() -> invokeRun(reconcileTask))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void testScheduledRetryBehavior() {
         AtomicInteger attemptCounter = new AtomicInteger(0);
 
@@ -157,5 +171,19 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
             updateQueue.scheduleReconciliationRetry("retryTest",
                     (x) -> retryableTask(x, attemptCounter), retryCount);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setReconcileCounter(String name, int pendingCount) throws Exception {
+        Field field = PeriodicUpdateQueue.class.getDeclaredField("reconcileCounters");
+        field.setAccessible(true);
+        var counters = (java.util.Map<String, Integer>) field.get(updateQueue);
+        counters.put(name, pendingCount);
+    }
+
+    private void invokeRun(PeriodicUpdateQueue.Task task) throws Exception {
+        Method method = PeriodicUpdateQueue.class.getDeclaredMethod("run", PeriodicUpdateQueue.Task.class);
+        method.setAccessible(true);
+        method.invoke(updateQueue, task);
     }
 }

@@ -1,14 +1,13 @@
 package org.commonhaus.automation.queue;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import jakarta.enterprise.event.Observes;
@@ -71,13 +70,14 @@ public class PeriodicUpdateQueue {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     /** Retry tasks: tasks that failed due to network or authentication issues that should be retried */
-    private final Map<String, RetryTask> retryTasks = new ConcurrentHashMap<>();
+    private final Map<String, RetryTask> retryTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Background tasks: low priority; choose after main tasks quiesce */
-    private final Map<String, Runnable> backgroundTasks = new ConcurrentHashMap<>();
+    private final Map<String, Runnable> backgroundTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Pending reconcile tasks (by group) */
-    private final Map<String, AtomicInteger> reconcileCounters = new ConcurrentHashMap<>();
+    private final Map<String, Integer> reconcileCounters = new HashMap<>();
+    private final Object reconcileLock = new Object();
 
     void startup(@Observes StartupEvent startup) {
         Log.debugf("🧵 Starting PeriodicUpdateQueue");
@@ -103,8 +103,10 @@ public class PeriodicUpdateQueue {
 
     public void queueReconciliation(String name, Runnable task) {
         Log.debugf("🧵 ❇️ RECONCILE task %s", name);
-        reconcileCounters.computeIfAbsent(name, k -> new AtomicInteger()).incrementAndGet();
-        taskQueue.add(new Task(TaskType.RECONCILE, name, task));
+        synchronized (reconcileLock) {
+            reconcileCounters.merge(name, 1, Integer::sum);
+            taskQueue.add(new Task(TaskType.RECONCILE, name, task));
+        }
     }
 
     public void queueBackground(String name, Runnable task) {
@@ -141,20 +143,11 @@ public class PeriodicUpdateQueue {
         try {
             boolean tryNext;
             do {
-                // skip or collapse reconciliation task?
                 tryNext = false;
-
-                // Defer reconciliation if changes of the same group are pending
                 if (task.type() == TaskType.RECONCILE) {
-                    int pendingCount = reconcileCounters.getOrDefault(task.name(), new AtomicInteger()).decrementAndGet();
-                    if (pendingCount > 0) {
-                        // There is another pending reconciliation for the same group; skip this one
-                        Log.debugf("🧵 ❎ RECONCILE [skip] %s task; %s of this task remaining", task.name(), pendingCount);
-                        task = taskQueue.poll(); // Get the next task
-                        tryNext = true;
-                    } else {
-                        reconcileCounters.remove(task.name());
-                    }
+                    Task resolvedTask = resolveReconcileTask(task);
+                    tryNext = resolvedTask != task;
+                    task = resolvedTask;
                 }
             } while (tryNext);
 
@@ -168,6 +161,27 @@ public class PeriodicUpdateQueue {
             logMailer.logAndSendEmail("queue",
                     "🧵 Error running %s %s task".formatted(task.type(), task.name()),
                     e, logMailer.botErrorEmailAddress());
+        }
+    }
+
+    private Task resolveReconcileTask(Task task) {
+        synchronized (reconcileLock) {
+            String reconcileGroup = task.name();
+            int pendingCount = reconcileCounters.getOrDefault(reconcileGroup, 0) - 1;
+            if (pendingCount > 0) {
+                Task nextTask = taskQueue.poll();
+                if (nextTask != null) {
+                    reconcileCounters.put(reconcileGroup, pendingCount);
+                    Log.debugf("🧵 ❎ RECONCILE [skip] %s task; %s of this task remaining", reconcileGroup, pendingCount);
+                    return nextTask;
+                }
+
+                Log.warnf(
+                        "🧵 RECONCILE state mismatch for %s; no queued replacement task was available, running current task",
+                        reconcileGroup);
+            }
+            reconcileCounters.remove(reconcileGroup);
+            return task;
         }
     }
 
