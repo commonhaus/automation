@@ -127,6 +127,28 @@ public class DomainMonitorTest extends HausManagerTestBase {
     }
 
     @Test
+    void normalizesSingleProjectShorthandToProjectPrefix() {
+        assertThat(domainMonitor.normalizeSingleProject("hibernate"))
+                .isEqualTo("project-hibernate");
+        assertThat(domainMonitor.normalizeSingleProject("project-hibernate"))
+                .isEqualTo("project-hibernate");
+    }
+
+    @Test
+    void returnsNullForInvalidSingleProjectFilter() {
+        assertThat(domainMonitor.normalizeSingleProject("bad/value")).isNull();
+        assertThat(domainMonitor.normalizeSingleProject("project bad")).isNull();
+    }
+
+    @Test
+    void invalidSingleProjectFilterSkipsRefresh() {
+        domainMonitor.refreshDomains(true, "bad/value");
+        waitForQueue();
+
+        verify(namecheapService, never()).fetchAllDomains();
+    }
+
+    @Test
     void testValidDomainsContactSync() {
         Log.info("TEST: All valid domains (org-managed and project-managed) get contact sync");
 

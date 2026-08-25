@@ -116,6 +116,30 @@ public class ProjectManagerTest extends HausManagerTestBase {
     }
 
     @Test
+    void ignoresSameOrgRepoWhoseNameDoesNotStartWithProjectPrefix() throws IOException {
+        var nonProjectRepo = mockRepository("test-org/my-project-tools", home_project_1.github());
+        mockFileContent(nonProjectRepo, ProjectConfig.PATH,
+                "src/test/resources/cf-haus-manager.yml");
+
+        mockTeam("test-org/cf-council", null);
+        mockTeam("test-org/admin", null);
+
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, new MockInstallation(
+                home_project_1.installationId(),
+                home_project_1.github(),
+                home_project_1.dql(),
+                home_project_1.organization(),
+                nonProjectRepo,
+                home_project_1.queryContext()), false);
+
+        waitForQueue();
+
+        verify(teamService, never()).syncCollaborators(any(), eq(nonProjectRepo), any(), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
     void testConfigurationUpdated() throws IOException {
         mockTeam("other-org/teamA", project_org.github(), otherTeamLogins);
 

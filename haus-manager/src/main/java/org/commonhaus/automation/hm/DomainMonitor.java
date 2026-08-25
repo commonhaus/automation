@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -47,6 +48,7 @@ import io.quarkus.scheduler.Scheduled;
 public class DomainMonitor extends BaseMonitor {
     static final String ME = "🌐-domains";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final Pattern PROJECT_FILTER_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
 
     @CheckedTemplate
     static class Templates {
@@ -142,8 +144,11 @@ public class DomainMonitor extends BaseMonitor {
      * @param singleProject send reports for a single project
      */
     public void refreshDomains(boolean userTriggered, String singleProject) {
-        if (singleProject != null && singleProject.isBlank()) {
-            singleProject = null;
+        String rawSingleProject = singleProject;
+        singleProject = normalizeSingleProject(singleProject);
+        if (rawSingleProject != null && !rawSingleProject.isBlank() && singleProject == null) {
+            Log.warnf("[%s] Invalid singleProject filter %s; skipping targeted domain refresh", ME, rawSingleProject);
+            return;
         }
         if (!namecheapService.isEnabled() || !latestOrgConfig.getConfig().isDomainMonitoringEnabled()) {
             Log.infof("[%s]: domain monitoring is disabled (last run: %s)", ME, lastRun);
@@ -246,6 +251,18 @@ public class DomainMonitor extends BaseMonitor {
         } catch (Exception e) {
             ctx.logAndSendEmail(ME, "Error refreshing domain information", e);
         }
+    }
+
+    String normalizeSingleProject(String singleProject) {
+        if (singleProject == null || singleProject.isBlank()) {
+            return null;
+        }
+        if (!PROJECT_FILTER_PATTERN.matcher(singleProject).matches()) {
+            return null;
+        }
+        return singleProject.startsWith("project-")
+                ? singleProject
+                : "project-" + singleProject;
     }
 
     private void dispatchDomainList(List<DomainRecord> namecheapDomains) {
