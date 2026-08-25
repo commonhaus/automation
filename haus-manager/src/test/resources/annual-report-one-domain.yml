@@ -1,0 +1,7 @@
+# Project declares one domain, no GitHub orgs. Whether "declared.example" counts as matched or
+# project-only depends entirely on the orgExpectedDomains map the test supplies alongside this
+# fixture — the fixture itself only describes what the project declares.
+domainManagement:
+  enabled: true
+  domains:
+    - name: declared.example

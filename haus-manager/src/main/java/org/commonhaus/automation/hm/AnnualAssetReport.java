@@ -116,7 +116,7 @@ public class AnnualAssetReport extends ScheduledService {
     /**
      * Reconcile a project's declared assets with the organization's expected assets
      */
-    private ProjectAssetReconciliation reconcileProjectAssets(
+    ProjectAssetReconciliation reconcileProjectAssets(
             ProjectConfigState projectState,
             Map<String, Set<String>> orgExpectedDomains,
             Map<String, Set<String>> orgExpectedOrgs) {
@@ -305,7 +305,7 @@ public class AnnualAssetReport extends ScheduledService {
      * @param recon reconciliation results for the project
      * @param dryRun if true, log what would be sent instead of actually sending
      */
-    private void sendAnnualReport(ProjectAssetReconciliation recon, boolean dryRun) {
+    void sendAnnualReport(ProjectAssetReconciliation recon, boolean dryRun) {
         var projectState = recon.projectState();
 
         // Get audit email addresses

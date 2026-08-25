@@ -4,6 +4,15 @@ dryRun: false
 githubOrganizations:
   - https://github.com/test-org-shared
 
+domainManagement:
+  enabled: true
+  domains:
+    # Matches projectA's expected domain in cf-haus-organization-shared-repo.yml.
+    # projectB's expected domain (projectb.example.org) is deliberately NOT declared here,
+    # so AnnualAssetReportTest#testProjectGroupMultiple can prove a matched + mismatched
+    # domain within the same pseudo-project cluster.
+    - name: projecta.example.org
+
 emailNotifications:
   errors:
     - errors@projectA.dev

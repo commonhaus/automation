@@ -1,0 +1,6 @@
+# Project declares one domain, no GitHub orgs. Used with an orgExpectedDomains map that either
+# does or doesn't claim "matched.example" for this project, to cover matched vs. project-only.
+domainManagement:
+  enabled: true
+  domains:
+    - name: matched.example

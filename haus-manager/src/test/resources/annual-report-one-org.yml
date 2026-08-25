@@ -1,0 +1,5 @@
+# Project declares one GitHub org, no domains. Whether "https://github.com/declared-org" counts
+# as matched or project-only depends entirely on the orgExpectedOrgs map the test supplies
+# alongside this fixture — the fixture itself only describes what the project declares.
+githubOrganizations:
+  - https://github.com/declared-org

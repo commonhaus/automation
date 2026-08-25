@@ -1,0 +1,5 @@
+# Project declares one GitHub org, no domains. Used with an orgExpectedOrgs map that either
+# does or doesn't claim "https://github.com/matched-org" for this project, to cover matched vs.
+# project-only.
+githubOrganizations:
+  - https://github.com/matched-org

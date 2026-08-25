@@ -1,0 +1,6 @@
+# Project declares no domains and no GitHub orgs. Used for org-only mismatch scenarios,
+# where the org expects an asset this project hasn't declared at all.
+domainManagement:
+  enabled: true
+  domains: []
+githubOrganizations: []
