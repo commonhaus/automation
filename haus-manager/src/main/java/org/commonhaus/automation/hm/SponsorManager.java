@@ -104,7 +104,7 @@ public class SponsorManager extends GroupCoordinator {
         String orgName = toOrganizationName(repoFullName);
         ScopedQueryContext qc = ctx.getOrgScopedQueryContext(orgName);
         if (qc == null) {
-            Log.debugf("[%s] reconcile: no query context for target repository", ME, sponsors);
+            Log.debugf("[%s] reconcile: no query context for target repository %s", ME, sponsors);
             return;
         }
         GHOrganization org = qc.getOrganization(orgName);

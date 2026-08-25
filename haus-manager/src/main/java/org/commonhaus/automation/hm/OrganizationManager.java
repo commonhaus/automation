@@ -195,7 +195,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         GHRepository repo = fileUpdate.repository();
 
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
-            Log.debugf("[%s] processFileUpdate: %s deleted", repo.getFullName());
+            Log.debugf("[%s] processFileUpdate: %s deleted", ME, repo.getFullName());
             currentConfig.set(Optional.empty());
             // TODO: clean up associated resources.
             // Leave the watcher, in case the file is re-added later
