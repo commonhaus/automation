@@ -68,7 +68,7 @@ public abstract class BaseMonitor extends ScheduledService {
             getCtx().sendEmail(me(), title, message, addresses);
             // CC to org errors
             getCtx().sendEmail(me(), title, message,
-                    getLatestOrgConfig().getConfig().emailNotifications().errors());
+                    getCtx().getErrorAddresses(getLatestOrgConfig().getConfig().emailNotifications()));
         }
     }
 
@@ -97,7 +97,7 @@ public abstract class BaseMonitor extends ScheduledService {
     protected void sendOrgErrorNotification(String title, String message, boolean dryRun) {
         var addresses = dryRun
                 ? getLatestOrgConfig().getConfig().emailNotifications().dryRun()
-                : getLatestOrgConfig().getConfig().emailNotifications().errors();
+                : getCtx().getErrorAddresses(getLatestOrgConfig().getConfig().emailNotifications());
 
         getCtx().sendEmail(me(), title, message, addresses);
     }

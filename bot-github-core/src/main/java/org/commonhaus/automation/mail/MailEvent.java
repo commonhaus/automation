@@ -1,5 +1,8 @@
 package org.commonhaus.automation.mail;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 
 public class MailEvent {
@@ -13,7 +16,7 @@ public class MailEvent {
         this.logId = logId;
         this.mailTemplateInstance = mailTemplateInstance;
         this.subject = subject;
-        this.addresses = addresses;
+        this.addresses = addresses == null ? null : new LinkedHashSet<>(Arrays.asList(addresses)).toArray(new String[0]);
     }
 
     public boolean hasAddresses() {

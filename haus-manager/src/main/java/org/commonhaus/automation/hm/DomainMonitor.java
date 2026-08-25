@@ -561,7 +561,7 @@ public class DomainMonitor extends BaseMonitor {
                                             ME, recon.domainName(), recon.isInNameCheap(), recon.orgManagedDirectly,
                                             recon.orgExpectedProjects(), recon.projectsClaimingDomain()),
                             null,
-                            latestOrgConfig.getConfig().emailNotifications().errors());
+                            ctx.getErrorAddresses(latestOrgConfig.getConfig().emailNotifications()));
                 }
             }
 
