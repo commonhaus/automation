@@ -121,7 +121,7 @@ public class CollaboratorMonitor extends ScheduledService {
             // Add all collaborators to the target repository
             teamService.syncCollaborators(qc, repo, role,
                     allCollaboratorLogins, monitorConfig.ignoreUsers(),
-                    monitorConfig.dryRun(), config.emailNotifications());
+                    monitorConfig.dryRun() || ctx.isDryRun(), config.emailNotifications());
 
             Log.infof("[%s] reconcile: synchronized %d collaborators to %s", ME, allCollaboratorLogins.size(),
                     repoFullName);

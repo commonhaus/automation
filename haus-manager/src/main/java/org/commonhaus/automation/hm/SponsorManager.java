@@ -123,7 +123,7 @@ public class SponsorManager extends GroupCoordinator {
                 config.emailNotifications(), sponsors);
 
         teamService.addExpectedCollaborators(qc, repo, role, sponsorLogins,
-                sponsors.ignoreUsers(), sponsors.dryRun(),
+                sponsors.ignoreUsers(), sponsors.dryRun() || ctx.isDryRun(),
                 config.emailNotifications());
 
         Log.debugf("[%s] reconcile: end %s", ME, sponsors);
