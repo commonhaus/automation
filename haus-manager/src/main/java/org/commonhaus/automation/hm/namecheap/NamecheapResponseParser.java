@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hm.namecheap;
 
+import java.io.StringReader;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -17,6 +19,7 @@ import org.commonhaus.automation.hm.namecheap.models.DomainRecord;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 import io.quarkus.logging.Log;
 
@@ -45,11 +48,11 @@ public class NamecheapResponseParser {
      * @throws NamecheapException if the API returns Status="ERROR"
      */
     public static void validateResponse(String xmlResponse) {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
+        validateResponse(parseDocument(xmlResponse, "Failed to parse Namecheap API response"));
+    }
 
+    private static void validateResponse(Document doc) {
+        try {
             Element root = doc.getDocumentElement();
             String status = root.getAttribute("Status");
 
@@ -82,14 +85,10 @@ public class NamecheapResponseParser {
     }
 
     public static DomainListResponse parseDomainListResponse(String xmlResponse) {
-        // Validate response and throw exception if there are errors
-        validateResponse(xmlResponse);
+        Document doc = parseDocument(xmlResponse, "Failed to parse Namecheap domain list response");
+        validateResponse(doc);
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
-
             // Parse domains
             List<DomainRecord> domains = new ArrayList<>();
             NodeList domainElements = doc.getElementsByTagName("Domain");
@@ -112,13 +111,10 @@ public class NamecheapResponseParser {
     }
 
     public static DomainRecord parseDomainInfoResponse(String xmlResponse) {
-        validateResponse(xmlResponse);
+        Document doc = parseDocument(xmlResponse, "Failed to parse Namecheap get domain info response");
+        validateResponse(doc);
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
-
             NodeList resultElements = doc.getElementsByTagName("DomainGetInfoResult");
             if (resultElements.getLength() == 0) {
                 throw new NamecheapException("No DomainGetInfoResult element found in response");
@@ -200,14 +196,10 @@ public class NamecheapResponseParser {
     }
 
     public static boolean parseSetContactsResponse(String xmlResponse) {
-        // Validate response and throw exception if there are errors
-        validateResponse(xmlResponse);
+        Document doc = parseDocument(xmlResponse, "Failed to parse Namecheap set contacts response");
+        validateResponse(doc);
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
-
             // Find DomainSetContactResult element
             NodeList resultElements = doc.getElementsByTagName("DomainSetContactResult");
             if (resultElements.getLength() == 0) {
@@ -233,14 +225,10 @@ public class NamecheapResponseParser {
      * @throws NamecheapException if the response has errors or is invalid
      */
     public static DomainContacts parseGetContactsResponse(String xmlResponse) {
-        // Validate response and throw exception if there are errors
-        validateResponse(xmlResponse);
+        Document doc = parseDocument(xmlResponse, "Failed to parse Namecheap get contacts response");
+        validateResponse(doc);
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
-
             // Find DomainContactsResult element
             NodeList resultElements = doc.getElementsByTagName("DomainContactsResult");
             if (resultElements.getLength() == 0) {
@@ -323,6 +311,24 @@ public class NamecheapResponseParser {
 
     private static String emptyToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
+    }
+
+    private static Document parseDocument(String xmlResponse, String failureMessage) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            return builder.parse(new InputSource(new StringReader(xmlResponse)));
+        } catch (Exception e) {
+            throw new NamecheapException(failureMessage, e);
+        }
     }
 
     private static String replaceTagValue(String xml, String tagName) {

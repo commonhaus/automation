@@ -1,6 +1,7 @@
 package org.commonhaus.automation.hm.namecheap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 
@@ -8,6 +9,13 @@ import org.commonhaus.automation.hm.namecheap.models.DomainRecord;
 import org.junit.jupiter.api.Test;
 
 class NamecheapResponseParserTest {
+
+    @Test
+    void validateResponseRejectsDoctypeBearingXml() {
+        assertThatThrownBy(() -> NamecheapResponseParser.validateResponse(DOCTYPE_DOMAIN_INFO_XML))
+                .isInstanceOf(NamecheapException.class)
+                .hasMessageContaining("Failed to parse Namecheap API response");
+    }
 
     @Test
     void parseDomainInfoResponseExtractsSafeOperationalFields() {
@@ -72,6 +80,23 @@ class NamecheapResponseParserTest {
                     <Phone>+1.5551234567</Phone>
                     <EmailAddress>jane@example.org</EmailAddress>
                   </RegistrantContact>
+                </DomainGetInfoResult>
+              </CommandResponse>
+            </ApiResponse>
+            """;
+
+    private static final String DOCTYPE_DOMAIN_INFO_XML = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <!DOCTYPE ApiResponse [
+              <!ELEMENT ApiResponse ANY>
+            ]>
+            <ApiResponse Status="OK">
+              <CommandResponse>
+                <DomainGetInfoResult DomainName="example.org" Status="ok" IsOurDNS="true">
+                  <DomainDetails CreatedDate="01/02/2020" ExpiredDate="01/02/2030" NumYears="1"/>
+                  <Modificationrights All="true">
+                    <Rights IsLocked="true" AutoRenew="true" IsExpired="false"/>
+                  </Modificationrights>
                 </DomainGetInfoResult>
               </CommandResponse>
             </ApiResponse>
