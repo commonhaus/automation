@@ -344,8 +344,7 @@ public class InstallMonitor extends BaseMonitor {
             } else if (!knownOrgs.contains(ir.ghOrgName()) && !ir.projectsDeclaring().isEmpty()) {
                 // Declared by project but not in org config
                 for (String repoFullName : ir.projectsDeclaring()) {
-                    String projectName = getProjectDisplayName(repoFullName);
-                    projectOrgMap.computeIfAbsent(projectName, k -> new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName)))
+                    projectOrgMap.computeIfAbsent(repoFullName, k -> new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName)))
                             .add(new OrgStatus(ir.ghOrgName(), ir.isInstalled(), true, true));
                 }
             }

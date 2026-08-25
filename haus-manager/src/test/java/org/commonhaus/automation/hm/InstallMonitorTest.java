@@ -385,4 +385,54 @@ public class InstallMonitorTest extends HausManagerTestBase {
         assertThat(subject).doesNotContain("projectA");
         assertThat(subject).doesNotContain("projectB");
     }
+
+    @Test
+    void testAuditSummaryDoesNotDuplicateSharedRepositorySection() throws IOException {
+        Log.info("TEST: Shared repository summary uses one section when org config and project declarations both contribute");
+
+        mockOrgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-shared-org.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(mockOrgConfig);
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("common")))
+                .thenReturn("test-org/project-common");
+        when(latestOrgConfig.projectNameToRepoFullName(any(), eq("common2")))
+                .thenReturn("test-org/project-common");
+
+        var sharedConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-common.yml",
+                ProjectConfig.class);
+
+        // Introduce a project-declared org that is absent from org config. This
+        // exercises the second path in sendOrgSummary while the org config entries
+        // still seed the first path for the same shared repository.
+        sharedConfig.githubOrganizations().add("extra-common");
+
+        var sharedProjectState = new ProjectConfigState(
+                ProjectManager.repoNametoTaskGroup("test-org/project-common"),
+                () -> {
+                },
+                "test-org/project-common",
+                home_project_1.installationId(),
+                sharedConfig);
+        when(latestProjectConfig.getProjectConfigState("test-org/project-common"))
+                .thenReturn(sharedProjectState);
+        when(latestProjectConfig.getAllProjects())
+                .thenReturn(List.of(sharedProjectState));
+
+        installationMap.addTestOrg(42000, "common/some-repo");
+        installationMap.addTestOrg(42001, "extra-common/some-repo");
+
+        installMonitor.checkInstallations(true);
+        waitForQueue();
+
+        var auditEmails = mailbox.getMailsSentTo("audit@test.org");
+        assertThat(auditEmails).hasSize(1);
+        String auditText = auditEmails.get(0).getText();
+
+        assertThat(auditText).contains("## common");
+        assertThat(auditText).contains("✅ common");
+        assertThat(auditText).contains("❓ extra-common");
+        assertThat(auditText.indexOf("## common")).isEqualTo(auditText.lastIndexOf("## common"));
+    }
 }
