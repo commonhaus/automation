@@ -335,6 +335,11 @@ public class DomainMonitor extends BaseMonitor {
             return;
         }
 
+        if (!validateConfiguredTechContact(managedDomain, domainConfig, emailNotification)) {
+            Log.infof("[%s] Skipping contact update for %s due to invalid configured tech contact", ME, domainName);
+            return;
+        }
+
         // Build desired contacts by merging: bot defaults + project tech contact +
         // domain-specific tech contact
         // Preserve contact type flags from current contacts (which types the TLD
@@ -380,6 +385,17 @@ public class DomainMonitor extends BaseMonitor {
         }
     }
 
+    private boolean validateConfiguredTechContact(ManagedDomain managedDomain,
+            DomainManagementConfig domainConfig, EmailNotification emailNotification) {
+        if (managedDomain.techContact().isPresent()) {
+            return managedDomain.techContact().get().isValid(ctx, ME, managedDomain.name(), emailNotification);
+        }
+        if (domainConfig.getTechContact().isPresent()) {
+            return domainConfig.getTechContact().get().isValid(ctx, ME, managedDomain.name(), emailNotification);
+        }
+        return true;
+    }
+
     /**
      * Build desired contacts by merging bot defaults with project/domain tech contact overrides.
      * Tech contact hierarchy: domain-specific > project-level > bot default
@@ -408,14 +424,12 @@ public class DomainMonitor extends BaseMonitor {
         ContactInfo tech = defaultContacts.tech();
 
         // Check for domain-specific tech contact override (highest priority)
-        if (managedDomain.techContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
-                .orElse(false)) {
+        if (managedDomain.techContact().isPresent()) {
             tech = ContactInfo.fromConfig(tech, managedDomain.techContact().get());
             Log.debugf("[%s] Merging domain-specific tech contact for %s", ME, managedDomain.name());
         }
         // Check for project-level tech contact override (medium priority)
-        else if (domainConfig.getTechContact().map(c -> c.isValid(ctx, ME, managedDomain.name(), emailNotification))
-                .orElse(false)) {
+        else if (domainConfig.getTechContact().isPresent()) {
             tech = ContactInfo.fromConfig(tech, domainConfig.getTechContact().get());
             Log.debugf("[%s] Merging project-level tech contact for %s", ME, managedDomain.name());
         }

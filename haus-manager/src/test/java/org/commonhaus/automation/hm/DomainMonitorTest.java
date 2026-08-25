@@ -423,6 +423,48 @@ public class DomainMonitorTest extends HausManagerTestBase {
         verify(namecheapService, never()).setContacts(eq(project2Domain), any());
     }
 
+    @Test
+    void testInvalidConfiguredTechContactDoesNotOverwriteRegistrarContact() throws IOException {
+        Log.info("TEST: Invalid configured tech contact is treated as a rejected update");
+
+        String domain = "test-project1.org";
+        DomainRecord ncDomain = createDomainRecord(domain);
+        DomainContacts currentContacts = createTestContacts("Current", "Owner");
+
+        when(namecheapService.fetchAllDomains()).thenReturn(List.of(ncDomain));
+        when(namecheapService.getContacts(domain)).thenReturn(Optional.of(currentContacts));
+
+        mockOrgConfig.domainManagement().domains().clear();
+        mockOrgConfig.projects().assetsForProject("one").domainAssociation().clear();
+        mockOrgConfig.projects().assetsForProject("one").domainAssociation().add(domain);
+        mockOrgConfig.projects().assetsForProject("two").domainAssociation().clear();
+        mockProjectState2.projectConfig().domainManagement().domains().clear();
+
+        var invalidConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-project1-invalid-tech.yml",
+                ProjectConfig.class);
+        mockProjectState1 = new ProjectConfigState(
+                ProjectManager.repoNametoTaskGroup(HOME_PROJECT_1.repoFullName()),
+                () -> {
+                },
+                HOME_PROJECT_1.repoFullName(),
+                HOME_PROJECT_1.installId(),
+                invalidConfig);
+        when(latestProjectConfig.getProjectConfigState(HOME_PROJECT_1.repoFullName()))
+                .thenReturn(mockProjectState1);
+        when(latestProjectConfig.getAllProjects())
+                .thenReturn(List.of(mockProjectState1, mockProjectState2));
+
+        domainMonitor.refreshDomains(true, null);
+        waitForQueue();
+
+        verify(namecheapService, never()).setContacts(eq(domain), any());
+
+        var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
+        assertThat(projectErrorEmails).hasSize(1);
+        assertThat(projectErrorEmails.get(0).getText()).contains("Invalid tech contact for " + domain + ": incomplete address");
+    }
+
     // ========== Helper Methods ==========
 
     private DomainRecord createDomainRecord(String domainName) {

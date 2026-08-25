@@ -1,0 +1,24 @@
+enabled: true
+dryRun: true
+
+domainManagement:
+  enabled: true
+  dryRun: false
+  techContact:
+    firstName: Invalid
+    lastName: Contact
+    address1: "123 Broken St"
+    stateProvince: CA
+    postalCode: 12345
+    country: US
+    emailAddress: invalid@example.com
+  domains:
+    - name: test-project1.org
+
+emailNotifications:
+  errors:
+    - errors@project1.dev
+  dryRun:
+    - test@project1.dev
+  audit:
+    - audit@project1.dev
