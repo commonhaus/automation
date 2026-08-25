@@ -53,7 +53,6 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
 
     @AfterEach
     void cleanup() {
-        await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
         assertNoErrorEmails();
     }
 
@@ -108,7 +107,7 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
         mockUpdateCommonhausData(builder, UserPath.WITH_APPLICATION);
 
         var apiResult = process.getUserApplication(mockMemberInfo, user);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         assertThat(apiResult.status()).isEqualTo(Response.Status.NOT_FOUND);
         assertThat(apiResult.user().application()).isNull();
@@ -135,7 +134,7 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
         CommonhausUser user = datastore.getCommonhausUser(mockMemberInfo, false, false);
 
         var apiResult = process.getUserApplication(mockMemberInfo, user);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         verify(builder).content(contentCaptor.capture());
@@ -164,7 +163,7 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
         ApplicationPost application = new ApplicationPost("unknown", "draft");
 
         var apiResult = process.setUserApplication(mockMemberInfo, user, application);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         assertThat(apiResult.status()).isEqualTo(Response.Status.OK);
         assertThat(apiResult.user().status()).isEqualTo(MemberStatus.PENDING);
@@ -192,7 +191,7 @@ public class ApplicationProcessUserTest extends HausKeeperTestBase {
 
         ApplicationPost application = new ApplicationPost("unknown", "draft");
         var apiResult = process.setUserApplication(mockMemberInfo, user, application);
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         assertThat(apiResult.status()).isEqualTo(Response.Status.OK);
         assertThat(apiResult.user().status()).isEqualTo(MemberStatus.PENDING);

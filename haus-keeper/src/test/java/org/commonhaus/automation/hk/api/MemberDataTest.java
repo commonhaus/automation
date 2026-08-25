@@ -23,7 +23,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
 
@@ -488,7 +487,7 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .statusCode(200)
                 .body("HAUS.goodUntil.attestation.test.withStatus", equalTo("UNKNOWN"));
 
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         // Verify captured input (common test output)
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
@@ -641,7 +640,7 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .statusCode(400);
 
         // wait for pending queue to drain (persisted data)
-        await().atMost(1, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 1);
 
         // read captured parameter of persisted file content
         final ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);

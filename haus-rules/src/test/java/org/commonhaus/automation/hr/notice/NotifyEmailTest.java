@@ -39,8 +39,12 @@ public class NotifyEmailTest extends HausRulesTestBase {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().failFast(() -> mailbox.getTotalMessagesSent() != 0)
-                .atMost(5, SECONDS);
+        drainQueue(updateQueue, 3);
+        await()
+                .during(3, SECONDS)
+                .atMost(4, SECONDS)
+                .failFast(() -> mailbox.getTotalMessagesSent() != 0)
+                .until(() -> mailbox.getTotalMessagesSent() == 0);
     }
 
     @Test
@@ -93,8 +97,10 @@ public class NotifyEmailTest extends HausRulesTestBase {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().atMost(5, SECONDS).failFast(() -> mailbox.getTotalMessagesSent() != 0);
-        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0);
+        drainQueue(updateQueue, 3);
+        await().during(3, SECONDS)
+                .atMost(4, SECONDS)
+                .untilAsserted(() -> assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0));
     }
 
     @Test
@@ -116,8 +122,10 @@ public class NotifyEmailTest extends HausRulesTestBase {
                     verifyNoMoreInteractions(mocks.ghObjects());
                 });
 
-        await().atMost(5, SECONDS).failFast(() -> mailbox.getTotalMessagesSent() != 0);
-        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0);
+        drainQueue(updateQueue, 3);
+        await().during(3, SECONDS)
+                .atMost(4, SECONDS)
+                .untilAsserted(() -> assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).hasSize(0));
     }
 
     @Test

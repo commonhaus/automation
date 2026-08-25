@@ -297,7 +297,7 @@ public class AnnualAssetReportTest extends HausManagerTestBase {
 
         report.generateAnnualReports(false);
 
-        await().during(2, SECONDS).atMost(2, SECONDS)
+        await().during(2, SECONDS).atMost(3, SECONDS)
                 .failFast(() -> !mailbox.getMailsSentTo("audit@projectA.dev").isEmpty())
                 .untilAsserted(
                         () -> assertThat(mailbox.getMailsSentTo("audit@projectA.dev")).isEmpty());
@@ -315,7 +315,7 @@ public class AnnualAssetReportTest extends HausManagerTestBase {
         // No exception propagates (JUnit would fail the test if it did). Negative assertion on
         // mail, same reasoning as testHomeRepositorySkipped: wait long enough for a wrongful
         // send to have arrived before confirming it didn't.
-        await().during(2, SECONDS).atMost(2, SECONDS)
+        await().during(2, SECONDS).atMost(3, SECONDS)
                 .untilAsserted(() -> {
                     assertThat(mailbox.getMailsSentTo("audit@test.org")).isEmpty();
                     assertThat(mailbox.getMailsSentTo("errors@test.org")).isEmpty();

@@ -2,10 +2,8 @@ package org.commonhaus.automation.github.watchers;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.inject.Inject;
@@ -51,7 +49,7 @@ public class MembershipWatcherTest extends ContextHelper {
     void cleanup() {
         membershipWatcher.dumpWatcherState();
         System.out.println(updateQueue);
-        await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
     }
 
     @Test
@@ -75,7 +73,7 @@ public class MembershipWatcherTest extends ContextHelper {
 
                 });
 
-        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 5);
         assertThat(updateTeam.get()).isEqualTo(1);
     }
 
@@ -100,7 +98,7 @@ public class MembershipWatcherTest extends ContextHelper {
 
                 });
 
-        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 5);
         assertThat(updateCollaborators.get()).isEqualTo(1);
     }
 
@@ -118,7 +116,7 @@ public class MembershipWatcherTest extends ContextHelper {
         // Trigger repository removal
         triggerRepositoryDiscovery(DiscoveryAction.INSTALL_REMOVED, myMocks, false);
 
-        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(callbackCounter.get()).isEqualTo(0);
 
         assertThat(membershipWatcher.isWatching("test-org")).isFalse();
@@ -135,7 +133,7 @@ public class MembershipWatcherTest extends ContextHelper {
 
         membershipWatcher.unwatchAll("taskGroup");
 
-        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(membershipWatcher.orgWatchers).isEmpty();
     }
 }

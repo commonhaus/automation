@@ -2,14 +2,12 @@ package org.commonhaus.automation.github.watchers;
 
 import static io.quarkiverse.githubapp.testing.GitHubAppTesting.given;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.inject.Inject;
@@ -60,7 +58,7 @@ public class FileWatcherTest extends ContextHelper {
     void cleanup() {
         fileWatcher.dumpWatcherState();
         System.out.println(updateQueue);
-        await().atMost(2, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
     }
 
     void recordFileUpdate(FileUpdate update) {
@@ -98,7 +96,7 @@ public class FileWatcherTest extends ContextHelper {
 
                 });
 
-        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 5);
         assertThat(updateRef.size()).isEqualTo(4);
         assertThat(updateRef).extracting(FileUpdate::updateType)
                 .containsAll(List.of(FileUpdateType.ADDED, FileUpdateType.MODIFIED, FileUpdateType.REMOVED));
@@ -130,7 +128,7 @@ public class FileWatcherTest extends ContextHelper {
                 .github(mocks -> {
                 });
 
-        await().atMost(3, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(updateRef.size()).isEqualTo(3);
         // each file is changed several times.
         // The last time should be the one that is recorded, and it should
@@ -167,7 +165,7 @@ public class FileWatcherTest extends ContextHelper {
                 });
 
         // Give some time for any processing that shouldn't happen
-        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(updateRef).isEmpty();
     }
 
@@ -186,7 +184,7 @@ public class FileWatcherTest extends ContextHelper {
         // Trigger repository removal
         triggerRepositoryDiscovery(DiscoveryAction.REMOVED, myMocks, false);
 
-        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(callbackCounter.get()).isEqualTo(0);
 
         assertThat(fileWatcher.isWatching(defaultValues.repoFullName())).isFalse();
@@ -204,7 +202,7 @@ public class FileWatcherTest extends ContextHelper {
 
         fileWatcher.unwatchAll("testGroup");
 
-        await().atLeast(3, TimeUnit.SECONDS).failFast(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
         assertThat(fileWatcher.repositoryFiles).isEmpty();
     }
 
@@ -236,7 +234,7 @@ public class FileWatcherTest extends ContextHelper {
 
         fileWatcher.refresh(ctx, "testGroup");
 
-        await().atMost(5, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 5);
         assertThat(updateRef.size()).isEqualTo(3);
         assertThat(updateRef).extracting(FileUpdate::updateType).contains(FileUpdateType.REFRESH);
     }

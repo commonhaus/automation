@@ -95,7 +95,9 @@ public abstract class HausRulesTestBase extends ContextHelper {
     @AfterEach
     protected void waitForQueue() {
         // Make sure queue is drained between tests
-        await().atMost(5, SECONDS).until(() -> updateQueue.isEmpty());
+        await().atMost(5, SECONDS)
+                .logging((s) -> System.out.println(s + "; " + updateQueue.toString()))
+                .until(() -> updateQueue.isEmpty());
     }
 
     /**

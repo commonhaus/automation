@@ -262,6 +262,12 @@ public class ContextHelper {
         Stream.of(BaseQueryCache.values()).forEach(v -> v.invalidateAll());
     }
 
+    public void drainQueue(PeriodicUpdateQueue updateQueue, long timeoutSeconds) {
+        await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .until(updateQueue::isEmpty);
+    }
+
     public void assertNoErrorEmails() {
         await()
                 .atMost(1, TimeUnit.SECONDS)

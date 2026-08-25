@@ -4,7 +4,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.commonhaus.automation.github.context.ContextHelper;
@@ -142,7 +141,7 @@ public class PeriodicUpdateQueueTest extends ContextHelper {
         }
 
         // Wait for all retries to complete
-        await().atMost(3, TimeUnit.SECONDS).until(() -> updateQueue.isEmpty());
+        drainQueue(updateQueue, 3);
 
         // Verify the task was attempted multiple times with increasing retry counts
         assertThat(attemptCounter.get()).isEqualTo(3); // Initial + 2 retries
