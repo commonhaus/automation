@@ -463,6 +463,8 @@ public class DomainMonitorTest extends HausManagerTestBase {
         var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
         assertThat(projectErrorEmails).hasSize(1);
         assertThat(projectErrorEmails.get(0).getText()).contains("Invalid tech contact for " + domain + ": incomplete address");
+        assertThat(projectErrorEmails.get(0).getText()).contains("address1: 123 Broken St");
+        assertThat(projectErrorEmails.get(0).getText()).contains("emailAddress: invalid@example.com");
     }
 
     // ========== Helper Methods ==========

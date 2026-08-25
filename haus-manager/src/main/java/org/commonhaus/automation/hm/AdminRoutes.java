@@ -8,6 +8,8 @@ import jakarta.inject.Singleton;
 import org.commonhaus.automation.config.LocalRouteOnly;
 import org.commonhaus.automation.github.stats.ProjectHealthCollector;
 import org.commonhaus.automation.hm.github.AppContextService;
+import org.commonhaus.automation.hm.namecheap.NamecheapException;
+import org.commonhaus.automation.hm.namecheap.NamecheapResponseParser;
 import org.commonhaus.automation.hm.namecheap.NamecheapService;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
@@ -120,7 +122,18 @@ public class AdminRoutes implements LocalRouteOnly {
         }
         updateQueue.queueReconciliation("domainInfo::" + domain, () -> {
             var info = namecheapService.getDomainInfo(domain);
-            Log.infof("Domain information for %s: %s", domain, info);
+            if (info.isEmpty()) {
+                Log.infof("No domain information returned for %s", domain);
+                return;
+            }
+            try {
+                var parsed = NamecheapResponseParser.parseDomainInfoResponse(info.get());
+                Log.infof("Domain information for %s: expires=%s, expired=%s, locked=%s, autoRenew=%s",
+                        parsed.name(), parsed.expires(), parsed.isExpired(), parsed.isLocked(), parsed.autoRenew());
+            } catch (NamecheapException e) {
+                Log.warnf(e, "Unable to parse domain information for %s. Redacted XML: %s",
+                        domain, NamecheapResponseParser.redactDomainInfoXml(info.get()));
+            }
         });
         routingExchange.ok().end();
     }

@@ -19,6 +19,7 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
+import org.commonhaus.automation.hm.config.DomainContact;
 import org.commonhaus.automation.hm.config.DomainManagementConfig;
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
@@ -388,12 +389,38 @@ public class DomainMonitor extends BaseMonitor {
     private boolean validateConfiguredTechContact(ManagedDomain managedDomain,
             DomainManagementConfig domainConfig, EmailNotification emailNotification) {
         if (managedDomain.techContact().isPresent()) {
-            return managedDomain.techContact().get().isValid(ctx, ME, managedDomain.name(), emailNotification);
+            return validateConfiguredTechContact(managedDomain.name(), managedDomain.techContact().get(),
+                    emailNotification);
         }
         if (domainConfig.getTechContact().isPresent()) {
-            return domainConfig.getTechContact().get().isValid(ctx, ME, managedDomain.name(), emailNotification);
+            return validateConfiguredTechContact(managedDomain.name(), domainConfig.getTechContact().get(),
+                    emailNotification);
         }
         return true;
+    }
+
+    private boolean validateConfiguredTechContact(String domainName, DomainContact techContact,
+            EmailNotification emailNotification) {
+        var failure = techContact.validationFailure();
+        if (failure.isEmpty()) {
+            return true;
+        }
+
+        Log.infof("[%s] Invalid configured tech contact for %s; skipping update", ME, domainName);
+        ctx.sendEmail(ME,
+                "Invalid tech contact for " + domainName + ": " + failure.get().summary(),
+                """
+                        Domain contact update for %s was skipped.
+
+                        Validation failure: %s
+                        %s
+
+                        Configured values:
+                        %s
+                        """.formatted(domainName, failure.get().summary(), failure.get().details(),
+                        techContact.detailedDescription()),
+                emailNotification.errors());
+        return false;
     }
 
     /**

@@ -1,30 +1,12 @@
 package org.commonhaus.automation.hm.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
 
-import org.commonhaus.automation.ContextService;
-import org.commonhaus.automation.config.EmailNotification;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class DomainContactTest {
-
-    private ContextService ctx;
-    private EmailNotification emailNotification;
-
-    @BeforeEach
-    void setup() {
-        ctx = mock(ContextService.class);
-        emailNotification = new EmailNotification(null, null, null);
-    }
 
     @Test
     void testValidMinimalContact() {
@@ -37,10 +19,9 @@ class DomainContactTest {
                 Optional.of("Acme Corp"), Optional.of("Engineer"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isTrue();
-        verify(ctx, never()).logAndSendEmail(anyString(), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -53,10 +34,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isFalse();
-        verify(ctx).logAndSendEmail(eq("TEST"), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -69,10 +49,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isFalse();
-        verify(ctx).logAndSendEmail(eq("TEST"), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -86,10 +65,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isTrue();
-        verify(ctx, never()).logAndSendEmail(anyString(), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -102,10 +80,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isFalse();
-        verify(ctx).logAndSendEmail(eq("TEST"), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -119,10 +96,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isTrue();
-        verify(ctx, never()).logAndSendEmail(anyString(), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -136,10 +112,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isFalse();
-        verify(ctx).logAndSendEmail(eq("TEST"), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -153,10 +128,9 @@ class DomainContactTest {
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isFalse();
-        verify(ctx).logAndSendEmail(eq("TEST"), anyString(), any(Throwable.class), any(String[].class));
     }
 
     @Test
@@ -170,10 +144,9 @@ class DomainContactTest {
                 Optional.of("Acme Corp"), Optional.of("Engineer"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        boolean valid = contact.isValid(ctx, "TEST", "example.com", emailNotification);
+        boolean valid = contact.isValid();
 
         assertThat(valid).isTrue();
-        verify(ctx, never()).logAndSendEmail(anyString(), anyString(), any(Throwable.class), any(String[].class));
     }
 
 }

@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -21,6 +22,19 @@ import io.quarkus.logging.Log;
 
 public class NamecheapResponseParser {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+    private static final List<String> PII_TAGS = List.of(
+            "FirstName",
+            "LastName",
+            "Address1",
+            "Address2",
+            "City",
+            "StateProvince",
+            "PostalCode",
+            "Country",
+            "Phone",
+            "PhoneExt",
+            "Fax",
+            "EmailAddress");
 
     /**
      * Validate the Namecheap API response and throw NamecheapException if there are errors.
@@ -93,6 +107,49 @@ public class NamecheapResponseParser {
         } catch (Exception e) {
             throw new NamecheapException("Failed to parse Namecheap domain list response", e);
         }
+    }
+
+    public static DomainRecord parseDomainInfoResponse(String xmlResponse) {
+        validateResponse(xmlResponse);
+
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResponse.getBytes()));
+
+            NodeList resultElements = doc.getElementsByTagName("DomainGetInfoResult");
+            if (resultElements.getLength() == 0) {
+                throw new NamecheapException("No DomainGetInfoResult element found in response");
+            }
+
+            Element resultElement = (Element) resultElements.item(0);
+            Element detailsElement = (Element) resultElement.getElementsByTagName("DomainDetails").item(0);
+            if (detailsElement == null) {
+                throw new NamecheapException("No DomainDetails element found in response");
+            }
+
+            Element rightsElement = (Element) resultElement.getElementsByTagName("Rights").item(0);
+
+            return new DomainRecord(
+                    resultElement.getAttribute("DomainName"),
+                    parseDate(detailsElement.getAttribute("ExpiredDate")),
+                    rightsElement != null && "true".equalsIgnoreCase(rightsElement.getAttribute("IsExpired")),
+                    rightsElement != null && "true".equalsIgnoreCase(rightsElement.getAttribute("IsLocked")),
+                    rightsElement != null && "true".equalsIgnoreCase(rightsElement.getAttribute("AutoRenew")),
+                    "true".equalsIgnoreCase(resultElement.getAttribute("IsOurDNS")));
+        } catch (NamecheapException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new NamecheapException("Failed to parse Namecheap get domain info response", e);
+        }
+    }
+
+    public static String redactDomainInfoXml(String xmlResponse) {
+        String redacted = xmlResponse;
+        for (String tag : PII_TAGS) {
+            redacted = replaceTagValue(redacted, tag);
+        }
+        return redacted;
     }
 
     private static DomainRecord parseDomainElement(Element element) {
@@ -264,5 +321,11 @@ public class NamecheapResponseParser {
 
     private static String emptyToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
+    }
+
+    private static String replaceTagValue(String xml, String tagName) {
+        Pattern pattern = Pattern.compile("(<" + tagName + ">)(.*?)(</" + tagName + ">)",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        return pattern.matcher(xml).replaceAll("$1[REDACTED]$3");
     }
 }

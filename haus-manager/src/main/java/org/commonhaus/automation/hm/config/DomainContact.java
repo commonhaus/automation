@@ -4,9 +4,6 @@ import static org.commonhaus.automation.hm.namecheap.models.ContactInfo.isValidP
 
 import java.util.Optional;
 
-import org.commonhaus.automation.ContextService;
-import org.commonhaus.automation.config.EmailNotification;
-
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 /**
@@ -64,16 +61,13 @@ public record DomainContact(
      * postalCode, country)
      * - Missing fields will be filled from default tech contact via merging
      *
-     * If invalid, logs and sends email with validation failure details.
-     *
-     * @param ctx Context service for logging and email
-     * @param logId Log identifier
-     * @param domainName Domain name for error message context
-     * @param emailNotification
-     * @return true if validation passes, false otherwise
+     * This method is pure validation only. Callers own logging and notification.
      */
-    public boolean isValid(ContextService ctx, String logId, String domainName,
-            EmailNotification emailNotification) {
+    public boolean isValid() {
+        return validationFailure().isEmpty();
+    }
+
+    public Optional<ValidationFailure> validationFailure() {
 
         // Always required: firstName, lastName, emailAddress
         boolean hasRequiredFields = firstName != null && !firstName.isBlank()
@@ -81,22 +75,16 @@ public record DomainContact(
                 && emailAddress != null && !emailAddress.isBlank();
 
         if (!hasRequiredFields) {
-            ctx.logAndSendEmail(logId,
-                    "Invalid tech contact for " + domainName + ": missing required fields",
-                    new IllegalStateException(
-                            "Contact must have firstName, lastName, and emailAddress. Got: " + this),
-                    emailNotification.errors());
-            return false;
+            return Optional.of(new ValidationFailure(
+                    "missing required fields",
+                    "Contact must have firstName, lastName, and emailAddress."));
         }
 
         // Phone validation: if specified, must be in valid format
         if (phone != null && !phone.isBlank() && !isValidPhoneFormat(phone)) {
-            ctx.logAndSendEmail(logId,
-                    "Invalid phone number format for " + domainName,
-                    new IllegalStateException(
-                            "Phone number must be in format +NNN.NNNNNNNNNN (e.g. +1.6613102107). Got: " + phone),
-                    emailNotification.errors());
-            return false;
+            return Optional.of(new ValidationFailure(
+                    "invalid phone number format",
+                    "Phone number must be in format +NNN.NNNNNNNNNN (e.g. +1.6613102107)."));
         }
 
         // Address validation: if ANY address field is specified, ALL must be specified
@@ -114,16 +102,55 @@ public record DomainContact(
                     && country != null && !country.isBlank();
 
             if (!hasAllAddress) {
-                ctx.logAndSendEmail(logId,
-                        "Invalid tech contact for " + domainName + ": incomplete address",
-                        new IllegalStateException(
-                                "If any address field is specified, all address fields must be provided "
-                                        + "(address1, city, stateProvince, postalCode, country). Got: " + this),
-                        emailNotification.errors());
-                return false;
+                return Optional.of(new ValidationFailure(
+                        "incomplete address",
+                        "If any address field is specified, all address fields must be provided "
+                                + "(address1, city, stateProvince, postalCode, country)."));
             }
         }
 
-        return true;
+        return Optional.empty();
+    }
+
+    public String detailedDescription() {
+        return """
+                firstName: %s
+                lastName: %s
+                organization: %s
+                jobTitle: %s
+                address1: %s
+                address2: %s
+                city: %s
+                stateProvince: %s
+                postalCode: %s
+                country: %s
+                phone: %s
+                phoneExt: %s
+                fax: %s
+                emailAddress: %s
+                contactBase: %s
+                """.formatted(
+                nullToEmpty(firstName),
+                nullToEmpty(lastName),
+                organization.orElse(""),
+                jobTitle.orElse(""),
+                nullToEmpty(address1),
+                address2.orElse(""),
+                nullToEmpty(city),
+                nullToEmpty(stateProvince),
+                nullToEmpty(postalCode),
+                nullToEmpty(country),
+                nullToEmpty(phone),
+                phoneExt.orElse(""),
+                fax.orElse(""),
+                nullToEmpty(emailAddress),
+                contactBase.orElse(""));
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    public record ValidationFailure(String summary, String details) {
     }
 }
