@@ -215,7 +215,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             readProjectConfig(taskGroup, qc);
         } else {
             // queue reconcile action
-            updateQueue.queueReconciliation(ME, () -> reconcile(taskGroup));
+            updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
         }
     }
 
@@ -254,7 +254,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
         readProjectConfig(taskGroup, qc);
-        updateQueue.queueReconciliation(ME, () -> reconcile(taskGroup));
+        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
     }
 
     /**
