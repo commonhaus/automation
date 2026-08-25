@@ -44,37 +44,13 @@ public record DomainContact(
          */
         Optional<String> contactBase) implements ContactConfig {
 
-    /**
-     * Merge this config with a base config, filling in missing (null) fields.
-     * Fields from this config take priority; if null, uses base config value.
-     *
-     * @param base Base configuration to merge with
-     * @return New DomainContact with merged values
-     */
-    public DomainContact mergeWith(DomainContact base) {
-        if (base == null) {
-            return this;
-        }
-
-        return new DomainContact(
-                // Required fields - prefer this, fall back to base
-                this.firstName != null ? this.firstName : base.firstName,
-                this.lastName != null ? this.lastName : base.lastName,
-                this.address1 != null ? this.address1 : base.address1,
-                this.city != null ? this.city : base.city,
-                this.stateProvince != null ? this.stateProvince : base.stateProvince,
-                this.postalCode != null ? this.postalCode : base.postalCode,
-                this.country != null ? this.country : base.country,
-                this.phone != null ? this.phone : base.phone,
-                this.emailAddress != null ? this.emailAddress : base.emailAddress,
-                // Optional fields - prefer this, fall back to base
-                this.organization != null ? this.organization : base.organization,
-                this.jobTitle != null ? this.jobTitle : base.jobTitle,
-                this.address2 != null ? this.address2 : base.address2,
-                this.phoneExt != null ? this.phoneExt : base.phoneExt,
-                this.fax != null ? this.fax : base.fax,
-                // Don't merge contactBase - keep this contact's base reference
-                this.contactBase);
+    public DomainContact {
+        organization = organization == null ? Optional.empty() : organization;
+        jobTitle = jobTitle == null ? Optional.empty() : jobTitle;
+        address2 = address2 == null ? Optional.empty() : address2;
+        phoneExt = phoneExt == null ? Optional.empty() : phoneExt;
+        fax = fax == null ? Optional.empty() : fax;
+        contactBase = contactBase == null ? Optional.empty() : contactBase;
     }
 
     /**

@@ -175,4 +175,5 @@ class DomainContactTest {
         assertThat(valid).isTrue();
         verify(ctx, never()).logAndSendEmail(anyString(), anyString(), any(Throwable.class), any(String[].class));
     }
+
 }

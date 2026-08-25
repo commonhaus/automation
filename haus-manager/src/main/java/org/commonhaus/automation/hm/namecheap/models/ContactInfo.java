@@ -32,6 +32,14 @@ public record ContactInfo(
 
         boolean readOnly) {
 
+    public ContactInfo {
+        organization = organization == null ? Optional.empty() : organization;
+        jobTitle = jobTitle == null ? Optional.empty() : jobTitle;
+        address2 = address2 == null ? Optional.empty() : address2;
+        phoneExt = phoneExt == null ? Optional.empty() : phoneExt;
+        fax = fax == null ? Optional.empty() : fax;
+    }
+
     public static ContactInfo fromConfig(ContactInfo base, ContactConfig config) {
         return base.mergeWith(fromConfig(config));
     }
@@ -79,27 +87,54 @@ public record ContactInfo(
             return this;
         }
 
-        // Special handling for optional fields:
-        // - phoneExt, copy it if phone is defined in override
-        // - address2, copy it if address1 is defined in override
+        MergedAddress mergedAddress = mergeAddress(override);
 
         return new ContactInfo(
                 override.firstName != null ? override.firstName : this.firstName,
                 override.lastName != null ? override.lastName : this.lastName,
-                /* address */ override.address1 != null ? override.address1 : this.address1,
-                /* address */ override.city != null ? override.city : this.city,
-                /* address */ override.stateProvince != null ? override.stateProvince : this.stateProvince,
-                /* address */ override.postalCode != null ? override.postalCode : this.postalCode,
-                /* address */ override.country != null ? override.country : this.country,
+                mergedAddress.address1(),
+                mergedAddress.city(),
+                mergedAddress.stateProvince(),
+                mergedAddress.postalCode(),
+                mergedAddress.country(),
                 /* phone */ override.phone != null ? override.phone : this.phone,
                 override.emailAddress != null ? override.emailAddress : this.emailAddress,
                 override.organization.isPresent() ? override.organization : this.organization,
                 override.jobTitle.isPresent() ? override.jobTitle : this.jobTitle,
-                /* address */ override.address1 != null ? override.address2 : this.address2,
+                mergedAddress.address2(),
                 /* phone */override.phone != null ? override.phoneExt : this.phoneExt,
                 override.fax.isPresent() ? override.fax : this.fax,
                 this.readOnly // Preserve readOnly status
         );
+    }
+
+    private MergedAddress mergeAddress(ContactInfo override) {
+        if (override.address1 == null) {
+            return new MergedAddress(
+                    this.address1,
+                    this.address2,
+                    this.city,
+                    this.stateProvince,
+                    this.postalCode,
+                    this.country);
+        }
+
+        return new MergedAddress(
+                override.address1,
+                override.address2,
+                override.city,
+                override.stateProvince,
+                override.postalCode,
+                override.country);
+    }
+
+    private record MergedAddress(
+            String address1,
+            Optional<String> address2,
+            String city,
+            String stateProvince,
+            String postalCode,
+            String country) {
     }
 
     /**
