@@ -97,7 +97,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
     }
 
     @Test
-    void dryRunModeSkipsMalformedTargetsButStillReadsMalformedCollaboratorSource() throws IOException {
+    void dryRunModeSkipsBlankTargetButStillSyncsMismatchedAndReadsMismatchedCollaboratorSource() throws IOException {
         OrganizationConfig orgConfig = loadYamlResource(
                 "src/test/resources/cf-haus-organization-team-verify-dryrun.yml",
                 OrganizationConfig.class);
@@ -109,7 +109,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
         mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
 
-        when(teamService.getTeamLogins(any(), eq("test-org/bad team!")))
+        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
                 .thenReturn(null);
         when(teamService.toRole(any(), any(), any(), any(), any(), any()))
                 .thenReturn(RepositoryRole.from(Permission.PUSH));
@@ -119,15 +119,15 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("test-org/bad team!"));
+        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
+        verify(teamService).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
+        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("org-dryrun@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("test-org/");
+            assertThat(body).contains("commonhaus-test/");
         });
         assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("dryRun");
@@ -167,7 +167,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
     }
 
     @Test
-    void warnModeSkipsMalformedTargetsButStillReadsMalformedCollaboratorSource() throws IOException {
+    void warnModeSkipsBlankTargetButStillSyncsMismatchedAndReadsMismatchedCollaboratorSource() throws IOException {
         OrganizationConfig orgConfig = loadYamlResource(
                 "src/test/resources/cf-haus-organization-team-verify-warn.yml",
                 OrganizationConfig.class);
@@ -179,7 +179,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
         mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
 
-        when(teamService.getTeamLogins(any(), eq("test-org/bad team!")))
+        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
                 .thenReturn(null);
         when(teamService.toRole(any(), any(), any(), any(), any(), any()))
                 .thenReturn(RepositoryRole.from(Permission.PUSH));
@@ -189,15 +189,15 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("test-org/bad team!"));
+        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
+        verify(teamService).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
+        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("test-org/");
+            assertThat(body).contains("commonhaus-test/");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("warn");
@@ -237,7 +237,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
     }
 
     @Test
-    void errorModeSkipsMalformedTargetsButStillReadsMalformedCollaboratorSource() throws IOException {
+    void errorModeSkipsBlankAndMismatchedTargetsButStillReadsMismatchedCollaboratorSource() throws IOException {
         OrganizationConfig orgConfig = loadYamlResource(
                 "src/test/resources/cf-haus-organization-team-verify-error.yml",
                 OrganizationConfig.class);
@@ -249,7 +249,7 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
         mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
 
-        when(teamService.getTeamLogins(any(), eq("test-org/bad team!")))
+        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
                 .thenReturn(null);
         when(teamService.toRole(any(), any(), any(), any(), any(), any()))
                 .thenReturn(RepositoryRole.from(Permission.PUSH));
@@ -259,15 +259,15 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("test-org/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("test-org/bad team!"));
+        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
+        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("test-org/");
+            assertThat(body).contains("commonhaus-test/");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
