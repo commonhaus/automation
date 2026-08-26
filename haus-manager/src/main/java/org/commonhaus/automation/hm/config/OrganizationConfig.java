@@ -283,4 +283,8 @@ public class OrganizationConfig {
         }
         return "%s/%s".formatted(defaultOrg, teamName);
     }
+
+    public static String normalizeOrg(String ghOrg) {
+        return ghOrg.replaceAll("^https?://github\\.com/", "");
+    }
 }

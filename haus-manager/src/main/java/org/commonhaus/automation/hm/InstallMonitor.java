@@ -23,6 +23,7 @@ import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
+import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.github.AppContextService;
 
@@ -179,7 +180,7 @@ public class InstallMonitor extends BaseMonitor {
 
         // 1. Seed org-managed organizations (from githubOrganizations field)
         for (String ghOrgKey : latestOrgConfig.getConfig().githubOrganizations()) {
-            String ghOrg = normalizeOrg(ghOrgKey);
+            String ghOrg = OrganizationConfig.normalizeOrg(ghOrgKey);
             result.put(ghOrg, new InstallationReconciliation(
                     ghOrg,
                     installedOrgs.contains(ghOrg),
@@ -190,7 +191,7 @@ public class InstallMonitor extends BaseMonitor {
 
         // 2. Add all org-expected organizations (from projects section of org config)
         for (var entry : orgExpectedOrganizations.entrySet()) {
-            String ghOrg = normalizeOrg(entry.getKey());
+            String ghOrg = OrganizationConfig.normalizeOrg(entry.getKey());
             Set<String> expectedProjects = entry.getValue();
 
             // Convert project names to repo full names
@@ -211,7 +212,7 @@ public class InstallMonitor extends BaseMonitor {
         for (var entry : projectDeclaredOrganizations.entrySet()) {
             String project = entry.getKey();
             for (String ghOrgKey : entry.getValue()) {
-                var ghOrg = this.normalizeOrg(ghOrgKey);
+                var ghOrg = OrganizationConfig.normalizeOrg(ghOrgKey);
                 InstallationReconciliation ir = result.computeIfAbsent(ghOrg,
                         k -> new InstallationReconciliation(
                                 ghOrg,
@@ -324,7 +325,7 @@ public class InstallMonitor extends BaseMonitor {
                         k -> new TreeSet<>(Comparator.comparing(OrgStatus::ghOrgName)));
 
                 for (String ghOrgKey : entry.getValue().githubOrganizations()) {
-                    String ghOrg = normalizeOrg(ghOrgKey);
+                    String ghOrg = OrganizationConfig.normalizeOrg(ghOrgKey);
                     knownOrgs.add(ghOrg);
                     InstallationReconciliation ir = reconciliation.get(ghOrg);
                     if (ir != null) {
@@ -425,10 +426,6 @@ public class InstallMonitor extends BaseMonitor {
     }
 
     record ProjectOrgGroup(String projectName, Set<OrgStatus> organizations) {
-    }
-
-    String normalizeOrg(String ghOrg) {
-        return ghOrg.replaceAll("^https?://github\\.com/", "");
     }
 
     @Override
