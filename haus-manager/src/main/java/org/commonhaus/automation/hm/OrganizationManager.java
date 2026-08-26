@@ -1,5 +1,7 @@
 package org.commonhaus.automation.hm;
 
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
@@ -353,8 +355,9 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
 
         public Set<String> teams() {
+            String orgName = toOrganizationName(repoFullName);
             return orgConfig.teamMembership().stream()
-                    .flatMap(x -> x.watchedTeams(repoFullName).stream())
+                    .flatMap(x -> x.watchedTeams(orgName).stream())
                     .collect(Collectors.toSet());
         }
 
