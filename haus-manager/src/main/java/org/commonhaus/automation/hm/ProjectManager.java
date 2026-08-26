@@ -30,6 +30,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
+import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.kohsuke.github.GHContent;
@@ -390,6 +391,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             Log.warnf("[%s] %s: No source team configured; skipping team sync", ME, state.taskGroup());
             return;
         }
+        sourceTeamName = OrganizationConfig.toFullTeamName(mgrBotConfig.home().organization(), sourceTeamName);
 
         String repoFullName = state.repoFullName();
         boolean isDryRun = projectConfig.dryRun() || ctx.isDryRun();
