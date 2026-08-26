@@ -1,0 +1,38 @@
+enabled: true
+dryRun: true
+githubOrganizations:
+  - test-org
+
+collaboratorSync:
+  role: push
+  sourceTeam: bad team!
+  includeUsers:
+    - malformed-user
+  ignoreUsers:
+    - botLogin
+
+teamMembership:
+  - dryRun: true
+    source:
+      repository: public-org/source
+      filePath: signatories.yaml
+    mapPointer: /signatories
+    defaults:
+      field: login
+      preserveUsers:
+        - test-bot
+    pushMembers:
+      active:
+        teams:
+          - test-org/cf-council
+          - ""
+          - bad team!
+          - test-org/admin
+
+emailNotifications:
+  errors:
+    - project-malformed-errors@test.org
+  dryRun:
+    - project-malformed-dryrun@test.org
+  audit:
+    - project-malformed-audit@test.org

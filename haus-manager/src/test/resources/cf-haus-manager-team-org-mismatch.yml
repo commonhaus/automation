@@ -1,0 +1,36 @@
+enabled: true
+dryRun: true
+githubOrganizations:
+  - test-org
+
+collaboratorSync:
+  role: push
+  sourceTeam: other-org/teamA
+  includeUsers:
+    - user4
+  ignoreUsers:
+    - botLogin
+
+teamMembership:
+  - dryRun: true
+    source:
+      repository: public-org/source
+      filePath: signatories.yaml
+    mapPointer: /signatories
+    defaults:
+      field: login
+      preserveUsers:
+        - test-bot
+    pushMembers:
+      active:
+        teams:
+          - test-org/cf-council
+          - other-org/teamB
+
+emailNotifications:
+  errors:
+    - project-mismatch-errors@test.org
+  dryRun:
+    - project-mismatch-dryrun@test.org
+  audit:
+    - project-mismatch-audit@test.org
