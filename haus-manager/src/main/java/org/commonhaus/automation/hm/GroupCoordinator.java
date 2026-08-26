@@ -16,6 +16,7 @@ import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpd
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.ManagerBotConfig;
+import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig.OrgDefaults;
 import org.commonhaus.automation.hm.config.PushToTeams;
 import org.commonhaus.automation.hm.github.AppContextService;
@@ -211,12 +212,14 @@ public abstract class GroupCoordinator extends ScheduledService {
                 }
 
                 for (String targetTeam : sync.teams()) {
-                    if (configState.blockedTeams().contains(targetTeam)) {
-                        Log.warnf("[%s] groupMapping: team %s is blocked; skipping sync", me(), targetTeam);
+                    String qualifiedTargetTeam = OrganizationConfig.toFullTeamName(
+                            mgrBotConfig.home().organization(), targetTeam);
+                    if (configState.blockedTeams().contains(qualifiedTargetTeam)) {
+                        Log.warnf("[%s] groupMapping: team %s is blocked; skipping sync", me(), qualifiedTargetTeam);
                         continue;
                     }
                     try {
-                        doSyncTeamMembers(configState.taskGroup(), sourceQc, targetTeam,
+                        doSyncTeamMembers(configState.taskGroup(), sourceQc, qualifiedTargetTeam,
                                 expectedLogins, sync.ignoreUsers(defaults),
                                 isDryRun, configState.emailNotifications());
                     } catch (Throwable t) {
