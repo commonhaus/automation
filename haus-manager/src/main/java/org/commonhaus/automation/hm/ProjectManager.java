@@ -331,8 +331,8 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                     unwatchRepoSource(newState, oldSource);
                 }
 
-                Set<String> removedTeams = oldState.targetTeams();
-                removedTeams.removeAll(newState.targetTeams());
+                Set<String> removedTeams = oldState.targetTeams(mgrBotConfig.home().organization());
+                removedTeams.removeAll(newState.targetTeams(mgrBotConfig.home().organization()));
                 teamConflictResolver.releaseProjectTeams(newState, removedTeams);
             }
         }
@@ -491,12 +491,11 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             this(taskGroup, refresh, repoFullName, installationId, projectConfig, new HashSet<>(), new HashSet<>());
         }
 
-        public Set<String> targetTeams() {
+        public Set<String> targetTeams(String defaultOrg) {
             return projectConfig == null
                     ? Set.of()
                     : projectConfig.teamMembership().stream()
-                            .flatMap(gm -> gm.pushMembers().values().stream())
-                            .flatMap(pts -> pts.teams().stream())
+                            .flatMap(gm -> gm.watchedTeams(defaultOrg).stream())
                             .collect(Collectors.toSet());
         }
 

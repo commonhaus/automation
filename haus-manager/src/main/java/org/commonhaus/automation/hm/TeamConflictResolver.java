@@ -21,6 +21,7 @@ import org.commonhaus.automation.github.discovery.BootstrapDiscoveryEvent;
 import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.hm.OrganizationManager.OrganizationConfigState;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
+import org.commonhaus.automation.hm.config.ManagerBotConfig;
 import org.commonhaus.automation.hm.github.AppContextService;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 
@@ -51,6 +52,9 @@ public class TeamConflictResolver {
 
     @Inject
     BotConfig botConfig;
+
+    @Inject
+    ManagerBotConfig mgrBotConfig;
 
     private final Map<String, TeamOwnership> teamOwnership = new ConcurrentHashMap<>();
 
@@ -213,7 +217,7 @@ public class TeamConflictResolver {
         Map<String, Runnable> updates = new HashMap<>();
 
         // Validate against org teams and other projects
-        for (var teamName : projectConfig.targetTeams()) {
+        for (var teamName : projectConfig.targetTeams(mgrBotConfig.home().organization())) {
             var oldTo = teamOwnership.get(teamName); // Get before compute
 
             var newTo = teamOwnership.compute(teamName, (k, v) -> {

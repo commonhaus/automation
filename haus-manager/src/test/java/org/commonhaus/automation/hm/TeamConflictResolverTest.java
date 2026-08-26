@@ -36,6 +36,7 @@ public class TeamConflictResolverTest extends HausManagerTestBase {
         resolver = new TeamConflictResolver();
         resolver.ctx = ctx;
         resolver.updateQueue = updateQueue;
+        resolver.mgrBotConfig = configProducer;
 
         String orgString = """
                 {
@@ -152,7 +153,7 @@ public class TeamConflictResolverTest extends HausManagerTestBase {
     @Test
     void testOrgTakesPrecedenceOverProject() {
         // Setup: Project registers first for "test-org/cf-council"
-        System.out.println("=== Project1 target teams: " + project1State.targetTeams());
+        System.out.println("=== Project1 target teams: " + project1State.targetTeams("test-org"));
         resolver.registerProjectTeams(project1State);
 
         waitForQueue();
@@ -205,7 +206,7 @@ public class TeamConflictResolverTest extends HausManagerTestBase {
         // - Project2 should get a filtered list back that doesn't include test-org/active-users
 
         // Project1 registers first for: test-org/cf-council, test-org/active-users
-        System.out.println("=== Project1 target teams: " + project1State.targetTeams());
+        System.out.println("=== Project1 target teams: " + project1State.targetTeams("test-org"));
         resolver.registerProjectTeams(project1State);
 
         waitForQueue();
@@ -216,7 +217,7 @@ public class TeamConflictResolverTest extends HausManagerTestBase {
 
         // Project2 registers second for: test-org/project-2, test-org/active-users
         // (CONFLICT!)
-        System.out.println("=== Project2 target teams: " + project2State.targetTeams());
+        System.out.println("=== Project2 target teams: " + project2State.targetTeams("test-org"));
         resolver.registerProjectTeams(project2State);
         System.out.println("=== Project2 BLOCKED target teams: " + project2State.blockedTeams());
 
