@@ -1,0 +1,12 @@
+teamMembershipVerification: dryRun
+
+emailNotifications:
+  errors:
+    - org-errors@test.org
+  dryRun:
+    - org-dryrun@test.org
+
+projects:
+  one:
+    githubOrganizations:
+      - test-org
