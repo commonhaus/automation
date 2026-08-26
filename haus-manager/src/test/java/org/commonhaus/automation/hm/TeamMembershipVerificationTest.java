@@ -203,6 +203,110 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("warn");
     }
 
+    @Test
+    void errorModeSkipsMismatchedTeamAndSendsProjectErrorEmail() throws IOException {
+        OrganizationConfig orgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-team-verify-error.yml",
+                OrganizationConfig.class);
+        ProjectConfig projectConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-team-org-mismatch.yml",
+                ProjectConfig.class);
+        registerProjectState(orgConfig, projectConfig);
+
+        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
+        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+
+        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
+                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
+        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RepositoryRole.from(Permission.PUSH));
+
+        projectManager.reconcile(TASK_GROUP);
+        waitForQueue();
+
+        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+
+        Awaitility.await().untilAsserted(() -> {
+            assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).hasSize(1);
+            assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org").get(0).getText())
+                    .contains("other-org/teamB");
+        });
+        assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
+        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
+    }
+
+    @Test
+    void errorModeSkipsMalformedTargetsButStillReadsMalformedCollaboratorSource() throws IOException {
+        OrganizationConfig orgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-team-verify-error.yml",
+                OrganizationConfig.class);
+        ProjectConfig projectConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-team-malformed.yml",
+                ProjectConfig.class);
+        registerProjectState(orgConfig, projectConfig);
+
+        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
+        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+
+        when(teamService.getTeamLogins(any(), eq("test-org/bad team!")))
+                .thenReturn(null);
+        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RepositoryRole.from(Permission.PUSH));
+
+        projectManager.reconcile(TASK_GROUP);
+        waitForQueue();
+
+        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/bad team!"), any(), any(), anyBoolean(), any());
+        verify(teamService).getTeamLogins(any(), eq("test-org/bad team!"));
+
+        Awaitility.await().untilAsserted(() -> {
+            assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
+            String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
+            assertThat(body).contains("bad team!");
+            assertThat(body).contains("test-org/");
+        });
+        assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
+        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
+    }
+
+    @Test
+    void absentGithubOrganizationsTreatsAllReferencedTeamsAsViolations() throws IOException {
+        OrganizationConfig orgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-team-verify-error.yml",
+                OrganizationConfig.class);
+        ProjectConfig projectConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-team-no-orgs.yml",
+                ProjectConfig.class);
+        registerProjectState(orgConfig, projectConfig);
+
+        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
+        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+
+        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
+                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
+        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RepositoryRole.from(Permission.PUSH));
+
+        projectManager.reconcile(TASK_GROUP);
+        waitForQueue();
+
+        verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+
+        Awaitility.await().untilAsserted(() -> {
+            assertThat(mailbox.getMailsSentTo("project-no-orgs-errors@test.org")).hasSize(1);
+            String body = mailbox.getMailsSentTo("project-no-orgs-errors@test.org").get(0).getText();
+            assertThat(body).contains("test-org/cf-council");
+            assertThat(body).contains("other-org/teamB");
+        });
+        assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
+        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
+    }
+
     private ProjectConfigState registerProjectState(OrganizationConfig orgConfig, ProjectConfig projectConfig) {
         when(latestOrgConfig.getConfig()).thenReturn(orgConfig);
         when(latestOrgConfig.projectNameToRepoFullName(any(), eq("one"))).thenReturn(HOME_PROJECT_1.repoFullName());

@@ -1,0 +1,34 @@
+enabled: true
+dryRun: true
+
+collaboratorSync:
+  role: push
+  sourceTeam: other-org/teamA
+  includeUsers:
+    - user4
+  ignoreUsers:
+    - botLogin
+
+teamMembership:
+  - dryRun: true
+    source:
+      repository: public-org/source
+      filePath: signatories.yaml
+    mapPointer: /signatories
+    defaults:
+      field: login
+      preserveUsers:
+        - test-bot
+    pushMembers:
+      active:
+        teams:
+          - test-org/cf-council
+          - other-org/teamB
+
+emailNotifications:
+  errors:
+    - project-no-orgs-errors@test.org
+  dryRun:
+    - project-no-orgs-dryrun@test.org
+  audit:
+    - project-no-orgs-audit@test.org
