@@ -1,5 +1,8 @@
 enabled: true
 dryRun: true
+githubOrganizations:
+  - test-org
+  - https://github.com/other-org
 
 # Add users from the specified source team as collaborators
 # to the repository containing this file.
