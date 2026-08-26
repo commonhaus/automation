@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.commonhaus.automation.config.EmailNotification;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -22,8 +24,28 @@ public class OrganizationConfig {
     protected ProjectAssetList projects;
     protected SponsorsConfig sponsors;
 
+    protected TeamMembershipVerification teamMembershipVerification;
     protected List<GroupMapping> teamMembership;
     protected CollaboratorMonitorConfig collaboratorMonitor;
+
+    public enum TeamMembershipVerification {
+        @JsonProperty("dryRun")
+        DRY_RUN("dryRun"),
+        @JsonProperty("warn")
+        WARN("warn"),
+        @JsonProperty("error")
+        ERROR("error");
+
+        final String value;
+
+        TeamMembershipVerification(String value) {
+            this.value = value;
+        }
+
+        public String value() {
+            return value;
+        }
+    }
 
     /**
      * @return the emailNotifications
@@ -46,6 +68,16 @@ public class OrganizationConfig {
      */
     public List<GroupMapping> teamMembership() {
         return teamMembership == null ? List.of() : teamMembership;
+    }
+
+    public String teamMembershipVerification() {
+        return teamMembershipVerificationMode().value();
+    }
+
+    public TeamMembershipVerification teamMembershipVerificationMode() {
+        return teamMembershipVerification == null
+                ? TeamMembershipVerification.WARN
+                : teamMembershipVerification;
     }
 
     /**
@@ -113,9 +145,9 @@ public class OrganizationConfig {
 
     @Override
     public String toString() {
-        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s, collaboratorMonitor=%s}"
-                .formatted(emailNotifications, sponsors, teamMembership, domainManagement, domainMonitoring,
-                        githubOrgVerification, projects, collaboratorMonitor);
+        return "OrganizationConfig{emailNotifications=%s, sponsors=%s, teamMembershipVerification=%s, teamMembership=%s, domainManagement=%s, domainMonitoring=%s, githubOrgVerification=%s, projects=%s, collaboratorMonitor=%s}"
+                .formatted(emailNotifications, sponsors, teamMembershipVerificationMode(), teamMembership,
+                        domainManagement, domainMonitoring, githubOrgVerification, projects, collaboratorMonitor);
     }
 
     /**
