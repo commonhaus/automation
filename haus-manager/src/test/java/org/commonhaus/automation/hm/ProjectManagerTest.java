@@ -25,6 +25,8 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.RepositoryEvent;
+import org.commonhaus.automation.hm.config.LatestOrgConfig;
+import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.commonhaus.automation.queue.TaskStateService;
@@ -51,6 +53,9 @@ public class ProjectManagerTest extends HausManagerTestBase {
     @InjectMock
     TaskStateService taskState;
 
+    @InjectMock
+    LatestOrgConfig latestOrgConfig;
+
     Set<String> otherTeamLogins = Set.of("user1", "user2", "other3", "other4");
 
     MockInstallation home_project_1;
@@ -61,6 +66,11 @@ public class ProjectManagerTest extends HausManagerTestBase {
         super.setup();
         home_project_1 = setupInstallationMocks(HOME_PROJECT_1);
         Log.info("START: ProjectManagerTest.setup()");
+
+        OrganizationConfig orgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(orgConfig);
 
         // Mock the file content for organization config in primary repo
         mockFileContent(home_project_1, ProjectConfig.PATH,

@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
@@ -29,6 +30,7 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdate;
 import org.commonhaus.automation.github.watchers.MembershipWatcher.MembershipUpdateType;
 import org.commonhaus.automation.hm.config.GroupMapping;
+import org.commonhaus.automation.hm.config.LatestOrgConfig;
 import org.commonhaus.automation.hm.config.LatestProjectConfig;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
@@ -45,6 +47,9 @@ import io.quarkus.scheduler.Scheduled;
 public class ProjectManager extends GroupCoordinator implements LatestProjectConfig {
     static final String ME = "🌳-project";
     static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, null, 0, null);
+
+    @Inject
+    LatestOrgConfig latestOrgConfig;
 
     // flat map of task group to its current state
     final Map<String, ProjectConfigState> taskGroupToState = new ConcurrentHashMap<>();
