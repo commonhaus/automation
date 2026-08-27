@@ -211,7 +211,7 @@ public abstract class GroupCoordinator extends ScheduledService {
                     }
                 }
 
-                for (String targetTeam : sync.teams()) {
+                for (String targetTeam : sync.filteredTeams()) {
                     String qualifiedTargetTeam = OrganizationConfig.toFullTeamName(
                             mgrBotConfig.home().organization(), targetTeam);
                     if (configState.blockedTeams().contains(qualifiedTargetTeam)) {

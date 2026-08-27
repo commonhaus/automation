@@ -26,6 +26,7 @@ teamMembership:
         teams:
           - test-org/cf-council
           - ""
+          -
           - other-org/bad team!
           - test-org/admin
 

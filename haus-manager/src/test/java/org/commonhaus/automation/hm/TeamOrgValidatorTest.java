@@ -92,7 +92,9 @@ public class TeamOrgValidatorTest {
         Result result = TeamOrgValidator.validate(projectConfig, "test-org");
 
         assertThat(result.pushTargetViolations()).extracting(Violation::qualifiedTeamName)
-                .containsExactlyInAnyOrder("test-org/", "other-org/bad team!");
+                .containsExactlyInAnyOrder("test-org/", "test-org/", "other-org/bad team!");
+        assertThat(result.pushTargetViolations()).extracting(Violation::kind)
+                .containsOnly(Kind.MALFORMED, Kind.ORG_MISMATCH);
         assertThat(result.sourceTeamViolations()).extracting(Violation::qualifiedTeamName)
                 .containsExactly("other-org/bad team!");
     }

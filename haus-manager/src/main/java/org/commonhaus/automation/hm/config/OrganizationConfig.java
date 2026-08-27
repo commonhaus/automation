@@ -278,6 +278,9 @@ public class OrganizationConfig {
      * @return
      */
     public static String toFullTeamName(String defaultOrg, String teamName) {
+        if (teamName == null) {
+            teamName = "";
+        }
         if (teamName.contains("/")) {
             return teamName;
         }

@@ -40,6 +40,11 @@ public record PushToTeams(
         return teams == null ? List.of() : teams;
     }
 
+    /** Teams with null elements dropped, for callers that will actually sync/qualify each entry. */
+    public List<String> filteredTeams() {
+        return teams().stream().filter(x -> x != null && !x.isBlank()).toList();
+    }
+
     @Override
     public List<String> preserveUsers() {
         return preserveUsers == null ? List.of() : preserveUsers;
