@@ -2,16 +2,11 @@ package org.commonhaus.automation.hm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 
 import jakarta.inject.Inject;
 
@@ -25,9 +20,6 @@ import org.commonhaus.automation.hm.github.HausManagerTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHOrganization.Permission;
-import org.kohsuke.github.GHOrganization.RepositoryRole;
-import org.kohsuke.github.GHRepository;
 
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.InjectMock;
@@ -47,14 +39,11 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
     @InjectMock
     LatestProjectConfig latestProjectConfig;
 
-    MockInstallation homeProject;
-
     @BeforeEach
     @Override
     protected void setup() throws IOException {
         super.setup();
-        homeProject = setupInstallationMocks(HOME_PROJECT_1);
-        clearInvocations(teamService);
+        setupInstallationMocks(HOME_PROJECT_1);
     }
 
     @AfterEach
@@ -72,19 +61,12 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
                 ProjectConfig.class);
         ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        // Config-load-time validation (normally run from readProjectConfig)
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
-                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("dryRun");
+        assertThat(latestProjectConfig.getProjectConfigState(state.repoFullName())).isSameAs(state);
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).hasSize(1);
@@ -92,8 +74,6 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
                     .contains("other-org/teamB");
         });
         assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).isEmpty();
-        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("dryRun");
-        assertThat(latestProjectConfig.getProjectConfigState(state.repoFullName())).isSameAs(state);
     }
 
     @Test
@@ -104,30 +84,18 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-malformed.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
-                .thenReturn(null);
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
+        assertThat(state.blockedTeams()).containsExactly("test-org/");
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("org-dryrun@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("commonhaus-test/");
+            assertThat(body).contains("test-org/");
         });
         assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("dryRun");
@@ -141,21 +109,12 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-org-mismatch.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
-                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+        assertThat(state.blockedTeams()).isEmpty();
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).hasSize(1);
@@ -174,30 +133,18 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-malformed.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
-                .thenReturn(null);
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
+        assertThat(state.blockedTeams()).containsExactly("test-org/");
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("commonhaus-test/");
+            assertThat(body).contains("test-org/");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("warn");
@@ -211,21 +158,12 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-org-mismatch.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
-                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+        assertThat(state.blockedTeams()).containsExactly("other-org/teamB");
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).hasSize(1);
@@ -244,30 +182,18 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-malformed.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("commonhaus-test/bad team!")))
-                .thenReturn(null);
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("commonhaus-test/bad team!"), any(), any(), anyBoolean(), any());
-        verify(teamService).getTeamLogins(any(), eq("commonhaus-test/bad team!"));
+        assertThat(state.blockedTeams()).containsExactlyInAnyOrder("test-org/", "other-org/bad team!");
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
             String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
-            assertThat(body).contains("commonhaus-test/");
+            assertThat(body).contains("test-org/");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
@@ -281,21 +207,12 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
         ProjectConfig projectConfig = loadYamlResource(
                 "src/test/resources/cf-haus-manager-team-no-orgs.yml",
                 ProjectConfig.class);
-        registerProjectState(orgConfig, projectConfig);
+        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
 
-        GHRepository contactRepo = mockRepository("public-org/source", homeProject.github());
-        mockFileContent(contactRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
+                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
 
-        when(teamService.getTeamLogins(any(), eq("other-org/teamA")))
-                .thenReturn(Set.of("user1", "user2", "other3", "other4"));
-        when(teamService.toRole(any(), any(), any(), any(), any(), any()))
-                .thenReturn(RepositoryRole.from(Permission.PUSH));
-
-        projectManager.reconcile(TASK_GROUP);
-        waitForQueue();
-
-        verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
-        verify(teamService, never()).syncMembers(any(), eq("other-org/teamB"), any(), any(), anyBoolean(), any());
+        assertThat(state.blockedTeams()).containsExactlyInAnyOrder("test-org/cf-council", "other-org/teamB");
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-no-orgs-errors@test.org")).hasSize(1);

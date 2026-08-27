@@ -123,7 +123,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 continue;
             }
             // do this in chunks to space the work out..
-            updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc));
+            updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc, true));
         }
         // After queuing all project config reads,
         // queue reconciliation tasks to sync team membership
@@ -153,7 +153,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                         .withExisting(repoEvent.github());
 
                 updateQueue.queue(taskGroup, () -> {
-                    readProjectConfig(taskGroup, qc);
+                    readProjectConfig(taskGroup, qc, false);
                     if (!repoEvent.bootstrap() && taskGroupToState.get(taskGroup) != null) {
                         reconcile(taskGroup);
                     }
@@ -218,7 +218,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         if (newState == EMPTY) { // lazy discovery
             Log.debugf("[%s] processMembershipUpdate: empty state for %s", ME, taskGroup);
             ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
-            readProjectConfig(taskGroup, qc);
+            readProjectConfig(taskGroup, qc, false);
         } else {
             // queue reconcile action
             updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
@@ -259,15 +259,20 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return;
         }
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
-        readProjectConfig(taskGroup, qc);
+        readProjectConfig(taskGroup, qc, true);
         updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
     }
 
     /**
      * Read organization configuration from repository.
      * Called by repositoryDiscovered, on file events, and periodic sync
+     *
+     * @param notify whether a detected team/org mismatch should trigger an email now (true for
+     *        the 12h scheduled refresh and real file-change events; false for bootstrap/lazy
+     *        discovery and internal conflict-resolution retries, so a restart doesn't re-notify
+     *        on every re-read of a lingering violation)
      */
-    protected void readProjectConfig(String taskGroup, ScopedQueryContext qc) {
+    protected void readProjectConfig(String taskGroup, ScopedQueryContext qc, boolean notify) {
         ProjectConfigState oldState = taskGroupToState.get(taskGroup);
         String repoFullName = taskGroupToRepo(taskGroup);
 
@@ -307,7 +312,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         ProjectConfigState newState = new ProjectConfigState(taskGroup,
                 () -> {
                     ScopedQueryContext taskQc = new ScopedQueryContext(ctx, qc.getInstallationId(), repo);
-                    readProjectConfig(taskGroup, taskQc);
+                    readProjectConfig(taskGroup, taskQc, false);
                 },
                 repo.getFullName(), qc.getInstallationId(), projectConfig);
 
@@ -344,6 +349,12 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         teamConflictResolver.registerProjectTeams(newState);
+
+        OrganizationConfig orgConfig = latestOrgConfig.getConfig();
+        TeamOrgValidator.validateAndNotify(ctx, ME, newState, projectConfig,
+                mgrBotConfig.home().organization(), orgConfig.teamMembershipVerificationMode(),
+                orgConfig.emailNotifications().dryRun(), notify);
+
         // Add the source file to the state
         taskGroupToState.put(taskGroup, newState);
     }
