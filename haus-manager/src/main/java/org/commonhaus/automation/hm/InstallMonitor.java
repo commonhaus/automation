@@ -48,7 +48,7 @@ public class InstallMonitor extends BaseMonitor {
 
         public static native TemplateInstance orgSummary(
                 List<ProjectOrgGroup> orgGroups,
-                List<String> unmapped);
+                List<UnmappedOrg> unmapped);
     }
 
     @Inject
@@ -366,18 +366,24 @@ public class InstallMonitor extends BaseMonitor {
         }
 
         // Find unmapped organizations (installed but not in any config)
-        List<String> unmappedList = new ArrayList<>();
+        List<UnmappedOrg> unmappedList = new ArrayList<>();
         for (String org : installedOrgs) {
             if (!reconciliation.containsKey(org)) {
-                unmappedList.add(org);
+                String installationId = installationMap.getInstallationId(org)
+                        .map(String::valueOf)
+                        .orElse("unknown");
+                unmappedList.add(new UnmappedOrg(org, installationId));
             }
         }
-        unmappedList.sort(null);
+        unmappedList.sort(Comparator.comparing(UnmappedOrg::orgName));
 
         String message = Templates.orgSummary(orgGroups, unmappedList).render();
         String title = "haus-manager: GitHub organization verification summary";
 
         sendOrgAuditNotification(title, message, dryRun);
+    }
+
+    record UnmappedOrg(String orgName, String installationId) {
     }
 
     record ProjectIssues(

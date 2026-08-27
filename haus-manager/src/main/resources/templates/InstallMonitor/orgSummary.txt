@@ -16,7 +16,7 @@
 The following organizations have HausManager installed but are not mapped to any project or organization config:
 
 {#for org in unmapped}
-  - ❓ {org}
+  - ❓ {org.orgName} (installation: {org.installationId})
 {/for}
 
 Consider adding these to the organization config or removing the installation if not needed.

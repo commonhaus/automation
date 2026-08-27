@@ -209,7 +209,7 @@ public class InstallMonitorTest extends HausManagerTestBase {
 
         // Unmapped section
         assertThat(auditText).contains("## Unmapped");
-        assertThat(auditText).contains("❓ orphan-org");
+        assertThat(auditText).contains("orphan-org (installation: 99999)");
     }
 
     @Test
