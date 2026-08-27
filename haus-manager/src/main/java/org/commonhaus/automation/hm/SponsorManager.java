@@ -140,19 +140,22 @@ public class SponsorManager extends GroupCoordinator {
         ScopedQueryContext qc = ctx.getOrgScopedQueryContext(sponsorableAccount);
         if (qc == null) {
             Log.warnf("[%s] getSponsors: no query context for %s", ME, sponsorable);
-            return Set.of();
-        } else {
-            // Query for GitHub sponsors
-            List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);
-            if (recentSponsors != null) {
-                sponsorLogins.addAll(recentSponsors.stream()
-                        .map(DataSponsorship::sponsorLogin).toList());
-            }
+            ctx.logAndSendEmail(ME,
+                    "[%s] getSponsors: no query context for %s".formatted(ME, sponsorable),
+                    (Throwable) null, ctx.getErrorAddresses(notifications));
+            return null;
+        }
+        // Query for GitHub sponsors
+        List<DataSponsorship> recentSponsors = DataSponsorship.queryRecentSponsors(qc, sponsorable);
+        if (recentSponsors != null) {
+            sponsorLogins.addAll(recentSponsors.stream()
+                    .map(DataSponsorship::sponsorLogin).toList());
         }
         if (qc.hasErrors()) {
             qc.logAndSendContextErrors("[%s] getSponsors: unable to retrieve sponsors %s"
                     .formatted(ME, sponsorable),
                     notifications);
+            return null;
         }
         Log.debugf("[%s] getSponsors: found sponsors for %s: %s", ME,
                 sponsorable, sponsorLogins);
@@ -164,12 +167,11 @@ public class SponsorManager extends GroupCoordinator {
             ocQc.logAndSendContextErrors("[%s] getSponsors: unable to retrieve OpenCollective sponsors"
                     .formatted(ME),
                     notifications);
-        } else {
-            Log.debugf("[%s] getSponsors: found sponsors from OpenCollective: %s", ME,
-                    openCollectiveSponsors);
-
-            sponsorLogins.addAll(openCollectiveSponsors);
+            return null;
         }
+        Log.debugf("[%s] getSponsors: found sponsors from OpenCollective: %s", ME,
+                openCollectiveSponsors);
+        sponsorLogins.addAll(openCollectiveSponsors);
 
         return sponsorLogins;
     }
