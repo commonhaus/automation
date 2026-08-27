@@ -23,6 +23,9 @@ class LabelWatcher {
     @Inject
     Instance<ContextService> ctxInstance;
 
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
+
     /**
      * Called when there is event.
      *
@@ -32,6 +35,10 @@ class LabelWatcher {
      * @param labelPayload GitHub API parsed payload
      */
     void onRepositoryLabelChange(GitHubEvent event, @Label GHEventPayload.Label labelPayload) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onRepositoryLabelChange] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         if (labelPayload.getRepository() == null || ctxInstance.isUnsatisfied()) {
             return;
         }

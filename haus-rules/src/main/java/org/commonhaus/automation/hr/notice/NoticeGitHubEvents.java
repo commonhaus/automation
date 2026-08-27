@@ -8,6 +8,7 @@ import java.util.Set;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.EventData;
+import org.commonhaus.automation.github.watchers.GitHubEventFilter;
 import org.commonhaus.automation.hr.AppContextService;
 import org.commonhaus.automation.hr.EventQueryContext;
 import org.commonhaus.automation.hr.actions.Action;
@@ -35,6 +36,9 @@ public class NoticeGitHubEvents {
     @Inject
     ConfigWatcher configWatcher;
 
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
+
     /**
      * Called when there is a discussion event.
      *
@@ -45,6 +49,10 @@ public class NoticeGitHubEvents {
     void onDiscussionEvent(GitHubEvent event,
             @Discussion GHEventPayload.Discussion payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onDiscussionEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
             Log.warnf("onDiscussionEvent: Missing repository information");
@@ -65,6 +73,10 @@ public class NoticeGitHubEvents {
     void onDiscussionCommentEvent(GitHubEvent event,
             @DiscussionComment GHEventPayload.DiscussionComment payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onDiscussionCommentEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
             Log.warnf("onDiscussionEvent: Missing repository information");
@@ -85,6 +97,10 @@ public class NoticeGitHubEvents {
     void onIssueEvent(GitHubEvent event,
             @Issue GHEventPayload.Issue payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onIssueEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
             Log.warnf("onDiscussionEvent: Missing repository information");
@@ -105,6 +121,10 @@ public class NoticeGitHubEvents {
     void onPullRequestEvent(GitHubEvent event,
             @PullRequest GHEventPayload.PullRequest payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onPullRequestEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
             Log.warnf("onDiscussionEvent: Missing repository information");
@@ -125,6 +145,10 @@ public class NoticeGitHubEvents {
     void onIssueCommentEvent(GitHubEvent event,
             @IssueComment GHEventPayload.IssueComment payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onIssueCommentEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
             Log.warnf("onDiscussionEvent: Missing repository information");

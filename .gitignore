@@ -45,6 +45,10 @@ logs
 /.quarkus/cli/plugins/
 
 # MCP experiments
-.claude
+.claude/settings.local.json
+.bob
+.bobignore
+*.local.md
 repomix
 qrspi
+reference

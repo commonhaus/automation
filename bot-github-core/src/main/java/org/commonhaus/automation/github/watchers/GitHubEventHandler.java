@@ -17,6 +17,7 @@ import io.quarkiverse.githubapp.event.Member;
 import io.quarkiverse.githubapp.event.Membership;
 import io.quarkiverse.githubapp.event.Push;
 import io.quarkiverse.githubapp.event.Team;
+import io.quarkus.logging.Log;
 
 /**
  * GitHub App will transform this into a multiplexed bean for
@@ -31,6 +32,9 @@ public class GitHubEventHandler {
     @Inject
     MembershipWatcher membershipWatcher;
 
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
+
     /**
      * Check for push to watched file
      *
@@ -40,6 +44,10 @@ public class GitHubEventHandler {
      */
     public void handlePushEvent(GitHubEvent event, GitHub github,
             @Push GHEventPayload.Push pushEvent) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[handlePushEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
 
         GHRepository repo = pushEvent.getRepository();
         FilePushEvent fileEvent = new FileWatcher.FilePushEvent(
@@ -65,6 +73,10 @@ public class GitHubEventHandler {
      */
     public void updateTeamMembership(GitHubEvent event, GitHub github,
             @Membership GHEventPayload.Membership payload) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[updateTeamMembership] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         long installationId = payload.getInstallation().getId();
 
         TeamEvent teamEvent = new TeamEvent(
@@ -90,6 +102,10 @@ public class GitHubEventHandler {
      */
     public void updateMember(GitHubEvent event, GitHub github,
             @Member GHEventPayload.Member payload) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[updateMember] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         long installationId = payload.getInstallation().getId();
 
         RepositoryEvent repositoryEvent = new RepositoryEvent(
@@ -118,6 +134,10 @@ public class GitHubEventHandler {
      */
     public void updateTeam(GitHubEvent event, GitHub github,
             @Team GHEventPayload.Team payload) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[updateTeam] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         long installationId = payload.getInstallation().getId();
 
         TeamEvent teamEvent = new TeamEvent(

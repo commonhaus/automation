@@ -14,6 +14,7 @@ import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseQueryCache;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.commonhaus.automation.github.scopes.ScopedInstallationMap;
+import org.commonhaus.automation.github.watchers.GitHubEventFilter;
 import org.commonhaus.automation.mail.LogMailer;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHAppInstallation;
@@ -59,6 +60,9 @@ public class RepositoryDiscovery {
     @Inject
     Event<BootstrapDiscoveryEvent> fireBootstrapDiscovery;
 
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
+
     /**
      * On startup, discover installations and repositories
      * (if discovery is enabled).
@@ -101,6 +105,10 @@ public class RepositoryDiscovery {
             // List installations for this GitHub App: roughly, each organization
             for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {
                 long ghiId = ghAppInstallation.getId();
+                if (gitHubEventFilter.isBlocked(ghiId)) {
+                    Log.infof("[discoverRepositories] Installation %d is blocked; skipping.", ghiId);
+                    continue;
+                }
                 GitHub github = gitHubService.getInstallationClient(ghiId);
                 GHAuthenticatedAppInstallation ghai = github.getInstallation();
                 DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(ghiId);
@@ -159,6 +167,9 @@ public class RepositoryDiscovery {
         @Inject
         GitHubClientProvider gitHubService;
 
+        @Inject
+        GitHubEventFilter gitHubEventFilter;
+
         void onEvent(@RawEvent GitHubEvent event) {
             if (event == null || event.getInstallationId() == null) {
                 return;
@@ -179,6 +190,11 @@ public class RepositoryDiscovery {
          * Respond to installation changes
          */
         void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent) {
+            if (gitHubEventFilter.isBlocked(gitHubEvent)) {
+                Log.infof("[onInstallationChange] Installation %d is blocked; skipping %s.",
+                        gitHubEvent.getInstallationId(), gitHubEvent.getAction());
+                return;
+            }
 
             String action = gitHubEvent.getAction();
             JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());

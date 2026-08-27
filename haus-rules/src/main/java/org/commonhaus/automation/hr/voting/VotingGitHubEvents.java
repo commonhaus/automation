@@ -7,6 +7,7 @@ import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.GitHubTeamService;
 import org.commonhaus.automation.github.context.JsonAttribute;
+import org.commonhaus.automation.github.watchers.GitHubEventFilter;
 import org.commonhaus.automation.hr.AppContextService;
 import org.commonhaus.automation.hr.EventQueryContext;
 import org.commonhaus.automation.hr.config.ConfigWatcher;
@@ -23,6 +24,7 @@ import io.quarkiverse.githubapp.event.Issue;
 import io.quarkiverse.githubapp.event.IssueComment;
 import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkiverse.githubapp.event.PullRequestReview;
+import io.quarkus.logging.Log;
 
 public class VotingGitHubEvents {
 
@@ -31,6 +33,9 @@ public class VotingGitHubEvents {
 
     @Inject
     ConfigWatcher configWatcher;
+
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
 
     @Inject
     PeriodicUpdateQueue periodicUpdate;
@@ -52,6 +57,10 @@ public class VotingGitHubEvents {
     void onDiscussionEvent(GitHubEvent event,
             @Discussion GHEventPayload.Discussion payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onDiscussionEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 
@@ -66,6 +75,10 @@ public class VotingGitHubEvents {
     void onDiscussionCommentEvent(GitHubEvent event,
             @DiscussionComment GHEventPayload.DiscussionComment payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onDiscussionCommentEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 
@@ -80,6 +93,10 @@ public class VotingGitHubEvents {
     void onIssueEvent(GitHubEvent event,
             @Issue GHEventPayload.Issue payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onIssueEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 
@@ -94,6 +111,10 @@ public class VotingGitHubEvents {
     void onPullRequestEvent(GitHubEvent event,
             @PullRequest GHEventPayload.PullRequest payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onPullRequestEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 
@@ -108,6 +129,10 @@ public class VotingGitHubEvents {
     void onPullRequestReviewEvent(GitHubEvent event,
             @PullRequestReview GHEventPayload.PullRequestReview payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onPullRequestReviewEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 
@@ -122,6 +147,10 @@ public class VotingGitHubEvents {
     void onIssueComment(GitHubEvent event,
             @IssueComment GHEventPayload.IssueComment payload,
             @ConfigFile(HausRulesConfig.NAME) HausRulesConfig repoConfigFile) {
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onIssueComment] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         processVoteEvent(repoConfigFile, new EventData(event, payload));
     }
 

@@ -6,6 +6,7 @@ import org.commonhaus.automation.github.context.DataDiscussion;
 import org.commonhaus.automation.github.context.DataLabel;
 import org.commonhaus.automation.github.context.EventData;
 import org.commonhaus.automation.github.context.EventPayload;
+import org.commonhaus.automation.github.watchers.GitHubEventFilter;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHLabel;
@@ -27,6 +28,9 @@ public class LabelChanges {
     @Inject
     AppContextService ctx;
 
+    @Inject
+    GitHubEventFilter gitHubEventFilter;
+
     /**
      * Called when there is a discussion labeled/unlabeled event.
      *
@@ -38,6 +42,10 @@ public class LabelChanges {
     void onDiscussionLabelChangeEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Discussion.Labeled @Discussion.Unlabeled GHEventPayload.Discussion discussionPayload) {
 
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onDiscussionLabelChangeEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         final EventData initialData = new EventData(event, discussionPayload);
         EventPayload.DiscussionPayload payload = initialData.getEventPayload();
         if (payload == null) {
@@ -71,6 +79,10 @@ public class LabelChanges {
     void onPullRequestLabelChangeEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @PullRequest.Labeled @PullRequest.Unlabeled GHEventPayload.PullRequest parsedPayload) {
 
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onPullRequestLabelChangeEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         final EventData initialData = new EventData(event, parsedPayload);
         GHLabel label = parsedPayload.getLabel();
         GHIssue issue = parsedPayload.getPullRequest();
@@ -95,6 +107,10 @@ public class LabelChanges {
     void onIssueLabelChangeEvent(GitHubEvent event, GitHub github, DynamicGraphQLClient graphQLClient,
             @Issue.Labeled @Issue.Unlabeled GHEventPayload.Issue parsedPayload) {
 
+        if (gitHubEventFilter.isBlocked(event)) {
+            Log.infof("[onIssueLabelChangeEvent] Installation %d is blocked; skipping.", event.getInstallationId());
+            return;
+        }
         final EventData initialData = new EventData(event, parsedPayload);
         GHLabel label = parsedPayload.getLabel();
         GHIssue issue = parsedPayload.getIssue();
