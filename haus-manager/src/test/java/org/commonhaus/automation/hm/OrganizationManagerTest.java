@@ -9,6 +9,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -164,6 +165,25 @@ public class OrganizationManagerTest extends HausManagerTestBase {
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
         verify(teamService, timeout(1000)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void unchangedConfigurationDoesNotTriggerSecondReconcile() throws IOException {
+        organizationManager.processFileUpdate(new FileUpdate(
+                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+                hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
+        waitForQueue();
+
+        clearInvocations(contactRepo, teamService);
+        mockFileContent(hausMocks, OrganizationConfig.PATH,
+                "src/test/resources/cf-haus-organization.yml");
+
+        organizationManager.processFileUpdate(new FileUpdate(
+                OrganizationConfig.PATH, FileUpdateType.MODIFIED,
+                hausMocks.installationId(), hausMocks.repository(), hausMocks.github()));
+        waitForQueue();
+
+        verifyNoInteractions(contactRepo, teamService);
     }
 
     @Test

@@ -1,6 +1,8 @@
 package org.commonhaus.automation.hm.config;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import org.commonhaus.automation.config.EmailNotification;
 
@@ -141,6 +143,46 @@ public class OrganizationConfig {
 
     public boolean isCollaboratorMonitorDryRun() {
         return collaboratorMonitor != null && collaboratorMonitor.isDryRun();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        OrganizationConfig that = (OrganizationConfig) o;
+        return Arrays.equals(emailNotifications().errors(), that.emailNotifications().errors())
+                && Arrays.equals(emailNotifications().dryRun(), that.emailNotifications().dryRun())
+                && Arrays.equals(emailNotifications().audit(), that.emailNotifications().audit())
+                && Objects.equals(domainManagement(), that.domainManagement())
+                && Objects.equals(domainMonitoring(), that.domainMonitoring())
+                && Objects.equals(githubOrgVerification(), that.githubOrgVerification())
+                && Objects.equals(githubOrganizations(), that.githubOrganizations())
+                && Objects.equals(projects(), that.projects())
+                && Objects.equals(sponsors(), that.sponsors())
+                && teamMembershipVerificationMode() == that.teamMembershipVerificationMode()
+                && Objects.equals(teamMembership(), that.teamMembership())
+                && Objects.equals(collaboratorMonitor(), that.collaboratorMonitor());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                Arrays.hashCode(emailNotifications().errors()),
+                Arrays.hashCode(emailNotifications().dryRun()),
+                Arrays.hashCode(emailNotifications().audit()),
+                domainManagement(),
+                domainMonitoring(),
+                githubOrgVerification(),
+                githubOrganizations(),
+                projects(),
+                sponsors(),
+                teamMembershipVerificationMode(),
+                teamMembership(),
+                collaboratorMonitor());
     }
 
     @Override

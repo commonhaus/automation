@@ -439,8 +439,8 @@ public class DomainMonitor extends BaseMonitor {
 
     private Optional<DomainContact> resolveConfiguredTechContact(ManagedDomain managedDomain,
             DomainManagementConfig domainConfig) {
-        if (managedDomain.techContact().isPresent()) {
-            return managedDomain.techContact();
+        if (managedDomain.getTechContact().isPresent()) {
+            return managedDomain.getTechContact();
         }
         return domainConfig.getTechContact();
     }
@@ -504,8 +504,8 @@ public class DomainMonitor extends BaseMonitor {
         ContactInfo tech = defaultContacts.tech();
 
         // Check for domain-specific tech contact override (highest priority)
-        if (managedDomain.techContact().isPresent()) {
-            tech = ContactInfo.fromConfig(tech, managedDomain.techContact().get());
+        if (managedDomain.getTechContact().isPresent()) {
+            tech = ContactInfo.fromConfig(tech, managedDomain.getTechContact().get());
             Log.debugf("[%s] Merging domain-specific tech contact for %s", ME, managedDomain.name());
         }
         // Check for project-level tech contact override (medium priority)

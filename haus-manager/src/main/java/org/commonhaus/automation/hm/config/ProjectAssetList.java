@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -101,5 +102,22 @@ public class ProjectAssetList {
 
     public void clear() {
         allAssets.clear();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ProjectAssetList that = (ProjectAssetList) o;
+        return Objects.equals(allAssets, that.allAssets);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(allAssets);
     }
 }

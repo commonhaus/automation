@@ -9,30 +9,15 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * Used in domainManagement.domains list.
  */
 @RegisterForReflection
-public class ManagedDomain {
-    /**
-     * Domain name (e.g., "project.org", "example.com")
-     */
-    public String name;
-
-    /**
-     * Optional tech contact override for this specific domain.
-     * If not specified, uses parent domainManagement.techContact or defaults.
-     */
-    public DomainContact techContact;
-
-    public ManagedDomain() {
-    }
+public record ManagedDomain(
+        String name,
+        DomainContact techContact) {
 
     public ManagedDomain(String name) {
-        this.name = name;
+        this(name, null);
     }
 
-    public String name() {
-        return name;
-    }
-
-    public Optional<DomainContact> techContact() {
+    public Optional<DomainContact> getTechContact() {
         return Optional.ofNullable(techContact);
     }
 
