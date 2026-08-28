@@ -245,6 +245,11 @@ public class RepositoryDiscovery {
             JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
             long installationId = JsonAttribute.id.longFrom(installation);
 
+            if (gitHubEventFilter.isBlocked(installationId)) {
+                Log.infof("[onInstallationRepositoryChange] Installation %d is blocked; skipping.", installationId);
+                return;
+            }
+
             List<GHRepository> added = JsonAttribute.repositoriesAdded.repositoriesFrom(payload);
             List<GHRepository> removed = JsonAttribute.repositoriesRemoved.repositoriesFrom(payload);
 
