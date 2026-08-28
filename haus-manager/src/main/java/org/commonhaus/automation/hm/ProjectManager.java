@@ -402,8 +402,12 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
     private void doSyncCollaborators(ProjectConfigState state, ProjectConfig projectConfig) {
         CollaboratorSync teamAccess = projectConfig.collaboratorSync();
-        String sourceTeamName = teamAccess == null ? null : teamAccess.sourceTeam();
-        if (sourceTeamName == null || teamAccess == null) {
+        if (teamAccess == null) {
+            Log.debugf("[%s] %s: No team sync configuration", ME, state.taskGroup());
+            return;
+        }
+        String sourceTeamName = teamAccess.sourceTeam();
+        if (sourceTeamName == null) {
             Log.warnf("[%s] %s: No source team configured; skipping team sync", ME, state.taskGroup());
             return;
         }
