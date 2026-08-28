@@ -201,6 +201,14 @@ public class DataReaction {
     /** package private. See QueryHelper / QueryContext */
     static void addBotReaction(GitHubQueryContext qc, String subjectId,
             ReactionContent reaction) {
+        if (qc.isDryRun()) {
+            Log.infof("[%s] would add reaction %s to %s", qc.getLogId(), reaction.name(), subjectId);
+            return;
+        }
+        if (qc.hasErrors()) {
+            Log.debugf("[%s] addBotReaction to reactable %s; skipping modify (errors)", qc.getLogId(), subjectId);
+            return;
+        }
         Log.debugf("[%s] addBotReaction %s to reactable %s", qc.getLogId(), reaction.name(), subjectId);
 
         Map<String, Object> variables = new HashMap<>();
@@ -210,7 +218,7 @@ public class DataReaction {
 
         qc.checkRemoveNotFound();
         if (qc.hasErrors()) {
-            Log.errorf("[%s] removeBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
+            Log.errorf("[%s] addBotReaction encountered errors: %s", qc.getLogId(), qc.bundleExceptions());
             qc.clearErrors();
         }
     }
