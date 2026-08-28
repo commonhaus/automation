@@ -334,6 +334,15 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         });
     }
 
+    public boolean isBot(DataCommonComment comment) {
+        if (comment != null) {
+            if (comment.author != null) {
+                return isBot(comment.author.login);
+            }
+        }
+        return false;
+    }
+
     public boolean isBot(String login) {
         String botLogin = BOT_LOGIN.computeIfAbsent("" + getInstallationId(), k -> {
             Response response = execQuerySync(QUERY_BOT_LOGIN, new HashMap<>());
@@ -383,7 +392,7 @@ public class GitHubQueryContext extends GraphQLQueryContext {
             String commentId = BotComment.getCommentId(botCommentPattern, itemBody);
             comment = DataCommonComment.findComment(this, itemId, commentId);
             if (comment == null) {
-                List<DataCommonComment> botComments = getComments(itemId, (c) -> isBot(c.author.login));
+                List<DataCommonComment> botComments = getComments(itemId, (c) -> isBot(c));
                 if (botComments != null && !botComments.isEmpty()) {
                     comment = botComments.get(0);
                 }

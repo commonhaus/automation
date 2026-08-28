@@ -110,6 +110,9 @@ public class DataCommonComment extends DataCommonObject {
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
             JsonObject comments = JsonAttribute.comments.jsonObjectFrom(node);
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(comments);
+            if (nodes == null) {
+                return null;
+            }
             allComments.addAll(nodes.stream()
                     .map(JsonObject.class::cast)
                     .map(DataCommonComment::new)
