@@ -93,6 +93,16 @@ public abstract class BaseContextService implements ContextService {
         return logMailer.botErrorEmailAddress();
     }
 
+    public String[] getErrorAddresses(EmailNotification notifications, String[] otherAddresses) {
+        Set<String> addresses = new HashSet<>();
+        Collections.addAll(addresses, otherAddresses);
+        if (notifications != null) {
+            Collections.addAll(addresses, notifications.errors());
+        }
+        Collections.addAll(addresses, botErrorEmailAddress());
+        return addresses.toArray(new String[0]);
+    }
+
     @Override
     public String[] getErrorAddresses(EmailNotification notifications) {
         Set<String> addresses = new HashSet<>();

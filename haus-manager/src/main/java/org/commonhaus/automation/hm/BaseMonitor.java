@@ -57,18 +57,16 @@ public abstract class BaseMonitor extends ScheduledService {
         }
 
         var addresses = state.projectConfig().emailNotifications().errors();
+        var orgNotifications = getLatestOrgConfig().getConfig().emailNotifications();
 
         if (dryRun) {
             Log.infof("[%s] DRY RUN: would send email for project %s to %s. title: %s",
                     me(), state.repoFullName(), String.join(", ", addresses), title);
-            getCtx().sendEmail(me(), title, message,
-                    getLatestOrgConfig().getConfig().emailNotifications().dryRun());
+            getCtx().sendEmail(me(), title, message, orgNotifications.dryRun());
         } else {
-            // Send to project
-            getCtx().sendEmail(me(), title, message, addresses);
-            // CC to org errors
+            // Send to project / CC to org errors
             getCtx().sendEmail(me(), title, message,
-                    getCtx().getErrorAddresses(getLatestOrgConfig().getConfig().emailNotifications()));
+                    getCtx().getErrorAddresses(orgNotifications, addresses));
         }
     }
 
