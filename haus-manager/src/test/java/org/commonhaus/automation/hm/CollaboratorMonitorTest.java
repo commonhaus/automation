@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hm;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -132,7 +133,7 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
                 ignoreUsers);
         when(orgConfig.isCollaboratorMonitorEnabled()).thenReturn(enabled);
         when(orgConfig.collaboratorMonitor()).thenReturn(monitorConfig);
-        when(orgConfig.emailNotifications()).thenReturn(null);
+        when(orgConfig.emailNotifications()).thenReturn(emailNotification);
         return orgConfig;
     }
 
@@ -236,6 +237,7 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
                 any(),
                 anyBoolean(),
                 any());
+        assertThat(mailbox.getTotalMessagesSent()).isZero();
     }
 
     @Test

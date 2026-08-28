@@ -31,6 +31,24 @@ import io.quarkus.scheduler.Scheduled;
 public class CollaboratorMonitor extends ScheduledService {
     static final String ME = "👥-collab";
 
+    private enum GatherStatus {
+        READY,
+        DEFERRED
+    }
+
+    private record GatherResult(
+            GatherStatus status,
+            Set<String> collaborators) {
+
+        static GatherResult ready(Set<String> collaborators) {
+            return new GatherResult(GatherStatus.READY, collaborators);
+        }
+
+        static GatherResult deferred() {
+            return new GatherResult(GatherStatus.DEFERRED, Set.of());
+        }
+    }
+
     @Inject
     AppContextService ctx;
 
@@ -86,7 +104,13 @@ public class CollaboratorMonitor extends ScheduledService {
 
         // Gather all collaborators from project repositories
         try {
-            Set<String> allCollaboratorLogins = gatherProjectCollaborators(config);
+            GatherResult gatherResult = gatherProjectCollaborators();
+            if (gatherResult.status() == GatherStatus.DEFERRED) {
+                Log.debugf("[%s] reconcile: deferring collaborator synchronization until project bootstrap completes", ME);
+                return;
+            }
+
+            Set<String> allCollaboratorLogins = gatherResult.collaborators();
             if (allCollaboratorLogins.isEmpty()) {
                 Log.debugf("[%s] reconcile: no collaborators found in project repositories", ME);
                 return;
@@ -147,7 +171,7 @@ public class CollaboratorMonitor extends ScheduledService {
      * @param config Organization configuration
      * @return Set of unique collaborator logins across all project repositories
      */
-    private Set<String> gatherProjectCollaborators(OrganizationConfig config) {
+    private GatherResult gatherProjectCollaborators() {
         Set<String> allCollaborators = new HashSet<>();
 
         var qc = ctx.getHomeQueryContext();
@@ -162,8 +186,8 @@ public class CollaboratorMonitor extends ScheduledService {
                     ? null
                     : projectState.projectConfig();
             if (projectConfig == null) {
-                Log.errorf("Uninitialized project. Deferring collaborator gathering.");
-                throw new IllegalStateException("Uninitialized project state encountered.");
+                Log.debugf("[%s] gatherProjectCollaborators: project state is not initialized yet; deferring", ME);
+                return GatherResult.deferred();
             }
 
             var teamAccess = projectConfig.collaboratorSync();
@@ -188,6 +212,6 @@ public class CollaboratorMonitor extends ScheduledService {
         }
 
         Log.infof("[%s] gatherProjectCollaborators: total unique collaborators: %d", ME, allCollaborators.size());
-        return allCollaborators;
+        return GatherResult.ready(allCollaborators);
     }
 }
