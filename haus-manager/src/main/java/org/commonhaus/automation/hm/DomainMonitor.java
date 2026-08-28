@@ -316,8 +316,14 @@ public class DomainMonitor extends BaseMonitor {
 
         // Combine org-level monitoring dry-run with domain-specific dry-run
         boolean effectiveDryRun = latestOrgConfig.getConfig().isMonitoringDryRun() || domainConfig.isDryRun();
+        Set<String> invalidDomains = validateConfiguredTechContacts(repoFullName, domainConfig, emailNotification);
 
         for (ManagedDomain managedDomain : domainConfig.domains()) {
+            if (invalidDomains.contains(managedDomain.name())) {
+                Log.infof("[%s] Skipping contact update for %s due to invalid configured tech contact",
+                        ME, managedDomain.name());
+                continue;
+            }
             try {
                 syncDomainContacts(managedDomain, domainConfig, defaultContacts, effectiveDryRun, emailNotification);
             } catch (Exception e) {
@@ -350,11 +356,6 @@ public class DomainMonitor extends BaseMonitor {
         } catch (Exception e) {
             ctx.logAndSendEmail(ME,
                     "Error syncing contacts for domain: " + domainName, e, emailNotification.errors());
-            return;
-        }
-
-        if (!validateConfiguredTechContact(managedDomain, domainConfig, emailNotification)) {
-            Log.infof("[%s] Skipping contact update for %s due to invalid configured tech contact", ME, domainName);
             return;
         }
 
@@ -403,41 +404,76 @@ public class DomainMonitor extends BaseMonitor {
         }
     }
 
-    private boolean validateConfiguredTechContact(ManagedDomain managedDomain,
+    private Set<String> validateConfiguredTechContacts(String repoFullName,
             DomainManagementConfig domainConfig, EmailNotification emailNotification) {
-        if (managedDomain.techContact().isPresent()) {
-            return validateConfiguredTechContact(managedDomain.name(), managedDomain.techContact().get(),
-                    emailNotification);
+        Map<DomainContact, List<String>> domainsByContact = new HashMap<>();
+
+        for (ManagedDomain managedDomain : domainConfig.domains()) {
+            resolveConfiguredTechContact(managedDomain, domainConfig)
+                    .ifPresent(contact -> domainsByContact.computeIfAbsent(contact, k -> new ArrayList<>())
+                            .add(managedDomain.name()));
         }
-        if (domainConfig.getTechContact().isPresent()) {
-            return validateConfiguredTechContact(managedDomain.name(), domainConfig.getTechContact().get(),
-                    emailNotification);
+
+        List<InvalidTechContact> invalidContacts = new ArrayList<>();
+        Set<String> invalidDomains = new HashSet<>();
+
+        for (var entry : domainsByContact.entrySet()) {
+            var failure = entry.getKey().validationFailure();
+            if (failure.isEmpty()) {
+                continue;
+            }
+
+            List<String> domains = new ArrayList<>(entry.getValue());
+            domains.sort(String::compareTo);
+            invalidContacts.add(new InvalidTechContact(entry.getKey(), failure.get(), domains));
+            invalidDomains.addAll(domains);
         }
-        return true;
+
+        if (!invalidContacts.isEmpty()) {
+            invalidContacts.sort((left, right) -> left.domains().get(0).compareTo(right.domains().get(0)));
+            sendInvalidTechContactNotification(repoFullName, invalidContacts, emailNotification);
+        }
+
+        return invalidDomains;
     }
 
-    private boolean validateConfiguredTechContact(String domainName, DomainContact techContact,
-            EmailNotification emailNotification) {
-        var failure = techContact.validationFailure();
-        if (failure.isEmpty()) {
-            return true;
+    private Optional<DomainContact> resolveConfiguredTechContact(ManagedDomain managedDomain,
+            DomainManagementConfig domainConfig) {
+        if (managedDomain.techContact().isPresent()) {
+            return managedDomain.techContact();
         }
+        return domainConfig.getTechContact();
+    }
 
-        Log.infof("[%s] Invalid configured tech contact for %s; skipping update", ME, domainName);
-        ctx.sendEmail(ME,
-                "Invalid tech contact for " + domainName + ": " + failure.get().summary(),
-                """
-                        Domain contact update for %s was skipped.
+    private void sendInvalidTechContactNotification(String repoFullName,
+            List<InvalidTechContact> invalidContacts, EmailNotification emailNotification) {
+        String title = "Invalid tech contacts for " + getProjectDisplayName(repoFullName);
+
+        String message = invalidContacts.stream()
+                .map(invalid -> """
+                        Domains:
+                          - %s
 
                         Validation failure: %s
                         %s
 
                         Configured values:
                         %s
-                        """.formatted(domainName, failure.get().summary(), failure.get().details(),
-                        techContact.detailedDescription()),
-                emailNotification.errors());
-        return false;
+                        """.formatted(
+                        String.join("\n  - ", invalid.domains()),
+                        invalid.failure().summary(),
+                        invalid.failure().details(),
+                        invalid.contact().detailedDescription()))
+                .collect(Collectors.joining("\n---\n\n",
+                        "One or more domain contact updates were skipped due to invalid tech contact configuration.\n\n",
+                        ""));
+
+        for (var invalid : invalidContacts) {
+            Log.infof("[%s] Invalid configured tech contact for %s; skipping update",
+                    ME, String.join(", ", invalid.domains()));
+        }
+
+        ctx.sendEmail(ME, title, message, emailNotification.errors());
     }
 
     /**
@@ -772,6 +808,12 @@ public class DomainMonitor extends BaseMonitor {
                     && (orgManagedDirectly || projectsClaimingDomain.size() == 1)
                     && !hasOrgMismatch();
         }
+    }
+
+    record InvalidTechContact(
+            DomainContact contact,
+            DomainContact.ValidationFailure failure,
+            List<String> domains) {
     }
 
     @Override

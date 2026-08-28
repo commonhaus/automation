@@ -484,9 +484,63 @@ public class DomainMonitorTest extends HausManagerTestBase {
 
         var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
         assertThat(projectErrorEmails).hasSize(1);
-        assertThat(projectErrorEmails.get(0).getText()).contains("Invalid tech contact for " + domain + ": incomplete address");
+        assertThat(projectErrorEmails.get(0).getSubject()).isEqualTo("Invalid tech contacts for one");
+        assertThat(projectErrorEmails.get(0).getText()).contains("Validation failure: incomplete address");
+        assertThat(projectErrorEmails.get(0).getText()).contains(domain);
         assertThat(projectErrorEmails.get(0).getText()).contains("address1: 123 Broken St");
         assertThat(projectErrorEmails.get(0).getText()).contains("emailAddress: invalid@example.com");
+    }
+
+    @Test
+    void testInvalidProjectTechContactSendsOneEmailPerProject() throws IOException {
+        Log.info("TEST: Invalid project tech contact sends one consolidated error email");
+
+        String domain1 = "test-project1.org";
+        String domain2 = "docs.project1.org";
+        DomainRecord ncDomain1 = createDomainRecord(domain1);
+        DomainRecord ncDomain2 = createDomainRecord(domain2);
+        DomainContacts currentContacts = createTestContacts("Current", "Owner");
+
+        when(namecheapService.fetchAllDomains()).thenReturn(List.of(ncDomain1, ncDomain2));
+        when(namecheapService.getContacts(domain1)).thenReturn(Optional.of(currentContacts));
+        when(namecheapService.getContacts(domain2)).thenReturn(Optional.of(currentContacts));
+
+        mockOrgConfig.domainManagement().domains().clear();
+        mockOrgConfig.projects().assetsForProject("one").domainAssociation().clear();
+        mockOrgConfig.projects().assetsForProject("one").domainAssociation().add(domain1);
+        mockOrgConfig.projects().assetsForProject("one").domainAssociation().add(domain2);
+        mockOrgConfig.projects().assetsForProject("two").domainAssociation().clear();
+        mockProjectState2.projectConfig().domainManagement().domains().clear();
+
+        var invalidConfig = loadYamlResource(
+                "src/test/resources/cf-haus-manager-project1-invalid-tech.yml",
+                ProjectConfig.class);
+        invalidConfig.domainManagement().domains().add(new ManagedDomain(domain2));
+
+        mockProjectState1 = new ProjectConfigState(
+                ProjectManager.repoNametoTaskGroup(HOME_PROJECT_1.repoFullName()),
+                () -> {
+                },
+                HOME_PROJECT_1.repoFullName(),
+                HOME_PROJECT_1.installId(),
+                invalidConfig);
+        when(latestProjectConfig.getProjectConfigState(HOME_PROJECT_1.repoFullName()))
+                .thenReturn(mockProjectState1);
+        when(latestProjectConfig.getAllProjects())
+                .thenReturn(List.of(mockProjectState1, mockProjectState2));
+
+        domainMonitor.refreshDomains(true, null);
+        waitForQueue();
+
+        verify(namecheapService, never()).setContacts(eq(domain1), any());
+        verify(namecheapService, never()).setContacts(eq(domain2), any());
+
+        var projectErrorEmails = mailbox.getMailsSentTo("errors@project1.dev");
+        assertThat(projectErrorEmails).hasSize(1);
+        assertThat(projectErrorEmails.get(0).getSubject()).contains("Invalid tech contact");
+        assertThat(projectErrorEmails.get(0).getText()).contains("incomplete address");
+        assertThat(projectErrorEmails.get(0).getText()).contains(domain1);
+        assertThat(projectErrorEmails.get(0).getText()).contains(domain2);
     }
 
     // ========== Helper Methods ==========
