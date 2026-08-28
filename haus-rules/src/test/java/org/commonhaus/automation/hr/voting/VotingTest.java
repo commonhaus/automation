@@ -702,6 +702,107 @@ public class VotingTest extends HausRulesTestBase {
                 "outsider");
     }
 
+    @Test
+    public void testManualResultsCommentSecondManager() throws Exception {
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-voting-multi-managers.yml");
+                    setupGivenMocks(mocks, TEST_ORG);
+
+                    GHUser user1 = mockUser("user1");
+                    GHUser user2 = mockUser("user2");
+                    GHUser user3 = mockUser("user3");
+                    GHUser ebullient = mockUser("ebullient");
+
+                    // ebullient is NOT in test-quorum-default
+                    mockTeams(hausMocks, user1, user2, user3);
+                    // ebullient IS in test-quorum-seconds (override the default mock)
+                    mockTeam("commonhaus/test-quorum-seconds", Set.of(ebullient));
+
+                    // pre-cache bot comment
+                    setupBotComment(discussionId);
+
+                    setupGraphQLProcessing(mocks,
+                            // initialize VoteProcessor + VoteInformation
+                            QueryResponse.DISCUSSION_VALID,
+                            // Count votes:
+                            QueryResponse.MANUAL_RESULT_COMMENT,
+                            QueryResponse.NO_REACTIONS,
+                            // Update results
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION_COMMENT,
+                            // Update discussion with comment reference
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION,
+                            // Add done, remove open
+                            QueryResponse.MUTATE_REMOVE_LABEL_OPEN,
+                            QueryResponse.MUTATE_ADD_LABEL_DONE);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCommentCreated.VoteResult.json")
+                .event(GHEvent.DISCUSSION_COMMENT)
+                .then().github(mocks -> {
+                    for (String cue : graphQueries) {
+                        verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                                .executeSync(contains(cue), anyMap());
+                    }
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
+        BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(comment.getBody()).contains(
+                "This vote has been [closed]",
+                "<!-- vote::data");
+    }
+
+    @Test
+    public void testIgnoredManualResultsCommentSecondManager() throws Exception {
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-voting-multi-managers.yml");
+                    setupGivenMocks(mocks, TEST_ORG);
+
+                    GHUser user1 = mockUser("user1");
+                    GHUser user2 = mockUser("user2");
+                    GHUser user3 = mockUser("user3");
+
+                    // ebullient absent from both teams
+                    mockTeams(hausMocks, user1, user2, user3);
+
+                    // pre-cache bot comment
+                    setupBotComment(discussionId);
+
+                    setupGraphQLProcessing(mocks,
+                            // initialize VoteProcessor + VoteInformation
+                            QueryResponse.DISCUSSION_VALID,
+                            // Count votes:
+                            QueryResponse.NO_REACTIONS,
+                            // Update results
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION_COMMENT,
+                            // Update discussion with comment reference
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCommentCreated.VoteResult.json")
+                .event(GHEvent.DISCUSSION_COMMENT)
+                .then().github(mocks -> {
+                    for (String cue : graphQueries) {
+                        verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                                .executeSync(contains(cue), anyMap());
+                    }
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
+        BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(comment.getBody()).contains(
+                "<!-- vote::data");
+        assertThat(comment.getBody()).doesNotContain("This vote has been [closed]");
+    }
+
     enum QueryResponse implements MockResponse {
         DISCUSSION_VALID("query($id: ID!) {",
                 "src/test/resources/github/queryDiscussion.methodMarthas.json"),

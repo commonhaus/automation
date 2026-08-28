@@ -222,11 +222,16 @@ public class GitHubTeamService {
             if (g.startsWith("@")) {
                 TeamList team = getTeamList(qc, g.substring(1));
                 if (team.isEmpty()) {
-                    return false;
+                    continue;
                 }
-                return team.members.stream().anyMatch(m -> m.login.equals(login));
+                if (team.members.stream().anyMatch(m -> m.login.equals(login))) {
+                    return true;
+                }
+                continue;
             }
-            return g.equals(login);
+            if (g.equals(login)) {
+                return true;
+            }
         }
         return false;
     }

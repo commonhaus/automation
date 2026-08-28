@@ -1,0 +1,23 @@
+voting:
+  managers:
+    - "@commonhaus/test-quorum-default"
+    - "@commonhaus/test-quorum-seconds"
+  error_email_address:
+    - test@commonhaus.org
+  alternates:
+    - source: CONTACTS.yaml
+      repo: commonhaus/foundation
+      mapping:
+        - field: project 
+          primary: 
+            data: egc
+            team: commonhaus/test-quorum-default
+          secondary: 
+            data: egc-second
+            team: commonhaus/test-quorum-seconds
+  vote_threshold:
+    commonhaus/cf-egc: twothirds
+
+  status:
+    badge: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.svg
+    page: https://www.commonhaus.org/votes/{{repoName}}/{{number}}.html
