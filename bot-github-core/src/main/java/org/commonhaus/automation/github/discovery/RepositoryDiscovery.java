@@ -176,6 +176,11 @@ public class RepositoryDiscovery {
             }
 
             long installationId = event.getInstallationId();
+            if (gitHubEventFilter.isBlocked(installationId)) {
+                Log.infof("[connectionEvent] Installation %d is blocked.", installationId);
+                return;
+            }
+
             GitHub github = gitHubService.getInstallationClient(installationId);
             DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(installationId);
 
