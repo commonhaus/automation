@@ -6,14 +6,12 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.EventType;
 import org.commonhaus.automation.github.context.GitHubTeamService;
@@ -26,11 +24,8 @@ import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.hk.UserLoginVerifier.LoginChangeEvent;
 import org.commonhaus.automation.hk.config.AdminBotConfig;
-import org.commonhaus.automation.hk.config.AliasManagementConfig;
-import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.config.ProjectAliasMapping;
 import org.commonhaus.automation.hk.config.ProjectAliasMapping.UserAliasList;
-import org.commonhaus.automation.hk.config.ProjectSourceConfig;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
@@ -73,14 +68,9 @@ public class ProjectAliasManager extends ScheduledService {
 
     // flat map of task group to its current state
     final Map<String, AliasConfigState> taskGroupToState = new ConcurrentHashMap<>();
-    final AtomicReference<Map<String, ProjectSourceConfig>> knownProjectDomains = new AtomicReference<>();
 
     void startup(@Observes @Priority(value = RdePriority.APP_DISCOVERY) StartupEvent startup) {
         RouteSupplier.registerSupplier("Project aliases refreshed", () -> lastRun);
-        hkConfig.notifyOnUpdate(ME, () -> {
-            Log.infof("HausKeeper project aliases config updated: %s", hkConfig.getProjectAliasesConfig());
-            updateDomainMap();
-        });
     }
 
     /**
@@ -162,12 +152,6 @@ public class ProjectAliasManager extends ScheduledService {
     }
 
     protected void readProjectConfig(String taskGroup, ScopedQueryContext qc, boolean queueReconciliation) {
-        AliasManagementConfig aliasMgmtConfig = hkConfig.getProjectAliasesConfig();
-        if (aliasMgmtConfig.isDisabled()) {
-            Log.debugf("%s: project aliases sync disabled", taskGroup);
-            return;
-        }
-
         // The repository containing the (added/modified) file must be present in the query context
         String repoFullName = taskGroupToRepo(taskGroup);
         GHRepository repo = qc.getRepository(repoFullName);
@@ -176,14 +160,7 @@ public class ProjectAliasManager extends ScheduledService {
             return;
         }
 
-        String projectName = aliasMgmtConfig.toProjectName(repoFullName);
-        ProjectSourceConfig projectConfig = getCentralProjectConfig(projectName);
-        if (projectConfig == null) {
-            Log.debugf("%s readProjectConfig: Repository %s does not map to a known project (%s)", taskGroup,
-                    repoFullName, projectName);
-            taskGroupToState.remove(taskGroup);
-            return;
-        }
+        String projectName = toProjectName(repoFullName);
 
         GHContent content = qc.readSourceFile(repo, ProjectAliasMapping.CONFIG_FILE);
         if (content == null || qc.hasErrors()) {
@@ -229,13 +206,6 @@ public class ProjectAliasManager extends ScheduledService {
         }
 
         Log.debugf("%s: aliases sync; %s", taskGroup, state.projectConfig());
-
-        ProjectSourceConfig centralProjectConfig = getCentralProjectConfig(state.projectName());
-        if (centralProjectConfig == null) {
-            Log.debugf("%s: project config not found for %s", taskGroup, state.projectName());
-            taskGroupToState.remove(taskGroup);
-            return;
-        }
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
         ProjectAliasMapping projectAliasConfig = state.projectConfig();
@@ -321,12 +291,6 @@ public class ProjectAliasManager extends ScheduledService {
     }
 
     void notifyUserProjects(@Observes LoginChangeEvent loginChangeEvent) {
-        AliasManagementConfig aliasMgmtConfig = hkConfig.getProjectAliasesConfig();
-        if (aliasMgmtConfig.isDisabled()) {
-            Log.debugf("[%s] %s: project aliases sync disabled", ME, loginChangeEvent);
-            return;
-        }
-
         // This event is fired when a user changes their login
         // Any projects that the user is a member of should be notified
         // so configurations can be modified.
@@ -334,7 +298,7 @@ public class ProjectAliasManager extends ScheduledService {
             for (var entry : taskGroupToState.entrySet()) {
                 String taskGroup = entry.getKey();
                 String repoFullName = taskGroupToRepo(taskGroup);
-                String projectName = aliasMgmtConfig.toProjectName(repoFullName);
+                String projectName = toProjectName(repoFullName);
                 if (projectName.equals(project)) {
                     var state = entry.getValue();
                     if (state == EMPTY) {
@@ -376,54 +340,13 @@ public class ProjectAliasManager extends ScheduledService {
         qc.createItem(EventType.issue, title, message, null);
     }
 
-    private ProjectSourceConfig getCentralProjectConfig(String projectName) {
-        Map<String, ProjectSourceConfig> map = knownProjectDomains.get();
-        if (map == null) {
-            map = updateDomainMap();
+    private String toProjectName(String repoFullName) {
+        int slash = repoFullName.lastIndexOf('/');
+        String repoName = slash >= 0 ? repoFullName.substring(slash + 1) : repoFullName;
+        if (repoName.startsWith("project-")) {
+            repoName = repoName.substring("project-".length());
         }
-        ProjectSourceConfig config = map.get(projectName);
-        if (config == null) {
-            Log.warnf("%s getCentralProjectConfig: no project list found for %s", ME, projectName);
-        }
-        return config;
-    }
-
-    private Map<String, ProjectSourceConfig> updateDomainMap() {
-        Map<String, ProjectSourceConfig> map = Map.of();
-        knownProjectDomains.set(map); // ensure non-null
-
-        AliasManagementConfig aliasMgmtConfig = hkConfig.getProjectAliasesConfig();
-        if (aliasMgmtConfig.isDisabled()) {
-            return map;
-        }
-        RepoSource projectList = aliasMgmtConfig.projectList();
-        String repoFullName = projectList.repository();
-        ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
-        GHRepository repo = qc == null ? null : qc.getRepository(repoFullName);
-        if (qc == null || repo == null) {
-            Log.warnf("[%s] updateDomainMap: no query context for %s", ME, projectList);
-            return map;
-        }
-        GHContent content = qc.readSourceFile(repo, projectList.filePath());
-        if (content == null || qc.hasErrors()) {
-            Log.debugf("[%s] updateDomainMap: no %s in %s", ME, HausKeeperConfig.PATH, repoFullName);
-            return map;
-        }
-        map = qc.readYamlContent(content, ProjectSourceConfig.TYPE_REF);
-        if (map == null || qc.hasErrors()) {
-            ctx.sendEmail(ME, "haus-keeper project aliases configuration could not be read", """
-                    Source file %s could not be read (or parsed) from %s.
-
-                    %s
-                    """.formatted(projectList.filePath(),
-                    projectList.repository(),
-                    qc.bundleExceptions()),
-                    qc.getErrorAddresses());
-            return Map.of();
-        }
-        // All good. Project list exists, and we parsed it correctly.
-        knownProjectDomains.set(map);
-        return map;
+        return repoName;
     }
 
     private String repoToTaskGroup(String repoFullName) {

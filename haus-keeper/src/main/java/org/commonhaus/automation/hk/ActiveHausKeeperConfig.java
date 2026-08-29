@@ -15,7 +15,6 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
-import org.commonhaus.automation.hk.config.AliasManagementConfig;
 import org.commonhaus.automation.hk.config.HausKeeperConfig;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
@@ -44,11 +43,6 @@ public class ActiveHausKeeperConfig {
 
     public boolean isReady() {
         return currentConfig.get().isPresent();
-    }
-
-    public AliasManagementConfig getProjectAliasesConfig() {
-        return currentConfig.get().map(HausKeeperConfig::projectAliases)
-                .orElse(AliasManagementConfig.DISABLED);
     }
 
     public UserManagementConfig getConfig() {

@@ -24,12 +24,6 @@ userManagement:
     sponsor: SPONSOR
     contributor: CONTRIBUTOR
 
-projectAliases:
-  projectList:
-    repository: commonhaus/foundation
-    filePath: PROJECTS.yaml
-  repoPrefix: project-
-
 ## Email addresses to notify of errors and dry-run results
 emailNotifications:
   errors:
