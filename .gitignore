@@ -46,6 +46,7 @@ logs
 
 # MCP experiments
 .claude/settings.local.json
+.claudeignore
 .bob
 .bobignore
 *.local.md
