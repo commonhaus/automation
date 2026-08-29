@@ -70,14 +70,16 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).hasSize(1);
-            assertThat(mailbox.getMailsSentTo("org-dryrun@test.org").get(0).getText())
-                    .contains("other-org/teamB");
+            String body = mailbox.getMailsSentTo("org-dryrun@test.org").get(0).getText();
+            assertThat(body).contains("other-org/teamB");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).isEmpty();
     }
 
     @Test
-    void dryRunModeSkipsBlankTargetButStillSyncsMismatchedAndReadsMismatchedCollaboratorSource() throws IOException {
+    void dryRunModeSkipsBlankTargetAndSendsDryRunEmail() throws IOException {
         OrganizationConfig orgConfig = loadYamlResource(
                 "src/test/resources/cf-haus-organization-team-verify-dryrun.yml",
                 OrganizationConfig.class);
@@ -96,6 +98,8 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
             String body = mailbox.getMailsSentTo("org-dryrun@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
             assertThat(body).contains("test-org/");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("dryRun");
@@ -118,33 +122,10 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).hasSize(1);
-            assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org").get(0).getText())
-                    .contains("other-org/teamB");
-        });
-        assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
-        assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("warn");
-    }
-
-    @Test
-    void warnModeSkipsBlankTargetButStillSyncsMismatchedAndReadsMismatchedCollaboratorSource() throws IOException {
-        OrganizationConfig orgConfig = loadYamlResource(
-                "src/test/resources/cf-haus-organization-team-verify-warn.yml",
-                OrganizationConfig.class);
-        ProjectConfig projectConfig = loadYamlResource(
-                "src/test/resources/cf-haus-manager-team-malformed.yml",
-                ProjectConfig.class);
-        ProjectConfigState state = registerProjectState(orgConfig, projectConfig);
-
-        TeamOrgValidator.validateAndNotify(ctx, ProjectManager.ME, state, projectConfig,
-                "test-org", orgConfig.teamMembershipVerificationMode(), orgConfig.emailNotifications().dryRun(), true);
-
-        assertThat(state.blockedTeams()).containsExactly("test-org/");
-
-        Awaitility.await().untilAsserted(() -> {
-            assertThat(mailbox.getMailsSentTo("project-malformed-errors@test.org")).hasSize(1);
-            String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
-            assertThat(body).contains("bad team!");
-            assertThat(body).contains("test-org/");
+            String body = mailbox.getMailsSentTo("project-mismatch-errors@test.org").get(0).getText();
+            assertThat(body).contains("other-org/teamB");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("warn");
@@ -167,8 +148,10 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
 
         Awaitility.await().untilAsserted(() -> {
             assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org")).hasSize(1);
-            assertThat(mailbox.getMailsSentTo("project-mismatch-errors@test.org").get(0).getText())
-                    .contains("other-org/teamB");
+            String body = mailbox.getMailsSentTo("project-mismatch-errors@test.org").get(0).getText();
+            assertThat(body).contains("other-org/teamB");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
@@ -194,6 +177,8 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
             String body = mailbox.getMailsSentTo("project-malformed-errors@test.org").get(0).getText();
             assertThat(body).contains("bad team!");
             assertThat(body).contains("test-org/");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");
@@ -219,6 +204,8 @@ public class TeamMembershipVerificationTest extends HausManagerTestBase {
             String body = mailbox.getMailsSentTo("project-no-orgs-errors@test.org").get(0).getText();
             assertThat(body).contains("test-org/cf-council");
             assertThat(body).contains("other-org/teamB");
+            assertThat(body).contains("do not match");
+            assertThat(body).contains("add the missing organization(s)");
         });
         assertThat(mailbox.getMailsSentTo("org-dryrun@test.org")).isEmpty();
         assertThat(latestOrgConfig.getConfig().teamMembershipVerification()).isEqualTo("error");

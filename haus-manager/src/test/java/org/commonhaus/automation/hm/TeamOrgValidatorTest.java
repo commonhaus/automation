@@ -72,7 +72,7 @@ public class TeamOrgValidatorTest {
     void orgMismatchFixtureProducesExpectedPushTargetAndSourceTeamViolations() throws IOException {
         ProjectConfig projectConfig = loadProjectConfig("src/test/resources/cf-haus-manager-team-org-mismatch.yml");
 
-        Result result = TeamOrgValidator.validate(projectConfig, "test-org");
+        Result result = TeamOrgValidator.validate(projectConfig, "test-org", "test-org/project-one");
 
         assertThat(result.isEmpty()).isFalse();
         assertThat(result.pushTargetViolations()).extracting(Violation::qualifiedTeamName)
@@ -89,7 +89,7 @@ public class TeamOrgValidatorTest {
     void malformedFixtureProducesBlankAndMismatchPushTargetViolations() throws IOException {
         ProjectConfig projectConfig = loadProjectConfig("src/test/resources/cf-haus-manager-team-malformed.yml");
 
-        Result result = TeamOrgValidator.validate(projectConfig, "test-org");
+        Result result = TeamOrgValidator.validate(projectConfig, "test-org", "test-org/project-one");
 
         assertThat(result.pushTargetViolations()).extracting(Violation::qualifiedTeamName)
                 .containsExactlyInAnyOrder("test-org/", "test-org/", "other-org/bad team!");
@@ -103,11 +103,74 @@ public class TeamOrgValidatorTest {
     void noOrgsFixtureTreatsEveryReferencedTeamAsMismatch() throws IOException {
         ProjectConfig projectConfig = loadProjectConfig("src/test/resources/cf-haus-manager-team-no-orgs.yml");
 
-        Result result = TeamOrgValidator.validate(projectConfig, "test-org");
+        Result result = TeamOrgValidator.validate(projectConfig, "test-org", "test-org/project-one");
 
         assertThat(result.pushTargetViolations()).extracting(Violation::qualifiedTeamName)
                 .containsExactlyInAnyOrder("test-org/cf-council", "other-org/teamB");
         assertThat(result.sourceTeamViolations()).extracting(Violation::qualifiedTeamName)
                 .containsExactly("other-org/teamA");
+    }
+
+    @Test
+    void homeOrgTeamContainingSlugIsExempt() {
+        assertThat(TeamOrgValidator.validate("commonhaus/hibernate", List.of(),
+                "commonhaus", "commonhaus/project-hibernate")).isNull();
+    }
+
+    @Test
+    void homeOrgTeamWithSlugSuffixIsExempt() {
+        assertThat(TeamOrgValidator.validate("commonhaus/hibernate-signatories", List.of(),
+                "commonhaus", "commonhaus/project-hibernate")).isNull();
+    }
+
+    @Test
+    void homeOrgTeamSlugMatchIsCaseInsensitive() {
+        assertThat(TeamOrgValidator.validate("commonhaus/Hibernate-Devs", List.of(),
+                "commonhaus", "commonhaus/project-hibernate")).isNull();
+    }
+
+    @Test
+    void homeOrgTeamWithUnrelatedNameIsNotExempt() {
+        Violation v = TeamOrgValidator.validate("commonhaus/unrelated-team", List.of(),
+                "commonhaus", "commonhaus/project-hibernate");
+        assertThat(v).isNotNull();
+        assertThat(v.kind()).isEqualTo(Kind.ORG_MISMATCH);
+    }
+
+    @Test
+    void otherOrgTeamIsNotExemptEvenIfNameContainsSlug() {
+        Violation v = TeamOrgValidator.validate("other-org/hibernate", List.of(),
+                "commonhaus", "commonhaus/project-hibernate");
+        assertThat(v).isNotNull();
+        assertThat(v.kind()).isEqualTo(Kind.ORG_MISMATCH);
+    }
+
+    @Test
+    void slugDerivedFromRepoWithoutProjectPrefix() {
+        assertThat(TeamOrgValidator.validate("test-org/one-contributors", List.of(),
+                "test-org", "test-org/project-one")).isNull();
+    }
+
+    @Test
+    void nonMatchingTeamForRepoWithoutProjectPrefix() {
+        Violation v = TeamOrgValidator.validate("test-org/two-contributors", List.of(),
+                "test-org", "test-org/project-one");
+        assertThat(v).isNotNull();
+        assertThat(v.kind()).isEqualTo(Kind.ORG_MISMATCH);
+    }
+
+    @Test
+    void malformedIsNeverExempt_blank() {
+        Violation v = TeamOrgValidator.validate("", List.of(), "commonhaus", "commonhaus/project-hibernate");
+        assertThat(v).isNotNull();
+        assertThat(v.kind()).isEqualTo(Kind.MALFORMED);
+    }
+
+    @Test
+    void malformedIsNeverExempt_emptyTeamSide() {
+        Violation v = TeamOrgValidator.validate("commonhaus/", List.of(),
+                "commonhaus", "commonhaus/project-hibernate");
+        assertThat(v).isNotNull();
+        assertThat(v.kind()).isEqualTo(Kind.MALFORMED);
     }
 }

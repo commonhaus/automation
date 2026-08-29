@@ -2,7 +2,6 @@ package org.commonhaus.automation.hm;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
@@ -11,6 +10,9 @@ import org.commonhaus.automation.hm.config.OrganizationConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.commonhaus.automation.hm.config.PushToTeams;
+
+import io.quarkus.qute.CheckedTemplate;
+import io.quarkus.qute.TemplateInstance;
 
 /**
  * Validates a project's push-target teams and collaboratorSync.sourceTeam against its
@@ -46,6 +48,15 @@ public class TeamOrgValidator {
         }
     }
 
+    @CheckedTemplate
+    static class Templates {
+        public static native TemplateInstance teamOrgMismatch(
+                String repoFullName,
+                List<String> githubOrganizations,
+                List<Violation> violations,
+                boolean hasOrgMismatch);
+    }
+
     private TeamOrgValidator() {
     }
 
@@ -67,7 +78,7 @@ public class TeamOrgValidator {
     public static void validateAndNotify(ContextService ctx, String logId, ProjectConfigState state,
             ProjectConfig projectConfig, String homeOrg, OrganizationConfig.TeamMembershipVerification mode,
             String[] dryRunAddresses, boolean sendEmail) {
-        Result result = validate(projectConfig, homeOrg);
+        Result result = validate(projectConfig, homeOrg, state.repoFullName());
         if (result.isEmpty()) {
             return;
         }
@@ -83,14 +94,13 @@ public class TeamOrgValidator {
         }
 
         String title = "[%s] Team/organization mismatch detected".formatted(logId);
-        String body = """
-                The following team references in %s do not match the project's declared githubOrganizations (%s):
-
-                %s
-                """.formatted(state.repoFullName(), projectConfig.githubOrganizations(),
-                result.all().stream()
-                        .map(v -> "- %s (%s)".formatted(v.qualifiedTeamName(), v.kind()))
-                        .collect(Collectors.joining("\n")));
+        boolean hasOrgMismatch = result.all().stream()
+                .anyMatch(v -> v.kind() == Kind.ORG_MISMATCH);
+        String body = Templates.teamOrgMismatch(
+                state.repoFullName(),
+                projectConfig.githubOrganizations(),
+                result.all(),
+                hasOrgMismatch).render();
 
         String[] addresses = mode == OrganizationConfig.TeamMembershipVerification.DRY_RUN
                 ? dryRunAddresses
@@ -100,13 +110,15 @@ public class TeamOrgValidator {
 
     /**
      * Validate every push-target team and the collaboratorSync sourceTeam declared by a
-     * project's config against its declared githubOrganizations.
+     * project's config against its declared githubOrganizations, applying the home-org /
+     * project-slug exemption.
      *
      * @param projectConfig the project configuration to validate
      * @param homeOrg the default/home organization used to qualify unqualified team names
+     * @param repoFullName the project's full repo name (e.g. {@code "commonhaus/project-hibernate"})
      * @return a {@link Result} with any violations found (empty if none)
      */
-    public static Result validate(ProjectConfig projectConfig, String homeOrg) {
+    public static Result validate(ProjectConfig projectConfig, String homeOrg, String repoFullName) {
         List<String> githubOrganizations = projectConfig.githubOrganizations();
         List<Violation> pushTargetViolations = new ArrayList<>();
 
@@ -117,7 +129,7 @@ public class TeamOrgValidator {
             for (PushToTeams pushToTeams : mapping.pushMembers().values()) {
                 for (String teamName : pushToTeams.teams()) {
                     String qualifiedTeamName = OrganizationConfig.toFullTeamName(homeOrg, teamName);
-                    Violation violation = validate(qualifiedTeamName, githubOrganizations);
+                    Violation violation = validate(qualifiedTeamName, githubOrganizations, homeOrg, repoFullName);
                     if (violation != null) {
                         pushTargetViolations.add(violation);
                     }
@@ -129,13 +141,75 @@ public class TeamOrgValidator {
         CollaboratorSync collaboratorSync = projectConfig.collaboratorSync();
         if (collaboratorSync != null && collaboratorSync.sourceTeam() != null) {
             String qualifiedSourceTeam = OrganizationConfig.toFullTeamName(homeOrg, collaboratorSync.sourceTeam());
-            Violation violation = validate(qualifiedSourceTeam, githubOrganizations);
+            Violation violation = validate(qualifiedSourceTeam, githubOrganizations, homeOrg, repoFullName);
             if (violation != null) {
                 sourceTeamViolations.add(violation);
             }
         }
 
         return new Result(pushTargetViolations, sourceTeamViolations);
+    }
+
+    /**
+     * Validate a single already-qualified team name against a project's declared organizations,
+     * applying the home-org / project-slug exemption.
+     *
+     * <p>
+     * A team is exempt from {@link Kind#ORG_MISMATCH} (returns {@code null}) when:
+     * <ul>
+     * <li>the team reference is well-formed,</li>
+     * <li>the org portion equals {@code homeOrg} (case-insensitive), and</li>
+     * <li>the team-name portion contains the project slug derived from {@code repoFullName}
+     * (case-insensitive substring match).</li>
+     * </ul>
+     * The project slug is the repo-name segment after the last {@code /}, with a leading
+     * {@code "project-"} prefix stripped if present (e.g. {@code "org/project-hibernate"} → {@code "hibernate"}).
+     *
+     * @param qualifiedTeamName team name, already run through {@link OrganizationConfig#toFullTeamName}
+     * @param githubOrganizations the project's declared {@code githubOrganizations} entries
+     * @param homeOrg the home organization (e.g. {@code "commonhaus"})
+     * @param repoFullName the project's full repo name (e.g. {@code "commonhaus/project-hibernate"})
+     * @return a {@link Violation} if invalid, or {@code null} if the team passes validation
+     */
+    public static Violation validate(String qualifiedTeamName, List<String> githubOrganizations,
+            String homeOrg, String repoFullName) {
+        if (qualifiedTeamName == null || qualifiedTeamName.isBlank()) {
+            return new Violation(qualifiedTeamName, Kind.MALFORMED);
+        }
+
+        int slash = qualifiedTeamName.indexOf('/');
+        String org = slash < 0 ? "" : qualifiedTeamName.substring(0, slash);
+        String team = slash < 0 ? "" : qualifiedTeamName.substring(slash + 1);
+        if (org.isBlank() || team.isBlank()) {
+            return new Violation(qualifiedTeamName, Kind.MALFORMED);
+        }
+
+        // Home-org / project-slug exemption: a team in the home org whose name contains
+        // the project slug (derived from repoFullName) is allowed without being listed
+        // in githubOrganizations.
+        if (org.equalsIgnoreCase(homeOrg)) {
+            String slug = projectSlug(repoFullName);
+            if (!slug.isBlank() && team.toLowerCase().contains(slug.toLowerCase())) {
+                return null;
+            }
+        }
+
+        boolean matches = githubOrganizations.stream()
+                .anyMatch(declared -> org.equals(OrganizationConfig.normalizeOrg(declared)));
+        return matches ? null : new Violation(qualifiedTeamName, Kind.ORG_MISMATCH);
+    }
+
+    /**
+     * Derive the project slug from a full repo name by extracting the repo-name segment
+     * (after the last {@code /}) and stripping a leading {@code "project-"} prefix if present.
+     */
+    static String projectSlug(String repoFullName) {
+        int slash = repoFullName.lastIndexOf('/');
+        String repoName = slash >= 0 ? repoFullName.substring(slash + 1) : repoFullName;
+        if (repoName.startsWith("project-")) {
+            repoName = repoName.substring("project-".length());
+        }
+        return repoName;
     }
 
     /**

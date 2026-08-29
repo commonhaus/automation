@@ -1,0 +1,10 @@
+The following team references in {repoFullName} do not match the project's declared githubOrganizations ({githubOrganizations}):
+
+{#for v in violations}
+- {v.qualifiedTeamName} ({v.kind})
+{/for}
+{#if hasOrgMismatch}
+
+To resolve ORG_MISMATCH violations, add the missing organization(s) to the
+`githubOrganizations` list in the project's `cf-haus-manager.yml`.
+{/if}
