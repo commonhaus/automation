@@ -187,7 +187,7 @@ class GitHubEventFilterTest {
     @Test
     void blockedIdReturnsTrueFromIsBlockedLong() {
         filter.botConfig = configWithDir(testResourcesDir());
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(111111111L)).isTrue();
         assertThat(filter.isBlocked(222222222L)).isTrue();
@@ -196,7 +196,7 @@ class GitHubEventFilterTest {
     @Test
     void nonBlockedIdReturnsFalseFromIsBlockedLong() {
         filter.botConfig = configWithDir(testResourcesDir());
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(999999999L)).isFalse();
     }
@@ -204,7 +204,7 @@ class GitHubEventFilterTest {
     @Test
     void isBlockedEventReturnsTrueWhenInstallationIdMatches() {
         filter.botConfig = configWithDir(testResourcesDir());
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(eventWithInstallation(111111111L))).isTrue();
     }
@@ -212,7 +212,7 @@ class GitHubEventFilterTest {
     @Test
     void isBlockedEventReturnsFalseWhenInstallationIdDoesNotMatch() {
         filter.botConfig = configWithDir(testResourcesDir());
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(eventWithInstallation(999999999L))).isFalse();
     }
@@ -220,7 +220,7 @@ class GitHubEventFilterTest {
     @Test
     void isBlockedEventReturnsFalseWhenInstallationIdIsNull() {
         filter.botConfig = configWithDir(testResourcesDir());
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(eventWithInstallation(null))).isFalse();
     }
@@ -228,7 +228,7 @@ class GitHubEventFilterTest {
     @Test
     void absentFileInitializesWithEmptyBlocklist() {
         filter.botConfig = configWithDir("/nonexistent/path/that/does/not/exist");
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(111111111L)).isFalse();
         assertThat(filter.isBlocked(eventWithInstallation(111111111L))).isFalse();
@@ -237,7 +237,7 @@ class GitHubEventFilterTest {
     @Test
     void noStateDirectoryInitializesWithEmptyBlocklist() {
         filter.botConfig = configWithDir(null);
-        filter.init(null);
+        filter.init();
 
         assertThat(filter.isBlocked(111111111L)).isFalse();
     }
@@ -250,7 +250,7 @@ class GitHubEventFilterTest {
         java.nio.file.Files.writeString(badFile, "not: valid: yaml: [structure: for: map\n");
 
         filter.botConfig = configWithDir(tempDir.toString());
-        filter.init(null); // must not throw
+        filter.init(); // must not throw
 
         assertThat(filter.isBlocked(111111111L)).isFalse();
         assertThat(filter.isBlocked(eventWithInstallation(111111111L))).isFalse();

@@ -6,9 +6,9 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.config.BotConfig;
@@ -17,9 +17,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkiverse.githubapp.GitHubEvent;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.StartupEvent;
 
-@ApplicationScoped
+@Singleton
 public class GitHubEventFilter {
 
     private static final String FILENAME = "ignored-installations.yaml";
@@ -31,7 +30,8 @@ public class GitHubEventFilter {
 
     private Set<Long> blocklist = Set.of();
 
-    void init(@Observes StartupEvent event) {
+    @PostConstruct
+    void init() {
         String directory = botConfig.queue().stateDirectory().orElse(null);
         if (directory == null) {
             return;
