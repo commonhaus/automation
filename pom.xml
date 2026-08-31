@@ -48,7 +48,7 @@
         <htmlunit.version>3.0.0</htmlunit.version>
         <impsort-plugin.version>1.13.0</impsort-plugin.version>
         <jandex-plugin.version>3.6.0</jandex-plugin.version>
-        <jar-plugin.version>3.5.0</jar-plugin.version>
+        <jar-plugin.version>3.5.1</jar-plugin.version>
         <license-plugin.version>2.7.1</license-plugin.version>
         <victools.version>4.35.0</victools.version>
         <maven.compiler.release>17</maven.compiler.release>
