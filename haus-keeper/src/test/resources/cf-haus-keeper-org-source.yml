@@ -1,0 +1,11 @@
+userManagement:
+  defaultAliasDomain: example.com
+  attestations:
+    repository: commonhaus/foundation
+    filePath: ATTESTATIONS.yaml
+  organizationConfig:
+    repository: commonhaus/foundation
+    filePath: cf-haus-organization.yml
+emailNotifications:
+  errors:
+    - repo-errors@example.com

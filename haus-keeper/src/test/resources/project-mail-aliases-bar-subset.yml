@@ -1,0 +1,11 @@
+domains:
+  - bar.org
+
+userMapping:
+  - login: carol
+    aliases:
+      - carol@bar.org
+
+emailNotifications:
+  errors:
+    - repo-errors@example.com

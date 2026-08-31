@@ -1,0 +1,16 @@
+domains:
+  - foo.org
+  - bar.org
+
+userMapping:
+  - login: alice
+    aliases:
+      - alice@foo.org
+
+  - login: bob
+    aliases:
+      - bob@bar.org
+
+emailNotifications:
+  errors:
+    - repo-errors@example.com

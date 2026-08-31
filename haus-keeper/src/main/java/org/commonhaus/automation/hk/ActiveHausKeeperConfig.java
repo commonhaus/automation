@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -15,8 +16,12 @@ import jakarta.inject.Inject;
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.commonhaus.automation.github.watchers.FileWatcher;
+import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
 import org.commonhaus.automation.hk.config.HausKeeperConfig;
+import org.commonhaus.automation.hk.config.OrganizationDomains;
 import org.commonhaus.automation.hk.config.UserManagementConfig;
+import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
@@ -27,18 +32,42 @@ import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class ActiveHausKeeperConfig {
+    static final String ORG_CONFIG_TASK_GROUP = "haus-keeper-org-config";
+
     protected final AtomicReference<Optional<HausKeeperConfig>> currentConfig = new AtomicReference<>(Optional.empty());
     protected final Set<String> attestationIds = new HashSet<>();
     protected final Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
+    protected final Map<String, Consumer<Set<String>>> domainChangeCallbacks = new ConcurrentHashMap<>();
+
+    protected final AtomicReference<Map<String, Set<String>>> organizationDomains = new AtomicReference<>(Map.of());
+    protected final AtomicReference<RepoSource> watchedOrgConfig = new AtomicReference<>(null);
 
     @Inject
     PeriodicUpdateQueue updateQueue;
+
+    @Inject
+    FileWatcher fileWatcher;
+
+    @Inject
+    AppContextService ctx;
 
     public void notifyOnUpdate(String id, Runnable callback) {
         if (callback == null) {
             return;
         }
         callbacks.put(id, callback);
+    }
+
+    /**
+     * Register a callback to be notified when the regrouped organization
+     * domain map changes. The callback receives the set of project names
+     * whose authoritative domains actually changed, in a single batched call.
+     */
+    public void notifyOnDomainChange(String id, Consumer<Set<String>> callback) {
+        if (callback == null) {
+            return;
+        }
+        domainChangeCallbacks.put(id, callback);
     }
 
     public boolean isReady() {
@@ -66,6 +95,15 @@ public class ActiveHausKeeperConfig {
         return attestationIds.isEmpty() || attestationIds.contains(id);
     }
 
+    /**
+     * @return the authoritative domain set for the given project name, or an
+     *         empty set if the project has no known authoritative domains
+     *         (either because it has no entry, or the source hasn't been read yet)
+     */
+    public Set<String> getDomainsForProject(String projectName) {
+        return organizationDomains.get().getOrDefault(projectName, Set.of());
+    }
+
     protected void clear() {
         currentConfig.set(Optional.empty());
         attestationIds.clear();
@@ -74,6 +112,7 @@ public class ActiveHausKeeperConfig {
     protected void update(ScopedQueryContext qc, HausKeeperConfig config) {
         currentConfig.set(Optional.of(config));
         updateValidAttestations(qc, config.userManagement());
+        updateOrganizationDomains(qc, config.userManagement());
 
         // Queue callbacks for config consumers
         for (var callback : callbacks.entrySet()) {
@@ -123,5 +162,149 @@ public class ActiveHausKeeperConfig {
         }
         attestationIds.addAll(newIds);
         attestationIds.retainAll(newIds);
+    }
+
+    protected void updateOrganizationDomains(ScopedQueryContext homeQc, UserManagementConfig userConfig) {
+        // A disabled config has no organizationConfig to read, but any previously
+        // registered watch (from when the config was enabled) must still be torn
+        // down -- otherwise it keeps firing indefinitely for a disabled feature.
+        RepoSource orgConfig = userConfig.isDisabled() ? null : userConfig.organizationConfig();
+        rewatchOrganizationConfig(orgConfig, homeQc);
+
+        if (userConfig.isDisabled()) {
+            return;
+        }
+
+        if (orgConfig == null || orgConfig.isEmpty()) {
+            Log.debugf("%s/updateOrganizationDomains: no organizationConfig defined in %s", UserManager.ME, userConfig);
+            return;
+        }
+
+        ScopedQueryContext qc = resolveOrgConfigContext(orgConfig, homeQc);
+        Map<String, Set<String>> regrouped = readAndRegroupOrganizationDomains(qc, orgConfig);
+        if (regrouped != null) {
+            organizationDomains.set(regrouped);
+        }
+    }
+
+    /**
+     * Read and regroup cf-haus-organization.yml. Returns null (and alerts) on
+     * a read/parse failure so the caller can leave the existing cache untouched;
+     * this is an availability failure of the authoritative source, not a reason
+     * to wipe out last-known-good data.
+     */
+    private Map<String, Set<String>> readAndRegroupOrganizationDomains(ScopedQueryContext qc, RepoSource orgConfig) {
+        GHRepository repo = qc.getRepository(orgConfig.repository());
+        if (repo == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] updateOrganizationDomains: unable to access repository %s"
+                    .formatted(UserManager.ME, orgConfig.repository()));
+            return null;
+        }
+        GHContent content = qc.readSourceFile(repo, orgConfig.filePath());
+        if (content == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] updateOrganizationDomains: unable to read %s from %s"
+                    .formatted(UserManager.ME, orgConfig.filePath(), repo.getFullName()));
+            return null;
+        }
+        OrganizationDomains parsed = qc.readYamlContent(content, OrganizationDomains.class);
+        if (parsed == null || qc.hasErrors()) {
+            qc.logAndSendContextErrors("[%s] updateOrganizationDomains: unable to parse %s from %s"
+                    .formatted(UserManager.ME, orgConfig.filePath(), repo.getFullName()));
+            return null;
+        }
+        return parsed.regroup(ProjectAliasManager::toProjectName);
+    }
+
+    /**
+     * Register/re-register the FileWatcher when the organizationConfig RepoSource
+     * value changes (including to/from empty), so no duplicate/stale watches
+     * accumulate across successive HausKeeperConfig reads.
+     * <p>
+     * cf-haus-organization.yml commonly lives in a different organization than
+     * the home repo, each with its own GitHub App installation, so the watch
+     * must be registered under the installation that actually owns the target
+     * repo -- not the home installation -- or GitHub will never deliver push
+     * events for it. homeQc is only a fallback when no installation exists yet
+     * for that org.
+     */
+    private void rewatchOrganizationConfig(RepoSource orgConfig, ScopedQueryContext homeQc) {
+        RepoSource previous = watchedOrgConfig.get();
+        boolean previousPresent = previous != null && !previous.isEmpty();
+        boolean newPresent = orgConfig != null && !orgConfig.isEmpty();
+
+        if (previousPresent && previous.equals(orgConfig)) {
+            return; // unchanged; nothing to do
+        }
+
+        if (previousPresent) {
+            fileWatcher.unwatchFile(ORG_CONFIG_TASK_GROUP, previous.repository(), previous.filePath());
+        }
+        if (newPresent) {
+            ScopedQueryContext qc = resolveOrgConfigContext(orgConfig, homeQc);
+            fileWatcher.watchFile(ORG_CONFIG_TASK_GROUP, qc.getInstallationId(),
+                    orgConfig.repository(), orgConfig.filePath(),
+                    (fileUpdate) -> onOrganizationConfigChanged(fileUpdate, orgConfig));
+        }
+        watchedOrgConfig.set(newPresent ? orgConfig : null);
+    }
+
+    /**
+     * Resolve the ScopedQueryContext for the installation that owns orgConfig's
+     * repository, trying forOrganization first (dry-run-aware) and falling back
+     * to forPublicContent, then finally to homeQc if neither can find an
+     * installation for that org.
+     */
+    private ScopedQueryContext resolveOrgConfigContext(RepoSource orgConfig, ScopedQueryContext homeQc) {
+        ScopedQueryContext qc = homeQc.forOrganization(orgConfig.repository(), homeQc.isDryRun());
+        if (qc == null) {
+            qc = homeQc.forPublicContent(orgConfig.repository());
+        }
+        return qc == null ? homeQc : qc;
+    }
+
+    /**
+     * FileWatcher callback: re-read and re-regroup, diff against the cached
+     * map project-name by project-name, and only if something actually
+     * changed, update the cache and notify registered callbacks with the
+     * set of changed project names (a single batched call, not one per project).
+     * <p>
+     * Builds its ScopedQueryContext from the FileUpdate itself (installation
+     * and repository as currently known to the FileWatcher) rather than the
+     * ScopedQueryContext captured when the watch was registered, since this
+     * callback fires repeatedly for as long as orgConfig is unchanged.
+     */
+    private void onOrganizationConfigChanged(FileUpdate fileUpdate, RepoSource orgConfig) {
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository())
+                .withExisting(fileUpdate.github());
+        Map<String, Set<String>> newRegrouped = readAndRegroupOrganizationDomains(qc, orgConfig);
+        if (newRegrouped == null) {
+            return; // read/parse failed; alert already sent, cache left untouched
+        }
+
+        Map<String, Set<String>> previous = organizationDomains.get();
+        Set<String> changedProjects = diffProjectDomains(previous, newRegrouped);
+        if (changedProjects.isEmpty()) {
+            return;
+        }
+
+        organizationDomains.set(newRegrouped);
+        for (var callback : domainChangeCallbacks.entrySet()) {
+            updateQueue.queueReconciliation(callback.getKey(), () -> callback.getValue().accept(changedProjects));
+        }
+    }
+
+    private static Set<String> diffProjectDomains(Map<String, Set<String>> oldMap, Map<String, Set<String>> newMap) {
+        Set<String> changed = new HashSet<>();
+        for (var entry : newMap.entrySet()) {
+            if (!entry.getValue().equals(oldMap.get(entry.getKey()))) {
+                changed.add(entry.getKey());
+            }
+        }
+        for (String projectName : oldMap.keySet()) {
+            if (!newMap.containsKey(projectName)) {
+                changed.add(projectName);
+            }
+        }
+        return changed;
     }
 }

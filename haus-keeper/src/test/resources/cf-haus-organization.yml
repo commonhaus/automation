@@ -1,0 +1,9 @@
+projects:
+  foo:
+    projectRepository: commonhaus/project-foo
+    domainAssociation:
+      - foo.org
+  bar:
+    projectRepository: commonhaus/project-bar
+    domainAssociation:
+      - bar.org

@@ -1,0 +1,8 @@
+userMapping:
+  - login: frank
+    aliases:
+      - frank@foo.org
+
+emailNotifications:
+  errors:
+    - repo-errors@example.com

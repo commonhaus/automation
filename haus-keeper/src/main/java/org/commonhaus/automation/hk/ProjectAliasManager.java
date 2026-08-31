@@ -3,9 +3,12 @@ package org.commonhaus.automation.hk;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,7 +46,16 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class ProjectAliasManager extends ScheduledService {
     private static final String ME = "📫-aliases";
-    private static final AliasConfigState EMPTY = new AliasConfigState(null, null, null, 0, null);
+
+    /**
+     * Sentinel projectConfig value meaning "read attempted, no
+     * project-mail-aliases.yml found in this repo" -- distinct from a
+     * not-yet-read placeholder (projectConfig == null). Its hasUserMapping()/
+     * hasDomains() are correctly false, so it behaves like an empty config
+     * everywhere it's used; the only reason it exists is so callers can tell
+     * "nothing to read yet" apart from "confirmed nothing to read, ever."
+     */
+    private static final ProjectAliasMapping CONFIRMED_ABSENT = new ProjectAliasMapping(null, null, null, null);
 
     @Inject
     ActiveHausKeeperConfig hkConfig;
@@ -71,6 +83,24 @@ public class ProjectAliasManager extends ScheduledService {
 
     void startup(@Observes @Priority(value = RdePriority.APP_DISCOVERY) StartupEvent startup) {
         RouteSupplier.registerSupplier("Project aliases refreshed", () -> lastRun);
+        hkConfig.notifyOnDomainChange(ME, this::reconcileChangedProjects);
+    }
+
+    private void reconcileChangedProjects(Set<String> changedProjectNames) {
+        for (var entry : taskGroupToState.entrySet()) {
+            String taskGroup = entry.getKey();
+            AliasConfigState state = entry.getValue();
+            if (state == null || !changedProjectNames.contains(state.projectName())) {
+                continue;
+            }
+            if (state.projectConfig() == null) {
+                // Lazily-discovered project: no config read yet. Read it now rather
+                // than silently dropping this domain change until the next cron pass.
+                updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, state.repoFullName()));
+            } else {
+                updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+            }
+        }
     }
 
     /**
@@ -97,10 +127,7 @@ public class ProjectAliasManager extends ScheduledService {
         }
         recordRun();
         for (var entry : taskGroupToState.entrySet()) {
-            String repoFullName = taskGroupToRepo(entry.getKey());
-            ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
-            qc.getRepository(repoFullName);
-            readProjectConfig(entry.getKey(), qc, true);
+            readProjectConfig(entry.getKey(), taskGroupToRepo(entry.getKey()));
         }
     }
 
@@ -131,7 +158,8 @@ public class ProjectAliasManager extends ScheduledService {
                     updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc, true));
                 } else {
                     Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates/cron");
-                    taskGroupToState.put(taskGroup, EMPTY);
+                    taskGroupToState.put(taskGroup,
+                            new AliasConfigState(taskGroup, toProjectName(repoFullName), repoFullName, installationId, null));
                 }
             } else {
                 taskGroupToState.remove(taskGroup);
@@ -143,11 +171,25 @@ public class ProjectAliasManager extends ScheduledService {
         if (fileUpdate.updateType() == FileUpdateType.REMOVED) {
             String repoFullName = fileUpdate.repository().getFullName();
             Log.debugf("[%s] processFileUpdate: %s deleted", taskGroup, repoFullName);
-            taskGroupToState.put(taskGroup, EMPTY);
+            taskGroupToState.put(taskGroup,
+                    new AliasConfigState(taskGroup, toProjectName(repoFullName), repoFullName,
+                            fileUpdate.installationId(), CONFIRMED_ABSENT));
             return;
         }
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
+        readProjectConfig(taskGroup, qc, true);
+    }
+
+    /**
+     * Build a fresh ScopedQueryContext for repoFullName and read its project
+     * config, queuing reconciliation on success. Shared by callers that only
+     * have a repo name in hand (scheduled/manual refresh, retroactive
+     * re-validation of a not-yet-read project) rather than an existing qc.
+     */
+    private void readProjectConfig(String taskGroup, String repoFullName) {
+        ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
+        qc.getRepository(repoFullName);
         readProjectConfig(taskGroup, qc, true);
     }
 
@@ -163,10 +205,21 @@ public class ProjectAliasManager extends ScheduledService {
         String projectName = toProjectName(repoFullName);
 
         GHContent content = qc.readSourceFile(repo, ProjectAliasMapping.CONFIG_FILE);
-        if (content == null || qc.hasErrors()) {
-            // Normal
-            Log.debugf("%s readProjectConfig: unable to read %s in %s", taskGroup,
+        if (qc.hasErrors()) {
+            // Transient/access error, not a confirmed absence -- leave existing
+            // state as-is so this is retried rather than recorded as permanent.
+            Log.debugf("%s readProjectConfig: error reading %s in %s: %s", taskGroup,
+                    ProjectAliasMapping.CONFIG_FILE, repoFullName, qc.bundleExceptions());
+            return;
+        }
+        if (content == null) {
+            // Confirmed: no project-mail-aliases.yml in this repo. Record that
+            // distinctly from "not read yet" so a later domain-change event
+            // doesn't keep re-reading a repo that will never have aliases.
+            Log.debugf("%s readProjectConfig: no %s in %s", taskGroup,
                     ProjectAliasMapping.CONFIG_FILE, repoFullName);
+            taskGroupToState.put(taskGroup,
+                    new AliasConfigState(taskGroup, projectName, repoFullName, qc.getInstallationId(), CONFIRMED_ABSENT));
             return;
         }
 
@@ -209,12 +262,24 @@ public class ProjectAliasManager extends ScheduledService {
 
         ScopedQueryContext qc = new ScopedQueryContext(ctx, state.installationId(), state.repoFullName());
         ProjectAliasMapping projectAliasConfig = state.projectConfig();
-        Set<String> domains = projectAliasConfig.domains();
+        Set<String> domains = projectAliasConfig.hasDomains() ? projectAliasConfig.domains() : Set.of();
 
         if (!projectAliasConfig.hasUserMapping()) {
             Log.debugf("%s: no user mappings defined in project alias config", taskGroup);
             return;
         }
+
+        // Restrict to authoritative domains, if we have any cached for this project.
+        // An empty authoritative set means "no data yet / not configured" (fail-open),
+        // not "no domains are allowed" -- so it must leave domains unfiltered.
+        Set<String> authoritativeDomains = hkConfig.getDomainsForProject(state.projectName());
+        if (!authoritativeDomains.isEmpty()) {
+            domains = domains.stream()
+                    .filter(authoritativeDomains::contains)
+                    .collect(Collectors.toSet());
+        }
+
+        List<InvalidAlias> invalidAliases = new ArrayList<>();
 
         // For each user in the mapping, ensure their aliases exist and are up to date
         for (UserAliasList userAliases : projectAliasConfig.userMapping()) {
@@ -225,7 +290,6 @@ public class ProjectAliasManager extends ScheduledService {
             }
             GHUser ghUser = login == null ? null : qc.getUser(login);
 
-            // If anything about the user alias is wrong, send an email and skip it
             if (qc.hasErrors()) {
                 qc.logAndSendEmail("Error fetching user from GitHub",
                         "%s: error fetching user %s".formatted(taskGroup, login),
@@ -234,25 +298,10 @@ public class ProjectAliasManager extends ScheduledService {
                 return; // stop processing. We will try again later (e.g the next cron run or after a fix)
             } else if (ghUser == null || !userAliases.isValid(domains)) {
                 Log.debugf("%s: invalid aliases for login %s (%s)", taskGroup, userAliases, ghUser);
-                String title = "Invalid alias defined";
-                String message = """
-
-                        Login: %s
-                        Aliases: %s
-
-                        Aliases should be fully qualified email addresses for one of the following:
-                        %s.
-
-                        Project config: %s
-                        """.formatted(
-                        userAliases.login(),
-                        userAliases.aliases(),
-                        domains,
-                        projectAliasConfig);
-
-                ctx.sendEmail(ME, title, message,
-                        qc.getErrorAddresses(projectAliasConfig.emailNotifications()));
-                qc.createItem(EventType.issue, title, message, null);
+                String reason = ghUser == null
+                        ? "GitHub user not found"
+                        : "one or more aliases use a domain that is not authorized for this project";
+                invalidAliases.add(new InvalidAlias(userAliases.login(), userAliases.aliases(), reason));
                 continue;
             }
 
@@ -287,6 +336,32 @@ public class ProjectAliasManager extends ScheduledService {
                 Log.debugf("%s: updated user %s with aliases %s", taskGroup, login, userAliases.aliases());
             }
         }
+
+        if (!invalidAliases.isEmpty()) {
+            String title = "Invalid alias(es) defined";
+            StringBuilder findings = new StringBuilder();
+            for (InvalidAlias invalid : invalidAliases) {
+                findings.append("""
+
+                        Login: %s
+                        Aliases: %s
+                        Reason: %s
+                        """.formatted(invalid.login(), invalid.aliases(), invalid.reason()));
+            }
+            String message = """
+
+                    The following aliases are invalid:
+                    %s
+                    Aliases should be fully qualified email addresses for one of the following:
+                    %s.
+
+                    Project config: %s
+                    """.formatted(findings, domains, projectAliasConfig);
+
+            ctx.sendEmail(ME, title, message,
+                    qc.getErrorAddresses(projectAliasConfig.emailNotifications()));
+            qc.createItem(EventType.issue, title, message, null);
+        }
         Log.debugf("%s: project alias sync complete; %s", taskGroup, state.projectConfig());
     }
 
@@ -301,7 +376,7 @@ public class ProjectAliasManager extends ScheduledService {
                 String projectName = toProjectName(repoFullName);
                 if (projectName.equals(project)) {
                     var state = entry.getValue();
-                    if (state == EMPTY) {
+                    if (state == null || state.projectConfig() == null) {
                         // Read the configuration but don't queue reconciliation
                         updateQueue.queue(taskGroup, () -> {
                             ScopedQueryContext qc = ctx.getScopedQueryContext(repoFullName);
@@ -340,7 +415,7 @@ public class ProjectAliasManager extends ScheduledService {
         qc.createItem(EventType.issue, title, message, null);
     }
 
-    private String toProjectName(String repoFullName) {
+    static String toProjectName(String repoFullName) {
         int slash = repoFullName.lastIndexOf('/');
         String repoName = slash >= 0 ? repoFullName.substring(slash + 1) : repoFullName;
         if (repoName.startsWith("project-")) {
@@ -368,5 +443,11 @@ public class ProjectAliasManager extends ScheduledService {
             String repoFullName,
             long installationId,
             ProjectAliasMapping projectConfig) {
+    }
+
+    record InvalidAlias(
+            String login,
+            Set<String> aliases,
+            String reason) {
     }
 }

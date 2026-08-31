@@ -1,0 +1,5 @@
+projects:
+  foo:
+    projectRepository: commonhaus/project-foo
+    domainAssociation:
+      - foo.alt

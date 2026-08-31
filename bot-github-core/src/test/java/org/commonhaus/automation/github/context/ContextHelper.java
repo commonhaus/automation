@@ -10,6 +10,7 @@ import static org.commonhaus.automation.github.context.GitHubTeamService.putCach
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -686,6 +687,10 @@ public class ContextHelper {
      * Mock file content for a repository:
      * Mocks GHContent.read() to return the file content.
      * repo.getFileContent(repoPath) will return the GHContent.
+     * <p>
+     * Each call to read() opens a fresh InputStream (matching the real
+     * GHContent, which re-fetches from GitHub on every call) rather than
+     * handing out the same already-consumed stream a second time.
      *
      * @param repo Mock GHRepository
      * @param repoPath Path to file in repository
@@ -694,7 +699,7 @@ public class ContextHelper {
      */
     public GHContent mockFileContent(GHRepository repo, String repoPath, Path contentFilePath) throws IOException {
         GHContent content = mock(GHContent.class);
-        doReturn(Files.newInputStream(contentFilePath)).when(content).read();
+        doAnswer(invocation -> Files.newInputStream(contentFilePath)).when(content).read();
         doReturn(content).when(repo).getFileContent(repoPath);
         return content;
     }

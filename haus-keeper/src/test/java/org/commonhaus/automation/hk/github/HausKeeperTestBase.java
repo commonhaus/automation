@@ -14,6 +14,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -31,6 +32,7 @@ import org.commonhaus.automation.github.context.DataRepository.Collaborators;
 import org.commonhaus.automation.github.context.TestBotConfig;
 import org.commonhaus.automation.github.discovery.DiscoveryAction;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
+import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.hk.ActiveHausKeeperConfig;
 import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.api.MemberSession;
@@ -439,6 +441,43 @@ public class HausKeeperTestBase extends ContextHelper {
 
         public void testUpdate(ScopedQueryContext qc, HausKeeperConfig config) {
             update(qc, config);
+        }
+
+        /**
+         * Clear organization-domains cache/watch state between tests. This is
+         * an @ApplicationScoped singleton shared across every test class in
+         * the same JVM/build, so state from one test class (e.g. a cached
+         * domain set) can otherwise leak into another's assertions.
+         * <p>
+         * domainChangeCallbacks is intentionally left untouched: production
+         * consumers (e.g. ProjectAliasManager) register there exactly once,
+         * on StartupEvent, keyed by a stable component name -- clearing it
+         * here would permanently destroy that registration for the rest of
+         * the JVM/build, since nothing re-runs startup() per test.
+         */
+        public void testResetOrganizationDomains() {
+            organizationDomains.set(Map.of());
+            watchedOrgConfig.set(null);
+        }
+    }
+
+    @ApplicationScoped
+    @Alternative
+    @Priority(1)
+    public static class TestFileWatcher extends FileWatcher {
+        @Inject
+        public TestFileWatcher() {
+            super();
+        }
+
+        /**
+         * Clear registered watches between tests. Repo/task-group names (e.g.
+         * ActiveHausKeeperConfig.ORG_CONFIG_TASK_GROUP) are fixed constants
+         * reused across test methods within a class, so stale registrations
+         * from a prior test must not leak into the next one.
+         */
+        public void testReset() {
+            super.reset();
         }
     }
 }

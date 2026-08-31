@@ -1,0 +1,9 @@
+projects:
+  foo:
+    projectRepository: commonhaus/project-foo # comment added, no domain change
+    domainAssociation:
+      - foo.org
+  bar:
+    projectRepository: commonhaus/project-bar
+    domainAssociation:
+      - bar.org
