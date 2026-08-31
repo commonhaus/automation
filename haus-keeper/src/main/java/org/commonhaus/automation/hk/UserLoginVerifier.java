@@ -89,11 +89,9 @@ public class UserLoginVerifier extends ScheduledService {
 
         Path tempDir = null;
         try {
-            // Create a temporary directory for the files
             tempDir = Files.createTempDirectory(ME).normalize();
             final var target = tempDir;
 
-            // Read files from the input stream
             try (ZipInputStream zs = repo.readZip(
                     (inputstream) -> new ZipInputStream(new BufferedInputStream(inputstream)),
                     null)) {

@@ -89,10 +89,9 @@ public class AccessRoleManager {
                     id, user.login(), login, user, dqc.writeYamlValue(user)),
                     dqc.getErrorAddresses(hkConfig.getAddresses()));
 
-            // Send event to notifiy project owners that login has changed
+            // Notify project owners so per-project alias configs can be updated for the new login
             loginChangeEvent.fire(new LoginChangeEvent(user.login(), Optional.of(login), user.projects()));
 
-            // Update the user login in the datastore
             user = datastore.setCommonhausUser(new UpdateEvent(user,
                     (c, u) -> {
                         u.changeLogin(login);

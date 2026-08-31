@@ -55,7 +55,6 @@ public class MemberResource {
     @Produces("application/json")
     public Response githubLogin() {
         Log.debugf("[%s] /member/github %s, %s", session.nodeId(), session.login(), session.roles());
-        // redirect to the member home page
         return Response.seeOther(URI.create("/member/login"))
                 .build();
     }
@@ -66,7 +65,6 @@ public class MemberResource {
     public Response finishLogin() {
         Log.debugf("[%s] /member/login %s, %s", session.nodeId(), session.login(), session.roles());
 
-        // redirect to the member home page
         return Response.seeOther(ctx.getMemberHome())
                 .cookie(new NewCookie.Builder("id")
                         .value(session.nodeId())

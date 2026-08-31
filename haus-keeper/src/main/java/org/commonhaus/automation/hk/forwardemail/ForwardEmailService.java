@@ -33,12 +33,10 @@ public class ForwardEmailService {
     AppContextService ctx;
 
     public Map<AliasKey, Alias> fetchAliases(MemberSession session, CommonhausUser user) {
-        // Find configured aliases for the user
         Set<AliasKey> emailAddresses = getConfiguredAliases(session, user);
         if (emailAddresses.isEmpty()) {
             return Map.of();
         }
-        // Cached API CALL: get alias mappings
         return fetchAliases(emailAddresses);
     }
 

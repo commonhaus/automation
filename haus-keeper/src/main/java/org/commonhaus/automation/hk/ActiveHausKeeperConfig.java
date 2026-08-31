@@ -127,16 +127,11 @@ public class ActiveHausKeeperConfig {
     }
 
     /**
-     * Retry a deferred organizationConfig once the installation that owns its
-     * repository becomes known. organizationConfig commonly points at a
-     * different org than the home repo -- each org's installation is
-     * discovered independently and asynchronously at startup, so the target
-     * org's installation may not exist yet in ScopedInstallationMap at the
-     * moment HausKeeperConfig is first read. resolveOrgConfigContext returns
-     * null in that case rather than silently querying the wrong
-     * installation; pendingOrgConfig records that a retry is owed, and this
-     * listener performs it as soon as a repository in the target org is
-     * discovered.
+     * Retry a deferred organizationConfig once its target org's installation
+     * is discovered. Installations are discovered asynchronously at startup,
+     * so organizationConfig (often a different org than the home repo) may
+     * not have a known installation yet when first read; pendingOrgConfig
+     * records that a retry is owed.
      */
     protected void onRepositoryDiscovered(
             @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
@@ -279,15 +274,12 @@ public class ActiveHausKeeperConfig {
 
     /**
      * Register/re-register the FileWatcher when the organizationConfig RepoSource
-     * value changes (including to/from empty), so no duplicate/stale watches
-     * accumulate across successive HausKeeperConfig reads.
-     * <p>
-     * cf-haus-organization.yml commonly lives in a different organization than
-     * the home repo, each with its own GitHub App installation, so the watch
-     * must be registered under the installation that actually owns the target
-     * repo -- not the home installation -- or GitHub will never deliver push
-     * events for it. Callers only pass a non-null orgConfig once qc has
-     * already been resolved to that installation (see resolveOrgConfigContext).
+     * changes (including to/from empty), so stale watches don't accumulate
+     * across successive HausKeeperConfig reads. The watch must be registered
+     * under the installation that owns the target repo -- often a different
+     * org than the home repo -- or GitHub won't deliver push events for it;
+     * callers only pass a non-null orgConfig once qc is resolved to that
+     * installation (see resolveOrgConfigContext).
      */
     private void rewatchOrganizationConfig(RepoSource orgConfig, ScopedQueryContext qc) {
         RepoSource previous = watchedOrgConfig.get();
@@ -311,24 +303,20 @@ public class ActiveHausKeeperConfig {
 
     /**
      * Resolve the ScopedQueryContext for the installation that owns orgConfig's
-     * repository. Returns null -- rather than silently falling back to homeQc's
-     * installation -- if no installation is known yet for that org, since
-     * homeQc's installation has no access to a repository in a different org
-     * and querying it anyway produces a misleading 404.
+     * repository. Returns null (rather than falling back to homeQc's installation)
+     * if that org's installation isn't known yet -- homeQc has no access to a
+     * different org's repository and querying it anyway produces a misleading 404.
      */
     private ScopedQueryContext resolveOrgConfigContext(RepoSource orgConfig, ScopedQueryContext homeQc) {
         return homeQc.forOrganization(orgConfig.repository(), homeQc.isDryRun());
     }
 
     /**
-     * FileWatcher callback: re-read and re-regroup, diff against the cached
-     * map project-name by project-name, and only if something actually
-     * changed, update the cache and notify registered callbacks with the
-     * set of changed project names (a single batched call, not one per project).
-     * <p>
-     * Builds its ScopedQueryContext from the FileUpdate itself (installation
-     * and repository as currently known to the FileWatcher) rather than the
-     * ScopedQueryContext captured when the watch was registered, since this
+     * FileWatcher callback: re-read, re-regroup, diff against the cached map,
+     * and if anything changed, update the cache and notify callbacks with the
+     * set of changed project names (one batched call, not one per project).
+     * Builds its ScopedQueryContext fresh from the FileUpdate rather than
+     * reusing the one captured at watch-registration time, since this
      * callback fires repeatedly for as long as orgConfig is unchanged.
      */
     private void onOrganizationConfigChanged(FileUpdate fileUpdate, RepoSource orgConfig) {

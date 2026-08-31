@@ -65,20 +65,20 @@ emailNotifications:
 
 See:
 
-- [KnownUserInterceptor](./src/main/java/org/commonhaus/automation/admin/api/KnownUserInterceptor.java)
-- [MemberAliasesResource](./src/main/java/org/commonhaus/automation/admin/api/MemberAliasesResource.java)
+- [KnownUserInterceptor](./src/main/java/org/commonhaus/automation/hk/api/KnownUserInterceptor.java)
+- [MemberAliasesResource](./src/main/java/org/commonhaus/automation/hk/api/MemberAliasesResource.java)
     - `/member/aliases`
-- [MemberApplicationResource](./src/main/java/org/commonhaus/automation/admin/api/MemberApplicationResource.java)
+- [MemberApplicationResource](./src/main/java/org/commonhaus/automation/hk/api/MemberApplicationResource.java)
     - `/member/apply`
-- [MemberAttestationResource](./src/main/java/org/commonhaus/automation/admin/api/MemberAttestationResource.java)
+- [MemberAttestationResource](./src/main/java/org/commonhaus/automation/hk/api/MemberAttestationResource.java)
     - `/member/commonhaus/attest`
-- [MemberResource](./src/main/java/org/commonhaus/automation/admin/api/MemberResource.java)
+- [MemberResource](./src/main/java/org/commonhaus/automation/hk/api/MemberResource.java)
     - `/member/github`
     - `/member/login`
     - `/member/me`
     - `/member/commonhaus`
     - `/member/commonhaus/status`
-- [MemberSession](./src/main/java/org/commonhaus/automation/admin/api/MemberSession.java)
+- [MemberSession](./src/main/java/org/commonhaus/automation/hk/api/MemberSession.java)
 
 ```yaml
 userManagement:

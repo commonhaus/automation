@@ -124,22 +124,18 @@ public class CommonhausDatastore {
      * @return CommonhausUser or null
      */
     private CommonhausUser readCommonhausUser(DatastoreQueryContext dqc, String userKey, QueryEvent event) {
-        // Get or create a _cache entry_ for this user
         DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
                 .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
 
         if (entry.hasUserData() && !event.refresh()) {
-            // User data is already present
             return entry.getUserData();
         }
 
         CommonhausUser result = null;
 
-        // Let QueryContext handle the errors from the fetch
         String userDataPath = dataPath(event.id());
         GHContent content = dqc.readSourceFile(dqc.getRepository(), userDataPath);
         if (content != null) {
-            // if this throws, it will be captured in the query context
             result = dqc.readYamlContent(content, CommonhausUser.class);
             if (result != null) {
                 result.sha(content.getSha());
@@ -147,7 +143,6 @@ public class CommonhausDatastore {
         }
 
         if (result == null && event.create()) {
-            // Create a new user if requested and not found
             result = CommonhausUser.create(event.login(), event.id());
         }
         if (result != null) {
@@ -172,7 +167,6 @@ public class CommonhausDatastore {
 
         DatastoreQueryContext dqc = ensureQueryContext().withLogId(userKey); // throws
 
-        // Get or create a _cache entry_ for this user
         DatastoreCacheEntry entry = AdminDataCache.COMMONHAUS_DATA
                 .computeIfAbsent(userKey, k -> new DatastoreCacheEntry(userKey));
 
@@ -186,13 +180,8 @@ public class CommonhausDatastore {
                 throw new IllegalStateException("Failed to load or create user: " + updateEvent.login());
             }
         }
-        // Update the working/cached user data
         CommonhausUser result = entry.applyUpdate(ctx, updateEvent);
-
-        // Offload persistence to the update queue
         updateQueue.queueReconciliation(userKey, () -> persistUserToGitHub(userKey, 0));
-
-        // Respond with the updated user data
         return result;
     }
 
@@ -392,7 +381,6 @@ public class CommonhausDatastore {
     void persistJournal() {
         Log.debugf("%s journal / persist: %s pending updates", ME, pendingJournal.size());
         try {
-            // Write the current state of the journal (including if empty)
             String yaml = ContextService.yamlMapper.writeValueAsString(pendingJournal);
             Files.writeString(journalFile, yaml);
         } catch (IOException e) {

@@ -35,7 +35,7 @@ userMapping:
 - **Scheduled Sync**: Every 3 days at 4:47 AM (`0 47 4 */3 * ?`)
 - **User Login Changes**: Listens for `LoginChangeEvent` and notifies affected projects
 - **Task Groups**: `📫-aliases-{repoFullName}` for per-repository workflow management
-- **Domain Validation**: Ensures project domains match central configuration
+- **Domain Validation**: Aliases are filtered against an authoritative domain-to-project map sourced from `cf-haus-organization.yml` (owned by haus-manager, read here via `HausKeeperConfig.organizationConfig` / `OrganizationDomains`). An empty authoritative set for a project fails open (no filtering), rather than rejecting all aliases.
 
 ### AdminDataCache
 
@@ -107,7 +107,7 @@ userMapping:
 - **Caching**: Cached API calls to reduce external service load
 
 **Configuration Integration**:
-- Domain management from central configuration
+- Domain management via `userManagement.defaultAliasDomain` (personal aliases) and per-project `project-mail-aliases.yml` (project aliases, see ProjectAliasManager above)
 - User permission validation
 - Sanitization of input addresses
 
@@ -166,7 +166,6 @@ application: # Only present when a membership application is pending
 ```yaml
 userManagement:
   defaultAliasDomain: example.com
-  emailDisabled: false
 
   attestations:
     repo: commonhaus/foundation
@@ -186,21 +185,14 @@ userManagement:
     member: ACTIVE
     sponsor: SPONSOR
 
-projectAliases:
-  enabled: true
-  projectList:
-    repository: commonhaus/foundation
-    filePath: PROJECTS.yaml
-  # Project name pattern matching for repository discovery
-  projectPattern: "^project-(.+)$"
+organizationConfig:
+  repository: commonhaus/foundation
+  filePath: cf-haus-organization.yml
 ```
 
-**Central Project Configuration** (PROJECTS.yaml):
-```yaml
-project-name:
-  displayName: "Project Name"
-  description: "Project description"
-```
+Note: `emailDisabled` is not a config field — it's a derived value (`isDisabled() || defaultAliasDomain == null`) computed by `UserManagementConfig`.
+
+**Organization Domain Configuration** (`cf-haus-organization.yml`, owned/authored by haus-manager): haus-keeper reads this file's `projects` map (via `organizationConfig` above) to build the authoritative domain-to-project map used by `ProjectAliasManager` to validate per-project email aliases.
 
 ## Integration Patterns
 

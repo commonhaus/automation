@@ -15,3 +15,4 @@ Member self-service: OAuth authentication, membership applications, email aliase
 - **Cache tiers have intentional TTLs.** `AdminDataCache` has five named tiers with specific expiry (15 min to 6 hours). Don't flatten or bypass the cache without understanding which tier applies.
 - **No frontend code here.** REST API endpoints only. UI is in the separate website repository.
 - **ForwardEmail API.** Email alias management calls the Forward Email external service. Keep external calls inside `ForwardEmailService`; don't scatter HTTP calls into business logic.
+- **Cross-module config dependency.** `cf-haus-organization.yml` is authored/owned by haus-manager, but haus-keeper's `ActiveHausKeeperConfig` also reads it (via `HausKeeperConfig.organizationConfig`, parsed as `OrganizationDomains`) to get the authoritative domain-to-project map used by `ProjectAliasManager`. Don't treat this file as haus-keeper's own config.

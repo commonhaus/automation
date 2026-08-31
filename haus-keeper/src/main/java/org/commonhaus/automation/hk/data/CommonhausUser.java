@@ -226,13 +226,11 @@ public class CommonhausUser implements UserLogin {
         return newStatus;
     }
 
-    // read-only: test for change in status value
     public boolean statusUpdateRequired(AppContextService ctx, Set<String> roles) {
         MemberStatus newStatus = refreshStatus(ctx, roles, data.status);
         return data.status != newStatus;
     }
 
-    // update user status
     public boolean updateMemberStatus(AppContextService ctx, Set<String> roles) {
         MemberStatus newStatus = refreshStatus(ctx, roles, data.status);
         return setStatus(newStatus);

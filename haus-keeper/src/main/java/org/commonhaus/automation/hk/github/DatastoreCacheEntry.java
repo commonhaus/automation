@@ -38,13 +38,8 @@ public class DatastoreCacheEntry {
             return null;
         }
 
-        // Apply changes to our cached copy
         event.applyChanges(ctx, userData);
-
-        // Add to pending updates
         pendingUpdates.add(event);
-
-        // Return a copy of the updated user data
         return CommonhausDatastore.deepCopy(userData);
     }
 
@@ -59,11 +54,8 @@ public class DatastoreCacheEntry {
             return null;
         }
 
-        // Accumulate all pending updates into a single in-flight list.
         inFlightUpdates.addAll(pendingUpdates);
         pendingUpdates.clear();
-
-        // Create a new snapshot of the user data.
         return inFlightSnapshot = CommonhausDatastore.deepCopy(userData);
     }
 
@@ -74,27 +66,18 @@ public class DatastoreCacheEntry {
     }
 
     public synchronized CommonhausUser handleConflict(AppContextService ctx, CommonhausUser gitHubVersion) {
-        // 1. Store the GitHub version as our new base
         this.userData = CommonhausDatastore.deepCopy(gitHubVersion);
 
-        // 2. Collect ALL pending updates (both in-flight and newly added)
+        // Reapply in-flight + pending updates on top of the new base, dropping any that aren't retriable
         List<UpdateEvent> allUpdates = new ArrayList<>(inFlightUpdates);
         allUpdates.addAll(pendingUpdates);
-
-        // 3. Clear the pending updates since we're reapplying everything
         pendingUpdates.clear();
-
-        // 4. Filter out updates that can't be retried
         allUpdates.removeIf(x -> !x.retry());
 
-        // 5. Reapply all updates to the new base version
         for (UpdateEvent event : allUpdates) {
             event.applyChanges(ctx, userData);
-            // Re-add to pending updates (they still need to be persisted)
             pendingUpdates.add(event);
         }
-
-        // 6. Clear the active update so we can start fresh
         inFlightSnapshot = null;
 
         return getUserData();

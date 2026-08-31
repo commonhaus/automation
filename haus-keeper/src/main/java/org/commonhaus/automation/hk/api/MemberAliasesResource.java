@@ -60,10 +60,8 @@ public class MemberAliasesResource {
                         .finish();
             }
 
-            // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
 
-            // Return as map of string / alias
             return user.toResponse()
                     .setData(ApiResponse.Type.ALIAS, aliasMap.entrySet().stream()
                             .collect(Collectors.toMap(e -> e.getKey().email(), Map.Entry::getValue)))
