@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.context;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.annotation.Priority;
@@ -153,5 +154,10 @@ public class TestBotConfig implements BotConfig {
     @Override
     public ScopeNotificationConfig scopeNotification() {
         return null;
+    }
+
+    @Override
+    public Optional<Set<String>> allowedInstallations() {
+        return Optional.empty();
     }
 }

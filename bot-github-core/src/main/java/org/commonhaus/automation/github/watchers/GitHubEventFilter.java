@@ -1,10 +1,13 @@
 package org.commonhaus.automation.github.watchers;
 
+import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
@@ -31,8 +34,19 @@ public class GitHubEventFilter {
     private Set<Long> blocklist = Set.of();
     private Set<String> blocklistByName = Set.of();
 
+    private Set<Long> allowlist = ConcurrentHashMap.newKeySet();
+    private Set<String> allowlistByName = Set.of();
+
     @PostConstruct
     void init() {
+        // Configured allow list, if present
+        this.allowlistByName = botConfig.allowedInstallations().orElse(Set.of())
+                .stream()
+                .filter(v -> v != null && !v.isBlank())
+                .map(String::toLowerCase)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
+        // read shared blocklist
         String directory = botConfig.queue().stateDirectory().orElse(null);
         if (directory == null) {
             return;
@@ -59,6 +73,19 @@ public class GitHubEventFilter {
         }
     }
 
+    public void addInstallation(Long installationId, String login) {
+        if (installationId == null || login == null || login.isBlank()) {
+            return;
+        }
+        String normalizedLogin = login.toLowerCase();
+        if (blocklistByName.contains(normalizedLogin)) {
+            return;
+        }
+        if (allowlistByName.contains(normalizedLogin)) {
+            allowlist.add(installationId);
+        }
+    }
+
     /**
      * Returns {@code true} if the installation associated with the given event
      * is on the blocklist.
@@ -68,10 +95,25 @@ public class GitHubEventFilter {
      *         {@code null} or not on the blocklist
      */
     public boolean isBlocked(GitHubEvent event) {
-        if (event.getInstallationId() == null) {
+        Long installationId = event.getInstallationId();
+        if (event.getRepository().isPresent()) {
+            return isBlocked(installationId, toOrganizationName(event.getRepository().get()));
+        }
+        if (installationId == null) {
             return false;
         }
-        return isBlocked(event.getInstallationId());
+        return isBlocked(installationId);
+    }
+
+    public boolean isBlocked(long ghiId, String orgName) {
+        if (isExplicitlyBlocked(ghiId)) {
+            return true;
+        }
+        if (isBlockedLogin(orgName)) {
+            return true;
+        }
+        addInstallation(ghiId, orgName);
+        return isBlocked(ghiId);
     }
 
     /**
@@ -81,7 +123,13 @@ public class GitHubEventFilter {
      * @return {@code true} if blocked
      */
     public boolean isBlocked(long installationId) {
-        return blocklist.contains(installationId);
+        if (isExplicitlyBlocked(installationId)) {
+            return true;
+        }
+        if (!allowlistByName.isEmpty()) {
+            return !allowlist.contains(installationId);
+        }
+        return false;
     }
 
     /**
@@ -93,9 +141,20 @@ public class GitHubEventFilter {
      */
     public boolean isBlockedLogin(String login) {
         if (login == null || login.isBlank()) {
-            return false;
+            return !allowlistByName.isEmpty();
         }
-        return blocklistByName.contains(login.toLowerCase());
+        String normalizedLogin = login.toLowerCase();
+        if (blocklistByName.contains(normalizedLogin)) {
+            return true;
+        }
+        if (!allowlistByName.isEmpty()) {
+            return !allowlistByName.contains(normalizedLogin);
+        }
+        return false;
+    }
+
+    public boolean isExplicitlyBlocked(long installationId) {
+        return blocklist.contains(installationId);
     }
 
     /**

@@ -6,6 +6,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 
 import org.commonhaus.automation.config.BotConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,10 @@ class GitHubEventFilterTest {
      * (or is empty when {@code null}).
      */
     BotConfig configWithDir(String dir) {
+        return configWithDirAndAllowedInstallations(dir, Set.of());
+    }
+
+    BotConfig configWithDirAndAllowedInstallations(String dir, Set<String> allowedInstallations) {
         return new BotConfig() {
             @Override
             public Optional<String> replyTo() {
@@ -105,11 +110,22 @@ class GitHubEventFilterTest {
             public ScopeNotificationConfig scopeNotification() {
                 return () -> Optional.empty();
             }
+
+            @Override
+            public Optional<Set<String>> allowedInstallations() {
+                return allowedInstallations.isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(allowedInstallations);
+            }
         };
     }
 
     /** Minimal GitHubEvent that only provides an installation ID. */
     GitHubEvent eventWithInstallation(Long installationId) {
+        return eventWithInstallationAndRepository(installationId, null);
+    }
+
+    GitHubEvent eventWithInstallationAndRepository(Long installationId, String repository) {
         return new GitHubEvent() {
             @Override
             public Long getInstallationId() {
@@ -133,7 +149,7 @@ class GitHubEventFilterTest {
 
             @Override
             public Optional<String> getRepository() {
-                return Optional.empty();
+                return Optional.ofNullable(repository);
             }
 
             @Override
@@ -298,5 +314,51 @@ class GitHubEventFilterTest {
         filter.init();
 
         assertThat(filter.isBlockedLogin("test-org-one")).isFalse();
+    }
+
+    @Test
+    void configuredAllowListBlocksUnknownLogin() {
+        filter.botConfig = configWithDirAndAllowedInstallations(null, Set.of("commonhaus", "commonhaus-ops"));
+        filter.init();
+
+        assertThat(filter.isBlockedLogin("some-other-org")).isTrue();
+    }
+
+    @Test
+    void configuredAllowListBlocksUnknownInstallationUntilAdmitted() {
+        filter.botConfig = configWithDirAndAllowedInstallations(null, Set.of("commonhaus", "commonhaus-ops"));
+        filter.init();
+
+        assertThat(filter.isBlocked(51110255L)).isTrue();
+    }
+
+    @Test
+    void allowedLoginAdmitsInstallationId() {
+        filter.botConfig = configWithDirAndAllowedInstallations(null, Set.of("commonhaus", "commonhaus-ops"));
+        filter.init();
+
+        filter.addInstallation(51110255L, "commonhaus");
+
+        assertThat(filter.isBlocked(51110255L)).isFalse();
+        assertThat(filter.isBlocked(51110255L, "commonhaus")).isFalse();
+    }
+
+    @Test
+    void blockedIdWinsEvenWhenLoginIsAllowed() {
+        filter.botConfig = configWithDirAndAllowedInstallations(testResourcesDir(), Set.of("test-org-one"));
+        filter.init();
+        filter.addInstallation(111111111L, "test-org-one");
+
+        assertThat(filter.isBlocked(111111111L, "test-org-one")).isTrue();
+        assertThat(filter.isBlocked(eventWithInstallationAndRepository(111111111L, "test-org-one/repo"))).isTrue();
+    }
+
+    @Test
+    void nullLoginIsBlockedWhenAllowListConfigured() {
+        filter.botConfig = configWithDirAndAllowedInstallations(null, Set.of("commonhaus", "commonhaus-ops"));
+        filter.init();
+
+        assertThat(filter.isBlockedLogin(null)).isTrue();
+        assertThat(filter.isBlocked(51110255L, null)).isTrue();
     }
 }

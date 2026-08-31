@@ -106,7 +106,7 @@ public class RepositoryDiscovery {
             // List installations for this GitHub App: roughly, each organization
             for (GHAppInstallation ghAppInstallation : ac.getApp().listInstallations()) {
                 long ghiId = ghAppInstallation.getId();
-                if (gitHubEventFilter.isBlocked(ghiId)) {
+                if (gitHubEventFilter.isExplicitlyBlocked(ghiId)) {
                     Log.infof("[discoverRepositories] Installation %d is blocked; skipping.", ghiId);
                     continue;
                 }
@@ -120,7 +120,7 @@ public class RepositoryDiscovery {
                         continue;
                     } else if (blocked == null) {
                         String orgName = GitHubQueryContext.toOrganizationName(repo.getFullName());
-                        if (gitHubEventFilter.isBlockedLogin(orgName)) {
+                        if (gitHubEventFilter.isBlocked(ghiId, orgName)) {
                             Log.infof("[discoverRepositories] Login %s is blocked; skipping installation %d.", orgName, ghiId);
                             blocked = Boolean.TRUE;
                             continue;
@@ -187,15 +187,10 @@ public class RepositoryDiscovery {
             }
 
             long installationId = event.getInstallationId();
-            if (gitHubEventFilter.isBlocked(installationId)) {
-                Log.infof("[connectionEvent] Installation %d is blocked.", installationId);
-                return;
-            }
-
             String orgName = event.getRepository()
                     .map(GitHubQueryContext::toOrganizationName)
                     .orElse(null);
-            if (gitHubEventFilter.isBlockedLogin(orgName)) {
+            if (gitHubEventFilter.isBlocked(installationId, orgName)) {
                 Log.infof("[connectionEvent] Login %s is blocked.", orgName);
                 return;
             }
@@ -214,19 +209,13 @@ public class RepositoryDiscovery {
          * Respond to installation changes
          */
         void onInstallationChange(@RawEvent(event = "installation") GitHubEvent gitHubEvent) {
-            if (gitHubEventFilter.isBlocked(gitHubEvent)) {
-                Log.infof("[onInstallationChange] Installation %d is blocked; skipping %s.",
-                        gitHubEvent.getInstallationId(), gitHubEvent.getAction());
-                return;
-            }
-
             String action = gitHubEvent.getAction();
             JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
             JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
             long installationId = JsonAttribute.id.longFrom(installation);
 
             String login = JsonAttribute.login.stringFrom(JsonAttribute.account.jsonObjectFrom(installation));
-            if (gitHubEventFilter.isBlockedLogin(login)) {
+            if (gitHubEventFilter.isBlocked(installationId, login)) {
                 Log.infof("[onInstallationChange] Login %s is blocked; skipping %s.", login, action);
                 return;
             }
@@ -275,13 +264,8 @@ public class RepositoryDiscovery {
             JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
             long installationId = JsonAttribute.id.longFrom(installation);
 
-            if (gitHubEventFilter.isBlocked(installationId)) {
-                Log.infof("[onInstallationRepositoryChange] Installation %d is blocked; skipping.", installationId);
-                return;
-            }
-
             String login = JsonAttribute.login.stringFrom(JsonAttribute.account.jsonObjectFrom(installation));
-            if (gitHubEventFilter.isBlockedLogin(login)) {
+            if (gitHubEventFilter.isBlocked(installationId, login)) {
                 Log.infof("[onInstallationRepositoryChange] Login %s is blocked; skipping.", login);
                 return;
             }

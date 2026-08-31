@@ -2,6 +2,7 @@ package org.commonhaus.automation.config;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -24,6 +25,11 @@ public interface BotConfig {
      * Default is true if not specified.
      */
     Optional<Boolean> discoveryEnabled();
+
+    /**
+     * Allow list: only allow events from named/listed orgs
+     */
+    Optional<Set<String>> allowedInstallations();
 
     /**
      * True if changes should not be made to the repository
