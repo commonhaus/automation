@@ -46,6 +46,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 public enum JsonAttribute implements JsonAttributeAccessor {
 
     // Event payload + repo discovery
+    account,
     installation,
     organization,
 

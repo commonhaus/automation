@@ -29,6 +29,7 @@ public class GitHubEventFilter {
     BotConfig botConfig;
 
     private Set<Long> blocklist = Set.of();
+    private Set<String> blocklistByName = Set.of();
 
     @PostConstruct
     void init() {
@@ -45,11 +46,16 @@ public class GitHubEventFilter {
             Map<Long, String> parsed = ContextService.yamlMapper.readValue(content, TYPE_REF);
             if (parsed != null && !parsed.isEmpty()) {
                 blocklist = Set.copyOf(parsed.keySet());
+                blocklistByName = parsed.values().stream()
+                        .filter(v -> v != null && !v.isBlank())
+                        .map(String::toLowerCase)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
                 Log.infof("[GitHubEventFilter] Loaded %d blocked installation(s) from %s", blocklist.size(), blockFile);
             }
         } catch (IOException e) {
             Log.warnf("[GitHubEventFilter] Could not read %s; no installations will be blocked: %s", blockFile, e.getMessage());
             blocklist = Set.of();
+            blocklistByName = Set.of();
         }
     }
 
@@ -79,9 +85,32 @@ public class GitHubEventFilter {
     }
 
     /**
+     * Returns {@code true} if the given login/org name is on the blocklist.
+     * Comparison is case-insensitive.
+     *
+     * @param login the GitHub login or org name to check
+     * @return {@code true} if blocked
+     */
+    public boolean isBlockedLogin(String login) {
+        if (login == null || login.isBlank()) {
+            return false;
+        }
+        return blocklistByName.contains(login.toLowerCase());
+    }
+
+    /**
      * For testing only: directly replace the blocklist.
      */
     void setBlocklistForTesting(Set<Long> ids) {
         blocklist = Set.copyOf(ids);
+    }
+
+    /**
+     * For testing only: directly replace the name blocklist.
+     */
+    void setNameBlocklistForTesting(Set<String> names) {
+        blocklistByName = names.stream()
+                .map(String::toLowerCase)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 }

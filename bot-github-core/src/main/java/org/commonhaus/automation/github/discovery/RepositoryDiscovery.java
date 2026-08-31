@@ -12,6 +12,7 @@ import jakarta.json.JsonObject;
 import org.commonhaus.automation.JsonAttributeAccessor;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseQueryCache;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.github.context.JsonAttribute;
 import org.commonhaus.automation.github.scopes.ScopedInstallationMap;
 import org.commonhaus.automation.github.watchers.GitHubEventFilter;
@@ -113,13 +114,18 @@ public class RepositoryDiscovery {
                 GHAuthenticatedAppInstallation ghai = github.getInstallation();
                 DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(ghiId);
 
-                BaseQueryCache.putCachedGithubClient(ghiId, github);
-                BaseQueryCache.putCachedGraphQLClient(ghiId, graphQLClient);
-
-                Log.debugf("[%s] Fire initial discovery events", ghiId);
-                installations.add(ghiId);
-
+                Boolean blocked = null;
                 for (GHRepository repo : ghai.listRepositories()) {
+                    if (blocked == Boolean.TRUE) {
+                        continue;
+                    } else if (blocked == null) {
+                        String orgName = GitHubQueryContext.toOrganizationName(repo.getFullName());
+                        if (gitHubEventFilter.isBlockedLogin(orgName)) {
+                            Log.infof("[discoverRepositories] Login %s is blocked; skipping installation %d.", orgName, ghiId);
+                            blocked = Boolean.TRUE;
+                            continue;
+                        }
+                    }
                     var event = new RepositoryDiscoveryEvent(
                             DiscoveryAction.ADDED, github, graphQLClient, ghiId,
                             repo, true);
@@ -129,9 +135,14 @@ public class RepositoryDiscovery {
                         scopedInstallationMap.repositoryDiscovered(event);
                     }
                 }
+                if (blocked == Boolean.TRUE) {
+                    continue;
+                }
 
                 Log.debugf("[%s] PostInitialDiscoveryEvent", ghiId);
 
+                BaseQueryCache.putCachedGithubClient(ghiId, github);
+                BaseQueryCache.putCachedGraphQLClient(ghiId, graphQLClient);
                 fireInstallationDiscoveryEvent.fire(
                         new InstallationDiscoveryEvent(DiscoveryAction.ADDED, ghiId, github, graphQLClient));
             }
@@ -181,6 +192,14 @@ public class RepositoryDiscovery {
                 return;
             }
 
+            String orgName = event.getRepository()
+                    .map(GitHubQueryContext::toOrganizationName)
+                    .orElse(null);
+            if (gitHubEventFilter.isBlockedLogin(orgName)) {
+                Log.infof("[connectionEvent] Login %s is blocked.", orgName);
+                return;
+            }
+
             GitHub github = gitHubService.getInstallationClient(installationId);
             DynamicGraphQLClient graphQLClient = gitHubService.getInstallationGraphQLClient(installationId);
 
@@ -205,6 +224,12 @@ public class RepositoryDiscovery {
             JsonObject payload = JsonAttributeAccessor.unpack(gitHubEvent.getPayload());
             JsonObject installation = JsonAttribute.installation.jsonObjectFrom(payload);
             long installationId = JsonAttribute.id.longFrom(installation);
+
+            String login = JsonAttribute.login.stringFrom(JsonAttribute.account.jsonObjectFrom(installation));
+            if (gitHubEventFilter.isBlockedLogin(login)) {
+                Log.infof("[onInstallationChange] Login %s is blocked; skipping %s.", login, action);
+                return;
+            }
 
             List<GHRepository> repositories = JsonAttribute.repositories.repositoriesFrom(payload);
 
@@ -252,6 +277,12 @@ public class RepositoryDiscovery {
 
             if (gitHubEventFilter.isBlocked(installationId)) {
                 Log.infof("[onInstallationRepositoryChange] Installation %d is blocked; skipping.", installationId);
+                return;
+            }
+
+            String login = JsonAttribute.login.stringFrom(JsonAttribute.account.jsonObjectFrom(installation));
+            if (gitHubEventFilter.isBlockedLogin(login)) {
+                Log.infof("[onInstallationRepositoryChange] Login %s is blocked; skipping.", login);
                 return;
             }
 

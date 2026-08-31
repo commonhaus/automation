@@ -255,4 +255,48 @@ class GitHubEventFilterTest {
         assertThat(filter.isBlocked(111111111L)).isFalse();
         assertThat(filter.isBlocked(eventWithInstallation(111111111L))).isFalse();
     }
+
+    @Test
+    void isBlockedLoginReturnsTrueForNameFromFile() {
+        filter.botConfig = configWithDir(testResourcesDir());
+        filter.init();
+
+        assertThat(filter.isBlockedLogin("test-org-one")).isTrue();
+        assertThat(filter.isBlockedLogin("test-org-two")).isTrue();
+    }
+
+    @Test
+    void isBlockedLoginIsCaseInsensitive() {
+        filter.botConfig = configWithDir(testResourcesDir());
+        filter.init();
+
+        assertThat(filter.isBlockedLogin("Test-Org-One")).isTrue();
+        assertThat(filter.isBlockedLogin("TEST-ORG-TWO")).isTrue();
+    }
+
+    @Test
+    void isBlockedLoginReturnsFalseForUnknownName() {
+        filter.botConfig = configWithDir(testResourcesDir());
+        filter.init();
+
+        assertThat(filter.isBlockedLogin("some-other-org")).isFalse();
+    }
+
+    @Test
+    void isBlockedLoginReturnsFalseForNullOrBlank() {
+        filter.botConfig = configWithDir(testResourcesDir());
+        filter.init();
+
+        assertThat(filter.isBlockedLogin(null)).isFalse();
+        assertThat(filter.isBlockedLogin("")).isFalse();
+        assertThat(filter.isBlockedLogin("   ")).isFalse();
+    }
+
+    @Test
+    void isBlockedLoginReturnsFalseWhenNoFileLoaded() {
+        filter.botConfig = configWithDir(null);
+        filter.init();
+
+        assertThat(filter.isBlockedLogin("test-org-one")).isFalse();
+    }
 }
