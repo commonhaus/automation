@@ -155,6 +155,7 @@ public class ProjectAliasManager extends ScheduledService {
                 if (!hkConfig.isReady()) {
                     updateQueue.queue(taskGroup, () -> repositoryDiscovered(repoEvent));
                 } else if (taskState.shouldRun(ME, Duration.ofHours(12))) {
+                    recordRun();
                     updateQueue.queue(taskGroup, () -> readProjectConfig(taskGroup, qc, true));
                 } else {
                     Log.debug("Skip eager project discovery (ran recently); lazy discovery on updates/cron");
