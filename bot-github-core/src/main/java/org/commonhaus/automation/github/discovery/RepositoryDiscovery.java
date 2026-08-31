@@ -2,6 +2,7 @@ package org.commonhaus.automation.github.discovery;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
@@ -290,7 +291,9 @@ public class RepositoryDiscovery {
         }
         mailer.sendEmail("RepositoryDiscovery",
                 "Configured installations",
-                String.join("\n", scopedInstallationMap.orgs()),
+                scopedInstallationMap.orgs().stream().sorted()
+                        .map(org -> "- " + org)
+                        .collect(Collectors.joining("\n")),
                 mailer.botErrorEmailAddress());
     }
 }
