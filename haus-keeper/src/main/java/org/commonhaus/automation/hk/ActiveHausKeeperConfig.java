@@ -10,11 +10,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.config.EmailNotification;
 import org.commonhaus.automation.config.RepoSource;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent;
+import org.commonhaus.automation.github.discovery.RepositoryDiscoveryEvent.RdePriority;
 import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdate;
@@ -41,6 +46,7 @@ public class ActiveHausKeeperConfig {
 
     protected final AtomicReference<Map<String, Set<String>>> organizationDomains = new AtomicReference<>(Map.of());
     protected final AtomicReference<RepoSource> watchedOrgConfig = new AtomicReference<>(null);
+    protected final AtomicReference<RepoSource> pendingOrgConfig = new AtomicReference<>(null);
 
     @Inject
     PeriodicUpdateQueue updateQueue;
@@ -112,11 +118,51 @@ public class ActiveHausKeeperConfig {
     protected void update(ScopedQueryContext qc, HausKeeperConfig config) {
         currentConfig.set(Optional.of(config));
         updateValidAttestations(qc, config.userManagement());
-        updateOrganizationDomains(qc, config.userManagement());
+        updateOrganizationDomains(qc, config.userManagement(), config.organizationConfig());
 
         // Queue callbacks for config consumers
         for (var callback : callbacks.entrySet()) {
             updateQueue.queueReconciliation(callback.getKey(), callback.getValue());
+        }
+    }
+
+    /**
+     * Retry a deferred organizationConfig once the installation that owns its
+     * repository becomes known. organizationConfig commonly points at a
+     * different org than the home repo -- each org's installation is
+     * discovered independently and asynchronously at startup, so the target
+     * org's installation may not exist yet in ScopedInstallationMap at the
+     * moment HausKeeperConfig is first read. resolveOrgConfigContext returns
+     * null in that case rather than silently querying the wrong
+     * installation; pendingOrgConfig records that a retry is owed, and this
+     * listener performs it as soon as a repository in the target org is
+     * discovered.
+     */
+    protected void onRepositoryDiscovered(
+            @Observes @Priority(value = RdePriority.APP_DISCOVERY) RepositoryDiscoveryEvent repoEvent) {
+        if (!repoEvent.added()) {
+            return;
+        }
+        RepoSource orgConfig = pendingOrgConfig.get();
+        if (orgConfig == null) {
+            return;
+        }
+        String targetOrg = GitHubQueryContext.toOrganizationName(orgConfig.repository());
+        String discoveredOrg = GitHubQueryContext.toOrganizationName(repoEvent.repository().getFullName());
+        if (!targetOrg.equals(discoveredOrg)) {
+            return;
+        }
+        ScopedQueryContext qc = ctx.getOrgScopedQueryContext(targetOrg);
+        if (qc == null) {
+            return;
+        }
+        Log.debugf("%s/onRepositoryDiscovered: retrying deferred organizationConfig %s now that %s is known",
+                UserManager.ME, orgConfig, targetOrg);
+        pendingOrgConfig.set(null);
+        rewatchOrganizationConfig(orgConfig, qc);
+        Map<String, Set<String>> regrouped = readAndRegroupOrganizationDomains(qc, orgConfig);
+        if (regrouped != null) {
+            organizationDomains.set(regrouped);
         }
     }
 
@@ -164,23 +210,39 @@ public class ActiveHausKeeperConfig {
         attestationIds.retainAll(newIds);
     }
 
-    protected void updateOrganizationDomains(ScopedQueryContext homeQc, UserManagementConfig userConfig) {
+    protected void updateOrganizationDomains(ScopedQueryContext homeQc, UserManagementConfig userConfig,
+            RepoSource configuredOrgConfig) {
         // A disabled config has no organizationConfig to read, but any previously
         // registered watch (from when the config was enabled) must still be torn
         // down -- otherwise it keeps firing indefinitely for a disabled feature.
-        RepoSource orgConfig = userConfig.isDisabled() ? null : userConfig.organizationConfig();
-        rewatchOrganizationConfig(orgConfig, homeQc);
+        RepoSource orgConfig = userConfig.isDisabled() ? null : configuredOrgConfig;
 
         if (userConfig.isDisabled()) {
+            pendingOrgConfig.set(null);
+            rewatchOrganizationConfig(null, homeQc);
             return;
         }
 
         if (orgConfig == null || orgConfig.isEmpty()) {
-            Log.debugf("%s/updateOrganizationDomains: no organizationConfig defined in %s", UserManager.ME, userConfig);
+            Log.debugf("%s/updateOrganizationDomains: no organizationConfig defined", UserManager.ME);
+            pendingOrgConfig.set(null);
+            rewatchOrganizationConfig(null, homeQc);
             return;
         }
 
         ScopedQueryContext qc = resolveOrgConfigContext(orgConfig, homeQc);
+        if (qc == null) {
+            // Target org's installation isn't known yet (e.g. discovered
+            // asynchronously at startup, after this org's config was read).
+            // Defer: leave the existing watch/cache untouched and retry via
+            // onRepositoryDiscovered once that installation shows up.
+            Log.debugf("%s/updateOrganizationDomains: no installation yet for %s; deferring", UserManager.ME, orgConfig);
+            pendingOrgConfig.set(orgConfig);
+            return;
+        }
+
+        pendingOrgConfig.set(null);
+        rewatchOrganizationConfig(orgConfig, qc);
         Map<String, Set<String>> regrouped = readAndRegroupOrganizationDomains(qc, orgConfig);
         if (regrouped != null) {
             organizationDomains.set(regrouped);
@@ -224,10 +286,10 @@ public class ActiveHausKeeperConfig {
      * the home repo, each with its own GitHub App installation, so the watch
      * must be registered under the installation that actually owns the target
      * repo -- not the home installation -- or GitHub will never deliver push
-     * events for it. homeQc is only a fallback when no installation exists yet
-     * for that org.
+     * events for it. Callers only pass a non-null orgConfig once qc has
+     * already been resolved to that installation (see resolveOrgConfigContext).
      */
-    private void rewatchOrganizationConfig(RepoSource orgConfig, ScopedQueryContext homeQc) {
+    private void rewatchOrganizationConfig(RepoSource orgConfig, ScopedQueryContext qc) {
         RepoSource previous = watchedOrgConfig.get();
         boolean previousPresent = previous != null && !previous.isEmpty();
         boolean newPresent = orgConfig != null && !orgConfig.isEmpty();
@@ -240,7 +302,6 @@ public class ActiveHausKeeperConfig {
             fileWatcher.unwatchFile(ORG_CONFIG_TASK_GROUP, previous.repository(), previous.filePath());
         }
         if (newPresent) {
-            ScopedQueryContext qc = resolveOrgConfigContext(orgConfig, homeQc);
             fileWatcher.watchFile(ORG_CONFIG_TASK_GROUP, qc.getInstallationId(),
                     orgConfig.repository(), orgConfig.filePath(),
                     (fileUpdate) -> onOrganizationConfigChanged(fileUpdate, orgConfig));
@@ -250,16 +311,13 @@ public class ActiveHausKeeperConfig {
 
     /**
      * Resolve the ScopedQueryContext for the installation that owns orgConfig's
-     * repository, trying forOrganization first (dry-run-aware) and falling back
-     * to forPublicContent, then finally to homeQc if neither can find an
-     * installation for that org.
+     * repository. Returns null -- rather than silently falling back to homeQc's
+     * installation -- if no installation is known yet for that org, since
+     * homeQc's installation has no access to a repository in a different org
+     * and querying it anyway produces a misleading 404.
      */
     private ScopedQueryContext resolveOrgConfigContext(RepoSource orgConfig, ScopedQueryContext homeQc) {
-        ScopedQueryContext qc = homeQc.forOrganization(orgConfig.repository(), homeQc.isDryRun());
-        if (qc == null) {
-            qc = homeQc.forPublicContent(orgConfig.repository());
-        }
-        return qc == null ? homeQc : qc;
+        return homeQc.forOrganization(orgConfig.repository(), homeQc.isDryRun());
     }
 
     /**

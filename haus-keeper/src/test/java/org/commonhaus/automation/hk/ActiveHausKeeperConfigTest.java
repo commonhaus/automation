@@ -208,9 +208,9 @@ public class ActiveHausKeeperConfigTest extends HausKeeperTestBase {
         String yaml = """
                 userManagement:
                   enabled: false
-                  organizationConfig:
-                    repository: %s
-                    filePath: %s
+                organizationConfig:
+                  repository: %s
+                  filePath: %s
                 emailNotifications:
                   errors:
                     - repo-errors@example.com

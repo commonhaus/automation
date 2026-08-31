@@ -3,9 +3,9 @@ userManagement:
   attestations:
     repository: commonhaus/foundation
     filePath: ATTESTATIONS.yaml
-  organizationConfig:
-    repository: commonhaus-test/sponsors-test
-    filePath: cf-haus-organization.yml
+organizationConfig:
+  repository: commonhaus-test/sponsors-test
+  filePath: cf-haus-organization.yml
 emailNotifications:
   errors:
     - repo-errors@example.com

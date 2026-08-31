@@ -205,9 +205,9 @@ public class ProjectAliasManagerTest extends HausKeeperTestBase {
                   attestations:
                     repository: commonhaus/foundation
                     filePath: ATTESTATIONS.yaml
-                  organizationConfig:
-                    repository: %s
-                    filePath: %s
+                organizationConfig:
+                  repository: %s
+                  filePath: %s
                 emailNotifications:
                   errors:
                     - repo-errors@example.com

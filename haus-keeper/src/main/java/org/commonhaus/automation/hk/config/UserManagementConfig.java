@@ -23,7 +23,6 @@ public class UserManagementConfig {
 
     String defaultAliasDomain;
     RepoSource attestations;
-    RepoSource organizationConfig;
     GroupRoleConfig groupRole;
     Map<String, String> roleStatus = new HashMap<>();
 
@@ -33,10 +32,6 @@ public class UserManagementConfig {
 
     public RepoSource attestations() {
         return attestations;
-    }
-
-    public RepoSource organizationConfig() {
-        return organizationConfig;
     }
 
     public Map<String, String> teamRoles() {
