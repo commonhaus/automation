@@ -5,6 +5,7 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrga
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,7 +44,7 @@ public class GitHubEventFilter {
         this.allowlistByName = botConfig.allowedInstallations().orElse(Set.of())
                 .stream()
                 .filter(v -> v != null && !v.isBlank())
-                .map(String::toLowerCase)
+                .map(v -> v.toLowerCase(Locale.ROOT))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
         // read shared blocklist
@@ -77,7 +78,7 @@ public class GitHubEventFilter {
         if (installationId == null || login == null || login.isBlank()) {
             return;
         }
-        String normalizedLogin = login.toLowerCase();
+        String normalizedLogin = login.toLowerCase(Locale.ROOT);
         if (blocklistByName.contains(normalizedLogin)) {
             return;
         }
@@ -143,7 +144,7 @@ public class GitHubEventFilter {
         if (login == null || login.isBlank()) {
             return !allowlistByName.isEmpty();
         }
-        String normalizedLogin = login.toLowerCase();
+        String normalizedLogin = login.toLowerCase(Locale.ROOT);
         if (blocklistByName.contains(normalizedLogin)) {
             return true;
         }
@@ -169,7 +170,7 @@ public class GitHubEventFilter {
      */
     void setNameBlocklistForTesting(Set<String> names) {
         blocklistByName = names.stream()
-                .map(String::toLowerCase)
+                .map(v -> v.toLowerCase(Locale.ROOT))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 }
