@@ -32,6 +32,14 @@ public interface BotConfig {
     Optional<Set<String>> allowedInstallations();
 
     /**
+     * CIDR block that may access admin routes (e.g. "172.20.0.0/24").
+     * When set, {@code LocalRouteOnly} requires that the request's remote
+     * address falls within this range AND that no proxy headers are present.
+     * When absent, only the proxy-header absence check is applied.
+     */
+    Optional<String> adminNetwork();
+
+    /**
      * True if changes should not be made to the repository
      */
     Optional<Boolean> dryRun();

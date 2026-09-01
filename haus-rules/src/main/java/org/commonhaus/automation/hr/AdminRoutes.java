@@ -3,6 +3,7 @@ package org.commonhaus.automation.hr;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.config.LocalRouteOnly;
 import org.commonhaus.automation.hr.voting.VoteProcessor;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
@@ -17,6 +18,9 @@ import io.vertx.ext.web.RoutingContext;
 public class AdminRoutes implements LocalRouteOnly {
 
     @Inject
+    BotConfig botConfig;
+
+    @Inject
     VoteProcessor voteProcessor;
 
     @Inject
@@ -24,7 +28,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/votes", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerVoteCount(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }

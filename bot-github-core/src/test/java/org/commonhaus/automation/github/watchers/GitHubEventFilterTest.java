@@ -117,6 +117,11 @@ class GitHubEventFilterTest {
                         ? Optional.empty()
                         : Optional.of(allowedInstallations);
             }
+
+            @Override
+            public Optional<String> adminNetwork() {
+                return Optional.empty();
+            }
         };
     }
 

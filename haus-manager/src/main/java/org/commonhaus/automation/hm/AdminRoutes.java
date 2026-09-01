@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.config.LocalRouteOnly;
 import org.commonhaus.automation.github.stats.ProjectHealthCollector;
 import org.commonhaus.automation.hm.github.AppContextService;
@@ -25,6 +26,9 @@ import io.vertx.ext.web.RoutingContext;
 
 @Singleton
 public class AdminRoutes implements LocalRouteOnly {
+    @Inject
+    BotConfig botConfig;
+
     @Inject
     AppContextService ctx;
 
@@ -69,7 +73,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/health", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerHealthUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -78,7 +82,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/collaborators", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerAllCollaborators(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -89,7 +93,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/domains", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerDomainRefresh(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -104,7 +108,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/domain", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerDomainInfo(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -140,7 +144,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/installations", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerInstallationUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -153,7 +157,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/annualAssetReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerAnnualAssetReport(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -169,7 +173,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/org", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerOrgUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -182,7 +186,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/projects", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerProjectUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -195,7 +199,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/sponsors", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerSponsorUpdate(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -208,7 +212,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/statistics", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerStatistics(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -257,7 +261,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/projectHealthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerProjectHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }
@@ -277,7 +281,7 @@ public class AdminRoutes implements LocalRouteOnly {
 
     @Route(path = "/healthReport", order = 99, produces = "text/html", methods = { HttpMethod.GET })
     public void triggerHealthReport(RoutingContext routingContext, RoutingExchange routingExchange) {
-        if (!isDirectConnection(routingExchange)) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
             rejectNonLocalAccess(routingExchange);
             return;
         }

@@ -160,4 +160,9 @@ public class TestBotConfig implements BotConfig {
     public Optional<Set<String>> allowedInstallations() {
         return Optional.empty();
     }
+
+    @Override
+    public Optional<String> adminNetwork() {
+        return Optional.empty();
+    }
 }
