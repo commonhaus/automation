@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import io.quarkus.qute.Engine;
@@ -16,7 +17,7 @@ import io.quarkus.vertx.web.RoutingExchange;
 import io.vertx.ext.web.RoutingContext;
 
 @Singleton
-public class RouteSupplier {
+public class RouteSupplier implements LocalRouteOnly {
     private static final Map<String, Supplier<String>> suppliers = new HashMap<>();
 
     public static void registerSupplier(String key, Supplier<String> supplier) {
@@ -28,19 +29,26 @@ public class RouteSupplier {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
     }
 
+    @Inject
+    BotConfig botConfig;
+
     private final Engine engine;
 
     RouteSupplier(Engine engine) {
         this.engine = engine;
     }
 
-    @Route(path = "/ping", order = 99, produces = "text/html", methods = { HttpMethod.GET })
-    public void handlePingRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
-        handleRootRequest(routingContext, routingExchange);
+    @Route(path = "/", order = 99, produces = "text/plain", methods = { HttpMethod.GET })
+    public void handleRootRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
+        routingExchange.ok().end("hello");
     }
 
-    @Route(path = "/", order = 99, produces = "text/html", methods = { HttpMethod.GET })
-    public void handleRootRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
+    @Route(path = "/ping", order = 99, produces = "text/html", methods = { HttpMethod.GET })
+    public void handlePingRequest(RoutingContext routingContext, RoutingExchange routingExchange) {
+        if (!isDirectConnection(routingExchange, botConfig.adminNetwork())) {
+            rejectNonLocalAccess(routingExchange);
+            return;
+        }
         routingExchange
                 .ok()
                 .putHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex")

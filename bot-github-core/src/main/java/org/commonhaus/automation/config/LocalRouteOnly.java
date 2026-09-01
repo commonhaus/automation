@@ -12,9 +12,9 @@ public interface LocalRouteOnly {
     /**
      * Returns {@code true} if the request is a direct (non-proxied) connection.
      *
-     * When {@code adminNetwork} is present, the remote address must also fall
-     * within that CIDR range. When absent, only the proxy-header absence check
-     * is applied.
+     * Loopback addresses (127.0.0.1 or ::1) are always allowed.
+     * When {@code adminNetwork} is present, non-loopback addresses must also fall
+     * within that CIDR range. When absent, any non-proxied address is accepted.
      *
      * @param rex the routing exchange
      * @param adminNetwork optional CIDR block, e.g. {@code "172.20.0.0/24"}
@@ -28,10 +28,14 @@ public interface LocalRouteOnly {
             return false;
         }
 
+        String host = request.remoteAddress().host();
+        if ("127.0.0.1".equals(host) || "::1".equals(host)) {
+            return true;
+        }
+
         // If a trusted network is configured, the remote address must also be in range
         if (adminNetwork.isPresent()) {
-            String remoteHost = request.remoteAddress().host();
-            return isInCidr(remoteHost, adminNetwork.get());
+            return isInCidr(host, adminNetwork.get());
         }
 
         return true;
