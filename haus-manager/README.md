@@ -63,8 +63,6 @@ emailNotifications:
 
 This automatically grants repository access to members of `other-org/teamA`.
 
-## Advanced Features
-
 ### Team Management
 
 Synchronize team membership in your project's GitHub organization based on source-controlled configuration files:
