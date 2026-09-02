@@ -32,6 +32,9 @@ public class Alias {
     public Set<String> recipients;
 
     public boolean has_recipient_verification;
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public boolean has_imap;
     public Set<String> verified_recipients;
 
     @Override
@@ -41,9 +44,10 @@ public class Alias {
                 + ", created_at=" + created_at + ", updated_at=" + updated_at + "]";
     }
 
-    public boolean isDirty(String description, Set<String> recipients) {
+    public boolean isDirty(String description, Set<String> recipients, boolean hasImap) {
         return !Objects.equals(this.recipients, recipients)
-                || !Objects.equals(this.description, description);
+                || !Objects.equals(this.description, description)
+                || has_imap != hasImap;
     }
 
     public static class AliasDomain {

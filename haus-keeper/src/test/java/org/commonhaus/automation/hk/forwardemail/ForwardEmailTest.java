@@ -19,6 +19,8 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.quarkiverse.githubapp.testing.GitHubAppTest;
 import io.quarkus.test.common.http.TestHTTPEndpoint;
 import io.quarkus.test.junit.QuarkusTest;
@@ -37,6 +39,9 @@ public class ForwardEmailTest extends HausKeeperTestBase {
 
     @Inject
     ForwardEmailTestEndpoint testEndpoint;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     @Override
     @BeforeEach
@@ -185,7 +190,8 @@ public class ForwardEmailTest extends HausKeeperTestBase {
         setUserManagementConfig();
 
         Map<AliasKey, Alias> aliases = forwardEmailService.postAliases(
-                Map.of(AliasKey.fromCache("make_new@commonhaus.dev"), Set.of("new@commonhaus.org")),
+                Map.of(AliasKey.fromCache("make_new@commonhaus.dev"),
+                        new AliasUpdate(Set.of("new@commonhaus.org"), false)),
                 "Test User");
         assertThat(aliases).size().isEqualTo(1);
 
@@ -209,7 +215,8 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     public void testUpdateAlias() throws Exception {
         setUserManagementConfig();
         forwardEmailService.postAliases(
-                Map.of(AliasKey.fromCache("test@commonhaus.dev"), Set.of("test@commonhaus.org")),
+                Map.of(AliasKey.fromCache("test@commonhaus.dev"),
+                        new AliasUpdate(Set.of("test@commonhaus.org"), true)),
                 "Test User");
         var methodCalls = testEndpoint.getMethodCalls();
         assertThat(methodCalls).size().isEqualTo(2);
@@ -225,6 +232,32 @@ public class ForwardEmailTest extends HausKeeperTestBase {
         var alias = (TestAlias) call.params().get("alias");
         assertThat(alias).isNotNull();
         assertThat(alias.name).isEqualTo("test");
+        assertThat(alias.has_imap).isTrue();
+    }
+
+    @Test
+    public void testUpdateAliasDisableImap() throws Exception {
+        setUserManagementConfig();
+        // Fixture starts with has_imap=true; toggle it off.
+        forwardEmailService.postAliases(
+                Map.of(AliasKey.fromCache("test@commonhaus.dev"),
+                        new AliasUpdate(Set.of("test@commonhaus.org"), false)),
+                "Test User");
+        var methodCalls = testEndpoint.getMethodCalls();
+        assertThat(methodCalls).size().isEqualTo(2);
+
+        var call = methodCalls.get(1);
+        assertThat(call.method()).isEqualTo("PUT");
+        var alias = (TestAlias) call.params().get("alias");
+        assertThat(alias).isNotNull();
+        assertThat(alias.has_imap).isFalse();
+
+        // Verify has_imap=false is actually present on the wire, not omitted by
+        // Alias's class-level @JsonInclude(NON_DEFAULT).
+        Alias sent = new Alias();
+        sent.has_imap = false;
+        String json = objectMapper.writeValueAsString(sent);
+        assertThat(json).contains("\"has_imap\":false");
     }
 
     @Test

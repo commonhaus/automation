@@ -45,6 +45,7 @@ public class ForwardEmailTestEndpoint {
         public Set<String> recipients;
 
         public boolean has_recipient_verification;
+        public boolean has_imap;
         public Set<String> verified_recipients;
     }
 
@@ -79,6 +80,7 @@ public class ForwardEmailTestEndpoint {
         test.description = "Test Only (delete me)";
         test.recipients = Set.of("test@example.com");
         test.is_enabled = true;
+        test.has_imap = true;
         test.domain = new AliasDomain();
         test.domain.name = commonhaus.name;
     }

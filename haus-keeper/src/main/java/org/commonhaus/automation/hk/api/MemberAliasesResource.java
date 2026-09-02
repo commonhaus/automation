@@ -1,7 +1,6 @@
 package org.commonhaus.automation.hk.api;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,6 +17,7 @@ import org.commonhaus.automation.hk.data.ApiResponse;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.forwardemail.Alias;
 import org.commonhaus.automation.hk.forwardemail.AliasKey;
+import org.commonhaus.automation.hk.forwardemail.AliasUpdate;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
@@ -79,7 +79,7 @@ public class MemberAliasesResource {
     @POST
     @KnownUser
     @Produces("application/json")
-    public Response updateAliases(Map<String, Set<String>> aliases) {
+    public Response updateAliases(Map<String, AliasUpdate> aliases) {
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
             if (user == null) {
@@ -91,7 +91,7 @@ public class MemberAliasesResource {
                         .finish();
             }
 
-            Map<AliasKey, Set<String>> sanitized = emailService.sanitizeInputAddresses(session, user, aliases);
+            Map<AliasKey, AliasUpdate> sanitized = emailService.sanitizeInputUpdates(session, user, aliases);
             if (sanitized.isEmpty()) {
                 Log.debugf("[%s] updateAliases: No valid email addresses to update: %s", session.login(), aliases.keySet());
                 return Response.status(Response.Status.NO_CONTENT).build();

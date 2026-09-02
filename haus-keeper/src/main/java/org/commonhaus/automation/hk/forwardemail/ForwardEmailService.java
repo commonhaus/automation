@@ -83,21 +83,22 @@ public class ForwardEmailService {
      * @see #fetchAliases(Set, boolean)
      * @see #putAlias(AliasKey, String, Set, Alias)
      */
-    public Map<AliasKey, Alias> postAliases(Map<AliasKey, Set<String>> aliases, String description) {
+    public Map<AliasKey, Alias> postAliases(Map<AliasKey, AliasUpdate> aliases, String description) {
         if (emailDisabled()) {
             return Map.of();
         }
         Map<AliasKey, Alias> result = new HashMap<>();
         Map<AliasKey, Alias> existingAliases = fetchAliases(aliases.keySet());
-        for (Map.Entry<AliasKey, Set<String>> entry : aliases.entrySet()) {
+        for (Map.Entry<AliasKey, AliasUpdate> entry : aliases.entrySet()) {
             try {
                 AliasKey key = entry.getKey();
                 Alias existing = existingAliases.get(key);
-                Set<String> recipients = entry.getValue();
+                AliasUpdate update = entry.getValue();
+                Set<String> recipients = update.recipients();
 
                 // API CALL: Create or Update alias
                 // will throw WebApplicationException if not found or error
-                Alias updated = putAlias(key, description, recipients, existing);
+                Alias updated = putAlias(key, description, recipients, update.has_imap(), existing);
                 result.put(key, updated);
             } catch (WebApplicationException e) {
                 if (e.getResponse().getStatus() == 404) {
@@ -193,7 +194,7 @@ public class ForwardEmailService {
      * @throws WebApplicationException on Rest Client error
      */
     protected Alias putAlias(AliasKey aliasKey, String description,
-            Set<String> recipients, Alias existing) {
+            Set<String> recipients, boolean hasImap, Alias existing) {
         if (emailDisabled() || recipients == null || recipients.isEmpty()) {
             return null;
         }
@@ -206,11 +207,13 @@ public class ForwardEmailService {
             alias.recipients = recipients;
             alias.is_enabled = true;
             alias.has_recipient_verification = true;
+            alias.has_imap = hasImap;
             // API CALL: will throw WebApplicationException or error
             alias = forwardEmailClient.createAlias(aliasKey.domain(), alias);
-        } else if (alias.isDirty(description, recipients)) {
+        } else if (alias.isDirty(description, recipients, hasImap)) {
             alias.has_recipient_verification = true;
             alias.description = description;
+            alias.has_imap = hasImap;
             alias.recipients = recipients;
             if (alias.verified_recipients != null) {
                 alias.verified_recipients.retainAll(recipients);
@@ -254,15 +257,17 @@ public class ForwardEmailService {
         return addresses.stream().map(this::normalizeAlias).collect(Collectors.toSet());
     }
 
-    public Map<AliasKey, Set<String>> sanitizeInputAddresses(Map<String, Set<String>> input, Set<AliasKey> permitted) {
-        // Filter/Remove any unknown/extraneous email addresses
-        Map<AliasKey, Set<String>> sanitized = new HashMap<>();
+    public Map<AliasKey, AliasUpdate> sanitizeInputUpdates(MemberSession session, CommonhausUser user,
+            Map<String, AliasUpdate> input) {
+        Set<AliasKey> permitted = getConfiguredAliases(session, user);
+        Map<AliasKey, AliasUpdate> sanitized = new HashMap<>();
         input.entrySet().forEach(x -> {
             AliasKey address = normalizeAlias(x.getKey());
             if (permitted.contains(address)) {
                 sanitized.put(address, x.getValue());
             }
         });
+        Log.debugf("sanitizeInputUpdates: permitted=%s, sanitized=%s", permitted, sanitized);
         return sanitized;
     }
 
@@ -273,21 +278,5 @@ public class ForwardEmailService {
         Services services = user.services();
         ForwardEmail emailConfig = services.forwardEmail();
         return normalizeEmailAddresses(session, emailConfig);
-    }
-
-    public Map<AliasKey, Set<String>> sanitizeInputAddresses(MemberSession session, CommonhausUser user,
-            Map<String, Set<String>> input) {
-        Set<AliasKey> permitted = getConfiguredAliases(session, user);
-
-        // Filter/Remove any unknown/extraneous email addresses
-        Map<AliasKey, Set<String>> sanitized = new HashMap<>();
-        input.entrySet().forEach(x -> {
-            AliasKey address = normalizeAlias(x.getKey());
-            if (permitted.contains(address)) {
-                sanitized.put(address, x.getValue());
-            }
-        });
-        Log.debugf("sanitizeInputAddresses: permitted=%s, sanitized=%s", permitted, sanitized);
-        return sanitized;
     }
 }

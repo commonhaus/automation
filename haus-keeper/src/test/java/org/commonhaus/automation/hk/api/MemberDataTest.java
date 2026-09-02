@@ -31,6 +31,7 @@ import org.commonhaus.automation.hk.api.MemberAttestationResource.AttestationPos
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.hk.data.MemberStatus;
+import org.commonhaus.automation.hk.forwardemail.AliasUpdate;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
 import org.commonhaus.automation.hk.member.MemberApplicationProcess;
@@ -290,8 +291,8 @@ public class MemberDataTest extends HausKeeperTestBase {
         appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
         addCollaborator(sponsorsRepo, "otherUser");
 
-        Map<String, Set<String>> input = Map.of(
-                botLogin, Set.of("target@example.com"));
+        Map<String, AliasUpdate> input = Map.of(
+                botLogin, new AliasUpdate(Set.of("target@example.com"), false));
 
         given()
                 .log().all()
