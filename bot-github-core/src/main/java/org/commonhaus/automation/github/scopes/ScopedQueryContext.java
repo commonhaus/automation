@@ -18,6 +18,7 @@ import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
+import io.quarkus.logging.Log;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
 public class ScopedQueryContext extends GitHubQueryContext {
@@ -101,6 +102,11 @@ public class ScopedQueryContext extends GitHubQueryContext {
 
         // Otherwise, create a new context for the target organization
         ScopedQueryContext newContext = ctx.getOrgScopedQueryContext(orgName);
+        // Fall back to original context in dry run mode
+        if (newContext == null) {
+            Log.warnf("[%s] No installation for %s (dry run: %b)", getLogId(), orgName, isDryRun);
+            return isDryRun ? this : null;
+        }
         return newContext;
     }
 
