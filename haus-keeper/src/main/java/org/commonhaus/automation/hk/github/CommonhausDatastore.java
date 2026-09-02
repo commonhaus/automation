@@ -251,14 +251,41 @@ public class CommonhausDatastore {
         }
 
         GHContent responseContent = response.getContent();
+        verifyPersistedUser(userKey, entry, dqc, user, responseContent, 0);
+    }
+
+    /**
+     * Re-read the just-committed file from GitHub to confirm the write is visible
+     * before marking the update finished. GitHub's content API can lag briefly
+     * after a commit (read-after-write consistency), so a not-yet-visible read here
+     * is expected and retried rather than treated as a persistence failure --
+     * the commit itself already succeeded.
+     *
+     * @param retryCount Number of verification retries attempted
+     */
+    private void verifyPersistedUser(String userKey, DatastoreCacheEntry entry, DatastoreQueryContext dqc,
+            CommonhausUser user, GHContent responseContent, int retryCount) {
         final CommonhausUser updated = dqc.readYamlContent(responseContent, CommonhausUser.class);
         if (updated != null) {
             updated.sha(responseContent.getSha()); // update sha in the user data
             entry.finishUpdate(updated);
             pendingJournal.remove(userKey); // remove from journal
-        } else {
-            handlePersistenceError(dqc, entry, user, retryCount);
+            return;
         }
+
+        if (dqc.checkRemoveNotFound()) {
+            // Commit already succeeded; GitHub's read-after-write lag means the file
+            // isn't visible yet. Retry the verification read (not the commit).
+            Log.infof("[%s|%s] Verification read after commit not yet visible, scheduling retry #%d",
+                    dqc.getLogId(), entry.userKey(), retryCount + 1);
+            updateQueue.scheduleReconciliationRetry(userKey,
+                    count -> verifyPersistedUser(userKey, entry, dqc, user, responseContent, count), retryCount);
+            return;
+        }
+
+        // Some other error occurred while verifying the commit; let the standard
+        // error handling decide whether to retry or report.
+        handlePersistenceError(dqc, entry, user, retryCount);
     }
 
     /**
