@@ -163,11 +163,24 @@ public class ForwardEmailTestEndpoint {
         return Response.ok().entity(alias).build();
     }
 
+    public static record GeneratePasswordResponse(String username, String password) {
+    }
+
     @POST
     @Path("/domains/{fqdn}/aliases/{id}/generate-password")
-    public void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions) {
+    public Response generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id,
+            GeneratePassword instructions) {
         methodCalls.add(new ApiCall("POST", "/domains/" + fqdn + "/aliases/" + id + "/generate-password",
                 Map.of("instructions", instructions)));
+        if ("not_found".equals(id)) {
+            throw new WebApplicationException(404);
+        }
+        if ("error".equals(id)) {
+            throw new WebApplicationException(500);
+        }
+        TestAlias alias = test.id.equals(id) ? test : null;
+        String username = alias != null ? alias.name + "@" + fqdn : id + "@" + fqdn;
+        return Response.ok().entity(new GeneratePasswordResponse(username, instructions.new_password())).build();
     }
 
     public static TestAlias create(String name, String description, String id, TestDomain domain) {
@@ -177,6 +190,7 @@ public class ForwardEmailTestEndpoint {
         alias.id = id;
         alias.domain = new AliasDomain();
         alias.domain.name = domain.name;
+        alias.has_imap = true;
         return alias;
     }
 }

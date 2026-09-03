@@ -316,6 +316,126 @@ public class MemberDataTest extends HausKeeperTestBase {
             @UserInfo(key = "node_id", value = botNodeId),
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
+    void testUpdateCommonhausUserRejectsEmptyRecipientsNoImap() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        Map<String, AliasUpdate> input = Map.of(
+                botLogin, new AliasUpdate(Set.of(), false));
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body("ERROR", notNullValue());
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordWithEmail() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "commonhaus-bot@example.com", null, "new-password", true, null);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("ALIAS.password", equalTo("new-password"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordNotPermitted() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "not-permitted@example.com", null, "new-password", true, null);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body(equalTo(""));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordMalformedAlias() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "not-an-email", null, "new-password", true, null);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body("ERROR", equalTo("alias is not a valid email address"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
     void testGetCommonhausSponsor() throws Exception {
         mockExistingCommonhausData(UserPath.WITH_EMAIL_SPONSOR);
 

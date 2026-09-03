@@ -18,7 +18,9 @@ import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.forwardemail.Alias;
 import org.commonhaus.automation.hk.forwardemail.AliasKey;
 import org.commonhaus.automation.hk.forwardemail.AliasUpdate;
+import org.commonhaus.automation.hk.forwardemail.AliasValidationException;
 import org.commonhaus.automation.hk.forwardemail.ForwardEmailService;
+import org.commonhaus.automation.hk.forwardemail.GeneratePasswordResponse;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 
@@ -80,8 +82,9 @@ public class MemberAliasesResource {
     @KnownUser
     @Produces("application/json")
     public Response updateAliases(Map<String, AliasUpdate> aliases) {
+        CommonhausUser user = null;
         try {
-            CommonhausUser user = datastore.getCommonhausUser(session);
+            user = datastore.getCommonhausUser(session);
             if (user == null) {
                 throw new WebApplicationException(UNKNOWN_USER, Status.NOT_FOUND);
             }
@@ -104,6 +107,11 @@ public class MemberAliasesResource {
                     .setData(ApiResponse.Type.ALIAS, aliasMap.entrySet().stream()
                             .collect(Collectors.toMap(e -> e.getKey().email(), Map.Entry::getValue)))
                     .finish();
+        } catch (AliasValidationException e) {
+            return user.toResponse()
+                    .setData(ApiResponse.Type.ERROR, e.getMessage())
+                    .responseStatus(Response.Status.BAD_REQUEST)
+                    .finish();
         } catch (Throwable e) {
             return ctx.toResponse("updateAliases", "Unable to update user aliases for " + session.login(), e);
         }
@@ -113,7 +121,8 @@ public class MemberAliasesResource {
     @KnownUser
     @Path("/password")
     @Produces("application/json")
-    public Response generatePassword(AliasRequest request) {
+    public Response generatePassword(PasswordRequest request) {
+        String requestAlias = request == null ? null : request.alias();
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
             if (user == null) {
@@ -125,19 +134,43 @@ public class MemberAliasesResource {
                         .finish();
             }
 
+            if (request == null) {
+                return user.toResponse()
+                        .setData(ApiResponse.Type.ERROR, "password request is required")
+                        .responseStatus(Response.Status.BAD_REQUEST)
+                        .finish();
+            }
+
+            if (!AliasKey.isValidFormat(requestAlias)) {
+                return user.toResponse()
+                        .setData(ApiResponse.Type.ERROR, "alias is not a valid email address")
+                        .responseStatus(Response.Status.BAD_REQUEST)
+                        .finish();
+            }
+
             // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
-            AliasKey key = AliasKey.fromCache(request.email());
+            AliasKey key = AliasKey.fromCache(requestAlias);
             Alias alias = aliasMap.get(key);
 
-            return emailService.generatePassword(alias)
-                    ? Response.noContent().build()
-                    : Response.status(Response.Status.BAD_REQUEST).build();
+            GeneratePasswordResponse response = emailService.generatePassword(
+                    alias, request.new_password(), request.password(), request.reset(), request.email());
+
+            return response == null
+                    ? Response.status(Response.Status.BAD_REQUEST).build()
+                    : user.toResponse()
+                            .setData(ApiResponse.Type.ALIAS, response)
+                            .finish();
         } catch (Throwable e) {
-            return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + request.email(), e);
+            return ctx.toResponse("generatePassword", "Unable to generate SMTP password for " + requestAlias, e);
         }
     }
 
-    public record AliasRequest(String email) {
+    public record PasswordRequest(
+            String alias,
+            String password,
+            String new_password,
+            boolean reset,
+            String email) {
     }
 }

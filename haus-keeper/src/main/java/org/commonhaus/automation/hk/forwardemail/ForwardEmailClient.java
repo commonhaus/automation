@@ -49,7 +49,8 @@ public interface ForwardEmailClient {
 
     @POST
     @Path("/domains/{fqdn}/aliases/{id}/generate-password")
-    void generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id, GeneratePassword instructions);
+    GeneratePasswordResponse generatePassword(@PathParam("fqdn") String fqdn, @PathParam("id") String id,
+            GeneratePassword instructions);
 
     default String lookupAuth() {
         String value = token.get();

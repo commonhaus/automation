@@ -25,6 +25,7 @@ import io.quarkus.logging.Log;
 
 @Singleton
 public class ForwardEmailService {
+    private static final int MAX_PASSWORD_LENGTH = 128;
 
     @RestClient
     ForwardEmailClient forwardEmailClient;
@@ -87,6 +88,8 @@ public class ForwardEmailService {
         if (emailDisabled()) {
             return Map.of();
         }
+        validateUpdates(aliases);
+
         Map<AliasKey, Alias> result = new HashMap<>();
         Map<AliasKey, Alias> existingAliases = fetchAliases(aliases.keySet());
         for (Map.Entry<AliasKey, AliasUpdate> entry : aliases.entrySet()) {
@@ -112,29 +115,78 @@ public class ForwardEmailService {
     }
 
     /**
-     * Generate a password for the specified email alias using the ForwardEmail Rest Client
+     * Validate all updates in the batch before any ForwardEmail API call is made.
+     * All-or-nothing: if any alias fails validation, the whole batch is rejected
+     * and no alias in it is applied.
      *
-     * @param alias
-     * @return
+     * @throws AliasValidationException on the first validation failure found
      */
-    public boolean generatePassword(Alias alias) {
-        if (emailDisabled() || alias == null || alias.verified_recipients == null || alias.verified_recipients.isEmpty()) {
-            return false;
+    protected void validateUpdates(Map<AliasKey, AliasUpdate> aliases) {
+        for (Map.Entry<AliasKey, AliasUpdate> entry : aliases.entrySet()) {
+            AliasKey key = entry.getKey();
+            AliasUpdate update = entry.getValue();
+            Set<String> recipients = update.recipients();
+            boolean hasRecipients = recipients != null && !recipients.isEmpty();
+
+            if (!hasRecipients && !update.has_imap()) {
+                throw new AliasValidationException(
+                        "alias " + key + " must have at least one recipient or have_imap enabled");
+            }
+
+            if (recipients != null && !recipients.isEmpty()) {
+                Domain domain = getDomain(key.domain());
+                if (domain != null && domain.max_recipients_per_alias != null
+                        && recipients.size() > domain.max_recipients_per_alias) {
+                    throw new AliasValidationException(
+                            "alias " + key + " recipients exceeds max_recipients_per_alias ("
+                                    + domain.max_recipients_per_alias + ")");
+                }
+            }
+        }
+    }
+
+    /**
+     * Set/change the password for the specified email alias using the ForwardEmail Rest Client
+     *
+     * @param alias Alias to set the password for
+     * @param newPassword Member-supplied new password (required)
+     * @param currentPassword Current password, to preserve mailbox contents (optional)
+     * @param reset Whether the member has confirmed a destructive reset (maps to ForwardEmail's is_override)
+     * @param email Verified recipient to notify, if any (maps to ForwardEmail's emailed_instructions)
+     * @return the ForwardEmail confirmation response, or null if the alias is null or ineligible
+     */
+    public GeneratePasswordResponse generatePassword(Alias alias, String newPassword, String currentPassword,
+            boolean reset, String email) {
+        if (newPassword == null || newPassword.isEmpty()) {
+            throw new WebApplicationException("new_password is required", Status.BAD_REQUEST);
+        }
+        if (newPassword.length() > MAX_PASSWORD_LENGTH
+                || !newPassword.equals(newPassword.strip())
+                || newPassword.indexOf('"') >= 0
+                || newPassword.indexOf('\'') >= 0) {
+            throw new WebApplicationException(
+                    "new_password must be 128 characters or fewer, have no leading or trailing whitespace, "
+                            + "and contain no quotes or apostrophes",
+                    Status.BAD_REQUEST);
+        }
+
+        boolean hasVerifiedRecipient = alias != null && alias.verified_recipients != null
+                && !alias.verified_recipients.isEmpty();
+        if (emailDisabled() || alias == null || (!hasVerifiedRecipient && !alias.has_imap)) {
+            return null;
         }
 
         // Check for null domain or id which would cause NullPointerException in REST client
         if (alias.domain == null || alias.domain.name == null || alias.id == null) {
             Log.errorf("generatePassword: Invalid alias data: %s", alias);
-            return false;
+            return null;
         }
 
         // API CALL: will throw WebApplicationException if not found or error
-        String targetEmail = alias.verified_recipients.iterator().next();
-        forwardEmailClient.generatePassword(
+        return forwardEmailClient.generatePassword(
                 alias.domain.name,
                 alias.id,
-                new GeneratePassword(true, targetEmail));
-        return true;
+                new GeneratePassword(reset, email, newPassword, currentPassword));
     }
 
     /**
@@ -181,6 +233,33 @@ public class ForwardEmailService {
             }
         }
         return alias;
+    }
+
+    /**
+     * Wrap the call to ForwardEmailClient.getDomains to cache the result
+     *
+     * @param fqdn Domain name to fetch (e.g. "commonhaus.dev")
+     * @return the matching Domain, or null if not found
+     * @throws WebApplicationException on Rest Client error
+     */
+    protected Domain getDomain(String fqdn) {
+        if (emailDisabled()) {
+            return null;
+        }
+        Domain domain = AdminDataCache.DOMAINS.get(fqdn);
+        if (domain == null) {
+            // API CALL: will throw WebApplicationException on error
+            Set<Domain> domains = forwardEmailClient.getDomains();
+            domain = domains.stream()
+                    .filter(x -> fqdn.equals(x.name))
+                    .findFirst()
+                    .orElse(null);
+            if (domain != null) {
+                Log.debugf("Cache retrieved domain: %s", domain);
+                AdminDataCache.DOMAINS.put(fqdn, domain);
+            }
+        }
+        return domain;
     }
 
     /**

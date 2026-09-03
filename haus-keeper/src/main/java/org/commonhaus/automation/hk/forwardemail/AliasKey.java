@@ -26,6 +26,18 @@ public record AliasKey(
         return new AliasKey(parts[0], parts[1], email);
     }
 
+    /**
+     * Validate that a caller-supplied address has exactly one '@' with a
+     * non-empty local part and domain, i.e. is safe to pass to {@link #fromCache(String)}.
+     */
+    public static boolean isValidFormat(String email) {
+        if (email == null) {
+            return false;
+        }
+        int at = email.indexOf('@');
+        return at > 0 && at == email.lastIndexOf('@') && at < email.length() - 1;
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;

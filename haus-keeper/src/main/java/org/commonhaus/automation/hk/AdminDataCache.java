@@ -25,6 +25,9 @@ public enum AdminDataCache {
 
     /** Cache forward email aliases to reduce API calls */
     ALIASES(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
+
+    /** Cache forward email domains (e.g. max_recipients_per_alias) to reduce API calls */
+    DOMAINS(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
     ;
 
     private QueryCache cache = null;
