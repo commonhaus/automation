@@ -3,6 +3,7 @@ package org.commonhaus.automation.hm;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
     void startup(@Observes StartupEvent startup) {
         RouteSupplier.registerSupplier("Organization membership refreshed", () -> lastRun);
+    }
+
+    Optional<OrganizationConfigState> getConfigState() {
+        return currentConfig.get();
     }
 
     public OrganizationConfig getConfig() {
@@ -277,6 +282,43 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             }
         }
         teamConflictResolver.registerOrgTeams(newState);
+
+        // Validate GroupMapping source repositories against home org trust boundary
+        String homeOrg = mgrBotConfig.home().organization();
+        OrganizationConfig.TeamMembershipVerification mode = orgCfg.teamMembershipVerificationMode();
+        List<RepoSource> sourceViolations = new ArrayList<>();
+        if (orgCfg.teamMembership() != null) {
+            for (GroupMapping mapping : orgCfg.teamMembership()) {
+                if (mapping == null) {
+                    continue;
+                }
+                RepoSource source = mapping.source();
+                if (source == null) {
+                    continue;
+                }
+                String resolvedRepo = source.repository() == null ? repo.getFullName() : source.repository();
+                String sourceOrg = toOrganizationName(resolvedRepo);
+                if (!sourceOrg.equalsIgnoreCase(homeOrg)) {
+                    sourceViolations.add(new RepoSource(resolvedRepo, source.filePath()));
+                }
+            }
+        }
+        if (!sourceViolations.isEmpty()) {
+            Log.warnf("[%s] source repositories outside home org trust boundary; mapping(s) blocked: %s",
+                    ME, sourceViolations);
+            if (mode == OrganizationConfig.TeamMembershipVerification.ERROR) {
+                for (RepoSource sv : sourceViolations) {
+                    newState.addBlockedSource(sv);
+                }
+            }
+            String title = "[%s] GroupMapping source repository outside trust boundary".formatted(ME);
+            String body = sourceViolations.stream()
+                    .map(RepoSource::toString)
+                    .collect(Collectors.joining("\n", "Source repositories outside trust boundary:\n\n", ""));
+            ctx.sendEmail(ME, title, body,
+                    qc.getErrorAddresses(orgCfg.emailNotifications()));
+        }
+
         currentConfig.set(Optional.of(newState));
         return true;
     }
@@ -333,10 +375,11 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             long installationId,
             String repoFullName,
             OrganizationConfig orgConfig,
-            Set<RepoSource> groupMapSources) implements ConfigState {
+            Set<RepoSource> groupMapSources,
+            Set<RepoSource> blockedSources) implements ConfigState {
 
         public OrganizationConfigState(long installationId, String repoName, OrganizationConfig orgConfig) {
-            this(installationId, repoName, orgConfig, new HashSet<>());
+            this(installationId, repoName, orgConfig, new HashSet<>(), new HashSet<>());
         }
 
         @Override
@@ -363,6 +406,14 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
 
         public Set<String> blockedTeams() {
             return Set.of();
+        }
+
+        public void addBlockedSource(RepoSource source) {
+            blockedSources.add(source);
+        }
+
+        public Set<RepoSource> blockedSources() {
+            return blockedSources;
         }
 
         public EmailNotification emailNotifications() {

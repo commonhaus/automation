@@ -8,3 +8,11 @@ The following team references in {repoFullName} do not match the project's decla
 To resolve ORG_MISMATCH violations, add the missing organization(s) to the
 `githubOrganizations` list in the project's `cf-haus-manager.yml`.
 {/if}
+{#if sourceRepoViolations}
+
+The following GroupMapping source repositories are outside the project's declared trust boundary:
+
+{#for s in sourceRepoViolations}
+- {s}
+{/for}
+{/if}

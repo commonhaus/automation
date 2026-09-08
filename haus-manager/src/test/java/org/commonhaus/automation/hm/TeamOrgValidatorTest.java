@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.commonhaus.automation.ContextService;
+import org.commonhaus.automation.config.RepoSource;
 import org.commonhaus.automation.hm.TeamOrgValidator.Kind;
 import org.commonhaus.automation.hm.TeamOrgValidator.Result;
 import org.commonhaus.automation.hm.TeamOrgValidator.Violation;
@@ -83,6 +84,8 @@ public class TeamOrgValidatorTest {
                 .containsExactly("other-org/teamA");
         assertThat(result.sourceTeamViolations()).extracting(Violation::kind)
                 .containsExactly(Kind.ORG_MISMATCH);
+        assertThat(result.sourceRepoViolations())
+                .containsExactly(new RepoSource("public-org/source", "signatories.yaml"));
     }
 
     @Test
@@ -109,6 +112,7 @@ public class TeamOrgValidatorTest {
                 .containsExactlyInAnyOrder("test-org/cf-council", "other-org/teamB");
         assertThat(result.sourceTeamViolations()).extracting(Violation::qualifiedTeamName)
                 .containsExactly("other-org/teamA");
+        assertThat(result.sourceRepoViolations()).isNotEmpty();
     }
 
     @Test
@@ -172,5 +176,25 @@ public class TeamOrgValidatorTest {
                 "commonhaus", "commonhaus/project-hibernate");
         assertThat(v).isNotNull();
         assertThat(v.kind()).isEqualTo(Kind.MALFORMED);
+    }
+
+    @Test
+    void sourceRepoInHomeOrgProducesNoViolation() throws IOException {
+        // Use the mismatch fixture (source.repository: public-org/source) with homeOrg "public-org"
+        // so the source belongs to the home org and is allowed.
+        ProjectConfig projectConfig = loadProjectConfig("src/test/resources/cf-haus-manager-team-org-mismatch.yml");
+
+        Result result = TeamOrgValidator.validate(projectConfig, "public-org", "public-org/project-one");
+
+        assertThat(result.sourceRepoViolations()).isEmpty();
+    }
+
+    @Test
+    void sourceRepoOrgComparisonIsCaseInsensitive() throws IOException {
+        ProjectConfig projectConfig = loadProjectConfig("src/test/resources/cf-haus-manager-team-org-mismatch.yml");
+
+        Result result = TeamOrgValidator.validate(projectConfig, "PUBLIC-ORG", "PUBLIC-ORG/project-one");
+
+        assertThat(result.sourceRepoViolations()).isEmpty();
     }
 }

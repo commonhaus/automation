@@ -153,7 +153,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                         .withExisting(repoEvent.github());
 
                 updateQueue.queue(taskGroup, () -> {
-                    readProjectConfig(taskGroup, qc, false);
+                    readProjectConfig(taskGroup, qc, !repoEvent.bootstrap());
                     if (!repoEvent.bootstrap() && taskGroupToState.get(taskGroup) != null) {
                         reconcile(taskGroup);
                     }
@@ -506,11 +506,13 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             long installationId,
             ProjectConfig projectConfig,
             Set<RepoSource> sources,
-            Set<String> blockedTeams) implements ConfigState {
+            Set<String> blockedTeams,
+            Set<RepoSource> blockedSources) implements ConfigState {
 
         public ProjectConfigState(String taskGroup, Runnable refresh, String repoFullName, long installationId,
                 ProjectConfig projectConfig) {
-            this(taskGroup, refresh, repoFullName, installationId, projectConfig, new HashSet<>(), new HashSet<>());
+            this(taskGroup, refresh, repoFullName, installationId, projectConfig, new HashSet<>(), new HashSet<>(),
+                    new HashSet<>());
         }
 
         public Set<String> targetTeams(String defaultOrg) {
@@ -535,6 +537,14 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
 
         public Set<String> blockedTeams() {
             return blockedTeams;
+        }
+
+        public void addBlockedSource(RepoSource source) {
+            blockedSources.add(source);
+        }
+
+        public Set<RepoSource> blockedSources() {
+            return blockedSources;
         }
 
         // ProjectConfig is only unset when using an empty placeholder

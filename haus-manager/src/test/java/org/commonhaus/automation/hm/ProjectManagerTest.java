@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hm;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -209,6 +210,57 @@ public class ProjectManagerTest extends HausManagerTestBase {
         // This shouldn't be called. The state is gone.
         verify(teamService, times(0)).syncCollaborators(any(),
                 eq(home_project_1.repository()), any(), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void blockedSourceIsSkippedAtReconcile() throws IOException {
+        // Switch to error mode — public-org/source is outside githubOrganizations: [test-org]
+        OrganizationConfig errorOrgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-team-verify-error.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(errorOrgConfig);
+
+        var sourceRepo = mockRepository("public-org/source", home_project_1.github());
+        mockFileContent(sourceRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        mockTeam("test-org/cf-council", null);
+        mockTeam("test-org/admin", null);
+
+        // Trigger discovery — readProjectConfig runs validateAndNotify which populates blockedSources
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, home_project_1, false);
+        waitForQueue();
+
+        // Blocked source must not be synced
+        verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+
+        // Out-of-band assertion: email body names the blocked source
+        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).isNotEmpty();
+        String body = mailbox.getMailsSentTo("test@commonhaus.org").get(0).getText();
+        assertThat(body).contains("public-org/source#signatories.yaml");
+    }
+
+    @Test
+    void warnModeDoesNotBlockSource() throws IOException {
+        OrganizationConfig warnOrgConfig = loadYamlResource(
+                "src/test/resources/cf-haus-organization-team-verify-warn.yml",
+                OrganizationConfig.class);
+        when(latestOrgConfig.getConfig()).thenReturn(warnOrgConfig);
+
+        var sourceRepo = mockRepository("public-org/source", home_project_1.github());
+        mockFileContent(sourceRepo, "signatories.yaml", "src/test/resources/signatories.yml");
+        mockTeam("test-org/cf-council", null);
+        mockTeam("test-org/admin", null);
+
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, home_project_1, false);
+        waitForQueue();
+
+        // Mapping must proceed — syncMembers called (source not blocked in warn mode)
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+
+        // Warn mode must not populate blockedSources
+        var repo = ProjectManager.taskGroupToRepo(taskGroup);
+        var state = projectManager.getProjectConfigState(repo);
+        assertThat(state.blockedSources()).isEmpty();
     }
 
     @Test

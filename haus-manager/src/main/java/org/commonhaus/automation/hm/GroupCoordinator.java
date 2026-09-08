@@ -65,6 +65,11 @@ public abstract class GroupCoordinator extends ScheduledService {
         /** Teams that can not be synced due to conflicts */
         Set<String> blockedTeams();
 
+        /** Source repositories that are blocked due to domain validation failures */
+        Set<RepoSource> blockedSources();
+
+        void addBlockedSource(RepoSource source);
+
         EmailNotification emailNotifications();
     }
 
@@ -124,6 +129,15 @@ public abstract class GroupCoordinator extends ScheduledService {
         // First: find the repository
         RepoSource source = groupMapping.source();
         String sourceRepoName = source.repository() == null ? configState.repoFullName() : source.repository();
+
+        // Skip if this source was blocked at config-load time (trust boundary violation)
+        RepoSource effectiveSource = source.repository() == null
+                ? new RepoSource(sourceRepoName, source.filePath())
+                : source;
+        if (configState.blockedSources().contains(effectiveSource)) {
+            Log.debugf("[%s] groupMapping: source %s is blocked; skipping", me(), effectiveSource);
+            return;
+        }
 
         ScopedQueryContext sourceQc = orgQc.forPublicContent(sourceRepoName);
         GHRepository sourceRepo = sourceQc == null ? null : sourceQc.getRepository(sourceRepoName);

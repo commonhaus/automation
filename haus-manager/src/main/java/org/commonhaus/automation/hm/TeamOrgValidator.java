@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.commonhaus.automation.ContextService;
+import org.commonhaus.automation.config.RepoSource;
+import org.commonhaus.automation.github.context.GitHubQueryContext;
 import org.commonhaus.automation.hm.ProjectManager.ProjectConfigState;
 import org.commonhaus.automation.hm.config.GroupMapping;
 import org.commonhaus.automation.hm.config.OrganizationConfig;
@@ -11,6 +13,7 @@ import org.commonhaus.automation.hm.config.ProjectConfig;
 import org.commonhaus.automation.hm.config.ProjectConfig.CollaboratorSync;
 import org.commonhaus.automation.hm.config.PushToTeams;
 
+import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 
@@ -36,9 +39,11 @@ public class TeamOrgValidator {
      * sourceTeam, split by surface since only push-target violations are ever blockable
      * (sourceTeam is a read-only lookup and is never added to blockedTeams).
      */
-    public record Result(List<Violation> pushTargetViolations, List<Violation> sourceTeamViolations) {
+    public record Result(List<Violation> pushTargetViolations, List<Violation> sourceTeamViolations,
+            List<RepoSource> sourceRepoViolations) {
         public boolean isEmpty() {
-            return pushTargetViolations.isEmpty() && sourceTeamViolations.isEmpty();
+            return pushTargetViolations.isEmpty() && sourceTeamViolations.isEmpty()
+                    && sourceRepoViolations.isEmpty();
         }
 
         public List<Violation> all() {
@@ -54,7 +59,8 @@ public class TeamOrgValidator {
                 String repoFullName,
                 List<String> githubOrganizations,
                 List<Violation> violations,
-                boolean hasOrgMismatch);
+                boolean hasOrgMismatch,
+                List<RepoSource> sourceRepoViolations);
     }
 
     private TeamOrgValidator() {
@@ -89,6 +95,16 @@ public class TeamOrgValidator {
             }
         }
 
+        if (!result.sourceRepoViolations().isEmpty()) {
+            Log.warnf("[%s] source repositories outside home org trust boundary; mapping(s) blocked: %s",
+                    logId, result.sourceRepoViolations());
+            if (mode == OrganizationConfig.TeamMembershipVerification.ERROR) {
+                for (RepoSource source : result.sourceRepoViolations()) {
+                    state.addBlockedSource(source);
+                }
+            }
+        }
+
         if (!sendEmail) {
             return;
         }
@@ -100,7 +116,8 @@ public class TeamOrgValidator {
                 state.repoFullName(),
                 projectConfig.githubOrganizations(),
                 result.all(),
-                hasOrgMismatch).render();
+                hasOrgMismatch,
+                result.sourceRepoViolations()).render();
 
         String[] addresses = mode == OrganizationConfig.TeamMembershipVerification.DRY_RUN
                 ? dryRunAddresses
@@ -147,7 +164,28 @@ public class TeamOrgValidator {
             }
         }
 
-        return new Result(pushTargetViolations, sourceTeamViolations);
+        List<RepoSource> sourceRepoViolations = new ArrayList<>();
+        for (GroupMapping mapping : projectConfig.teamMembership()) {
+            if (mapping == null) {
+                continue;
+            }
+            RepoSource source = mapping.source();
+            if (source == null) {
+                continue;
+            }
+            String repo = source.repository() == null ? repoFullName : source.repository();
+            String sourceOrg = GitHubQueryContext.toOrganizationName(repo);
+            if (sourceOrg.equalsIgnoreCase(homeOrg)) {
+                continue; // home org always allowed
+            }
+            boolean allowed = githubOrganizations.stream()
+                    .anyMatch(declared -> sourceOrg.equalsIgnoreCase(OrganizationConfig.normalizeOrg(declared)));
+            if (!allowed) {
+                sourceRepoViolations.add(new RepoSource(repo, source.filePath()));
+            }
+        }
+
+        return new Result(pushTargetViolations, sourceTeamViolations, sourceRepoViolations);
     }
 
     /**

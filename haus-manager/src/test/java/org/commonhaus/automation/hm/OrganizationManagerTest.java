@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -218,6 +219,43 @@ public class OrganizationManagerTest extends HausManagerTestBase {
 
         verify(taskState).recordRun(OrganizationManager.ME);
         verify(contactRepo, timeout(1000).atLeastOnce()).getFileContent(anyString());
+    }
+
+    @Test
+    void blockedSourceIsSkippedAtOrgReconcile() throws IOException {
+        // error mode — public-org/source is outside home org (test-org) trust boundary
+        mockFileContent(hausMocks, OrganizationConfig.PATH,
+                "src/test/resources/cf-haus-organization-team-verify-source-error.yml");
+
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
+        triggerBootstrapDiscovery(hausMocks);
+        waitForQueue();
+
+        // Blocked source must not be synced
+        verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, never()).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
+
+        // Out-of-band assertion: email body names the blocked source
+        assertThat(mailbox.getMailsSentTo("test@test.org")).isNotEmpty();
+        String body = mailbox.getMailsSentTo("test@test.org").get(0).getText();
+        assertThat(body).contains("public-org/source#CONTACTS.yaml");
+    }
+
+    @Test
+    void warnModeDoesNotBlockOrgSource() throws IOException {
+        // cf-haus-organization.yml has no teamMembershipVerification set (defaults to warn)
+        // and a teamMembership source (public-org/source) outside the home org boundary
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, hausMocks, true);
+        triggerBootstrapDiscovery(hausMocks);
+        waitForQueue();
+
+        // Mapping must proceed — syncMembers called (source not blocked in warn mode)
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
+        verify(teamService, times(1)).syncMembers(any(), eq("test-org/team-quorum"), any(), any(), anyBoolean(), any());
+
+        assertThat(organizationManager.getConfigState().orElseThrow().blockedSources()).isEmpty();
     }
 
     List<String> teams(OrganizationConfig config) {

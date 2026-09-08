@@ -1,0 +1,24 @@
+teamMembershipVerification: error
+
+teamMembership:
+  - source:
+      repository: public-org/source
+      filePath: CONTACTS.yaml
+    defaults:
+      field: login
+      preserveUsers:
+        - test-bot
+    pushMembers:
+      cf-council:
+        teams:
+          - test-org/cf-council
+          - test-org/admin
+      egc:
+        teams:
+          - test-org/team-quorum
+
+emailNotifications:
+  errors:
+    - test@test.org
+  dryRun:
+    - test@test.org
