@@ -81,6 +81,15 @@ teamMembership:
         teams: [your-org/maintainers, your-org/admin]
 ```
 
+#### Team Conflict Resolution
+
+Haus Manager prevents conflicts between organization and project-level team management:
+
+- **Organization Priority**: Organization-level configs always take precedence
+- **Project Isolation**: Single project configs work when no organization conflict exists  
+- **Conflict Detection**: Multiple projects claiming the same team are automatically blocked
+- **Email Alerts**: Administrators receive notifications about conflicts
+
 ### Project Health Monitoring
 
 Collect weekly health metrics for your repositories:
@@ -158,15 +167,6 @@ domainManagement:
 **Scheduled Operation**: Weekly on Thursday at 1:25 PM (`27 25 13 ? * THU *`)
 
 **Domain Assignment**: Projects must be listed in organization's `projects` section with `domainAssociation` to claim domains.
-
-### Team Conflict Resolution
-
-Haus Manager prevents conflicts between organization and project-level team management:
-
-- **Organization Priority**: Organization-level configs always take precedence
-- **Project Isolation**: Single project configs work when no organization conflict exists  
-- **Conflict Detection**: Multiple projects claiming the same team are automatically blocked
-- **Email Alerts**: Administrators receive notifications about conflicts
 
 ## GitHub App Permissions
 
