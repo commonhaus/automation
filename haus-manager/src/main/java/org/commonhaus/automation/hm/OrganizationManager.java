@@ -288,10 +288,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         teamConflictResolver.registerOrgTeams(newState);
 
         // Validate GroupMapping source repositories against home org trust boundary
-        String homeOrg = mgrBotConfig.home().organization();
-        OrganizationConfig.TeamMembershipVerification mode = orgCfg.teamMembershipVerificationMode();
-        List<RepoSource> sourceViolations = new ArrayList<>();
         if (orgCfg.teamMembership() != null) {
+            String homeOrg = mgrBotConfig.home().organization();
+            OrganizationConfig.TeamMembershipVerification mode = orgCfg.teamMembershipVerificationMode();
+            List<RepoSource> sourceViolations = new ArrayList<>();
             for (GroupMapping mapping : orgCfg.teamMembership()) {
                 if (mapping == null) {
                     continue;
@@ -306,21 +306,29 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                     sourceViolations.add(effectiveSource);
                 }
             }
-        }
-        if (!sourceViolations.isEmpty()) {
-            Log.warnf("[%s] source repositories outside home org trust boundary; mapping(s) blocked: %s",
-                    ME, sourceViolations);
-            if (mode == OrganizationConfig.TeamMembershipVerification.ERROR) {
-                for (RepoSource sv : sourceViolations) {
-                    newState.addBlockedSource(sv);
+            if (!sourceViolations.isEmpty()) {
+                Log.warnf("[%s] source repositories outside home org trust boundary; mapping(s) blocked: %s",
+                        ME, sourceViolations);
+                if (mode == OrganizationConfig.TeamMembershipVerification.ERROR) {
+                    for (RepoSource sv : sourceViolations) {
+                        newState.addBlockedSource(sv);
+                    }
+                }
+
+                // sourceViolations is fully determined by teamMembership (homeOrg is static),
+                // so only re-notify when teamMembership itself changed -- otherwise an edit to
+                // an unrelated part of the org config would re-send this on a lingering violation.
+                boolean teamMembershipChanged = oldState == null
+                        || !Objects.equals(oldState.orgConfig().teamMembership(), newState.orgConfig().teamMembership());
+                if (teamMembershipChanged) {
+                    String title = "[%s] GroupMapping source repository outside trust boundary".formatted(ME);
+                    String body = sourceViolations.stream()
+                            .map(RepoSource::toString)
+                            .collect(Collectors.joining("\n", "Source repositories outside trust boundary:\n\n", ""));
+                    ctx.sendEmail(ME, title, body,
+                            qc.getErrorAddresses(orgCfg.emailNotifications()));
                 }
             }
-            String title = "[%s] GroupMapping source repository outside trust boundary".formatted(ME);
-            String body = sourceViolations.stream()
-                    .map(RepoSource::toString)
-                    .collect(Collectors.joining("\n", "Source repositories outside trust boundary:\n\n", ""));
-            ctx.sendEmail(ME, title, body,
-                    qc.getErrorAddresses(orgCfg.emailNotifications()));
         }
 
         currentConfig.set(Optional.of(newState));
