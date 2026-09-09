@@ -46,7 +46,7 @@ public class TeamOrgValidator {
                     && sourceRepoViolations.isEmpty();
         }
 
-        public List<Violation> all() {
+        public List<Violation> teamViolations() {
             List<Violation> all = new ArrayList<>(pushTargetViolations);
             all.addAll(sourceTeamViolations);
             return all;
@@ -110,12 +110,12 @@ public class TeamOrgValidator {
         }
 
         String title = "[%s] Team/organization mismatch detected".formatted(logId);
-        boolean hasOrgMismatch = result.all().stream()
+        boolean hasOrgMismatch = result.teamViolations().stream()
                 .anyMatch(v -> v.kind() == Kind.ORG_MISMATCH);
         String body = Templates.teamOrgMismatch(
                 state.repoFullName(),
                 projectConfig.githubOrganizations(),
-                result.all(),
+                result.teamViolations(),
                 hasOrgMismatch,
                 result.sourceRepoViolations()).render();
 
