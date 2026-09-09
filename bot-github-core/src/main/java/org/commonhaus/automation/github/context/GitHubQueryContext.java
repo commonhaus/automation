@@ -334,11 +334,9 @@ public class GitHubQueryContext extends GraphQLQueryContext {
         });
     }
 
-    public boolean isBot(DataCommonComment comment) {
-        if (comment != null) {
-            if (comment.author != null) {
-                return isBot(comment.author.login);
-            }
+    public boolean isBot(DataCommonObject object) {
+        if (object != null && object.author != null) {
+            return isBot(object.author.login);
         }
         return false;
     }

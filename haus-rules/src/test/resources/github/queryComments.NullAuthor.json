@@ -1,0 +1,30 @@
+{
+  "node": {
+    "comments": {
+      "nodes": [
+        {
+          "id": "DC_kwDOKRPTI84AhAo2",
+          "author": null,
+          "body": "my vote",
+          "createdAt": "2024-03-02T18:13:23Z",
+          "updatedAt": "2024-03-02T18:13:24Z",
+          "url": "https://github.com/commonhaus/foundation-draft/discussions/95#discussioncomment-8653366",
+          "databaseId": 8653366
+        },
+        {
+          "id": "DC_kwDOKRPTI84AhAy0",
+          "author": {
+            "login": "nmcl",
+            "url": "https://github.com/nmcl",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/580667?v=4"
+          },
+          "body": "also my vote",
+          "createdAt": "2024-03-02T20:38:04Z",
+          "updatedAt": "2024-03-02T20:38:05Z",
+          "url": "https://github.com/commonhaus/foundation-draft/discussions/95#discussioncomment-8654004",
+          "databaseId": 8654004
+        }
+      ]
+    }
+  }
+}

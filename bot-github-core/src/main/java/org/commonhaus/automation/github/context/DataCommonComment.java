@@ -85,7 +85,7 @@ public class DataCommonComment extends DataCommonObject {
             }
             JsonObject node = JsonAttribute.node.jsonObjectFrom(response.getData());
             DataCommonComment ec = new DataCommonComment(node);
-            if (qc.isBot(ec.author.login)) {
+            if (qc.isBot(ec)) {
                 return ec;
             }
         }
@@ -111,7 +111,7 @@ public class DataCommonComment extends DataCommonObject {
             JsonObject comments = JsonAttribute.comments.jsonObjectFrom(node);
             JsonArray nodes = JsonAttribute.nodes.jsonArrayFrom(comments);
             if (nodes == null) {
-                return null;
+                break;
             }
             allComments.addAll(nodes.stream()
                     .map(JsonObject.class::cast)

@@ -242,9 +242,9 @@ public class VoteProcessor extends ScheduledService {
     }
 
     private List<DataCommonComment> findHumanComments(ScopedQueryContext qc, VoteEvent voteEvent) {
-        // Skip all bot comments
+        // Skip all bot comments (author may be null for deleted/ghost accounts)
         List<DataCommonComment> comments = qc.getComments(voteEvent.getItemNodeId(),
-                x -> !qc.isBot(x.author.login));
+                x -> !qc.isBot(x));
         return comments;
     }
 
@@ -343,7 +343,8 @@ public class VoteProcessor extends ScheduledService {
     }
 
     public boolean isManualVoteResult(GitHubQueryContext qc, VoteConfig votingConfig, DataCommonComment comment) {
-        return comment.body.contains(MANUAL_VOTE_RESULT)
+        return comment.author != null
+                && comment.body.contains(MANUAL_VOTE_RESULT)
                 && ctx.getTeamMembershipService().isLoginIncluded(qc, comment.author.login, votingConfig.managers);
     }
 

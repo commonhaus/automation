@@ -170,7 +170,7 @@ public class VotingGitHubEvents {
         if (eventData.getEventType() == EventType.discussion_comment || eventData.getEventType() == EventType.issue_comment) {
             EventQueryContext qc = new EventQueryContext(ctx, eventData);
             DataCommonComment comment = JsonAttribute.comment.commonCommentFrom(eventData.getJsonData());
-            if (qc.isBot(comment.author.login)) {
+            if (qc.isBot(comment)) {
                 // skip bot comment events
                 return;
             }

@@ -803,6 +803,95 @@ public class VotingTest extends HausRulesTestBase {
         assertThat(comment.getBody()).doesNotContain("This vote has been [closed]");
     }
 
+    @Test
+    void testVoteOpenNullNodesComments() throws Exception {
+        // Null nodes in queryComments response should be treated as empty (no NPE)
+
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-voting.yml");
+                    setupGivenMocks(mocks, TEST_ORG);
+                    mockTeams(hausMocks);
+
+                    // Vote processing always starts fresh (query from item id)
+                    setupGraphQLProcessing(mocks,
+                            // initialize VoteProcessor + VoteInformation
+                            QueryResponse.DISCUSSION_VALID,
+                            // Count votes: comments response with no nodes field
+                            QueryResponse.NULL_NODES_COMMENTS,
+                            QueryResponse.NO_REACTIONS,
+                            // Add bot comment with vote results
+                            QueryResponse.MUTATE_ADD_DISCUSSION_COMMENT,
+                            // Update discussion with comment reference
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    for (String cue : graphQueries) {
+                        verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                                .executeSync(contains(cue), anyMap());
+                    }
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
+        BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(comment.getBody()).contains(
+                "No votes (non-bot reactions) found on this item.",
+                "<!-- vote::data");
+    }
+
+    @Test
+    void testVoteOpenNullAuthorComment() throws Exception {
+        // A null author on a comment (deleted/ghost account) should not NPE
+
+        // repository and discussion label
+        setLabels(repositoryId, REPO_LABELS);
+        setLabels(discussionId, ITEM_VOTE_OPEN);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-voting.yml");
+                    setupGivenMocks(mocks, TEST_ORG);
+
+                    GHUser user1 = mockUser("nmcl");
+                    GHUser user2 = mockUser("evanchooly");
+                    GHUser user3 = mockUser("kenfinnigan");
+
+                    mockTeams(hausMocks, user1, user2, user3);
+
+                    // pre-cache bot comment
+                    setupBotComment(discussionId);
+
+                    // Vote processing always starts fresh (query from item id)
+                    setupGraphQLProcessing(mocks,
+                            // initialize VoteProcessor + VoteInformation
+                            QueryResponse.DISCUSSION_VALID_COMMENTS,
+                            // Count votes: one comment has author=null (deleted account)
+                            QueryResponse.NULL_AUTHOR_COMMENT,
+                            // Update results
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION_COMMENT,
+                            // Update discussion with comment reference
+                            QueryResponse.MUTATE_UPDATE_DISCUSSION);
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreated.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    for (String cue : graphQueries) {
+                        verify(mocks.installationGraphQLClient(installationId), timeout(500))
+                                .executeSync(contains(cue), anyMap());
+                    }
+
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
+        BotComment comment = verifyBotCommentCache(discussionId, botCommentId);
+        assertThat(comment.getBody()).contains("<!-- vote::data");
+    }
+
     enum QueryResponse implements MockResponse {
         DISCUSSION_VALID("query($id: ID!) {",
                 "src/test/resources/github/queryDiscussion.methodMarthas.json"),
@@ -835,6 +924,10 @@ public class VotingTest extends HausRulesTestBase {
                 "src/test/resources/github/queryComments.VoteComments.json"),
         VOTE_RESULT_COMMENT("query($itemId: ID!, $after: String)",
                 "src/test/resources/github/queryComments.ManualVoteResult.json"),
+        NULL_NODES_COMMENTS("query($itemId: ID!, $after: String)",
+                "src/test/resources/github/queryComments.NullNodes.json"),
+        NULL_AUTHOR_COMMENT("query($itemId: ID!, $after: String)",
+                "src/test/resources/github/queryComments.NullAuthor.json"),
 
         NO_REACTIONS("reactions(first: 100",
                 "src/test/resources/github/queryReactions.None.json"),

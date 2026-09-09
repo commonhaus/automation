@@ -171,6 +171,9 @@ public class VoteTally {
         List<DataCommonComment> reactions = new ArrayList<>();
         // translate review states into reaction votes
         for (DataPullRequestReview review : reviews) {
+            if (review.author == null) {
+                continue; // deleted/ghost account — no identity to count
+            }
             reactions.add(new DataCommonComment(review));
         }
         comments.addAll(0, reactions);
@@ -180,6 +183,9 @@ public class VoteTally {
         List<DataReaction> reactions = new ArrayList<>();
         // translate review states into reaction votes
         for (DataPullRequestReview review : reviews) {
+            if (review.author == null) {
+                continue; // deleted/ghost account — no identity to count
+            }
             switch (review.state) {
                 case "APPROVED" -> reactions.add(
                         new DataReaction(review.author, ReactionContent.PLUS_ONE.getContent(), review.submittedAt));
@@ -199,7 +205,7 @@ public class VoteTally {
         Category c = categories.computeIfAbsent("comment", k -> new Category(k));
 
         for (DataCommonComment comment : comments) {
-            if (seenLogins.add(comment.author)) {
+            if (comment.author != null && seenLogins.add(comment.author)) {
                 c.add(new VoteRecord(comment.author, comment.createdAt), teamLogins);
             }
         }

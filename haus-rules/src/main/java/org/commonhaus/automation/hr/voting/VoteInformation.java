@@ -145,8 +145,8 @@ public class VoteInformation {
         }
         if (prReviews == null) {
             prReviews = qc.queryReviews(event.itemNodeId);
-            // The bot's reviews are not counted
-            prReviews.removeIf(x -> qc.isBot(x.author.login));
+            // The bot's reviews are not counted (author may be null for deleted accounts)
+            prReviews.removeIf(x -> qc.isBot(x));
         }
         return prReviews;
     }
