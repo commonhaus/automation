@@ -46,8 +46,6 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class ProjectManager extends GroupCoordinator implements LatestProjectConfig {
     static final String ME = "🌳-project";
-    static final ProjectConfigState EMPTY = new ProjectConfigState(null, null, null, 0, null);
-
     @Inject
     LatestOrgConfig latestOrgConfig;
 
@@ -103,6 +101,10 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
      * Allow manual trigger from admin endpoint
      */
     public void refreshConfig(boolean userTriggered) {
+        if (!latestOrgConfig.isReady()) {
+            Log.infof("[%s]: skip project config update; org config is not ready", ME);
+            return;
+        }
         if (!userTriggered && !taskState.shouldRun(ME, Duration.ofHours(12))) {
             Log.infof("[%s]: skip scheduled project config update (last run: %s)", ME, lastRun);
             return;
@@ -115,7 +117,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             var state = entry.getValue();
 
             String repoFullName = taskGroupToRepo(taskGroup);
-            ScopedQueryContext qc = state == null || state == EMPTY
+            ScopedQueryContext qc = state == null
                     ? ctx.getOrgScopedQueryContext(repoFullName)
                     : new ScopedQueryContext(ctx, state.installationId(), repoFullName);
             if (qc == null) {
@@ -152,12 +154,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
-                updateQueue.queue(taskGroup, () -> {
-                    readProjectConfig(taskGroup, qc, !repoEvent.bootstrap());
-                    if (!repoEvent.bootstrap() && taskGroupToState.get(taskGroup) != null) {
-                        reconcile(taskGroup);
-                    }
-                });
+                updateQueue.queue(taskGroup, () -> readDiscoveredProjectConfig(taskGroup, qc, repoEvent.bootstrap()));
 
                 // Register watcher to monitor for org config changes
                 fileWatcher.watchFile(taskGroup,
@@ -168,7 +165,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 // Remove any state associated with the repository (all watcher cleanup handled
                 // separately)
                 var state = taskGroupToState.remove(taskGroup);
-                if (state != null && state != EMPTY) {
+                if (state != null) {
                     for (var group : state.projectConfig().teamMembership()) {
                         var source = group.source();
                         if (source != null && !source.isEmpty()) {
@@ -215,14 +212,8 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return;
         }
 
-        if (newState == EMPTY) { // lazy discovery
-            Log.debugf("[%s] processMembershipUpdate: empty state for %s", ME, taskGroup);
-            ScopedQueryContext qc = new ScopedQueryContext(ctx, update.installationId(), update.orgName());
-            readProjectConfig(taskGroup, qc, false);
-        } else {
-            // queue reconcile action
-            updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
-        }
+        // queue reconcile action
+        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
     }
 
     @Override
@@ -259,8 +250,27 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return;
         }
         ScopedQueryContext qc = new ScopedQueryContext(ctx, fileUpdate.installationId(), fileUpdate.repository());
-        readProjectConfig(taskGroup, qc, true);
-        updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+        readDiscoveredProjectConfig(taskGroup, qc, false);
+    }
+
+    /**
+     * Read project config discovered via repositoryDiscovered, then reconcile.
+     * Org config must be ready before validation/blocked-team setup in
+     * readProjectConfig can run correctly; if it isn't ready yet, this
+     * requeues itself (read + reconcile together) rather than splintering
+     * the retry from the reconcile that must follow a successful read.
+     */
+    private void readDiscoveredProjectConfig(String taskGroup, ScopedQueryContext qc, boolean bootstrap) {
+        if (!latestOrgConfig.isReady()) {
+            Log.debugf("[%s] readDiscoveredProjectConfig %s: organization configuration not yet available; retrying",
+                    ME, taskGroup);
+            updateQueue.queue(taskGroup, () -> readDiscoveredProjectConfig(taskGroup, qc, false));
+            return;
+        }
+        readProjectConfig(taskGroup, qc, false);
+        if (!bootstrap && taskGroupToState.get(taskGroup) != null) {
+            updateQueue.queueReconciliation(taskGroup, () -> reconcile(taskGroup));
+        }
     }
 
     /**
@@ -327,25 +337,23 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                     callback.onProjectConfigUpdate(callback.getTaskGroup(newState.repoFullName()), newState);
                 }
             }
-            if (oldState != EMPTY) {
-                Set<RepoSource> oldSources = oldState.projectConfig().teamMembership().stream()
-                        .map(GroupMapping::source)
-                        .filter(x -> x != null && !x.isEmpty())
-                        .collect(Collectors.toSet());
+            Set<RepoSource> oldSources = oldState.projectConfig().teamMembership().stream()
+                    .map(GroupMapping::source)
+                    .filter(x -> x != null && !x.isEmpty())
+                    .collect(Collectors.toSet());
 
-                for (GroupMapping mapping : newState.projectConfig().teamMembership()) {
-                    if (mapping != null && mapping.source() != null && !mapping.source().isEmpty()) {
-                        oldSources.remove(mapping.source());
-                    }
+            for (GroupMapping mapping : newState.projectConfig().teamMembership()) {
+                if (mapping != null && mapping.source() != null && !mapping.source().isEmpty()) {
+                    oldSources.remove(mapping.source());
                 }
-                for (RepoSource oldSource : oldSources) {
-                    unwatchRepoSource(newState, oldSource);
-                }
-
-                Set<String> removedTeams = oldState.targetTeams(mgrBotConfig.home().organization());
-                removedTeams.removeAll(newState.targetTeams(mgrBotConfig.home().organization()));
-                teamConflictResolver.releaseProjectTeams(newState, removedTeams);
             }
+            for (RepoSource oldSource : oldSources) {
+                unwatchRepoSource(newState, oldSource);
+            }
+
+            Set<String> removedTeams = oldState.targetTeams(mgrBotConfig.home().organization());
+            removedTeams.removeAll(newState.targetTeams(mgrBotConfig.home().organization()));
+            teamConflictResolver.releaseProjectTeams(newState, removedTeams);
         }
 
         teamConflictResolver.registerProjectTeams(newState);
@@ -368,7 +376,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
     public void reconcile(String taskGroup) {
         // Always fetch latest state (in case of changes / skips)
         ProjectConfigState state = taskGroupToState.get(taskGroup);
-        if (state == null || state == EMPTY) {
+        if (state == null) {
             Log.debugf("[%s] %s: no state for reconcile; skipping", ME, taskGroup);
             return;
         }
@@ -547,18 +555,14 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
             return blockedSources;
         }
 
-        // ProjectConfig is only unset when using an empty placeholder
         public String sourceTeam() {
-            if (this == EMPTY) {
-                return null;
-            }
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             return myAccess != null ? myAccess.sourceTeam() : null;
         }
 
         public boolean healthCollectionHasChanged(ProjectConfigState newState) {
-            boolean oldEnabled = this != EMPTY && this.isHealthCollectionEnabled();
-            boolean newEnabled = newState != EMPTY && newState.isHealthCollectionEnabled();
+            boolean oldEnabled = this.isHealthCollectionEnabled();
+            boolean newEnabled = newState.isHealthCollectionEnabled();
 
             // Health collection toggled on or off
             if (oldEnabled != newEnabled) {
@@ -577,9 +581,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public boolean sourceTeamHasChanged(ProjectConfigState newState) {
-            if (this == EMPTY) {
-                return false; // nothing to clean up
-            }
             CollaboratorSync myAccess = projectConfig.collaboratorSync();
             if (myAccess == null || myAccess.sourceTeam() == null) {
                 return false; // nothing to clean up
@@ -589,9 +590,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public boolean isDomainManagementEnabled() {
-            if (this == EMPTY) {
-                return false; // not configured yet (wait)
-            }
             ProjectConfig config = projectConfig();
             return config != null
                     && config.domainManagement() != null
@@ -599,9 +597,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public boolean isDomainManagementDryRun() {
-            if (this == EMPTY) {
-                return false; // not configured yet (wait)
-            }
             ProjectConfig config = projectConfig();
             return config != null
                     && config.domainManagement() != null
@@ -609,9 +604,6 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public boolean isHealthCollectionEnabled() {
-            if (this == EMPTY) {
-                return false; // not configured yet (wait)
-            }
             ProjectConfig config = projectConfig();
             return config != null
                     && config.projectHealth() != null
@@ -619,16 +611,16 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
         }
 
         public List<String> githubOrganizations() {
-            return this == EMPTY ? List.of() : projectConfig().githubOrganizations();
+            return projectConfig().githubOrganizations();
         }
 
         public String[] errors() {
-            return this == EMPTY ? null : projectConfig().emailNotifications().errors();
+            return projectConfig().emailNotifications().errors();
         }
 
         @Override
         public EmailNotification emailNotifications() {
-            return this == EMPTY ? null : projectConfig().emailNotifications();
+            return projectConfig().emailNotifications();
         }
 
         @Override

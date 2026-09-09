@@ -3,6 +3,8 @@ package org.commonhaus.automation.hm.config;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toFullName;
 
 public interface LatestOrgConfig {
+    boolean isReady();
+
     OrganizationConfig getConfig();
 
     void notifyOnUpdate(String id, Runnable callback);

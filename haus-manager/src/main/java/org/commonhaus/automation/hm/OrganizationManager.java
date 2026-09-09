@@ -44,8 +44,6 @@ import io.quarkus.scheduler.Scheduled;
 @ApplicationScoped
 public class OrganizationManager extends GroupCoordinator implements LatestOrgConfig {
     static final String ME = "🏡-org";
-    static final OrganizationConfigState EMPTY = new OrganizationConfigState(0, "", null);
-
     final AtomicReference<Optional<OrganizationConfigState>> currentConfig = new AtomicReference<>(Optional.empty());
     private Map<String, Runnable> callbacks = new ConcurrentHashMap<>();
 
@@ -57,6 +55,12 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         return currentConfig.get();
     }
 
+    @Override
+    public boolean isReady() {
+        return currentConfig.get().isPresent();
+    }
+
+    @Override
     public OrganizationConfig getConfig() {
         return currentConfig.get().map(OrganizationConfigState::orgConfig).orElse(null);
     }

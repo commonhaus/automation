@@ -1,6 +1,5 @@
 package org.commonhaus.automation.hm;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -216,28 +215,6 @@ public class CollaboratorMonitorTest extends HausManagerTestBase {
                 any(),
                 anyBoolean(),
                 any());
-    }
-
-    @Test
-    void testCollaboratorMonitorHandlesUninitializedProject() {
-        Log.info("TEST: testCollaboratorMonitorHandlesUninitializedProject");
-
-        // Mock uninitialized project state
-        when(latestProjectConfig.getAllProjects()).thenReturn(List.of(ProjectManager.EMPTY));
-
-        collaboratorMonitor.refreshCollaborators(true);
-        waitForQueue();
-
-        // Verify syncCollaborators was NOT called due to error
-        verify(teamService, never()).syncCollaborators(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                anyBoolean(),
-                any());
-        assertThat(mailbox.getTotalMessagesSent()).isZero();
     }
 
     @Test

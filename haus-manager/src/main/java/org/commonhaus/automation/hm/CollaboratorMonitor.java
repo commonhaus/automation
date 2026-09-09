@@ -31,24 +31,6 @@ import io.quarkus.scheduler.Scheduled;
 public class CollaboratorMonitor extends ScheduledService {
     static final String ME = "👥-collab";
 
-    private enum GatherStatus {
-        READY,
-        DEFERRED
-    }
-
-    private record GatherResult(
-            GatherStatus status,
-            Set<String> collaborators) {
-
-        static GatherResult ready(Set<String> collaborators) {
-            return new GatherResult(GatherStatus.READY, collaborators);
-        }
-
-        static GatherResult deferred() {
-            return new GatherResult(GatherStatus.DEFERRED, Set.of());
-        }
-    }
-
     @Inject
     AppContextService ctx;
 
@@ -104,13 +86,7 @@ public class CollaboratorMonitor extends ScheduledService {
 
         // Gather all collaborators from project repositories
         try {
-            GatherResult gatherResult = gatherProjectCollaborators();
-            if (gatherResult.status() == GatherStatus.DEFERRED) {
-                Log.debugf("[%s] reconcile: deferring collaborator synchronization until project bootstrap completes", ME);
-                return;
-            }
-
-            Set<String> allCollaboratorLogins = gatherResult.collaborators();
+            Set<String> allCollaboratorLogins = gatherProjectCollaborators();
             if (allCollaboratorLogins.isEmpty()) {
                 Log.debugf("[%s] reconcile: no collaborators found in project repositories", ME);
                 return;
@@ -171,7 +147,7 @@ public class CollaboratorMonitor extends ScheduledService {
      * @param config Organization configuration
      * @return Set of unique collaborator logins across all project repositories
      */
-    private GatherResult gatherProjectCollaborators() {
+    private Set<String> gatherProjectCollaborators() {
         Set<String> allCollaborators = new HashSet<>();
 
         var qc = ctx.getHomeQueryContext();
@@ -182,14 +158,7 @@ public class CollaboratorMonitor extends ScheduledService {
 
         // Iterate through all configured projects
         for (var projectState : latestProjectConfig.getAllProjects()) {
-            var projectConfig = projectState == ProjectManager.EMPTY
-                    ? null
-                    : projectState.projectConfig();
-            if (projectConfig == null) {
-                Log.debugf("[%s] gatherProjectCollaborators: project state is not initialized yet; deferring", ME);
-                return GatherResult.deferred();
-            }
-
+            var projectConfig = projectState.projectConfig();
             var teamAccess = projectConfig.collaboratorSync();
             if (teamAccess == null) {
                 Log.debugf("[%s] gatherProjectCollaborators: project has no collaboratorSync configured", ME);
@@ -212,6 +181,6 @@ public class CollaboratorMonitor extends ScheduledService {
         }
 
         Log.infof("[%s] gatherProjectCollaborators: total unique collaborators: %d", ME, allCollaborators.size());
-        return GatherResult.ready(allCollaborators);
+        return allCollaborators;
     }
 }

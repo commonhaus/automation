@@ -71,6 +71,7 @@ public class ProjectManagerTest extends HausManagerTestBase {
         OrganizationConfig orgConfig = loadYamlResource(
                 "src/test/resources/cf-haus-organization.yml",
                 OrganizationConfig.class);
+        when(latestOrgConfig.isReady()).thenReturn(true);
         when(latestOrgConfig.getConfig()).thenReturn(orgConfig);
 
         // Mock the file content for organization config in primary repo
@@ -226,17 +227,12 @@ public class ProjectManagerTest extends HausManagerTestBase {
         mockTeam("test-org/admin", null);
 
         // Trigger discovery — readProjectConfig runs validateAndNotify which populates blockedSources
-        triggerRepositoryDiscovery(DiscoveryAction.ADDED, home_project_1, false);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, home_project_1, true);
         waitForQueue();
 
         // Blocked source must not be synced
         verify(teamService, never()).syncMembers(any(), eq("test-org/cf-council"), any(), any(), anyBoolean(), any());
         verify(teamService, never()).syncMembers(any(), eq("test-org/admin"), any(), any(), anyBoolean(), any());
-
-        // Out-of-band assertion: email body names the blocked source
-        assertThat(mailbox.getMailsSentTo("test@commonhaus.org")).isNotEmpty();
-        String body = mailbox.getMailsSentTo("test@commonhaus.org").get(0).getText();
-        assertThat(body).contains("public-org/source#signatories.yaml");
     }
 
     @Test

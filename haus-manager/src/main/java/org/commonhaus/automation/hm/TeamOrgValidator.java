@@ -233,7 +233,7 @@ public class TeamOrgValidator {
         }
 
         boolean matches = githubOrganizations.stream()
-                .anyMatch(declared -> org.equals(OrganizationConfig.normalizeOrg(declared)));
+                .anyMatch(declared -> org.equalsIgnoreCase(OrganizationConfig.normalizeOrg(declared)));
         return matches ? null : new Violation(qualifiedTeamName, Kind.ORG_MISMATCH);
     }
 

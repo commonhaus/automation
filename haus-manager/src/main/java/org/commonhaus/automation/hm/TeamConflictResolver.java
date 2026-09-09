@@ -58,6 +58,12 @@ public class TeamConflictResolver {
 
     private final Map<String, TeamOwnership> teamOwnership = new ConcurrentHashMap<>();
 
+    static final ProjectManager.ProjectConfigState EMPTY_PROJECT = new ProjectManager.ProjectConfigState(null, null, null, 0,
+            null);
+
+    static final OrganizationManager.OrganizationConfigState EMPTY_ORG = new OrganizationManager.OrganizationConfigState(0, "",
+            null);
+
     void init(@Observes StartupEvent event) {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
@@ -98,13 +104,13 @@ public class TeamConflictResolver {
 
             // Replace org with EMPTY if non-null, preserve null
             OrganizationConfigState persistableOrg = original.org != null
-                    ? OrganizationManager.EMPTY
+                    ? TeamConflictResolver.EMPTY_ORG
                     : null;
 
             // Replace all projects with EMPTY, preserving taskGroup keys
             Map<String, ProjectConfigState> persistableProjects = new HashMap<>();
             for (String taskGroup : original.projects.keySet()) {
-                persistableProjects.put(taskGroup, ProjectManager.EMPTY);
+                persistableProjects.put(taskGroup, TeamConflictResolver.EMPTY_PROJECT);
             }
 
             persistableState.put(entry.getKey(),
@@ -129,12 +135,12 @@ public class TeamConflictResolver {
         for (var entry : teamOwnership.entrySet()) {
             TeamOwnership original = entry.getValue();
 
-            var cleanedOrg = original.org == OrganizationManager.EMPTY
+            var cleanedOrg = original.org == TeamConflictResolver.EMPTY_ORG
                     ? null
                     : original.org;
 
             Map<String, ProjectConfigState> cleanedProjects = new HashMap<>(original.projects);
-            cleanedProjects.values().removeIf(v -> v == ProjectManager.EMPTY);
+            cleanedProjects.values().removeIf(v -> v == TeamConflictResolver.EMPTY_PROJECT);
 
             // Create new TeamOwnership with cleaned values
             entry.setValue(new TeamOwnership(cleanedOrg, cleanedProjects));
