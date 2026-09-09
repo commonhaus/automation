@@ -46,22 +46,6 @@ public class DataRepository extends DataCommonType {
             }
             """.stripIndent();
 
-    private static final String PAGED_STARGAZERS = """
-            query ($org: String!, $repo: String!, $after: String) {
-                repository(owner: $org, name: $repo) {
-                    stargazers(first: 100, after: $after, orderBy: {field: STARRED_AT, direction: DESC}) {
-                        pageInfo {
-                            endCursor
-                            hasNextPage
-                        }
-                        edges {
-                            starredAt
-                        }
-                    }
-                }
-            }
-            """.stripIndent();
-
     private static final String RANGED_ITEM_STATISTICS = """
             query($query: String!, $searchType: SearchType!, $after: String) {
                 search(query: $query, type: $searchType, first: 100, after: $after) {
@@ -103,8 +87,8 @@ public class DataRepository extends DataCommonType {
             return repo.listReleases().toList();
         });
 
-        if (releases == null) {
-            qc.logAndSendContextErrors("Unable to list releases for " + repo.getFullName());
+        if (qc.hasErrors()) {
+            qc.checkRemoveNotFound();
             return null;
         }
 
@@ -114,31 +98,16 @@ public class DataRepository extends DataCommonType {
         return releaseDates;
     }
 
+    /**
+     * GitHub restricted the stargazers listing endpoints (both {@link GHRepository#listStargazers()}
+     * and {@link GHRepository#listStargazers2()}) to repo admins/collaborators in July 2026, and the
+     * GraphQL {@code stargazers} field is not accessible to GitHub App installation tokens at all.
+     * The privacy-safe replacement ({@code GET /repos/{owner}/{repo}/stargazers/history}) has no typed
+     * support yet in org.kohsuke:github-api (1.330, or the RC-only 2.x line). Star history is disabled
+     * until one of those paths is available.
+     */
     public static List<Instant> starHistory(GitHubQueryContext qc, GHRepository repo) {
-        Map<String, Object> variables = new HashMap<>();
-        List<Instant> stargazerDates = new java.util.ArrayList<>();
-        variables.put("org", repo.getOwnerName());
-        variables.put("repo", repo.getName());
-
-        DataPageInfo pageInfo = new DataPageInfo(null, false);
-        do {
-            variables.put("after", pageInfo.cursor());
-            Response response = qc.execQuerySync(PAGED_STARGAZERS, variables);
-            if (qc.hasErrors()) {
-                qc.checkRemoveNotFound();
-                return null;
-            }
-            JsonObject stargazers = JsonAttribute.stargazers.jsonObjectFrom(response.getData());
-            JsonArray edges = JsonAttribute.edges.extractArrayFrom(stargazers);
-            if (edges != null && !edges.isEmpty()) {
-                for (var edge : edges) {
-                    Instant starredAt = JsonAttribute.starredAt.instantFrom(edge.asJsonObject());
-                    stargazerDates.add(starredAt);
-                }
-            }
-            pageInfo = JsonAttribute.pageInfo.pageInfoFrom(stargazers);
-        } while (pageInfo.hasNextPage());
-        return stargazerDates;
+        return List.of();
     }
 
     private static int countStargazersInRange(GitHubQueryContext qc, GHRepository repo,

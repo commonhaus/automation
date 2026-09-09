@@ -242,6 +242,10 @@ public class AdminRoutes implements LocalRouteOnly {
         updateQueue.queueReconciliation("triggerStatistics/" + fullName, () -> {
             Log.infof("🚀 📊 Statistics update triggered for %s", fullName);
             var report = projectHealthCollector.collect(qc, startDate, true, true);
+            if (qc.hasErrors()) {
+                qc.logAndSendContextErrors("Failed to collect statistics for " + fullName);
+                return;
+            }
             try {
                 var reportAsString = objectMapper.writeValueAsString(report);
                 logMailer.sendEmail(
