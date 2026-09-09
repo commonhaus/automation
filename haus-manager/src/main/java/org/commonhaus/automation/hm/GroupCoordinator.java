@@ -58,9 +58,9 @@ public abstract class GroupCoordinator extends ScheduledService {
 
         String repoFullName();
 
-        boolean add(RepoSource repoSource);
+        boolean add(RepoSource effectiveSource);
 
-        boolean remove(RepoSource repoSource);
+        boolean remove(RepoSource effectiveSource);
 
         /** Teams that can not be synced due to conflicts */
         Set<String> blockedTeams();
@@ -76,18 +76,18 @@ public abstract class GroupCoordinator extends ScheduledService {
     protected void processMembershipUpdate(String taskGroup, MembershipUpdate update) {
     }
 
-    protected abstract void processRepoSourceUpdate(String taskGroup, RepoSource repoSource);
+    protected abstract void processRepoSourceUpdate(String taskGroup, RepoSource effectiveSource);
 
     /**
      * Register a file watcher for the GroupMapping source file.
      * This allows the system to react when team membership source files change.
      */
-    protected void watchRepoSource(ConfigState configState, RepoSource repoSource) {
-        if (configState.add(repoSource)) {
-            Log.debugf("[%s] Watching source %s for taskGroup %s", me(), repoSource,
+    protected void watchRepoSource(ConfigState configState, RepoSource effectiveSource) {
+        if (configState.add(effectiveSource)) {
+            Log.debugf("[%s] Watching source %s for taskGroup %s", me(), effectiveSource,
                     configState.taskGroup());
             fileWatcher.watchFile(configState.taskGroup(), configState.installationId(),
-                    repoSource.repository(), repoSource.filePath(),
+                    effectiveSource.repository(), effectiveSource.filePath(),
                     (fileUpdate) -> {
                         Log.debugf("[%s] GroupMapping source file updated: %s", me(), fileUpdate.filePath());
                         // Queue reconciliation when source file changes
@@ -95,7 +95,7 @@ public abstract class GroupCoordinator extends ScheduledService {
                             // The specific reconcile method will be called by the concrete class
                             Log.debugf("[%s] Reconciling due to GroupMapping source change: %s", me(),
                                     fileUpdate.filePath());
-                            processRepoSourceUpdate(configState.taskGroup(), repoSource);
+                            processRepoSourceUpdate(configState.taskGroup(), effectiveSource);
                         });
                     });
         }
@@ -105,14 +105,14 @@ public abstract class GroupCoordinator extends ScheduledService {
      * Remove file watcher for a GroupMapping source file.
      * Call this when GroupMapping is removed or its source changes.
      */
-    protected void unwatchRepoSource(ConfigState configState, RepoSource repoSource) {
-        if (repoSource == null || repoSource.isEmpty()) {
+    protected void unwatchRepoSource(ConfigState configState, RepoSource effectiveSource) {
+        if (effectiveSource == null || effectiveSource.isEmpty()) {
             return;
         }
-        if (configState.remove(repoSource)) {
+        if (configState.remove(effectiveSource)) {
             Log.debugf("[%s] Unwatching GroupMapping source %s for taskGroup %s",
-                    me(), repoSource, configState.taskGroup());
-            fileWatcher.unwatchFile(configState.taskGroup(), repoSource.repository(), repoSource.filePath());
+                    me(), effectiveSource, configState.taskGroup());
+            fileWatcher.unwatchFile(configState.taskGroup(), effectiveSource.repository(), effectiveSource.filePath());
         }
     }
 

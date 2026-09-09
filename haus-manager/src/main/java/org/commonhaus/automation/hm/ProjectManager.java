@@ -169,7 +169,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                     for (var group : state.projectConfig().teamMembership()) {
                         var source = group.source();
                         if (source != null && !source.isEmpty()) {
-                            unwatchRepoSource(state, source);
+                            unwatchRepoSource(state, source.resolve(state.repoFullName()));
                         }
                     }
                 }
@@ -217,7 +217,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
     }
 
     @Override
-    protected void processRepoSourceUpdate(String taskGroup, RepoSource repoSource) {
+    protected void processRepoSourceUpdate(String taskGroup, RepoSource effectiveSource) {
         // queue reconcile action: deal with bursty config updates
         updateQueue.queue(taskGroup, () -> {
             ProjectConfigState configState = taskGroupToState.get(taskGroup);
@@ -225,11 +225,11 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 Log.warnf("[%s] processRepoSourceUpdate: no state for %s", ME, taskGroup);
                 return;
             }
-            Log.debugf("[%s] processRepoSourceUpdate: %s %s", ME, taskGroup, repoSource);
+            Log.debugf("[%s] processRepoSourceUpdate: %s %s", ME, taskGroup, effectiveSource);
 
             ProjectConfig config = configState.projectConfig();
             List<GroupMapping> mappings = config.teamMembership().stream()
-                    .filter(mapping -> repoSource.equals(mapping.source()))
+                    .filter(mapping -> effectiveSource.equalsResolved(mapping.source(), configState.repoFullName()))
                     .toList();
 
             for (var mapping : mappings) {
@@ -348,7 +348,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 }
             }
             for (RepoSource oldSource : oldSources) {
-                unwatchRepoSource(newState, oldSource);
+                unwatchRepoSource(oldState, oldSource.resolve(oldState.repoFullName()));
             }
 
             Set<String> removedTeams = oldState.targetTeams(mgrBotConfig.home().organization());
@@ -401,7 +401,7 @@ public class ProjectManager extends GroupCoordinator implements LatestProjectCon
                 continue;
             }
             // Register watcher for the source file so we get notified when it changes
-            watchRepoSource(state, groupMapping.source());
+            watchRepoSource(state, groupMapping.source().resolve(state.repoFullName()));
             processGroupMapping(state, groupMapping);
         }
 

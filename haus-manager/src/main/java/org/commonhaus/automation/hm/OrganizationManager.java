@@ -174,7 +174,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
     }
 
     @Override
-    protected void processRepoSourceUpdate(String taskGroup, RepoSource repoSource) {
+    protected void processRepoSourceUpdate(String taskGroup, RepoSource effectiveSource) {
         // queue reconcile action: deal with bursty config updates
         updateQueue.queue(ME, () -> {
             OrganizationConfigState configState = currentConfig.get().orElse(null);
@@ -183,10 +183,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                         configState);
                 return;
             }
-            Log.debugf("[%s] processRepoSourceUpdate: %s", ME, repoSource);
+            Log.debugf("[%s] processRepoSourceUpdate: %s", ME, effectiveSource);
             OrganizationConfig orgConfig = configState.orgConfig();
             List<GroupMapping> mappings = orgConfig.teamMembership().stream()
-                    .filter(mapping -> repoSource.equals(mapping.source()))
+                    .filter(mapping -> effectiveSource.equalsResolved(mapping.source(), configState.repoFullName()))
                     .toList();
             for (var mapping : mappings) {
                 processGroupMapping(configState, mapping);
@@ -282,7 +282,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             }
 
             for (RepoSource oldSource : oldSources) {
-                unwatchRepoSource(oldState, oldSource);
+                unwatchRepoSource(oldState, oldSource.resolve(oldState.repoFullName()));
             }
         }
         teamConflictResolver.registerOrgTeams(newState);
@@ -363,7 +363,7 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 continue;
             }
             // Register watcher for the source file so we get notified when it changes
-            watchRepoSource(configState, groupMapping.source());
+            watchRepoSource(configState, groupMapping.source().resolve(configState.repoFullName()));
             processGroupMapping(configState, groupMapping);
         }
         Log.debugf("[%s] reconcile: end %s::%s", ME, configState.repoFullName(), OrganizationConfig.PATH);
@@ -395,13 +395,13 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
         }
 
         @Override
-        public boolean add(RepoSource source) {
-            return groupMapSources.add(source);
+        public boolean add(RepoSource effectiveSource) {
+            return groupMapSources.add(effectiveSource);
         }
 
         @Override
-        public boolean remove(RepoSource source) {
-            return groupMapSources.remove(source);
+        public boolean remove(RepoSource effectiveSource) {
+            return groupMapSources.remove(effectiveSource);
         }
 
         public boolean performSync() {
