@@ -300,10 +300,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
                 if (source == null) {
                     continue;
                 }
-                String resolvedRepo = source.repository() == null ? repo.getFullName() : source.repository();
-                String sourceOrg = toOrganizationName(resolvedRepo);
+                RepoSource effectiveSource = source.resolve(repo.getFullName());
+                String sourceOrg = toOrganizationName(effectiveSource.repository());
                 if (!sourceOrg.equalsIgnoreCase(homeOrg)) {
-                    sourceViolations.add(new RepoSource(resolvedRepo, source.filePath()));
+                    sourceViolations.add(effectiveSource);
                 }
             }
         }

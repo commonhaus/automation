@@ -173,15 +173,15 @@ public class TeamOrgValidator {
             if (source == null) {
                 continue;
             }
-            String repo = source.repository() == null ? repoFullName : source.repository();
-            String sourceOrg = GitHubQueryContext.toOrganizationName(repo);
+            RepoSource effectiveSource = source.resolve(repoFullName);
+            String sourceOrg = GitHubQueryContext.toOrganizationName(effectiveSource.repository());
             if (sourceOrg.equalsIgnoreCase(homeOrg)) {
                 continue; // home org always allowed
             }
             boolean allowed = githubOrganizations.stream()
                     .anyMatch(declared -> sourceOrg.equalsIgnoreCase(OrganizationConfig.normalizeOrg(declared)));
             if (!allowed) {
-                sourceRepoViolations.add(new RepoSource(repo, source.filePath()));
+                sourceRepoViolations.add(effectiveSource);
             }
         }
 

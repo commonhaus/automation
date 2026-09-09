@@ -128,12 +128,10 @@ public abstract class GroupCoordinator extends ScheduledService {
         // Find and read the source file (CONTACTS.yaml)
         // First: find the repository
         RepoSource source = groupMapping.source();
-        String sourceRepoName = source.repository() == null ? configState.repoFullName() : source.repository();
+        RepoSource effectiveSource = source.resolve(configState.repoFullName());
+        String sourceRepoName = effectiveSource.repository();
 
         // Skip if this source was blocked at config-load time (trust boundary violation)
-        RepoSource effectiveSource = source.repository() == null
-                ? new RepoSource(sourceRepoName, source.filePath())
-                : source;
         if (configState.blockedSources().contains(effectiveSource)) {
             Log.debugf("[%s] groupMapping: source %s is blocked; skipping", me(), effectiveSource);
             return;
