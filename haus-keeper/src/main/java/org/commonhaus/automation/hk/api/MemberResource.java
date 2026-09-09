@@ -50,6 +50,9 @@ public class MemberResource {
     @Inject
     ForwardEmailService emailService;
 
+    @Inject
+    RateLimiterService rateLimiterService;
+
     @GET
     @Path("/github")
     @Produces("application/json")
@@ -113,6 +116,10 @@ public class MemberResource {
     @Path("/commonhaus/status")
     @Produces("application/json")
     public Response updateUserStatus(@DefaultValue("false") @QueryParam("refresh") boolean refresh) {
+        if (!rateLimiterService.tryAcquireStatusEndpoint(session.nodeId())) {
+            return Response.status(Response.Status.TOO_MANY_REQUESTS).build();
+        }
+
         if (refresh) {
             // reset all the things.
             AdminDataCache.forgetUser(session);

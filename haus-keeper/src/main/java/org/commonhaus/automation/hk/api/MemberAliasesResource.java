@@ -80,6 +80,7 @@ public class MemberAliasesResource {
 
     @POST
     @KnownUser
+    @RateLimited
     @Produces("application/json")
     public Response updateAliases(Map<String, AliasUpdate> aliases) {
         CommonhausUser user = null;
@@ -119,6 +120,7 @@ public class MemberAliasesResource {
 
     @POST
     @KnownUser
+    @RateLimited
     @Path("/password")
     @Produces("application/json")
     public Response generatePassword(PasswordRequest request) {

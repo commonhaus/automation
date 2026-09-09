@@ -37,6 +37,7 @@ public class MemberApplicationResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Produces("application/json")
     public Response getApplication() {
         try {
@@ -54,6 +55,7 @@ public class MemberApplicationResource {
 
     @POST
     @KnownUser
+    @RateLimited
     @Produces("application/json")
     public Response setApplication(ApplicationPost applicationPost) {
         try {

@@ -40,6 +40,7 @@ public class MemberAttestationResource {
 
     @POST
     @KnownUser
+    @RateLimited
     @Produces("application/json")
     public Response updateAttestation(AttestationPost post) {
         if (!ctx.isValidAttestation(post.id())) {
@@ -72,6 +73,7 @@ public class MemberAttestationResource {
 
     @POST
     @KnownUser
+    @RateLimited
     @Path("/all")
     @Produces("application/json")
     public Response updateAttestations(List<AttestationPost> postList) {

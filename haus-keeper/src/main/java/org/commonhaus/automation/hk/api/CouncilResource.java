@@ -36,6 +36,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/keeper/projectAliases")
     public Response triggerProjectAliasUpdate() {
         Log.debugf("[%s] Trigger project alias refresh for council members", session.login());
@@ -48,6 +49,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/keeper/verifyLogins")
     public Response triggerVerifyLogins() {
         Log.debugf("[%s] Trigger user login verification", session.login());
@@ -60,6 +62,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/manager/installations")
     public Response triggerInstallMonitor() {
         asyncCommonhausService.triggerInstallMonitor(session);
@@ -68,6 +71,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/manager/org")
     public Response triggerOrgUpdate() {
         asyncCommonhausService.triggerOrgUpdate(session);
@@ -76,6 +80,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/manager/projects")
     public Response triggerProjectUpdate() {
         asyncCommonhausService.triggerProjectUpdate(session);
@@ -84,6 +89,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/manager/sponsors")
     public Response triggerSponsorUpdate() {
         asyncCommonhausService.triggerSponsorUpdate(session);
@@ -92,6 +98,7 @@ public class CouncilResource {
 
     @GET
     @KnownUser
+    @RateLimited
     @Path("/rules/votes")
     public Response triggerVoteCount() {
         asyncCommonhausService.triggerVoteCount(session);

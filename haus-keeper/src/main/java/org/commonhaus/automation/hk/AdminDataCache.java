@@ -28,6 +28,12 @@ public enum AdminDataCache {
 
     /** Cache forward email domains (e.g. max_recipients_per_alias) to reduce API calls */
     DOMAINS(b -> b.expireAfterAccess(6, TimeUnit.HOURS)),
+
+    /** Per-user rolling-window rate-limit counters for the shared member-endpoint budget */
+    RATE_LIMIT_MEMBER_ENDPOINTS(b -> b.expireAfterAccess(15, TimeUnit.MINUTES)),
+
+    /** Per-user rolling-window rate-limit counter for /member/commonhaus/status */
+    RATE_LIMIT_STATUS_ENDPOINT(b -> b.expireAfterAccess(15, TimeUnit.MINUTES)),
     ;
 
     private QueryCache cache = null;
