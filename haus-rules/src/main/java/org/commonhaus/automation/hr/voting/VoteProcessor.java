@@ -16,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
+import org.commonhaus.automation.PackagedException;
 import org.commonhaus.automation.config.RouteSupplier;
 import org.commonhaus.automation.github.context.BotComment;
 import org.commonhaus.automation.github.context.DataCommonComment;
@@ -352,20 +353,25 @@ public class VoteProcessor extends ScheduledService {
             DataCommonItem item, VoteEvent voteEvent, Throwable e) {
         // If configured to do so, email the error_email_address
         if (votingConfig.sendErrorEmail()) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
+            String title;
+            String messageBody;
             if (e != null) {
-                e.printStackTrace(pw);
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                title = "Voting Error: " + e;
+                messageBody = sw.toString();
+            } else {
+                PackagedException bundled = qc.bundleExceptions();
+                title = "Voting Error (context errors accumulated)";
+                messageBody = bundled != null ? bundled.details() : "";
             }
 
             String subject = "Voting error occurred with " + voteEvent.getRepoFullName() + " #" + voteEvent.getNumber();
-
-            String messageBody = sw.toString();
             String htmlBody = messageBody.replace("\n", "<br/>\n");
 
             MailTemplateInstance mail = Templates.votingErrorEvent(item,
                     voteEvent,
-                    "Voting Error: " + e,
+                    title,
                     messageBody,
                     htmlBody,
                     Instant.now().toString());
