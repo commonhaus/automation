@@ -19,6 +19,6 @@ public class MatchBody {
         }
 
         String body = eventData.getBody();
-        return body != null && matchPattern.matcher(body).matches();
+        return body != null && matchPattern.matcher(body).find();
     }
 }
