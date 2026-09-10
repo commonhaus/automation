@@ -36,7 +36,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.quarkus.logging.Log;
 
 public class VoteInformation {
-    public record Alternates(int hash, Map<String, Map<String, DataActor>> alternates) {
+    public record Alternates(Map<String, Map<String, DataActor>> alternates) {
     }
 
     static final Pattern groupPattern = Pattern.compile("voting group[^@]+@([\\S]+)", Pattern.CASE_INSENSITIVE);
@@ -283,45 +283,46 @@ public class VoteInformation {
 
     private Map<String, DataActor> getAlternates(GitHubQueryContext qc, String teamName, VoteConfig voteConfig) {
         // Generate a cache key using the repository ID
-        String key = "ALTS_" + qc.getRepositoryId();
+        String key = VoteQueryCache.alternateCacheKey(qc.getRepositoryId());
+        List<AlternateConfig> alternates = voteConfig.alternates;
 
-        // Look up or compute the alternates for the given key
-        Alternates alts = VoteQueryCache.ALT_ACTORS.computeIfAbsent(key, k -> {
-            List<AlternateConfig> alternates = voteConfig.alternates;
-            int hash = alternates == null ? 0 : alternates.hashCode();
+        Alternates cached = VoteQueryCache.ALT_ACTORS.get(key);
+        if (cached != null) {
+            return cached.alternates().get(teamName);
+        }
 
-            // If no alternates are configured, return an empty map
-            if (alternates == null) {
-                return new Alternates(hash, Map.of());
+        // Cache the empty result when no alternates are configured
+        if (alternates == null) {
+            VoteQueryCache.ALT_ACTORS.put(key, new Alternates(Map.of()));
+            return null;
+        }
+
+        // Iterate over the list of alternate configurations
+        Map<String, Map<String, DataActor>> githubTeamToAlternates = new HashMap<>();
+        for (AlternateConfig alt : alternates) {
+            if (!alt.valid()) {
+                continue;
             }
 
-            // Iterate over the list of alternate configurations
-            Map<String, Map<String, DataActor>> githubTeamToAlternates = new HashMap<>();
-            for (AlternateConfig alt : alternates) {
-                if (!alt.valid()) {
-                    continue;
-                }
-
-                // Retrieve the configuration data for the alternate
-                Optional<JsonNode> configDataNode = getAlternateConfigData(qc, alt);
-                if (configDataNode.isEmpty()) {
-                    continue;
-                }
-
-                // Map logins from the primary team to the secondary team
-                JsonNode data = configDataNode.get();
-                for (AlternateDefinition altDef : alt.mapping()) {
-                    String primaryTeam = altDef.primary().team();
-                    Map<String, DataActor> loginToSecond = mapLoginToSecond(qc, data, altDef);
-                    if (loginToSecond.isEmpty()) {
-                        continue;
-                    }
-                    githubTeamToAlternates.computeIfAbsent(primaryTeam, x -> new HashMap<>()).putAll(loginToSecond);
-                }
+            // Retrieve the configuration data for the alternate
+            Optional<JsonNode> configDataNode = getAlternateConfigData(qc, alt);
+            if (configDataNode.isEmpty()) {
+                continue;
             }
-            // Return the computed alternates
-            return new Alternates(hash, githubTeamToAlternates);
-        });
+
+            // Map logins from the primary team to the secondary team
+            JsonNode data = configDataNode.get();
+            for (AlternateDefinition altDef : alt.mapping()) {
+                String primaryTeam = altDef.primary().team();
+                Map<String, DataActor> loginToSecond = mapLoginToSecond(qc, data, altDef);
+                if (loginToSecond.isEmpty()) {
+                    continue;
+                }
+                githubTeamToAlternates.computeIfAbsent(primaryTeam, x -> new HashMap<>()).putAll(loginToSecond);
+            }
+        }
+        Alternates alts = new Alternates(githubTeamToAlternates);
+        VoteQueryCache.ALT_ACTORS.put(key, alts);
 
         // Return the alternates for the specified team name (if any)
         return alts.alternates().get(teamName);

@@ -15,6 +15,7 @@ import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.commonhaus.automation.github.watchers.FileWatcher;
 import org.commonhaus.automation.github.watchers.FileWatcher.FileUpdateType;
 import org.commonhaus.automation.hr.AppContextService;
+import org.commonhaus.automation.hr.voting.VoteQueryCache;
 import org.commonhaus.automation.queue.PeriodicUpdateQueue;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
@@ -104,8 +105,10 @@ public class ConfigWatcher {
             Log.warnf("[%s] readConfiguration: repository not set in FileUpdate", ME);
             return;
         }
+        invalidateAlternateCache(repo);
+
         if (updateType == FileUpdateType.REMOVED) {
-            Log.debugf("[%s] readConfiguration: %s config deleted", repo.getFullName());
+            Log.debugf("[%s] readConfiguration: %s config deleted", ME, repo.getFullName());
             repoConfig.remove(repo.getFullName());
             return;
         }
@@ -127,5 +130,9 @@ public class ConfigWatcher {
 
         Log.debugf("[%s] readHausRulesConfig: ✔️ found %s in %s", ME, HausRulesConfig.PATH, repo.getFullName());
         repoConfig.put(repo.getFullName(), hausRulesCfg);
+    }
+
+    private void invalidateAlternateCache(GHRepository repo) {
+        VoteQueryCache.ALT_ACTORS.invalidate(VoteQueryCache.alternateCacheKey(repo.getNodeId()));
     }
 }
