@@ -9,6 +9,8 @@ import org.commonhaus.automation.hr.EventQueryContext;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHUser;
 
+import io.quarkus.logging.Log;
+
 public class MatchMember {
     public final List<String> include = new ArrayList<>();
     public final List<String> exclude = new ArrayList<>();
@@ -48,6 +50,10 @@ public class MatchMember {
         }
         // Check for org membership
         GHOrganization org = qc.getOrganization(group);
+        if (org == null) {
+            Log.warnf("MatchMember: organization '%s' not found or not accessible", group);
+            return false;
+        }
         return org.hasMember(user);
     }
 

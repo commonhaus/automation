@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 
+import org.commonhaus.automation.github.context.TestFileNotFoundException;
 import org.commonhaus.automation.hr.HausRulesTestBase;
 import org.commonhaus.automation.hr.config.HausRulesConfig;
 import org.commonhaus.automation.hr.rules.RuleHelper;
@@ -189,6 +190,39 @@ public class NotifyLabelsTest extends HausRulesTestBase {
                 });
 
         // verify presence of label(s) from mock response in the cache
+        verifyLabels(discussionId, 1, "bug");
+    }
+
+    @Test
+    void discussionCreatedOrganizationNotFound() throws Exception {
+        // When a discussion is created in announcements
+        // - organization membership is checked: org not found (getOrganization returns null)
+        // - the notice label is not added
+
+        // from src/test/resources/github/eventDiscussionCreatedAnnouncements.json
+        String discussionId = "D_kwDOLDuJqs4AXaZM";
+
+        setLabels(repositoryId, NOTICE);
+        setLabels(discussionId, BUG);
+
+        given()
+                .github(mocks -> {
+                    mocks.configFile(HausRulesConfig.NAME).fromClasspath("/cf-notice-label-organization.yml");
+
+                    setupGivenMocks(mocks, TEST_ORG);
+                    mockTeams(hausMocks);
+                    // org lookup throws → getOrganization returns null → userIsMember returns false
+                    when(hausMocks.github().getOrganization("commonhaus"))
+                            .thenThrow(new TestFileNotFoundException("mock: org not found"));
+                })
+                .when().payloadFromClasspath("/github/eventDiscussionCreatedAnnouncements.json")
+                .event(GHEvent.DISCUSSION)
+                .then().github(mocks -> {
+                    // no call to add labels
+                    verifyNoMoreInteractions(mocks.installationGraphQLClient(installationId));
+                });
+
+        // label unchanged
         verifyLabels(discussionId, 1, "bug");
     }
 
