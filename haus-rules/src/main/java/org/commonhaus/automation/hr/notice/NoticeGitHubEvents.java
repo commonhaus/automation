@@ -79,7 +79,7 @@ public class NoticeGitHubEvents {
         }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
-            Log.warnf("onDiscussionEvent: Missing repository information");
+            Log.warnf("onDiscussionCommentEvent: Missing repository information");
             return;
         }
         NoticeConfig noticeConfig = configWatcher.updateNoticeConfig(repoFullName, repoConfigFile);
@@ -103,7 +103,7 @@ public class NoticeGitHubEvents {
         }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
-            Log.warnf("onDiscussionEvent: Missing repository information");
+            Log.warnf("onIssueEvent: Missing repository information");
             return;
         }
         NoticeConfig noticeConfig = configWatcher.updateNoticeConfig(repoFullName, repoConfigFile);
@@ -127,7 +127,7 @@ public class NoticeGitHubEvents {
         }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
-            Log.warnf("onDiscussionEvent: Missing repository information");
+            Log.warnf("onPullRequestEvent: Missing repository information");
             return;
         }
         NoticeConfig noticeConfig = configWatcher.updateNoticeConfig(repoFullName, repoConfigFile);
@@ -151,7 +151,7 @@ public class NoticeGitHubEvents {
         }
         String repoFullName = event.getRepository().orElse(null);
         if (repoFullName == null) {
-            Log.warnf("onDiscussionEvent: Missing repository information");
+            Log.warnf("onIssueCommentEvent: Missing repository information");
             return;
         }
         NoticeConfig noticeConfig = configWatcher.updateNoticeConfig(repoFullName, repoConfigFile);
