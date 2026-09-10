@@ -39,7 +39,8 @@ public abstract class Action {
             } else if (root.has("address")) {
                 return new EmailAction(root.get("address"));
             }
-            return null;
+            return (Action) context.reportInputMismatch(Action.class,
+                    "Unrecognized action shape: %s", root);
         }
     }
 }
