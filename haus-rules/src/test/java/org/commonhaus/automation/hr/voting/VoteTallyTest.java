@@ -213,7 +213,7 @@ public class VoteTallyTest extends HausRulesTestBase {
                         new TeamMapping("egc", "commonhaus/test-quorum-default"),
                         new TeamMapping("egc-second", "commonhaus/test-quorum-seconds")))));
 
-        setupMockAlternates(votingConfig.alternates.hashCode(),
+        setupMockAlternates(votingConfig.alternates,
                 "commonhaus/test-quorum-default",
                 Map.of("user28", alternateUser));
 
@@ -256,6 +256,21 @@ public class VoteTallyTest extends HausRulesTestBase {
         String[] markdown = voteTally.toMarkdown(false).split("\n");
         assertThat(markdown).anyMatch(line -> line.contains("alt_1") && line.contains("revise"));
         assertThat(markdown).noneMatch(line -> line.contains("alt_1") && !line.contains("revise"));
+    }
+
+    @Test
+    void testAlternateCacheEmptyWhenNotConfigured() {
+        VoteConfig withoutAlternates = createVoteConfig(VoteConfig.Threshold.all);
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repoFullName);
+        VoteEvent event = createVoteEvent(withoutAlternates);
+
+        VoteInformation voteInfo = new VoteInformation(ctx, qc, withoutAlternates,
+                createItem(CountingMethod.marthas), event);
+
+        assertThat(voteInfo.alternates).isNull();
+        Alternates cached = VoteQueryCache.ALT_ACTORS.get(VoteQueryCache.alternateCacheKey(repositoryId));
+        assertThat(cached).isNotNull();
+        assertThat(cached.alternates()).isEmpty();
     }
 
     VoteConfig createVoteConfig(VoteConfig.Threshold threshold) {
@@ -483,9 +498,9 @@ public class VoteTallyTest extends HausRulesTestBase {
         return voteTally;
     }
 
-    void setupMockAlternates(int hash, String primaryTeam, Map<String, DataActor> alternateLogins) {
-        Alternates alts = new Alternates(hash, Map.of(primaryTeam, alternateLogins));
-        VoteQueryCache.ALT_ACTORS.put("ALTS_" + repositoryId, alts);
+    void setupMockAlternates(List<AlternateConfig> alternates, String primaryTeam, Map<String, DataActor> alternateLogins) {
+        Alternates alts = new Alternates(Map.of(primaryTeam, alternateLogins));
+        VoteQueryCache.ALT_ACTORS.put(VoteQueryCache.alternateCacheKey(repositoryId), alts);
     }
 
     private void mockReaction(List<DataReaction> reactions, DataActor user, int i) {

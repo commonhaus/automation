@@ -19,6 +19,10 @@ public enum VoteQueryCache {
         this.cache = QueryCache.create(name(), config);
     }
 
+    public static String alternateCacheKey(String repositoryId) {
+        return "ALTS_" + repositoryId;
+    }
+
     public <T> T compute(String key, BiFunction<String, Object, T> mappingFunction) {
         return cache.compute(key, mappingFunction);
     }
