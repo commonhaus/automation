@@ -31,6 +31,7 @@ import org.commonhaus.automation.hk.api.MemberAttestationResource.AttestationPos
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.hk.data.MemberStatus;
+import org.commonhaus.automation.hk.dev.ForwardEmailTestEndpoint;
 import org.commonhaus.automation.hk.forwardemail.AliasUpdate;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.HausKeeperTestBase;
@@ -67,6 +68,9 @@ public class MemberDataTest extends HausKeeperTestBase {
     @Inject
     MemberApplicationProcess applicationProcess;
 
+    @Inject
+    ForwardEmailTestEndpoint testEndpoint;
+
     boolean errorMailExpected = false;
 
     @Override
@@ -77,6 +81,7 @@ public class MemberDataTest extends HausKeeperTestBase {
         setupBotLogin();
         setupMockTeam();
         setUserManagementConfig();
+        testEndpoint.clear();
     }
 
     @AfterEach
@@ -346,6 +351,157 @@ public class MemberDataTest extends HausKeeperTestBase {
             @UserInfo(key = "node_id", value = botNodeId),
             @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
     })
+    void testUpdateCommonhausUserRejectsMalformedAliasKey() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        Map<String, AliasUpdate> input = Map.of(
+                "not an email", new AliasUpdate(Set.of("target@example.com"), false));
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body("ERROR", equalTo("malformed email address"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testUpdateCommonhausUserRejectsMalformedRecipient() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        Map<String, AliasUpdate> input = Map.of(
+                botLogin, new AliasUpdate(Set.of("not-an-email"), false));
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body("ERROR", equalTo("malformed email address"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGetAliasesEmailDisabled() throws Exception {
+        setUserManagementConfigEmailDisabled();
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        given()
+                .log().all()
+                .when()
+                .get("/aliases")
+                .then()
+                .log().all()
+                .statusCode(503);
+
+        assertThat(testEndpoint.getMethodCalls()).isEmpty();
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testUpdateAliasesEmailDisabled() throws Exception {
+        setUserManagementConfigEmailDisabled();
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        Map<String, AliasUpdate> input = Map.of(
+                botLogin, new AliasUpdate(Set.of("target@example.com"), false));
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases")
+                .then()
+                .log().all()
+                .statusCode(503);
+
+        assertThat(testEndpoint.getMethodCalls()).isEmpty();
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordEmailDisabled() throws Exception {
+        setUserManagementConfigEmailDisabled();
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "commonhaus-bot@example.com", null, "new-password", true, null);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(503);
+
+        assertThat(testEndpoint.getMethodCalls()).isEmpty();
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
     void testGeneratePasswordWithEmail() throws Exception {
         mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
 
@@ -425,7 +581,67 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .then()
                 .log().all()
                 .statusCode(400)
-                .body("ERROR", equalTo("alias is not a valid email address"));
+                .body("ERROR", equalTo("malformed email address"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordWhitespacePaddedAlias() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "  commonhaus-bot@example.com  ", null, "new-password", true, null);
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("ALIAS.password", equalTo("new-password"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testGeneratePasswordMalformedNotificationEmail() throws Exception {
+        mockExistingCommonhausData(UserPath.WITH_EMAIL_COMMITTEE);
+
+        GHUser botUser = sponsorMocks.github().getUser(botLogin);
+        appendCachedTeam(sponsorsOrgName + "/cf-voting", botUser);
+        addCollaborator(sponsorsRepo, "otherUser");
+
+        MemberAliasesResource.PasswordRequest input = new MemberAliasesResource.PasswordRequest(
+                "commonhaus-bot@example.com", null, "new-password", true, "not-an-email");
+
+        given()
+                .log().all()
+                .when()
+                .contentType(ContentType.JSON)
+                .body(mapper.writeValueAsString(input))
+                .post("/aliases/password")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body("ERROR", equalTo("malformed email address"));
     }
 
     @Test

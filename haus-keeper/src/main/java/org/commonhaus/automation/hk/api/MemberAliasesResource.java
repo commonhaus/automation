@@ -51,6 +51,9 @@ public class MemberAliasesResource {
     @KnownUser
     @Produces("application/json")
     public Response getAliases() {
+        if (ctx.getConfig().emailDisabled()) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
+        }
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
             if (user == null) {
@@ -83,6 +86,9 @@ public class MemberAliasesResource {
     @RateLimited
     @Produces("application/json")
     public Response updateAliases(Map<String, AliasUpdate> aliases) {
+        if (ctx.getConfig().emailDisabled()) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
+        }
         CommonhausUser user = null;
         try {
             user = datastore.getCommonhausUser(session);
@@ -124,6 +130,9 @@ public class MemberAliasesResource {
     @Path("/password")
     @Produces("application/json")
     public Response generatePassword(PasswordRequest request) {
+        if (ctx.getConfig().emailDisabled()) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
+        }
         String requestAlias = request == null ? null : request.alias();
         try {
             CommonhausUser user = datastore.getCommonhausUser(session);
@@ -143,20 +152,32 @@ public class MemberAliasesResource {
                         .finish();
             }
 
-            if (!AliasKey.isValidFormat(requestAlias)) {
+            String normalizedAlias = AliasKey.normalize(requestAlias);
+            if (normalizedAlias == null) {
                 return user.toResponse()
-                        .setData(ApiResponse.Type.ERROR, "alias is not a valid email address")
+                        .setData(ApiResponse.Type.ERROR, "malformed email address")
                         .responseStatus(Response.Status.BAD_REQUEST)
                         .finish();
             }
 
+            String notificationEmail = request.email();
+            if (notificationEmail != null) {
+                notificationEmail = AliasKey.normalize(notificationEmail);
+                if (notificationEmail == null) {
+                    return user.toResponse()
+                            .setData(ApiResponse.Type.ERROR, "malformed email address")
+                            .responseStatus(Response.Status.BAD_REQUEST)
+                            .finish();
+                }
+            }
+
             // Cached API CALL: get alias mappings
             Map<AliasKey, Alias> aliasMap = emailService.fetchAliases(session, user);
-            AliasKey key = AliasKey.fromCache(requestAlias);
+            AliasKey key = AliasKey.fromCache(normalizedAlias);
             Alias alias = aliasMap.get(key);
 
             GeneratePasswordResponse response = emailService.generatePassword(
-                    alias, request.new_password(), request.password(), request.reset(), request.email());
+                    alias, request.new_password(), request.password(), request.reset(), notificationEmail);
 
             return response == null
                     ? Response.status(Response.Status.BAD_REQUEST).build()

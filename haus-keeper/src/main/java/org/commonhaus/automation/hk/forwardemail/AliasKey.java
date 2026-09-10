@@ -28,14 +28,36 @@ public record AliasKey(
 
     /**
      * Validate that a caller-supplied address has exactly one '@' with a
-     * non-empty local part and domain, i.e. is safe to pass to {@link #fromCache(String)}.
+     * non-empty local part and domain, no whitespace, and no control
+     * characters, i.e. is safe to pass to {@link #fromCache(String)}.
+     * Callers are responsible for trimming leading/trailing whitespace
+     * before calling this method; see {@link #normalize(String)}.
      */
     public static boolean isValidFormat(String email) {
-        if (email == null) {
+        if (!isValidCharacters(email)) {
             return false;
         }
         int at = email.indexOf('@');
         return at > 0 && at == email.lastIndexOf('@') && at < email.length() - 1;
+    }
+
+    static boolean isValidCharacters(String value) {
+        return value != null && value.chars()
+                .noneMatch(c -> Character.isWhitespace(c) || Character.isISOControl(c));
+    }
+
+    /**
+     * Trim leading/trailing whitespace and validate the result with
+     * {@link #isValidFormat(String)}.
+     *
+     * @return the trimmed value if it is a validly-formatted address, otherwise null
+     */
+    public static String normalize(String email) {
+        if (email == null) {
+            return null;
+        }
+        String trimmed = email.strip();
+        return isValidFormat(trimmed) ? trimmed : null;
     }
 
     @Override

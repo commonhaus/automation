@@ -260,6 +260,19 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     }
 
     @Test
+    public void testPostAliasesRejectsMalformedRecipient() throws Exception {
+        setUserManagementConfig();
+
+        assertThrows(AliasValidationException.class, () -> forwardEmailService.postAliases(
+                Map.of(AliasKey.fromCache("make_new@commonhaus.dev"),
+                        new AliasUpdate(Set.of("not-an-email"), false)),
+                "Test User"));
+
+        // no ForwardEmail call should have been made
+        assertThat(testEndpoint.getMethodCalls()).isEmpty();
+    }
+
+    @Test
     public void testPostAliasesRejectsExceedingMaxRecipients() throws Exception {
         setUserManagementConfig();
 

@@ -251,6 +251,14 @@ public class HausKeeperTestBase extends ContextHelper {
         testConfig.testUpdate(qc, config);
     }
 
+    public void setUserManagementConfigEmailDisabled() throws Exception {
+        HausKeeperConfig config = ctx.yamlMapper().readValue(
+                ContextHelper.class.getResourceAsStream("/cf-haus-keeper-email-disabled.yml"), HausKeeperConfig.class);
+
+        ScopedQueryContext qc = new ScopedQueryContext(ctx, datastoreInstallationId, dataMocks.repository());
+        testConfig.testUpdate(qc, config);
+    }
+
     public GHContent mockExistingCommonhausData(UserPath userPath) throws IOException {
         GHRepository dataStore = dataMocks.repository();
         return mockFileContent(dataStore, "data/users/" + botId + ".yaml", userPath.filename());
