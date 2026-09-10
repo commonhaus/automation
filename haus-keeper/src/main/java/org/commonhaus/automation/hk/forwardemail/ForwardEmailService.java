@@ -134,6 +134,12 @@ public class ForwardEmailService {
             }
 
             if (recipients != null && !recipients.isEmpty()) {
+                for (String recipient : recipients) {
+                    if (AliasKey.normalize(recipient) == null) {
+                        throw new AliasValidationException("malformed email address");
+                    }
+                }
+
                 Domain domain = getDomain(key.domain());
                 if (domain != null && domain.max_recipients_per_alias != null
                         && recipients.size() > domain.max_recipients_per_alias) {
@@ -315,7 +321,7 @@ public class ForwardEmailService {
         return userConfig.emailDisabled() ? null : userConfig.defaultAliasDomain();
     }
 
-    protected AliasKey normalizeAlias(String email) {
+    protected AliasKey resolveAliasKey(String email) {
         int at = email.indexOf('@');
         String name = at < 0 ? email : email.substring(0, at);
         String domain = at < 0 ? defaultAliasDomain() : email.substring(at + 1);
@@ -326,14 +332,14 @@ public class ForwardEmailService {
         return email.name().equals(login) && email.domain().equals(defaultAliasDomain());
     }
 
-    public Set<AliasKey> normalizeEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {
+    public Set<AliasKey> resolveEmailAddresses(MemberSession session, ForwardEmail forwardEmail) {
         List<String> addresses = new ArrayList<>();
         if (forwardEmail.hasDefaultAlias()) {
             addresses.add(session.login());
         }
         addresses.addAll(forwardEmail.altAlias());
         // Normalize email addresses using the default domain (server config)
-        return addresses.stream().map(this::normalizeAlias).collect(Collectors.toSet());
+        return addresses.stream().map(this::resolveAliasKey).collect(Collectors.toSet());
     }
 
     public Map<AliasKey, AliasUpdate> sanitizeInputUpdates(MemberSession session, CommonhausUser user,
@@ -341,7 +347,8 @@ public class ForwardEmailService {
         Set<AliasKey> permitted = getConfiguredAliases(session, user);
         Map<AliasKey, AliasUpdate> sanitized = new HashMap<>();
         input.entrySet().forEach(x -> {
-            AliasKey address = normalizeAlias(x.getKey());
+            String key = validateAliasKeyInput(x.getKey());
+            AliasKey address = resolveAliasKey(key);
             if (permitted.contains(address)) {
                 sanitized.put(address, x.getValue());
             }
@@ -350,12 +357,37 @@ public class ForwardEmailService {
         return sanitized;
     }
 
+    /**
+     * Validate a caller-supplied alias identifier before it is normalized.
+     * A value with no '@' is a bare local part and is left as-is, to be
+     * resolved against the default alias domain by {@link #resolveAliasKey(String)}.
+     * A value containing '@' must be a validly-formatted address.
+     *
+     * @throws AliasValidationException if the value is malformed
+     */
+    private String validateAliasKeyInput(String rawKey) {
+        String trimmed = rawKey == null ? null : rawKey.strip();
+        if (trimmed == null || trimmed.isEmpty()) {
+            throw new AliasValidationException("malformed email address");
+        }
+        if (trimmed.indexOf('@') < 0) {
+            if (!AliasKey.isValidCharacters(trimmed)) {
+                throw new AliasValidationException("malformed email address");
+            }
+            return trimmed;
+        }
+        if (!AliasKey.isValidFormat(trimmed)) {
+            throw new AliasValidationException("malformed email address");
+        }
+        return trimmed;
+    }
+
     public Set<AliasKey> getConfiguredAliases(MemberSession session, CommonhausUser user) {
         if (emailDisabled() || !(user.status().mayHaveEmail() || user.status().mayHaveAltEmail())) {
             return Set.of();
         }
         Services services = user.services();
         ForwardEmail emailConfig = services.forwardEmail();
-        return normalizeEmailAddresses(session, emailConfig);
+        return resolveEmailAddresses(session, emailConfig);
     }
 }
