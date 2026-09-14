@@ -18,6 +18,7 @@ import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.ApplicationIssue;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.MemberStatus;
+import org.commonhaus.automation.hk.forwardemail.AliasKey;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
@@ -356,13 +357,14 @@ public class MemberApplicationProcess {
                     // DIFFERENT CONTEXT: team organization
                     ctx.addTeamMember(applicant, teamFullName);
                 }
-                if (!dqc.hasErrors() && isValidEmail(email)) {
+                String validEmail = AliasKey.normalize(email);
+                if (!dqc.hasErrors() && validEmail != null) {
                     String body = accepted
                             ? Templates.applicationAccepted().render()
                             : Templates.applicationDeclined().render();
                     ctx.sendEmail(dqc.getLogId(),
                             "Commonhaus Foundation Membership Application",
-                            body, new String[] { email });
+                            body, new String[] { validEmail });
                 }
             }
         }
@@ -370,7 +372,7 @@ public class MemberApplicationProcess {
         if (dqc.hasErrors()) {
             return;
         }
-        if (isValidEmail(email)) {
+        if (AliasKey.normalize(email) != null) {
             // Try to remove the notification email from the issue body
             String updated = NOTIFICATION.matcher(item.body).replaceAll("");
             dqc.updateItemDescription(EventType.issue, item.id, updated, DataCommonItem.ISSUE_FIELDS);
@@ -389,8 +391,8 @@ public class MemberApplicationProcess {
     public void handleApplicationComment(DatastoreQueryContext dqc, DataCommonItem issue, DataCommonComment comment) {
         if (isUserFeedback(comment.body)) {
             Log.debugf("[%s] updateApplicationComments: #%s - user feedback", dqc.getLogId(), issue.number);
-            String notificationEmail = getNotificationEmail(issue);
-            if (isValidEmail(notificationEmail)) {
+            String notificationEmail = AliasKey.normalize(getNotificationEmail(issue));
+            if (notificationEmail != null) {
                 String body = Templates.applicationUpdated(comment.body.replaceAll("\\s*::response::\\s*", "")).render();
                 ctx.sendEmail(dqc.getLogId(),
                         "Commonhaus Foundation Membership Application",
@@ -406,10 +408,6 @@ public class MemberApplicationProcess {
         return (comments == null || comments.isEmpty())
                 ? null
                 : new MemberApplication.Feedback(comments.get(0));
-    }
-
-    protected boolean isValidEmail(String notificationEmail) {
-        return notificationEmail != null && !notificationEmail.isBlank();
     }
 
     public static String createTitle(MemberInfo session) {
