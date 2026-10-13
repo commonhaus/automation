@@ -547,6 +547,12 @@ public class GitHubTeamService {
         List<String> currentLogins = DataTeam.queryImmediateTeamMemberLogin(qc,
                 teamOrgName, relativeTeamName);
 
+        // Logins with a pending invitation still need `ghTeam.add()` called on them (GitHub
+        // may use that to renew the invite before it expires), but they should not be reported
+        // as newly added on every reconcile -- GitHub's API doesn't list them as members until accepted.
+        List<String> pendingLogins = DataTeam.queryPendingTeamInviteLogin(qc,
+                teamOrgName, relativeTeamName);
+
         MembershipChanges changes = computeMemberChanges(false,
                 targetTeam, new HashSet<>(currentLogins), expectedLogins, new HashSet<>(ignoreUsers));
 
@@ -556,6 +562,12 @@ public class GitHubTeamService {
         }
 
         if (isDryRun) {
+            changes.addedMembers().removeAll(pendingLogins);
+            if (changes.isEmpty()) {
+                Log.debugf("[%s] syncMembers: No reportable changes for team %s (pending invites only)",
+                        qc.getLogId(), targetTeam);
+                return;
+            }
             sendNotificationEmail(qc, changes, true, qc.bundleExceptions(), addresses);
         } else {
             // Execute changes to team
@@ -582,7 +594,13 @@ public class GitHubTeamService {
             // invalidate cache to force refresh/re-fetch
             refreshTeam(targetTeam);
 
-            // Send notification with results
+            // Send notification with results (exclude already-pending invites from the report)
+            changes.addedMembers().removeAll(pendingLogins);
+            if (changes.isEmpty()) {
+                Log.debugf("[%s] syncMembers: No reportable changes for team %s (pending invites only)",
+                        qc.getLogId(), targetTeam);
+                return;
+            }
             sendNotificationEmail(qc, changes, false, qc.bundleExceptions(), addresses);
         }
 

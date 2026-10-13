@@ -292,6 +292,68 @@ public class GitHubTeamServiceTest extends ContextHelper {
     }
 
     @Test
+    void testSyncMembersSkipsPendingInviteFromReport() throws Exception {
+        mockUser("user1");
+        mockUser("user2"); // already has a pending invitation
+
+        Set<String> currentLogins = Set.of("user1");
+        Set<String> expectedLogins = Set.of("user1", "user2");
+
+        mockDataTeamQueryResponse(currentLogins);
+        mockDataTeamInvitationsResponse(Set.of("user2"));
+
+        teamService.syncMembers(queryContext, TEAM_FULL_NAME, expectedLogins, List.of(),
+                defaultDryRun, emailNotification);
+
+        if (!defaultDryRun) {
+            // user2 is still (re-)added, e.g. so GitHub can refresh/renew the invitation
+            ArgumentCaptor<GHUser> addCaptor = ArgumentCaptor.forClass(GHUser.class);
+            verify(team, times(1)).add(addCaptor.capture());
+            assertThat(addCaptor.getValue().getLogin()).isEqualTo("user2");
+        }
+
+        // But since the only "change" is a user who already has a pending invite,
+        // there is nothing new to report -- no email should be sent.
+        verify(ctx, times(0)).sendEmail(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void testSyncMembersSkipsPendingInviteFromReportDryRun() throws Exception {
+        defaultDryRun = true;
+        testSyncMembersSkipsPendingInviteFromReport();
+    }
+
+    @Test
+    void testSyncMembersReportsPendingInviteSeparatelyFromRealChanges() throws Exception {
+        mockUser("user1");
+        mockUser("user2"); // already has a pending invitation
+        mockUser("user3"); // genuinely new
+
+        Set<String> currentLogins = Set.of("user1");
+        Set<String> expectedLogins = Set.of("user1", "user2", "user3");
+
+        mockDataTeamQueryResponse(currentLogins);
+        mockDataTeamInvitationsResponse(Set.of("user2"));
+
+        teamService.syncMembers(queryContext, TEAM_FULL_NAME, expectedLogins, List.of(),
+                defaultDryRun, emailNotification);
+
+        // A real change (user3) still triggers the notification email
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ctx).sendEmail(
+                anyString(),
+                anyString(),
+                bodyCaptor.capture(),
+                eq(defaultDryRun ? emailNotification.dryRun() : emailNotification.audit()));
+
+        // user2's pending invite is not reported as newly added, even though it
+        // legitimately still shows up in current/final membership
+        assertThat(bodyCaptor.getValue())
+                .contains("Members added (1):\nuser3")
+                .contains("Current membership (3):\nuser1, user2, user3");
+    }
+
+    @Test
     void testSyncMembersTeamNotFound() throws IOException {
         // GH API will return null for teams that are not found in the organization
         when(organization.getTeamByName(TEAM_NAME)).thenReturn(null);
@@ -452,7 +514,26 @@ public class GitHubTeamServiceTest extends ContextHelper {
                                                 .add("hasNextPage", false)))))
                 .build();
 
-        mockResponse("team(slug: $slug)", jsonObject);
+        mockResponse("members(first: 100", jsonObject);
+    }
+
+    private void mockDataTeamInvitationsResponse(Set<String> pendingLogins) throws ExecutionException, InterruptedException {
+        JsonObject jsonObject = Json.createObjectBuilder()
+                .add("organization", Json.createObjectBuilder()
+                        .add("team", Json.createObjectBuilder()
+                                .add("invitations", Json.createObjectBuilder()
+                                        .add("nodes", Json.createArrayBuilder(
+                                                pendingLogins.stream()
+                                                        .map(login -> Json.createObjectBuilder()
+                                                                .add("invitee", Json.createObjectBuilder()
+                                                                        .add("login", login)))
+                                                        .toList()))
+                                        .add("pageInfo", Json.createObjectBuilder()
+                                                .add("endCursor", "Y3Vyc29yOnYyOpHOAAxXCQ==")
+                                                .add("hasNextPage", false)))))
+                .build();
+
+        mockResponse("invitations(first: 100", jsonObject);
     }
 
     private void mockDataCollaboratorsQueryResponse(Collaborators collaborators)
