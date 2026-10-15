@@ -160,6 +160,10 @@ public class OrganizationManager extends GroupCoordinator implements LatestOrgCo
             qc.logAndSendContextErrors(
                     "Unable to read %s in %s".formatted(OrganizationConfig.PATH,
                             mgrBotConfig.home().repositoryFullName()));
+        } else if (userTriggered) {
+            // readOrgConfig found no changes; manual trigger still forces a membership sync
+            recordRun();
+            queueReconciliation();
         }
     }
 
