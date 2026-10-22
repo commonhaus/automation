@@ -142,20 +142,28 @@ public abstract class GraphQLQueryContext {
      * @return true if there is a network error that can be retried
      */
     public boolean hasRetriableNetworkError() {
+        return exceptions.stream().anyMatch(GraphQLQueryContext::isRetriableNetworkError);
+    }
+
+    /**
+     * Check if a throwable is a network error that can be retried
+     * (e.g. transient HTTP errors or connection failures such as DNS
+     * resolution or connection refused, surfaced by the GitHub SDK as an
+     * {@link HttpException} with no response code).
+     *
+     * @return true if the throwable is a retriable network error
+     */
+    public static boolean isRetriableNetworkError(Throwable e) {
+        if (!(e instanceof HttpException he)) {
+            return false;
+        }
         // Unauthorized can be retried after connection is refreshed.
-        return exceptions.stream().anyMatch(e -> List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
+        return he.getResponseCode() == -1 || List.of(HttpURLConnection.HTTP_UNAUTHORIZED,
                 HttpURLConnection.HTTP_PROXY_AUTH,
                 HttpURLConnection.HTTP_BAD_GATEWAY,
                 HttpURLConnection.HTTP_CLIENT_TIMEOUT,
                 HttpURLConnection.HTTP_GATEWAY_TIMEOUT)
-                .contains(getResponseCode(e)));
-    }
-
-    private int getResponseCode(Throwable e) {
-        if (e instanceof HttpException) {
-            return ((HttpException) e).getResponseCode();
-        }
-        return -1;
+                .contains(he.getResponseCode());
     }
 
     // Helper method to extract status code from response

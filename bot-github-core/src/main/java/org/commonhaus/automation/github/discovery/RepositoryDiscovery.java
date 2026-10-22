@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.json.JsonObject;
 
+import org.commonhaus.automation.GraphQLQueryContext;
 import org.commonhaus.automation.JsonAttributeAccessor;
 import org.commonhaus.automation.config.BotConfig;
 import org.commonhaus.automation.github.context.BaseQueryCache;
@@ -99,6 +100,10 @@ public class RepositoryDiscovery {
      * Discover repositories for all installations.
      */
     void discoverRepositories() {
+        discoverRepositoriesRetry(0);
+    }
+
+    void discoverRepositoriesRetry(int retryCount) {
         LogMailer mailer = Arc.container().instance(LogMailer.class).orElse(new LogMailer());
 
         List<Long> installations = new ArrayList<>();
@@ -149,10 +154,17 @@ public class RepositoryDiscovery {
             }
         } catch (GHIOException e) {
             mailer.logAndSendEmail("discoverRepositories", "Error making GH Request", e, null);
-            if (Log.isDebugEnabled() && e.getResponseHeaderFields() != null) {
-                e.getResponseHeaderFields()
-                        .forEach((k, v) -> Log.debugf("%s: %s", k, v));
+            if (Log.isDebugEnabled()) {
+                try {
+                    e.getResponseHeaderFields().forEach((k, v) -> Log.debugf("%s: %s", k, v));
+                } catch (NullPointerException ignored) {
+                    // no response headers available (e.g. connection-level failure)
+                }
                 e.printStackTrace();
+            }
+            if (GraphQLQueryContext.isRetriableNetworkError(e)) {
+                Log.infof("[discoverRepositories] Network error, scheduling retry #%d", retryCount + 1);
+                periodicUpdateQueue.scheduleReconciliationRetry("discovery", this::discoverRepositoriesRetry, retryCount);
             }
         } catch (Throwable t) {
             mailer.logAndSendEmail("discoverRepositories", "Error making GH Request", t, null);
