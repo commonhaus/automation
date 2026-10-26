@@ -670,12 +670,14 @@ public class GitHubTeamService {
         }
 
         public void removeOrganizations(Set<String> organizations) {
+            previousMembers.removeAll(organizations);
             addedMembers.removeAll(organizations);
             removedMembers.removeAll(organizations);
             finalMembers.removeAll(organizations);
         }
 
         public void removeOwners(Set<String> owners) {
+            previousMembers.removeAll(owners);
             addedMembers.removeAll(owners);
             removedMembers.removeAll(owners);
             finalMembers.removeAll(owners);
