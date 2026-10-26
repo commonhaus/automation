@@ -498,6 +498,56 @@ public class GitHubTeamServiceTest extends ContextHelper {
         testSyncCollaborators();
     }
 
+    /**
+     * Regression test: admin/owner users were shown in "Previous membership" but
+     * omitted from "Current membership" in the notification email, making it
+     * falsely appear that members had been lost. Both sections should consistently
+     * exclude users stripped via removeOwners().
+     */
+    @Test
+    void testSyncCollaboratorsOmitsAdminsFromBothMembershipSections() throws Exception {
+        GHRepository repository = hausMocks.repository();
+
+        mockUser("regularUser");
+        mockUser("newUser");
+        mockUser("adminUser");
+
+        Set<Collaborator> testCollaborators = Set.of(
+                // regularUser: direct access only, stays in expected set
+                new Collaborator("regularUser", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))),
+
+                // adminUser: ADMIN permission -> stripped by removeOwners()
+                new Collaborator("adminUser", "ADMIN", List.of(
+                        new CollaboratorPermission("ADMIN", "Repository"))));
+
+        // newUser is added; regularUser stays; adminUser is not touched (owner)
+        Set<String> expectedLogins = Set.of("regularUser", "newUser");
+
+        mockDataCollaboratorsQueryResponse(new Collaborators(testCollaborators));
+
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
+                .from(GHOrganization.Permission.PUSH);
+
+        teamService.syncCollaborators(queryContext, repository, collaboratorRole,
+                expectedLogins, List.of(), false, emailNotification);
+
+        // Capture the email body
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ctx).sendEmail(anyString(), anyString(), bodyCaptor.capture(),
+                eq(emailNotification.audit()));
+
+        String body = bodyCaptor.getValue();
+
+        // adminUser must not appear in either membership section
+        assertThat(body)
+                .doesNotContain("adminUser")
+                .contains("Members added (1):")
+                .contains("newUser")
+                .contains("Previous membership (1):")
+                .contains("Current membership (2):");
+    }
+
     // Helper methods
 
     private void mockDataTeamQueryResponse(Set<String> logins) throws ExecutionException, InterruptedException {
