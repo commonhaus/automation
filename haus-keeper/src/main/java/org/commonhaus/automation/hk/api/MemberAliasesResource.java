@@ -177,7 +177,7 @@ public class MemberAliasesResource {
             Alias alias = aliasMap.get(key);
 
             GeneratePasswordResponse response = emailService.generatePassword(
-                    alias, request.new_password(), request.password(), request.reset(), notificationEmail);
+                    key, alias, request.new_password(), request.password(), request.reset(), notificationEmail);
 
             return response == null
                     ? Response.status(Response.Status.BAD_REQUEST).build()

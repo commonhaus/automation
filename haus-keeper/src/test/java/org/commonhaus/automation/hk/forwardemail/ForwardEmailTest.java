@@ -366,14 +366,14 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @Test
     public void testGeneratePassword() throws Exception {
         setUserManagementConfig();
-        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+        AliasKey aliasKey = AliasKey.fromCache("test@commonhaus.dev");
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(Set.of(aliasKey));
 
         Alias testAlias = aliases.values().iterator().next();
         testAlias.verified_recipients = Set.of("test@commonhaus.org");
 
         GeneratePasswordResponse response = forwardEmailService.generatePassword(
-                testAlias, "new-password", "current-password", true, "test@commonhaus.org");
+                aliasKey, testAlias, "new-password", "current-password", true, "test@commonhaus.org");
 
         assertThat(response).isNotNull();
         assertThat(response.password()).isEqualTo("new-password");
@@ -394,14 +394,14 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @Test
     public void testGeneratePasswordRequiresNewPassword() throws Exception {
         setUserManagementConfig();
-        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+        AliasKey aliasKey = AliasKey.fromCache("test@commonhaus.dev");
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(Set.of(aliasKey));
 
         Alias testAlias = aliases.values().iterator().next();
         testAlias.verified_recipients = Set.of("test@commonhaus.org");
 
         var exception = assertThrows(WebApplicationException.class, () -> forwardEmailService.generatePassword(
-                testAlias, null, null, false, null));
+                aliasKey, testAlias, null, null, false, null));
 
         assertThat(exception.getResponse().getStatus()).isEqualTo(400);
         assertThat(exception).hasMessage("new_password is required");
@@ -416,14 +416,14 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @MethodSource("invalidNewPasswords")
     public void testGeneratePasswordRejectsInvalidNewPassword(String newPassword) throws Exception {
         setUserManagementConfig();
-        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+        AliasKey aliasKey = AliasKey.fromCache("test@commonhaus.dev");
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(Set.of(aliasKey));
 
         Alias testAlias = aliases.values().iterator().next();
         testAlias.verified_recipients = Set.of("test@commonhaus.org");
 
         var exception = assertThrows(WebApplicationException.class, () -> forwardEmailService.generatePassword(
-                testAlias, newPassword, null, false, null));
+                aliasKey, testAlias, newPassword, null, false, null));
 
         assertThat(exception.getResponse().getStatus()).isEqualTo(400);
         assertThat(exception).hasMessage(
@@ -434,15 +434,15 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @Test
     public void testGeneratePasswordImapOnlyEligible() throws Exception {
         setUserManagementConfig();
-        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+        AliasKey aliasKey = AliasKey.fromCache("test@commonhaus.dev");
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(Set.of(aliasKey));
 
         Alias testAlias = aliases.values().iterator().next();
         testAlias.verified_recipients = Set.of();
         testAlias.has_imap = true;
 
         GeneratePasswordResponse response = forwardEmailService.generatePassword(
-                testAlias, "new-password", null, false, null);
+                aliasKey, testAlias, "new-password", null, false, null);
 
         assertThat(response).isNotNull();
     }
@@ -450,15 +450,15 @@ public class ForwardEmailTest extends HausKeeperTestBase {
     @Test
     public void testGeneratePasswordIneligible() throws Exception {
         setUserManagementConfig();
-        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(
-                Set.of(AliasKey.fromCache("test@commonhaus.dev")));
+        AliasKey aliasKey = AliasKey.fromCache("test@commonhaus.dev");
+        Map<AliasKey, Alias> aliases = forwardEmailService.fetchAliases(Set.of(aliasKey));
 
         Alias testAlias = aliases.values().iterator().next();
         testAlias.verified_recipients = Set.of();
         testAlias.has_imap = false;
 
         GeneratePasswordResponse response = forwardEmailService.generatePassword(
-                testAlias, "new-password", null, false, null);
+                aliasKey, testAlias, "new-password", null, false, null);
 
         assertThat(response).isNull();
     }

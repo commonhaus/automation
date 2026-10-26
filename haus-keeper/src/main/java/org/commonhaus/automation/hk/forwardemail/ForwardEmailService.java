@@ -154,6 +154,8 @@ public class ForwardEmailService {
     /**
      * Set/change the password for the specified email alias using the ForwardEmail Rest Client
      *
+     * @param aliasKey AliasKey identifying the domain/name of the alias (fqdn is authoritative;
+     *        ForwardEmail's API does not reliably populate Alias.domain)
      * @param alias Alias to set the password for
      * @param newPassword Member-supplied new password (required)
      * @param currentPassword Current password, to preserve mailbox contents (optional)
@@ -161,8 +163,8 @@ public class ForwardEmailService {
      * @param email Verified recipient to notify, if any (maps to ForwardEmail's emailed_instructions)
      * @return the ForwardEmail confirmation response, or null if the alias is null or ineligible
      */
-    public GeneratePasswordResponse generatePassword(Alias alias, String newPassword, String currentPassword,
-            boolean reset, String email) {
+    public GeneratePasswordResponse generatePassword(AliasKey aliasKey, Alias alias, String newPassword,
+            String currentPassword, boolean reset, String email) {
         if (newPassword == null || newPassword.isEmpty()) {
             throw new WebApplicationException("new_password is required", Status.BAD_REQUEST);
         }
@@ -182,15 +184,15 @@ public class ForwardEmailService {
             return null;
         }
 
-        // Check for null domain or id which would cause NullPointerException in REST client
-        if (alias.domain == null || alias.domain.name == null || alias.id == null) {
+        // Check for null id which would cause NullPointerException in REST client
+        if (alias.id == null) {
             Log.errorf("generatePassword: Invalid alias data: %s", alias);
             return null;
         }
 
         // API CALL: will throw WebApplicationException if not found or error
         return forwardEmailClient.generatePassword(
-                alias.domain.name,
+                aliasKey.domain(),
                 alias.id,
                 new GeneratePassword(reset, email, newPassword, currentPassword));
     }

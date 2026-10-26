@@ -30,6 +30,7 @@ import org.commonhaus.automation.hk.config.AdminBotConfig;
 import org.commonhaus.automation.hk.config.ProjectAliasMapping;
 import org.commonhaus.automation.hk.config.ProjectAliasMapping.UserAliasList;
 import org.commonhaus.automation.hk.data.CommonhausUser;
+import org.commonhaus.automation.hk.data.MemberStatus;
 import org.commonhaus.automation.hk.github.AppContextService;
 import org.commonhaus.automation.hk.github.CommonhausDatastore;
 import org.commonhaus.automation.hk.github.DatastoreEvent.UpdateEvent;
@@ -321,6 +322,9 @@ public class ProjectAliasManager extends ScheduledService {
                         (c, u) -> {
                             u.addProject(state.projectName());
                             u.services().forwardEmail().addAliases(userAliases.aliases());
+                            if (u.status() == MemberStatus.UNKNOWN) {
+                                u.setStatus(MemberStatus.CONTRIBUTOR);
+                            }
                         },
                         "Update user aliases",
                         true, true));
