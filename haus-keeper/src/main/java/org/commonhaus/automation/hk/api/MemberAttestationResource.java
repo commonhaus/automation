@@ -14,6 +14,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Response;
 
+import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
 import org.commonhaus.automation.hk.data.MemberStatus;
@@ -52,6 +53,7 @@ public class MemberAttestationResource {
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
             // update status first so correct values are used for attestation
             user.updateMemberStatus(ctx, roles);
+            AdminDataCache.setKnownUser(session, roles);
 
             Attestation newAttestation = createAttestation(user.status(), post);
             String message = "Sign attestation (%s|%s)".formatted(post.id(), post.version());
@@ -88,6 +90,7 @@ public class MemberAttestationResource {
             CommonhausUser user = datastore.getCommonhausUser(session, false, true);
             // update status first so correct values are used for attestation
             user.updateMemberStatus(ctx, roles);
+            AdminDataCache.setKnownUser(session, roles);
 
             Map<String, Attestation> newAttestations = new HashMap<>();
 

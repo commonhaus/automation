@@ -211,7 +211,9 @@ public class CommonhausUser implements UserLogin {
             // inconsistency: user is a member but does not have the member role
             // this could be a missed automation step
             ctx.logAndSendEmail("refreshStatus",
-                    "refreshStatus: %s is a member but does not have the member role (missing group?)".formatted(login()),
+                    "refreshStatus: member role inconsistency for %s".formatted(login()),
+                    "%s is a member (isMember=true) but does not have the member role in their current session roles. This may indicate a missed automation step or a cache inconsistency (MEMBER_SESSION expired while KNOWN_USER cache was still valid)."
+                            .formatted(login()),
                     null);
             roles.add(MEMBER_ROLE);
         }

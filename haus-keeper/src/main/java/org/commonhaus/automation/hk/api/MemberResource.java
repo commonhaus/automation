@@ -135,6 +135,7 @@ public class MemberResource {
             }
 
             final Set<String> roles = session.roles();
+            AdminDataCache.setKnownUser(session, roles);
             if (user.statusUpdateRequired(ctx, roles)) {
                 // Refresh the user's status
                 user = datastore.setCommonhausUser(new UpdateEvent(

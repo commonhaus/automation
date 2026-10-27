@@ -8,6 +8,7 @@ import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -27,6 +28,7 @@ import java.util.Set;
 import jakarta.inject.Inject;
 
 import org.commonhaus.automation.github.context.TestFileNotFoundException;
+import org.commonhaus.automation.hk.AdminDataCache;
 import org.commonhaus.automation.hk.api.MemberAttestationResource.AttestationPost;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 import org.commonhaus.automation.hk.data.CommonhausUserData.Attestation;
@@ -110,6 +112,62 @@ public class MemberDataTest extends HausKeeperTestBase {
                 .when().get("/me")
                 .then()
                 .log().all()
+                .statusCode(403);
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testKnownUserRolesRestoredAfterSessionExpiry() throws Exception {
+        addCollaborator("commonhaus-test/sponsors-test", botLogin);
+
+        // First request — full evaluation populates MEMBER_SESSION and KNOWN_USER
+        given()
+                .when().get("/me")
+                .then()
+                .statusCode(200)
+                .body("INFO.roles", hasItem("sponsor"));
+
+        // Simulate MEMBER_SESSION (15m) expiry while KNOWN_USER (6h) survives
+        AdminDataCache.MEMBER_SESSION.invalidateAll();
+
+        // New session created with empty roles; KNOWN_USER cache hit should restore them
+        given()
+                .when().get("/me")
+                .then()
+                .statusCode(200)
+                .body("INFO.roles", hasItem("sponsor"));
+    }
+
+    @Test
+    @TestSecurity(user = botLogin)
+    @OidcSecurity(userinfo = {
+            @UserInfo(key = "login", value = botLogin),
+            @UserInfo(key = "id", value = botId + ""),
+            @UserInfo(key = "node_id", value = botNodeId),
+            @UserInfo(key = "avatar_url", value = "https://avatars.githubusercontent.com/u/156364140?v=4")
+    })
+    void testUnknownUserAfterSessionExpiry() throws Exception {
+        setUserAsUnknown(botLogin);
+
+        // First request — KNOWN_USER says not known, returns 403
+        given()
+                .when().get("/me")
+                .then()
+                .statusCode(403);
+
+        // Simulate MEMBER_SESSION expiry
+        AdminDataCache.MEMBER_SESSION.invalidateAll();
+
+        // KNOWN_USER cache still says not known — should still be 403
+        given()
+                .when().get("/me")
+                .then()
                 .statusCode(403);
     }
 

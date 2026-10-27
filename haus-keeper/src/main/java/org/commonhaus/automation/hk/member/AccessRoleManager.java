@@ -52,9 +52,13 @@ public class AccessRoleManager {
             return false;
         }
 
-        Boolean result = AdminDataCache.getKnownUser(memberInfo);
-        if (result != null) {
-            return result;
+        Set<String> cachedRoles = AdminDataCache.getKnownUserRoles(memberInfo);
+        if (cachedRoles != null) {
+            if (cachedRoles.isEmpty()) {
+                return false;
+            }
+            memberInfo.roles().addAll(cachedRoles);
+            return true;
         }
 
         long id = memberInfo.id();
@@ -100,7 +104,6 @@ public class AccessRoleManager {
                     true, true));
         }
 
-        result = Boolean.FALSE;
         if (!userConfig.collaboratorRoles().isEmpty()) {
             Map<String, String> collabRoles = userConfig.collaboratorRoles();
             Log.debugf("collaborators: %s", collabRoles);
@@ -115,7 +118,6 @@ public class AccessRoleManager {
                 } else {
                     if (teamService.isCollaborator(qc, ghUser, repoName)) {
                         roles.add(role);
-                        result = Boolean.TRUE;
                     }
                 }
             }
@@ -136,18 +138,15 @@ public class AccessRoleManager {
                     Log.errorf("No context for %s", orgName);
                 } else if (teamService.isTeamMember(qc, ghUser, teamFullName)) {
                     roles.add(role);
-                    result = Boolean.TRUE;
                 }
             }
         }
         if (userHasProjectRole(user)) {
-            // add the contributor role if they are associated with a project
             roles.add(MemberStatus.CONTRIBUTOR.name().toLowerCase());
-            result = Boolean.TRUE;
         }
 
-        AdminDataCache.setKnownUser(memberInfo, result);
-        return result;
+        AdminDataCache.setKnownUser(memberInfo, roles);
+        return !roles.isEmpty();
     }
 
     boolean userHasProjectRole(CommonhausUser user) {

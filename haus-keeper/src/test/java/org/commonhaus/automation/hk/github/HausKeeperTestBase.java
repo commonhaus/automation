@@ -155,7 +155,7 @@ public class HausKeeperTestBase extends ContextHelper {
     }
 
     public void setUserAsUnknown(String login) {
-        AdminDataCache.KNOWN_USER.put("user-" + botId, Boolean.FALSE);
+        AdminDataCache.KNOWN_USER.put("user-" + botId, Set.of());
     }
 
     public void addCollaborator(String repoName, String login) {

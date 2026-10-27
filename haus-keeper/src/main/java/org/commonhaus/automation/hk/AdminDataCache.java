@@ -1,5 +1,6 @@
 package org.commonhaus.automation.hk;
 
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -71,13 +72,13 @@ public enum AdminDataCache {
         cache.invalidate(login);
     }
 
-    public static Boolean getKnownUser(MemberInfo info) {
+    public static Set<String> getKnownUserRoles(MemberInfo info) {
         return AdminDataCache.KNOWN_USER.get("user-" + info.id());
     }
 
-    public static Boolean setKnownUser(MemberInfo info, Boolean value) {
-        AdminDataCache.KNOWN_USER.put("user-" + info.id(), value);
-        return value;
+    public static void setKnownUser(MemberInfo info, Set<String> roles) {
+        AdminDataCache.KNOWN_USER.put("user-" + info.id(),
+                roles.isEmpty() ? Set.of() : Set.copyOf(roles));
     }
 
     public static void forgetUser(MemberInfo info) {
