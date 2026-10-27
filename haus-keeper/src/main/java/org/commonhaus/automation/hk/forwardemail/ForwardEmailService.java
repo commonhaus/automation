@@ -282,7 +282,8 @@ public class ForwardEmailService {
      */
     protected Alias putAlias(AliasKey aliasKey, String description,
             Set<String> recipients, boolean hasImap, Alias existing) {
-        if (emailDisabled() || recipients == null || recipients.isEmpty()) {
+        boolean hasRecipients = recipients != null && !recipients.isEmpty();
+        if (emailDisabled() || (!hasRecipients && !hasImap)) {
             return null;
         }
 
@@ -302,7 +303,7 @@ public class ForwardEmailService {
             alias.description = description;
             alias.has_imap = hasImap;
             alias.recipients = recipients;
-            if (alias.verified_recipients != null) {
+            if (alias.verified_recipients != null && hasRecipients) {
                 alias.verified_recipients.retainAll(recipients);
             }
             // API CALL: will throw WebApplicationException on error
