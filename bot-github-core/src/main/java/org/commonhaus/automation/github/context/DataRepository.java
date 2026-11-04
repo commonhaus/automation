@@ -4,6 +4,8 @@ import static org.commonhaus.automation.github.context.GitHubQueryContext.isBetw
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toOrganizationName;
 import static org.commonhaus.automation.github.context.GitHubQueryContext.toRelativeName;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -17,9 +19,12 @@ import java.util.stream.Collectors;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 
+import org.kohsuke.github.GHInvitation;
 import org.kohsuke.github.GHRelease;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHUser;
 
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.smallrye.graphql.client.Response;
 
@@ -248,6 +253,120 @@ public class DataRepository extends DataCommonType {
         return count;
     }
 
+    /**
+     * {@link GHInvitation} in {@code org.kohsuke.github-api} defines {@code private GHUser invitee}
+     * which Jackson populates directly during deserialization of {@code GET /repos/{owner}/{repo}/invitations}
+     * (https://docs.github.com/en/rest/collaborators/invitations#list-repository-invitations),
+     * but {@link GHInvitation} does not expose a public getter for the invitee (or other fields;
+     * see e.g. https://github.com/hub4j/github-api/issues/1598, https://github.com/hub4j/github-api/pull/2343).
+     * Reflection is used here to read the populated invitee user and expired status.
+     */
+    static final Field INVITEE_FIELD;
+    static final Field EXPIRED_FIELD;
+    static final Method GET_INVITEE_METHOD;
+    static final Method IS_EXPIRED_METHOD;
+    static {
+        Field inviteeField = null;
+        Field expiredField = null;
+        Method getInviteeMethod = null;
+        Method isExpiredMethod = null;
+        try {
+            inviteeField = GHInvitation.class.getDeclaredField("invitee");
+            inviteeField.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            Log.warn("Failed to find 'invitee' field on GHInvitation", e);
+        }
+        try {
+            expiredField = GHInvitation.class.getDeclaredField("expired");
+            expiredField.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            // Not present in older github-api versions; see https://github.com/hub4j/github-api/pull/2343
+        }
+        try {
+            getInviteeMethod = GHInvitation.class.getMethod("getInvitee");
+        } catch (NoSuchMethodException e) {
+            // Not present in older github-api versions; see https://github.com/hub4j/github-api/pull/2343
+        }
+        try {
+            isExpiredMethod = GHInvitation.class.getMethod("isExpired");
+        } catch (NoSuchMethodException e) {
+            // Not present in older github-api versions; see https://github.com/hub4j/github-api/pull/2343
+        }
+        INVITEE_FIELD = inviteeField;
+        EXPIRED_FIELD = expiredField;
+        GET_INVITEE_METHOD = getInviteeMethod;
+        IS_EXPIRED_METHOD = isExpiredMethod;
+    }
+
+    public static Set<String> queryPendingInvitations(GitHubQueryContext qc, String repoFullName) {
+        GHRepository repo = qc.getRepository(repoFullName);
+        if (repo == null) {
+            return Set.of();
+        }
+        return queryPendingInvitations(qc, repo);
+    }
+
+    public static Set<String> queryPendingInvitations(GitHubQueryContext qc, GHRepository repo) {
+        if (INVITEE_FIELD == null && GET_INVITEE_METHOD == null) {
+            return Set.of();
+        }
+        List<GHInvitation> invitations = qc.execGitHubSync((gh, dr) -> {
+            var list = repo.listInvitations();
+            return list == null ? List.of() : list.toList();
+        });
+        if (invitations == null || qc.hasErrors()) {
+            qc.checkRemoveNotFound();
+            return Set.of();
+        }
+        Set<String> invitedLogins = new HashSet<>();
+        for (GHInvitation invitation : invitations) {
+            if (isExpired(invitation)) {
+                continue;
+            }
+            GHUser user = getInvitee(invitation);
+            if (user != null && user.getLogin() != null) {
+                invitedLogins.add(user.getLogin());
+            }
+        }
+        return invitedLogins;
+    }
+
+    private static boolean isExpired(GHInvitation invitation) {
+        if (IS_EXPIRED_METHOD != null) {
+            try {
+                return (boolean) IS_EXPIRED_METHOD.invoke(invitation);
+            } catch (Exception e) {
+                Log.warnf("Failed to invoke 'isExpired' method on GHInvitation: %s", e.getMessage());
+            }
+        }
+        if (EXPIRED_FIELD != null) {
+            try {
+                return EXPIRED_FIELD.getBoolean(invitation);
+            } catch (IllegalAccessException e) {
+                Log.warnf("Failed to access 'expired' field on GHInvitation: %s", e.getMessage());
+            }
+        }
+        return false;
+    }
+
+    private static GHUser getInvitee(GHInvitation invitation) {
+        if (GET_INVITEE_METHOD != null) {
+            try {
+                return (GHUser) GET_INVITEE_METHOD.invoke(invitation);
+            } catch (Exception e) {
+                Log.warnf("Failed to invoke 'getInvitee' method on GHInvitation: %s", e.getMessage());
+            }
+        }
+        if (INVITEE_FIELD != null) {
+            try {
+                return (GHUser) INVITEE_FIELD.get(invitation);
+            } catch (IllegalAccessException e) {
+                Log.warnf("Failed to access 'invitee' field on GHInvitation: %s", e.getMessage());
+            }
+        }
+        return null;
+    }
+
     public static Collaborators queryCollaborators(GitHubQueryContext qc, String repoFullName) {
         Map<String, Object> variables = new HashMap<>();
         String org = toOrganizationName(repoFullName);
@@ -292,7 +411,9 @@ public class DataRepository extends DataCommonType {
             pageInfo = JsonAttribute.pageInfo.pageInfoFrom(collaborators);
         } while (pageInfo.hasNextPage());
 
-        return new Collaborators(members);
+        Set<String> pendingInvitations = queryPendingInvitations(qc, repoFullName);
+
+        return new Collaborators(members, pendingInvitations);
     }
 
     public record CollaboratorPermission(
@@ -306,7 +427,15 @@ public class DataRepository extends DataCommonType {
             List<CollaboratorPermission> permissionSources) {
     }
 
-    public record Collaborators(Set<Collaborator> members) {
+    public record Collaborators(Set<Collaborator> members, Set<String> pendingInvitations) {
+        public Collaborators(Set<Collaborator> members) {
+            this(members, Set.of());
+        }
+
+        public Set<String> pendingInvitations() {
+            return pendingInvitations == null ? Set.of() : pendingInvitations;
+        }
+
         public Set<String> logins() {
             return members.stream()
                     .map(Collaborator::login)
