@@ -65,7 +65,7 @@ public class ProjectAliasManagerTest extends HausKeeperTestBase {
         // class in the same JVM/build (e.g. ActiveHausKeeperConfigTest runs in
         // the same instance), so stale state from a prior test/class must be
         // cleared first.
-        projectAliasManager.taskGroupToState.clear();
+        projectAliasManager.taskGroupToState().clear();
         testConfig.testResetOrganizationDomains();
         testFileWatcher.testReset();
         setupInstallationRepositories();
@@ -437,6 +437,74 @@ public class ProjectAliasManagerTest extends HausKeeperTestBase {
         // Unfiltered: both alice@foo.org and bob@bar.org self-declared domains accepted
         // (no authoritative data at all -> fail-open); no invalid-alias report.
         assertNoErrorEmails();
+    }
+
+    @Test
+    void ignoresSameOrgRepoWhoseNameDoesNotStartWithProjectPrefix() throws Exception {
+        GHRepository nonProjectRepo = mockProjectRepo("datastore/infra-tools");
+        mockFileContent(nonProjectRepo, ProjectAliasMapping.CONFIG_FILE,
+                Path.of("src/test/resources/project-mail-aliases-foo.yml"));
+
+        var nonProjectMocks = new MockInstallation(
+                datastoreInstallationId, dataMocks.github(), dataMocks.dql(),
+                dataMocks.organization(), nonProjectRepo, null);
+        triggerRepositoryDiscovery(DiscoveryAction.ADDED, nonProjectMocks, nonProjectRepo, false);
+        drainQueue(updateQueue, 5);
+
+        assertThat(projectAliasManager.taskGroupToState()).isEmpty();
+        assertThat(fileWatcher.isWatching("datastore/infra-tools")).isFalse();
+    }
+
+    @Test
+    void discoveringProjectRepoRegistersFileWatcher() throws Exception {
+        discoverProject("datastore/project-foo", "project-mail-aliases-foo.yml");
+
+        assertThat(fileWatcher.isWatching("datastore/project-foo")).isTrue();
+    }
+
+    @Test
+    void pushUpdateToAliasFileTriggersReconcileWithoutWaitingForCron() throws Exception {
+        loadOrganizationDomains("cf-haus-organization.yml");
+        setupGraphQLProcessing(dataMocks, MemberQueryResponse.CREATE_ISSUE);
+
+        mockProjectUser("dave");
+        mockProjectUser("erin");
+        discoverProject("datastore/project-foo", "project-mail-aliases-foo.yml");
+        GHRepository projectRepo = dataMocks.github().getRepository("datastore/project-foo");
+
+        // A push that changes project-mail-aliases.yml: the watcher registered during
+        // discovery re-reads + reconciles directly through the real FileWatcher, without
+        // the 12h cron or a domain-change event (both exercised elsewhere in this class)
+        // firing.
+        mailbox.clear();
+        mockFileContent(projectRepo, ProjectAliasMapping.CONFIG_FILE,
+                Path.of("src/test/resources/project-mail-aliases-multi-invalid.yml"));
+        testFileWatcher.simulateFileUpdate("datastore/project-foo", ProjectAliasMapping.CONFIG_FILE,
+                new FileWatcher.FileUpdate(ProjectAliasMapping.CONFIG_FILE, FileWatcher.FileUpdateType.MODIFIED,
+                        datastoreInstallationId, projectRepo, dataMocks.github()));
+        drainQueue(updateQueue, 5);
+
+        await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() > 0);
+        assertThat(mailbox.getMailsSentTo("repo-errors@example.com")).hasSize(1);
+        String body = mailbox.getMailsSentTo("repo-errors@example.com").get(0).getText();
+        assertThat(body).contains("dave").contains("erin");
+    }
+
+    @Test
+    void removingAliasFileViaPushClearsConfirmedState() throws Exception {
+        discoverProject("datastore/project-foo", "project-mail-aliases-foo.yml");
+        assertThat(projectAliasManager.taskGroupToState()).hasSize(1);
+        GHRepository projectRepo = dataMocks.github().getRepository("datastore/project-foo");
+
+        testFileWatcher.simulateFileUpdate("datastore/project-foo", ProjectAliasMapping.CONFIG_FILE,
+                new FileWatcher.FileUpdate(ProjectAliasMapping.CONFIG_FILE, FileWatcher.FileUpdateType.REMOVED,
+                        datastoreInstallationId, projectRepo, dataMocks.github()));
+        drainQueue(updateQueue, 5);
+
+        // Repo stays tracked, but the cached config is now the CONFIRMED_ABSENT sentinel --
+        // the same state recorded when the file was never present (see
+        // testOrganizationConfigAbsentFailsOpenWithoutAlert-style absence handling above).
+        assertThat(projectAliasManager.taskGroupToState()).hasSize(1);
     }
 
     @Test

@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import jakarta.annotation.Priority;
@@ -473,9 +475,32 @@ public class HausKeeperTestBase extends ContextHelper {
     @Alternative
     @Priority(1)
     public static class TestFileWatcher extends FileWatcher {
+        /** repoName + "#" + filePath -> most recently registered callback. */
+        private final Map<String, Consumer<FileUpdate>> registeredCallbacks = new ConcurrentHashMap<>();
+
         @Inject
         public TestFileWatcher() {
             super();
+        }
+
+        @Override
+        public void watchFile(String taskGroupName, long installationId, String repoName, String filePath,
+                Consumer<FileUpdate> callback) {
+            registeredCallbacks.put(repoName + "#" + filePath, callback);
+            super.watchFile(taskGroupName, installationId, repoName, filePath, callback);
+        }
+
+        /**
+         * Invoke the callback registered for repoName/filePath directly, as if the
+         * real push-event path had delivered this update -- without constructing a
+         * GitHub push payload.
+         */
+        public void simulateFileUpdate(String repoName, String filePath, FileUpdate update) {
+            var callback = registeredCallbacks.get(repoName + "#" + filePath);
+            if (callback == null) {
+                throw new IllegalStateException("No watcher registered for " + repoName + "#" + filePath);
+            }
+            callback.accept(update);
         }
 
         /**
@@ -486,6 +511,7 @@ public class HausKeeperTestBase extends ContextHelper {
          */
         public void testReset() {
             super.reset();
+            registeredCallbacks.clear();
         }
     }
 }

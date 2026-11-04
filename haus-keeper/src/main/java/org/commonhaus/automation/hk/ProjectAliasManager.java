@@ -149,7 +149,7 @@ public class ProjectAliasManager extends ScheduledService {
         if (action.repository() && orgName.equals(adminBotConfig.home().organization())) {
             final String taskGroup = repoToTaskGroup(repoFullName);
 
-            if (action.added()) {
+            if (action.added() && repoFullName.contains("/project-")) {
                 ScopedQueryContext qc = new ScopedQueryContext(ctx, installationId, repo)
                         .withExisting(repoEvent.github());
 
@@ -163,6 +163,11 @@ public class ProjectAliasManager extends ScheduledService {
                     taskGroupToState.put(taskGroup,
                             new AliasConfigState(taskGroup, toProjectName(repoFullName), repoFullName, installationId, null));
                 }
+
+                // Register watcher to monitor for changes to project-mail-aliases.yml
+                fileWatcher.watchFile(taskGroup,
+                        installationId, repoFullName, ProjectAliasMapping.CONFIG_FILE,
+                        (fileUpdate) -> processFileUpdate(taskGroup, fileUpdate));
             } else {
                 taskGroupToState.remove(taskGroup);
             }
@@ -440,6 +445,11 @@ public class ProjectAliasManager extends ScheduledService {
     @Override
     protected String me() {
         return ME;
+    }
+
+    // test-only accessor
+    Map<String, AliasConfigState> taskGroupToState() {
+        return taskGroupToState;
     }
 
     record AliasConfigState(
