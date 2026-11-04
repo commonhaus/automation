@@ -38,8 +38,9 @@ public class DatastoreCacheEntry {
             return null;
         }
 
-        event.applyChanges(ctx, userData);
-        pendingUpdates.add(event);
+        if (event.applyChanges(ctx, userData)) {
+            pendingUpdates.add(event);
+        }
         return CommonhausDatastore.deepCopy(userData);
     }
 
@@ -75,8 +76,9 @@ public class DatastoreCacheEntry {
         allUpdates.removeIf(x -> !x.retry());
 
         for (UpdateEvent event : allUpdates) {
-            event.applyChanges(ctx, userData);
-            pendingUpdates.add(event);
+            if (event.applyChanges(ctx, userData)) {
+                pendingUpdates.add(event);
+            }
         }
         inFlightSnapshot = null;
 

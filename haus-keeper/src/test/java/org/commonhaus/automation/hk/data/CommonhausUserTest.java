@@ -115,6 +115,7 @@ public class CommonhausUserTest extends HausKeeperTestBase {
                 "2025-03-18T09:51:00Z Sign attestation (email|fe-2024-05-31)"));
         user.data.projects().add("test-project");
         user.data.projects().add("other-project");
+        user.services().forwardEmail().addAliases(List.of("alias@example.com"));
 
         // Serialize to YAML
         String yaml = ctx.yamlMapper().writeValueAsString(user);
@@ -126,6 +127,8 @@ public class CommonhausUserTest extends HausKeeperTestBase {
         assertThat(deserializedUser.id).isEqualTo(user.id);
         assertThat(deserializedUser.history).isEqualTo(user.history);
         assertThat(deserializedUser.projects()).isEqualTo(user.projects());
+        assertThat(deserializedUser.services().forwardEmail().altAlias())
+                .isEqualTo(user.services().forwardEmail().altAlias());
     }
 
     @Test

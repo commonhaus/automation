@@ -2,6 +2,7 @@ package org.commonhaus.automation.hk.github;
 
 import java.util.function.BiConsumer;
 
+import org.commonhaus.automation.ContextService;
 import org.commonhaus.automation.hk.data.CommonhausUser;
 
 /**
@@ -68,13 +69,16 @@ public interface DatastoreEvent {
             return true;
         }
 
-        public void applyChanges(AppContextService ctx, CommonhausUser user) {
+        public boolean applyChanges(AppContextService ctx, CommonhausUser user) {
             CommonhausUser original = CommonhausDatastore.deepCopy(user);
             updateUser.accept(ctx, user);
-            // Add to history if requested and object was changed
-            if (history && !original.equals(user)) {
+            // Add to history if requested and persisted user data changed.
+            boolean changed = !ContextService.yamlMapper.valueToTree(original)
+                    .equals(ContextService.yamlMapper.valueToTree(user));
+            if (history && changed) {
                 user.addHistory(message);
             }
+            return changed;
         }
 
         static UpdateEvent retryEvent(UpdateEvent initial, CommonhausUser revisedUser) {
