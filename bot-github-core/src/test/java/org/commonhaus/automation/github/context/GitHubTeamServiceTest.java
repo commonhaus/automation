@@ -14,6 +14,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -35,12 +37,14 @@ import org.commonhaus.automation.github.scopes.ScopedQueryContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHFileNotFoundException;
+import org.kohsuke.github.GHInvitation;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHOrganization.RepositoryRole;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.PagedIterable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -548,6 +552,130 @@ public class GitHubTeamServiceTest extends ContextHelper {
                 .contains("Current membership (2):");
     }
 
+    @Test
+    void testSyncCollaboratorsWithPendingInvitations() throws Exception {
+        GHRepository repository = hausMocks.repository();
+
+        mockUser("user1");
+        mockUser("user4");
+        mockUser("user5");
+        mockUser("user6");
+
+        Set<Collaborator> testCollaborators = Set.of(
+                new Collaborator("user5", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))));
+
+        // user4 has a pending invitation
+        mockPendingInvitations(repository, List.of("user4"));
+
+        // Expected: user4 (pending invite), user5 (current collaborator), user6 (new collaborator)
+        Set<String> teamLogins = Set.of("user4", "user5", "user6");
+
+        mockDataCollaboratorsQueryResponse(new Collaborators(testCollaborators, Set.of("user4")));
+
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
+                .from(GHOrganization.Permission.PUSH);
+
+        // Test syncing collaborators
+        teamService.syncCollaborators(queryContext, repository, collaboratorRole,
+                teamLogins, List.of(), false, emailNotification);
+
+        // Verify: only user6 was added (user4 was skipped because invitation is pending)
+        ArgumentCaptor<List<GHUser>> addCaptor = ArgumentCaptor.captor();
+        verify(repository, times(1)).addCollaborators(addCaptor.capture(), any(RepositoryRole.class));
+        verify(repository, times(0)).removeCollaborators(anyList());
+
+        List<GHUser> addedUsers = addCaptor.getValue();
+        assertThat(addedUsers.stream().map(GHUser::getLogin))
+                .containsExactlyInAnyOrder("user6");
+
+        // Verify notification email shows real additions and current membership containing pending invitee
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ctx).sendEmail(anyString(), anyString(), bodyCaptor.capture(), eq(emailNotification.audit()));
+        String body = bodyCaptor.getValue();
+        assertThat(body)
+                .contains("Members added (1):\nuser6")
+                .contains("Previous membership (1):\nuser5")
+                .contains("Current membership (3):")
+                .contains("user4")
+                .contains("user5")
+                .contains("user6");
+    }
+
+    @Test
+    void testSyncCollaboratorsAllPendingNoChanges() throws Exception {
+        GHRepository repository = hausMocks.repository();
+
+        mockUser("user4");
+        mockUser("user5");
+
+        Set<Collaborator> testCollaborators = Set.of(
+                new Collaborator("user5", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))));
+
+        // user4 has a pending invitation
+        mockPendingInvitations(repository, List.of("user4"));
+
+        // Expected: user4 (pending), user5 (current)
+        Set<String> teamLogins = Set.of("user4", "user5");
+
+        mockDataCollaboratorsQueryResponse(new Collaborators(testCollaborators, Set.of("user4")));
+
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
+                .from(GHOrganization.Permission.PUSH);
+
+        // Test syncing collaborators
+        teamService.syncCollaborators(queryContext, repository, collaboratorRole,
+                teamLogins, List.of(), false, emailNotification);
+
+        // Verify no changes were made and no email was sent
+        verify(repository, times(0)).addCollaborators(anyList(), any(RepositoryRole.class));
+        verify(repository, times(0)).removeCollaborators(anyList());
+        verify(ctx, times(0)).sendEmail(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void testAddExpectedCollaboratorsWithPendingInvitations() throws Exception {
+        GHRepository repository = hausMocks.repository();
+
+        mockUser("user4");
+        mockUser("user5");
+
+        Set<Collaborator> testCollaborators = Set.of(
+                new Collaborator("user5", "WRITE", List.of(
+                        new CollaboratorPermission("WRITE", "Repository"))));
+
+        // user4 has a pending invitation
+        mockPendingInvitations(repository, List.of("user4"));
+
+        mockDataCollaboratorsQueryResponse(new Collaborators(testCollaborators, Set.of("user4")));
+
+        GHOrganization.RepositoryRole collaboratorRole = GHOrganization.RepositoryRole
+                .from(GHOrganization.Permission.PUSH);
+
+        teamService.addExpectedCollaborators(queryContext, repository, collaboratorRole,
+                Set.of("user4", "user5"), List.of(), false, emailNotification);
+
+        // Verify no additions and no email sent
+        verify(repository, times(0)).addCollaborators(anyList(), any(RepositoryRole.class));
+        verify(ctx, times(0)).sendEmail(anyString(), anyString(), anyString(), any());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mockPendingInvitations(GHRepository repository, List<String> logins) throws Exception {
+        PagedIterable<GHInvitation> pagedIterable = Mockito.mock(PagedIterable.class);
+        List<GHInvitation> invitations = new ArrayList<>();
+        for (String login : logins) {
+            GHInvitation inv = Mockito.mock(GHInvitation.class);
+            GHUser user = mockUser(login);
+            Field f = GHInvitation.class.getDeclaredField("invitee");
+            f.setAccessible(true);
+            f.set(inv, user);
+            invitations.add(inv);
+        }
+        when(pagedIterable.toList()).thenReturn(invitations);
+        when(repository.listInvitations()).thenReturn(pagedIterable);
+    }
     // Helper methods
 
     private void mockDataTeamQueryResponse(Set<String> logins) throws ExecutionException, InterruptedException {

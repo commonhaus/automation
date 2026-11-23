@@ -356,7 +356,8 @@ public class GitHubTeamService {
                 repository.getFullName());
 
         String repoFullName = repository.getFullName();
-        Set<String> currentLogins = getCollaboratorLogins(qc, repository);
+        Collaborators collaborators = getCollaborators(qc, repoFullName);
+        Set<String> currentLogins = collaborators.logins();
 
         // Determine logins to add and remove
         MembershipChanges changes = computeMemberChanges(true,
@@ -364,6 +365,7 @@ public class GitHubTeamService {
 
         Set<String> ownerLogins = getOwnerAdministrators(qc, repoFullName);
         changes.removeOwners(ownerLogins); // no owners in changes
+        changes.removePending(collaborators.pendingInvitations());
 
         changes.toRemove().clear(); // no removals
         if (changes.isEmpty()) {
@@ -439,6 +441,7 @@ public class GitHubTeamService {
 
         Set<String> owners = getOwnerAdministrators(qc, repoFullName);
         changes.removeOwners(owners); // no owners in changes
+        changes.removePending(collaborators.pendingInvitations());
 
         if (changes.toAdd().isEmpty() && changes.toRemove().isEmpty()) {
             Log.debugf("[%s] syncCollaborators: No changes needed for repository %s",
@@ -681,6 +684,12 @@ public class GitHubTeamService {
             addedMembers.removeAll(owners);
             removedMembers.removeAll(owners);
             finalMembers.removeAll(owners);
+        }
+
+        public void removePending(Set<String> pending) {
+            if (pending != null && !pending.isEmpty()) {
+                addedMembers.removeAll(pending);
+            }
         }
 
         public Set<String> toRemove() {
